@@ -4,6 +4,13 @@ order: 2
 
 # Run a Validator
 
+::: warning
+During testnet 2.0, we will invite validators in two batches. The first batch is for the validators that want to be genesis validators. This is important to ensure the quality and performance of the initial network. The second batch is for the public nodes that want to be validators. Please fill in this [Google Form](https://forms.gle/T7i77dhjAxXGcjpj9). This will help the team decide which batch will be opened to you.
+
+Once you are able to join as a validoator, here is the instructions for you to set it up.
+:::
+
+
 Learn how to setup and run a validator node {synopsis}
 
 ## Pre-requisite Readings
