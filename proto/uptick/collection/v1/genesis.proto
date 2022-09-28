@@ -1,0 +1,12 @@
+syntax = "proto3";
+package uptick.collection.v1;
+
+import "gogoproto/gogo.proto";
+import "uptick/collection/v1/collection.proto";
+
+option go_package = "github.com/UptickNetwork/uptick/x/collection/types";
+
+// GenesisState defines the collection module's genesis state
+message GenesisState {
+  repeated Collection collections = 1 [ (gogoproto.nullable) = false ];
+}

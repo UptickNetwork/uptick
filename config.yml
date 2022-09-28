@@ -1,0 +1,39 @@
+accounts:
+  - name: alice
+    coins: ["100000000uatom", "100000000000000000000auptick"]
+  - name: bob
+    coins: ["5000000000000auptick"]
+validator:
+  name: alice
+  staked: "100000000000000000000auptick"
+faucet:
+  name: bob 
+  coins: ["10auptick"]
+build:
+  binary: "uptickd"
+init:
+  home: "$HOME/.uptickd"
+  app:
+    evm-rpc:
+      address: "0.0.0.0:8545"     # change the JSON-RPC address and port
+      ws-address: "0.0.0.0:8546"  # change the JSON-RPC websocket address and port
+genesis:
+  chain_id: "uptick_7000-1"
+  app_state:
+    staking:
+      params:
+        bond_denom: "auptick"
+    mint:
+      params:
+        mint_denom: "auptick"
+    crisis:
+      constant_fee:
+        denom: "auptick"
+    gov:
+      deposit_params:
+        min_deposit:
+          - amount: "10000000"
+            denom: "auptick"
+    evm:
+      params:
+        evm_denom: "auptick"
