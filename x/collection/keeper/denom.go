@@ -1,0 +1,29 @@
+package keeper
+
+import (
+	sdk "github.com/cosmos/cosmos-sdk/types"
+	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
+
+	"github.com/UptickNetwork/uptick/x/collection/types"
+)
+
+func (k Keeper) GetDenomInfo(ctx sdk.Context, denomID string) (*types.Denom, error) {
+	class, has := k.nk.GetClass(ctx, denomID)
+	if !has {
+		return nil, sdkerrors.Wrapf(types.ErrInvalidDenom, "denom ID %s not exists", denomID)
+	}
+
+	var denomMetadata types.DenomMetadata
+	if err := k.cdc.Unmarshal(class.Data.GetValue(), &denomMetadata); err != nil {
+		return nil, err
+	}
+	return &types.Denom{
+		ID:               class.Id,
+		Name:             class.Name,
+		Schema:           denomMetadata.Schema,
+		Creator:          denomMetadata.Creator,
+		Symbol:           class.Symbol,
+		MintRestricted:   denomMetadata.MintRestricted,
+		UpdateRestricted: denomMetadata.UpdateRestricted,
+	}, nil
+}
