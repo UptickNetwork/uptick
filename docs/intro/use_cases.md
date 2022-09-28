@@ -40,8 +40,7 @@ available in the Uptick chain such as developing a module or importing a third-p
 
 Using Uptick chain will allow for the direct deployment of smart contracts to the Uptick
 network. Utilizing the Uptick client will defer the chain maintenance to the Uptick network
-and allow for the participation in a more mature blockchain. The Uptick client will also offer
-(in the near future) IBC compatibility which allows for interoperability between different network.
+and allow for the participation in a more mature blockchain.
 
 |                                         | Uptick Chain     | x/evm dependency |
 |-----------------------------------------|-----------------|------------------|

@@ -58,23 +58,24 @@ module.exports = {
       testnet_denom: 'Uptick',
       testnet_ticker: 'UPTICK',
       rpc_url: 'http://localhost:8545/',
-      rpc_url_testnet: 'http://peer1.testnet.uptick.network:8545/',
+      rpc_url_testnet: 'https://peer1.testnet.uptick.network:8645/',
       rpc_url_local: 'http://localhost:8545/',
-      chain_id: '7000',
+      chain_id: '未定',
       testnet_chain_id: '7000',
-      latest_version: 'v0.1.0',
+      latest_version: 'v0.2.2',
       version_number: '1',
       testnet_version_number: '2',
-      cosmos_block_explorer_url: 'https://explorer.uptick.org',
+      cosmos_block_explorer_url: 'https://explorer.testnet.uptick.network/',
+      block_explorer_url:'https://evm-explorer.testnet.uptick.network'
     },
     logo: {
       src: '/uptick-black.svg',
     },
-    algolia: {
-      id: 'BH4D9OD16A',
-      key: 'a5d55fe5f540cc3bd28fa2c72f2b5bd8',
-      index: 'uptick'
-    },
+    // algolia: {
+    //   id: 'BH4D9OD16A',
+    //   key: 'a5d55fe5f540cc3bd28fa2c72f2b5bd8',
+    //   index: 'uptick'
+    // },
     topbar: {
       banner: false
     },

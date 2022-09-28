@@ -12,7 +12,7 @@ You specify the network you want to join by setting the **genesis file** and **s
 
 | Network Chain ID | Description                       | Site                                                                     | Version                                               |
 |------------------|-----------------------------------|--------------------------------------------------------------------------|-------------------------------------------------------|
-| `uptick_7000-1`   | Uptick Testnet | [uptick_7000-1 testnet](https://github.com/UptickNetwork/uptick-testnet/tree/main/uptick_7000-1) | [`v0.1.x`](https://github.com/UptickNetwork/uptick/releases) |
+| `uptick_7000-1`   | Uptick Testnet | [uptick_7000-1 testnet](https://github.com/UptickNetwork/uptick-testnet/tree/main/uptick_7000-1) | [`v0.2.x`](https://github.com/UptickNetwork/uptick/releases) |
 
 ## Install `uptickd`
 
