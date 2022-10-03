@@ -1,0 +1,25 @@
+syntax = "proto3";
+package uptick.erc721.v1;
+
+import "uptick/erc721/v1/erc721.proto";
+import "gogoproto/gogo.proto";
+
+option go_package = "github.com/UptickNetwork/uptick/x/erc721/types";
+
+// GenesisState defines the module's genesis state.
+message GenesisState {
+  // module parameters
+  Params params = 1 [ (gogoproto.nullable) = false ];
+  // registered token pairs
+  repeated TokenPair token_pairs = 2 [ (gogoproto.nullable) = false ];
+}
+
+// Params defines the erc721 module params
+message Params {
+  // parameter to enable the conversion of Cosmos nft <--> ERC721 tokens.
+  bool enable_erc721 = 1;
+  // parameter to enable the EVM hook that converts an ERC721 token to a Cosmos
+  // NFT by transferring the Tokens through a MsgEthereumTx to the
+  // ModuleAddress Ethereum address.
+  bool enable_evm_hook = 2 [ (gogoproto.customname) = "EnableEVMHook" ];
+}

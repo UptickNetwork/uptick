@@ -1,7 +1,7 @@
 #!/bin/bash
 
 KEY="mykey"
-CHAINID="uptick_7000-1"
+CHAINID="uptick_7777-1"
 MONIKER="mymoniker"
 DATA_DIR=$(mktemp -d -t uptick-datadir.XXXXX)
 

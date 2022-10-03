@@ -1,6 +1,7 @@
 package erc20
 
 import (
+	"fmt"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authkeeper "github.com/cosmos/cosmos-sdk/x/auth/keeper"
 
@@ -15,6 +16,10 @@ func InitGenesis(
 	accountKeeper authkeeper.AccountKeeper,
 	data types.GenesisState,
 ) {
+
+	fmt.Println("xxl InitGenesis erc20 :::")
+
+
 	k.SetParams(ctx, data.Params)
 
 	// ensure erc20 module account is set on genesis

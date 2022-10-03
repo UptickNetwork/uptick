@@ -8,7 +8,7 @@ Learn about Uptick with the list of official resources. {synopsis}
 
 - Official Documentation: [https://docs.uptick.network/](https://docs.uptick.network/)
 - Official Codebase: [https://github.com/UptickNetwork/uptick](https://github.com/UptickNetwork/uptick)
-- Official Website: [https://uptick.network/](https://uptick.network/)
+- Official Website: [https://www.uptick.network/](https://www.uptick.network/)
 
 ## Workshops and Videos
 

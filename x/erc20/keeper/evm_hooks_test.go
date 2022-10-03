@@ -9,7 +9,7 @@ package keeper_test
 //	"github.com/ethereum/go-ethereum/common"
 //	ethtypes "github.com/ethereum/go-ethereum/core/types"
 //
-//	"github.com/tharsis/ethermint/tests"
+//	"github.com/evmos/ethermint/tests"
 //
 //	"github.com/UptickNetwork/uptick/contracts"
 //	"github.com/UptickNetwork/uptick/x/erc20/types"

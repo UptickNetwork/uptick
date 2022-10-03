@@ -7,12 +7,13 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
-	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
+	// v1beta1 "github.com/cosmos/cosmos-sdk/x/gov/types"
+	v1beta1 "github.com/cosmos/cosmos-sdk/x/gov/types/v1beta1"
 
-	ibctransfertypes "github.com/cosmos/ibc-go/v3/modules/apps/transfer/types"
+	ibctransfertypes "github.com/cosmos/ibc-go/v5/modules/apps/transfer/types"
 
 	"github.com/ethereum/go-ethereum/common"
-	ethermint "github.com/tharsis/ethermint/types"
+	ethermint "github.com/evmos/ethermint/types"
 )
 
 // constants
@@ -25,21 +26,21 @@ const (
 
 // Implements Proposal Interface
 var (
-	_ govtypes.Content = &RegisterCoinProposal{}
-	_ govtypes.Content = &RegisterERC20Proposal{}
-	_ govtypes.Content = &ToggleTokenRelayProposal{}
-	_ govtypes.Content = &UpdateTokenPairERC20Proposal{}
+	_ v1beta1.Content = &RegisterCoinProposal{}
+	_ v1beta1.Content = &RegisterERC20Proposal{}
+	_ v1beta1.Content = &ToggleTokenRelayProposal{}
+	_ v1beta1.Content = &UpdateTokenPairERC20Proposal{}
 )
 
 func init() {
-	govtypes.RegisterProposalType(ProposalTypeRegisterCoin)
-	govtypes.RegisterProposalType(ProposalTypeRegisterERC20)
-	govtypes.RegisterProposalType(ProposalTypeToggleTokenRelay)
-	govtypes.RegisterProposalType(ProposalTypeUpdateTokenPairERC20)
-	govtypes.RegisterProposalTypeCodec(&RegisterCoinProposal{}, "erc20/RegisterCoinProposal")
-	govtypes.RegisterProposalTypeCodec(&RegisterERC20Proposal{}, "erc20/RegisterERC20Proposal")
-	govtypes.RegisterProposalTypeCodec(&ToggleTokenRelayProposal{}, "erc20/ToggleTokenRelayProposal")
-	govtypes.RegisterProposalTypeCodec(&UpdateTokenPairERC20Proposal{}, "erc20/UpdateTokenPairERC20Proposal")
+	v1beta1.RegisterProposalType(ProposalTypeRegisterCoin)
+	v1beta1.RegisterProposalType(ProposalTypeRegisterERC20)
+	v1beta1.RegisterProposalType(ProposalTypeToggleTokenRelay)
+	v1beta1.RegisterProposalType(ProposalTypeUpdateTokenPairERC20)
+	v1beta1.ModuleCdc.Amino.RegisterConcrete(&RegisterCoinProposal{}, "erc20/RegisterCoinProposal",nil)
+	v1beta1.ModuleCdc.Amino.RegisterConcrete(&RegisterERC20Proposal{}, "erc20/RegisterERC20Proposal",nil)
+	v1beta1.ModuleCdc.Amino.RegisterConcrete(&ToggleTokenRelayProposal{}, "erc20/ToggleTokenRelayProposal",nil)
+	v1beta1.ModuleCdc.Amino.RegisterConcrete(&UpdateTokenPairERC20Proposal{}, "erc20/UpdateTokenPairERC20Proposal",nil)
 }
 
 // CreateDenomDescription generates a string with the coin description
@@ -53,7 +54,7 @@ func CreateDenom(address string) string {
 }
 
 // NewRegisterCoinProposal returns new instance of RegisterCoinProposal
-func NewRegisterCoinProposal(title, description string, coinMetadata banktypes.Metadata) govtypes.Content {
+func NewRegisterCoinProposal(title, description string, coinMetadata banktypes.Metadata) v1beta1.Content {
 	return &RegisterCoinProposal{
 		Title:       title,
 		Description: description,
@@ -83,7 +84,7 @@ func (rtbp *RegisterCoinProposal) ValidateBasic() error {
 		return err
 	}
 
-	return govtypes.ValidateAbstract(rtbp)
+	return v1beta1.ValidateAbstract(rtbp)
 }
 
 func validateIBC(metadata banktypes.Metadata) error {
@@ -95,7 +96,7 @@ func validateIBC(metadata banktypes.Metadata) error {
 		return nil
 	}
 
-	//commit out propsal name check
+	//modify the naming rules of the ibc proposal
 	//if len(denomSplit) != 2 || denomSplit[0] != ibctransfertypes.DenomPrefix {
 	//	// NOTE: should be unaccessible (covered on ValidateIBCDenom)
 	//	return fmt.Errorf("invalid metadata. %s denomination should be prefixed with the format 'ibc/", metadata.Base)
@@ -125,7 +126,7 @@ func ValidateErc20Denom(denom string) error {
 }
 
 // NewRegisterERC20Proposal returns new instance of RegisterERC20Proposal
-func NewRegisterERC20Proposal(title, description, erc20Addr string) govtypes.Content {
+func NewRegisterERC20Proposal(title, description, erc20Addr string) v1beta1.Content {
 	return &RegisterERC20Proposal{
 		Title:        title,
 		Description:  description,
@@ -146,11 +147,11 @@ func (rtbp *RegisterERC20Proposal) ValidateBasic() error {
 	if err := ethermint.ValidateAddress(rtbp.Erc20Address); err != nil {
 		return sdkerrors.Wrap(err, "ERC20 address")
 	}
-	return govtypes.ValidateAbstract(rtbp)
+	return v1beta1.ValidateAbstract(rtbp)
 }
 
 // NewToggleTokenRelayProposal returns new instance of ToggleTokenRelayProposal
-func NewToggleTokenRelayProposal(title, description string, token string) govtypes.Content {
+func NewToggleTokenRelayProposal(title, description string, token string) v1beta1.Content {
 	return &ToggleTokenRelayProposal{
 		Title:       title,
 		Description: description,
@@ -176,11 +177,11 @@ func (etrp *ToggleTokenRelayProposal) ValidateBasic() error {
 		}
 	}
 
-	return govtypes.ValidateAbstract(etrp)
+	return v1beta1.ValidateAbstract(etrp)
 }
 
 // NewUpdateTokenPairERC20Proposal returns new instance of UpdateTokenPairERC20Proposal
-func NewUpdateTokenPairERC20Proposal(title, description, erc20Addr, newERC20Addr string) govtypes.Content {
+func NewUpdateTokenPairERC20Proposal(title, description, erc20Addr, newERC20Addr string) v1beta1.Content {
 	return &UpdateTokenPairERC20Proposal{
 		Title:           title,
 		Description:     description,
@@ -207,7 +208,7 @@ func (p *UpdateTokenPairERC20Proposal) ValidateBasic() error {
 		return sdkerrors.Wrap(err, "new ERC20 address")
 	}
 
-	return govtypes.ValidateAbstract(p)
+	return v1beta1.ValidateAbstract(p)
 }
 
 // GetERC20Address returns the common.Address representation of the ERC20 hex address
