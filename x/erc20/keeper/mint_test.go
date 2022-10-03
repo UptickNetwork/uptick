@@ -6,7 +6,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 
-	"github.com/tharsis/ethermint/tests"
+	"github.com/evmos/ethermint/tests"
 
 	"github.com/UptickNetwork/uptick/x/erc20/types"
 )

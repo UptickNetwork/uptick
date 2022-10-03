@@ -14,7 +14,7 @@ import (
 
 	clitestutil "github.com/cosmos/cosmos-sdk/testutil/cli"
 
-	"github.com/tharsis/ethermint/testutil/network"
+	"github.com/evmos/ethermint/testutil/network"
 
 	upticknetwork "github.com/UptickNetwork/uptick/testutil/network"
 	"github.com/UptickNetwork/uptick/x/erc20/client/cli"
