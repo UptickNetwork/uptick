@@ -132,8 +132,6 @@ Example:
 	`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 
-			fmt.Println("xxl testnet 2")
-
 			clientCtx, err := client.GetClientQueryContext(cmd)
 			if err != nil {
 				return err
@@ -179,8 +177,6 @@ Example:
 	`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 
-			fmt.Println("xxl testnet 3")
-
 			args := startArgs{}
 			args.outputDir, _ = cmd.Flags().GetString(flagOutputDir)
 			args.chainID, _ = cmd.Flags().GetString(flags.FlagChainID)
@@ -219,7 +215,6 @@ func initTestnetFiles(
 	genBalIterator banktypes.GenesisBalancesIterator,
 	args initArgs,
 ) error {
-	fmt.Println("xxl testnet 4")
 
 	if args.chainID == "" {
 		args.chainID = fmt.Sprintf("evmos_%d-1", tmrand.Int63n(9999999999999)+1)
@@ -528,7 +523,6 @@ func calculateIP(ip string, i int) (string, error) {
 func startTestnet(cmd *cobra.Command, args startArgs) error {
 	networkConfig := network.DefaultConfig()
 
-	fmt.Println("xxl testnet 5")
 	// Default networkConfig.ChainID is random, and we should only override it if chainID provided
 	// is non-empty
 	if args.chainID != "" {

@@ -1,7 +1,6 @@
 package collection
 
 import (
-	"fmt"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	"github.com/UptickNetwork/uptick/x/collection/keeper"
@@ -10,8 +9,6 @@ import (
 
 // InitGenesis stores the collection genesis.
 func InitGenesis(ctx sdk.Context, k keeper.Keeper, data types.GenesisState) {
-
-	fmt.Println("xxl InitGenesis collection :::")
 
 	if err := types.ValidateGenesis(data); err != nil {
 		panic(err.Error())
