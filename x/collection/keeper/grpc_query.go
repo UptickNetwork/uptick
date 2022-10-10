@@ -10,7 +10,7 @@ import (
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 
 	"github.com/UptickNetwork/uptick/x/collection/types"
-	"github.com/UptickNetwork/uptick/x/nft"
+	"github.com/cosmos/cosmos-sdk/x/nft"
 )
 
 var _ types.QueryServer = Keeper{}

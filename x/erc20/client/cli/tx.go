@@ -11,10 +11,11 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/version"
 	"github.com/cosmos/cosmos-sdk/x/gov/client/cli"
-	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
+	//govv1beta1 "github.com/cosmos/cosmos-sdk/x/gov/types"
+	govv1beta1 "github.com/cosmos/cosmos-sdk/x/gov/types/v1beta1"
 
 	"github.com/ethereum/go-ethereum/common"
-	ethermint "github.com/tharsis/ethermint/types"
+	ethermint "github.com/evmos/ethermint/types"
 
 	"github.com/UptickNetwork/uptick/x/erc20/types"
 )
@@ -201,7 +202,7 @@ Where metadata.json contains (example):
 
 			content := types.NewRegisterCoinProposal(title, description, metadata)
 
-			msg, err := govtypes.NewMsgSubmitProposal(content, deposit, from)
+			msg, err := govv1beta1.NewMsgSubmitProposal(content, deposit, from)
 			if err != nil {
 				return err
 			}
@@ -267,7 +268,7 @@ func NewRegisterERC20ProposalCmd() *cobra.Command {
 			from := clientCtx.GetFromAddress()
 			content := types.NewRegisterERC20Proposal(title, description, erc20Addr)
 
-			msg, err := govtypes.NewMsgSubmitProposal(content, deposit, from)
+			msg, err := govv1beta1.NewMsgSubmitProposal(content, deposit, from)
 			if err != nil {
 				return err
 			}
@@ -333,7 +334,7 @@ func NewToggleTokenRelayProposalCmd() *cobra.Command {
 			token := args[0]
 			content := types.NewToggleTokenRelayProposal(title, description, token)
 
-			msg, err := govtypes.NewMsgSubmitProposal(content, deposit, from)
+			msg, err := govv1beta1.NewMsgSubmitProposal(content, deposit, from)
 			if err != nil {
 				return err
 			}
@@ -400,7 +401,7 @@ func NewUpdateTokenPairERC20ProposalCmd() *cobra.Command {
 
 			from := clientCtx.GetFromAddress()
 			content := types.NewUpdateTokenPairERC20Proposal(title, description, erc20Addr, newERC20Addr)
-			msg, err := govtypes.NewMsgSubmitProposal(content, deposit, from)
+			msg, err := govv1beta1.NewMsgSubmitProposal(content, deposit, from)
 			if err != nil {
 				return err
 			}

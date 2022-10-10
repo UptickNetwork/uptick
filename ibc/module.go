@@ -3,9 +3,9 @@ package ibc
 import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	capabilitytypes "github.com/cosmos/cosmos-sdk/x/capability/types"
-	channeltypes "github.com/cosmos/ibc-go/v3/modules/core/04-channel/types"
-	porttypes "github.com/cosmos/ibc-go/v3/modules/core/05-port/types"
-	"github.com/cosmos/ibc-go/v3/modules/core/exported"
+	channeltypes "github.com/cosmos/ibc-go/v5/modules/core/04-channel/types"
+	porttypes "github.com/cosmos/ibc-go/v5/modules/core/05-port/types"
+	"github.com/cosmos/ibc-go/v5/modules/core/exported"
 )
 
 var _ porttypes.IBCModule = &Module{}
@@ -21,6 +21,21 @@ func NewModule(app porttypes.IBCModule) *Module {
 		app: app,
 	}
 }
+//
+//// OnChanOpenInit implements the Module interface
+//// It calls the underlying app's OnChanOpenInit callback.
+//func (im Module) OnChanOpenInit(
+//	ctx sdk.Context,
+//	order channeltypes.Order,
+//	connectionHops []string,
+//	portID string,
+//	channelID string,
+//	chanCap *capabilitytypes.Capability,
+//	counterparty channeltypes.Counterparty,
+//	version string,
+//) error {
+//	return im.app.OnChanOpenInit(ctx, order, connectionHops, portID, channelID, chanCap, counterparty, version)
+//}
 
 // OnChanOpenInit implements the Module interface
 // It calls the underlying app's OnChanOpenInit callback.
@@ -33,7 +48,7 @@ func (im Module) OnChanOpenInit(
 	chanCap *capabilitytypes.Capability,
 	counterparty channeltypes.Counterparty,
 	version string,
-) error {
+) (string, error) {
 	return im.app.OnChanOpenInit(ctx, order, connectionHops, portID, channelID, chanCap, counterparty, version)
 }
 

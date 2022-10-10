@@ -9,6 +9,7 @@ import (
 
 // InitGenesis stores the collection genesis.
 func InitGenesis(ctx sdk.Context, k keeper.Keeper, data types.GenesisState) {
+
 	if err := types.ValidateGenesis(data); err != nil {
 		panic(err.Error())
 	}

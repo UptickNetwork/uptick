@@ -12,12 +12,13 @@ import (
 )
 
 func main() {
+
 	setupConfig()
 	cmdcfg.RegisterDenoms()
 
 	rootCmd, _ := NewRootCmd()
 
-	if err := svrcmd.Execute(rootCmd, app.DefaultNodeHome); err != nil {
+	if err := svrcmd.Execute(rootCmd,"uptickd",app.DefaultNodeHome); err != nil {
 		switch e := err.(type) {
 		case server.ErrorCode:
 			os.Exit(e.Code)

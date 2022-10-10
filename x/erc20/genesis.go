@@ -15,6 +15,7 @@ func InitGenesis(
 	accountKeeper authkeeper.AccountKeeper,
 	data types.GenesisState,
 ) {
+
 	k.SetParams(ctx, data.Params)
 
 	// ensure erc20 module account is set on genesis
