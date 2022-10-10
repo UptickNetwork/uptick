@@ -20,9 +20,9 @@ import (
 	genutiltypes "github.com/cosmos/cosmos-sdk/x/genutil/types"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/tharsis/ethermint/crypto/hd"
-	ethermint "github.com/tharsis/ethermint/types"
-	evmtypes "github.com/tharsis/ethermint/x/evm/types"
+	"github.com/evmos/ethermint/crypto/hd"
+	ethermint "github.com/evmos/ethermint/types"
+	evmtypes "github.com/evmos/ethermint/x/evm/types"
 )
 
 const (
@@ -63,6 +63,7 @@ contain valid denominations. Accounts may optionally be supplied with vesting pa
 						keyringBackend,
 						clientCtx.HomeDir,
 						inBuf,
+						clientCtx.Codec,
 						hd.EthSecp256k1Option(),
 					)
 					if err != nil {
@@ -77,7 +78,10 @@ contain valid denominations. Accounts may optionally be supplied with vesting pa
 					return fmt.Errorf("failed to get address from Keyring: %w", err)
 				}
 
-				addr = info.GetAddress()
+				addr, err = info.GetAddress()
+				if err != nil {
+					return fmt.Errorf("failed to get address from Keyring: %w", err)
+				}
 			}
 
 			coins, err := sdk.ParseCoinsNormalized(args[1])

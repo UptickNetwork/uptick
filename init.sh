@@ -1,9 +1,9 @@
 KEY="mykey"
-CHAINID="uptick_7000-1"
+CHAINID="uptick_7777-1"
 MONIKER="localtestnet"
 KEYRING="test"
 KEYALGO="eth_secp256k1"
-LOGLEVEL="info"
+LOGLEVEL="debug"
 # to trace evm
 #TRACE="--trace"
 TRACE=""
@@ -33,12 +33,13 @@ cat $HOME/.uptickd/config/genesis.json | jq '.app_state["staking"]["params"]["bo
 cat $HOME/.uptickd/config/genesis.json | jq '.app_state["crisis"]["constant_fee"]["denom"]="auptick"' >$HOME/.uptickd/config/tmp_genesis.json && mv $HOME/.uptickd/config/tmp_genesis.json $HOME/.uptickd/config/genesis.json
 cat $HOME/.uptickd/config/genesis.json | jq '.app_state["gov"]["deposit_params"]["min_deposit"][0]["denom"]="auptick"' >$HOME/.uptickd/config/tmp_genesis.json && mv $HOME/.uptickd/config/tmp_genesis.json $HOME/.uptickd/config/genesis.json
 cat $HOME/.uptickd/config/genesis.json | jq '.app_state["mint"]["params"]["mint_denom"]="auptick"' >$HOME/.uptickd/config/tmp_genesis.json && mv $HOME/.uptickd/config/tmp_genesis.json $HOME/.uptickd/config/genesis.json
+cat $HOME/.uptickd/config/genesis.json | jq '.app_state["evm"]["params"]["evm_denom"]="auptick"' > $HOME/.uptickd/config/tmp_genesis.json && mv $HOME/.uptickd/config/tmp_genesis.json $HOME/.uptickd/config/genesis.json
 
 # increase block time (?)
-cat $HOME/.uptickd/config/genesis.json | jq '.consensus_params["block"]["time_iota_ms"]="30000"' >$HOME/.uptickd/config/tmp_genesis.json && mv $HOME/.uptickd/config/tmp_genesis.json $HOME/.uptickd/config/genesis.json
+# cat $HOME/.uptickd/config/genesis.json | jq '.consensus_params["block"]["time_iota_ms"]="30000"' >$HOME/.uptickd/config/tmp_genesis.json && mv $HOME/.uptickd/config/tmp_genesis.json $HOME/.uptickd/config/genesis.json
 
 # Set gas limit in genesis
-cat $HOME/.uptickd/config/genesis.json | jq '.consensus_params["block"]["max_gas"]="10000000"' >$HOME/.uptickd/config/tmp_genesis.json && mv $HOME/.uptickd/config/tmp_genesis.json $HOME/.uptickd/config/genesis.json
+# cat $HOME/.uptickd/config/genesis.json | jq '.consensus_params["block"]["max_gas]="10000000"' >$HOME/.uptickd/config/tmp_genesis.json && mv $HOME/.uptickd/config/tmp_genesis.json $HOME/.uptickd/config/genesis.json
 
 # disable produce empty block
 if [[ "$OSTYPE" == "darwin"* ]]; then
@@ -95,4 +96,4 @@ if [[ $1 == "pending" ]]; then
 fi
 
 # Start the node (remove the --pruning=nothing flag if historical queries are not needed)
-uptickd start --pruning=nothing $TRACE --log_level $LOGLEVEL --minimum-gas-prices=0.0001auptick --json-rpc.api eth,txpool,personal,net,debug,web3
+uptickd start --pruning=nothing $TRACE --log_level $LOGLEVEL --minimum-gas-prices=0auptick --json-rpc.api eth,txpool,personal,net,debug,web3

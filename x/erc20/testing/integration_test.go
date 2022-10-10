@@ -12,8 +12,8 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/tharsis/ethermint/server/config"
-	"github.com/tharsis/ethermint/testutil/network"
+	"github.com/evmos/ethermint/server/config"
+	"github.com/evmos/ethermint/testutil/network"
 
 	"github.com/UptickNetwork/uptick/x/erc20/types"
 )

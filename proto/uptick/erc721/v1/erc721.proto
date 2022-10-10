@@ -1,0 +1,69 @@
+syntax = "proto3";
+package uptick.erc721.v1;
+
+import "gogoproto/gogo.proto";
+import "cosmos/nft/v1beta1/nft.proto";
+
+option go_package = "github.com/UptickNetwork/uptick/x/erc721/types";
+
+// Owner enumerates the ownership of a ERC721 contract.
+enum Owner {
+  option (gogoproto.goproto_enum_prefix) = false;
+  // OWNER_UNSPECIFIED defines an invalid/undefined owner.
+  OWNER_UNSPECIFIED = 0;
+  // OWNER_MODULE erc721 is owned by the erc721 module account.
+  OWNER_MODULE = 1;
+  // EXTERNAL erc721 is owned by an external account.
+  OWNER_EXTERNAL = 2;
+}
+
+// TokenPair defines an instance that records a pairing consisting of a native
+// Cosmos Coin and an ERC721 token address.
+message TokenPair {
+  option (gogoproto.equal) = true;
+  // address of ERC721 contract token
+  string erc721_address = 1;
+  // cosmos nft class ID to be mapped to
+  string class_id = 2;
+  // shows token mapping enable status
+  bool enabled = 3;
+  // ERC721 owner address ENUM (0 invalid, 1 ModuleAccount, 2 external address)
+  Owner contract_owner = 4;
+}
+
+// RegisterNFTProposal is a gov Content type to register a token pair for a
+// native Cosmos coin.
+message RegisterNFTProposal {
+  option (gogoproto.equal) = false;
+  // title of the proposal
+  string title = 1;
+  // proposal description
+  string description = 2;
+  // nft class of the native Cosmos nft class
+  cosmos.nft.v1beta1.Class class = 3 [ (gogoproto.nullable) = false ];
+}
+
+// RegisterERC721Proposal is a gov Content type to register a token pair for an
+// ERC721 class
+message RegisterERC721Proposal {
+  option (gogoproto.equal) = false;
+  // title of the proposal
+  string title = 1;
+  // proposal description
+  string description = 2;
+  // contract address of ERC721 token
+  string erc721address = 3;
+}
+
+// ToggleTokenConversionProposal is a gov Content type to toggle the conversion
+// of a token pair.
+message ToggleTokenConversionProposal {
+  option (gogoproto.equal) = true;
+  // title of the proposal
+  string title = 1;
+  // proposal description
+  string description = 2;
+  // token identifier can be either the hex contract address of the ERC721 or
+  // the Cosmos nft class
+  string token = 3;
+}

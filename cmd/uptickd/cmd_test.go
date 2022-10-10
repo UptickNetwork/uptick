@@ -20,9 +20,9 @@ func TestInitCmd(t *testing.T) {
 		"init",        // Test the init cmd
 		"uptick-test", // Moniker
 		fmt.Sprintf("--%s=%s", cli.FlagOverwrite, "true"), // Overwrite genesis.json, in case it already exists
-		fmt.Sprintf("--%s=%s", flags.FlagChainID, "uptick_7000-1"),
+		fmt.Sprintf("--%s=%s", flags.FlagChainID, "uptick_7777-1"),
 	})
 
-	err := svrcmd.Execute(rootCmd, app.DefaultNodeHome)
+	err := svrcmd.Execute(rootCmd, "uptick",app.DefaultNodeHome)
 	require.NoError(t, err)
 }

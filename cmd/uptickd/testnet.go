@@ -33,19 +33,20 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/genutil"
 	genutiltypes "github.com/cosmos/cosmos-sdk/x/genutil/types"
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
-	mintypes "github.com/cosmos/cosmos-sdk/x/mint/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/tharsis/ethermint/crypto/hd"
-	"github.com/tharsis/ethermint/server/config"
-	srvflags "github.com/tharsis/ethermint/server/flags"
-	ethermint "github.com/tharsis/ethermint/types"
-	evmtypes "github.com/tharsis/ethermint/x/evm/types"
+	"github.com/evmos/ethermint/crypto/hd"
+	"github.com/evmos/ethermint/server/config"
+	srvflags "github.com/evmos/ethermint/server/flags"
+	ethermint "github.com/evmos/ethermint/types"
+	evmtypes "github.com/evmos/ethermint/x/evm/types"
 
 	cmdcfg "github.com/UptickNetwork/uptick/cmd/config"
 	"github.com/UptickNetwork/uptick/testutil/network"
+
+	govv1 "github.com/cosmos/cosmos-sdk/x/gov/types/v1"
 )
 
 var (
@@ -87,11 +88,13 @@ type startArgs struct {
 }
 
 func addTestnetFlagsToCmd(cmd *cobra.Command) {
+
 	cmd.Flags().Int(flagNumValidators, 4, "Number of validators to initialize the testnet with")
 	cmd.Flags().StringP(flagOutputDir, "o", "./.testnets", "Directory to store initialization data for the testnet")
 	cmd.Flags().String(flags.FlagChainID, "", "genesis file chain-id, if left blank will be randomly created")
 	cmd.Flags().String(sdkserver.FlagMinGasPrices, fmt.Sprintf("0.000006%s", cmdcfg.BaseDenom), "Minimum gas prices to accept for transactions; All fees in a tx must meet this minimum (e.g. 0.01uptick,0.001stake)")
 	cmd.Flags().String(flags.FlagKeyAlgorithm, string(hd.EthSecp256k1Type), "Key signing algorithm to generate keys for")
+
 }
 
 // NewTestnetCmd creates a root testnet command with subcommands to run an in-process testnet or initialize
@@ -125,9 +128,10 @@ or a similar setup where each node has a manually configurable IP address.
 Note, strict routability for addresses is turned off in the config file.
 
 Example:
-	uptickd testnet init-files --v 4 --output-dir ./.testnets --starting-ip-address 192.168.10.2
+	evmosd testnet init-files --v 4 --output-dir ./.testnets --starting-ip-address 192.168.10.2
 	`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+
 			clientCtx, err := client.GetClientQueryContext(cmd)
 			if err != nil {
 				return err
@@ -152,7 +156,7 @@ Example:
 
 	addTestnetFlagsToCmd(cmd)
 	cmd.Flags().String(flagNodeDirPrefix, "node", "Prefix the directory name for each node with (node results in node0, node1, ...)")
-	cmd.Flags().String(flagNodeDaemonHome, "uptickd", "Home directory of the node's daemon configuration")
+	cmd.Flags().String(flagNodeDaemonHome, "evmosd", "Home directory of the node's daemon configuration")
 	cmd.Flags().String(flagStartingIPAddress, "192.168.0.1", "Starting IP address (192.168.0.1 results in persistent peers list ID0@192.168.0.1:46656, ID1@192.168.0.2:46656, ...)")
 	cmd.Flags().String(flags.FlagKeyringBackend, flags.DefaultKeyringBackend, "Select keyring's backend (os|file|test)")
 
@@ -169,9 +173,10 @@ and generate "v" directories, populated with necessary validator configuration f
 (private validator, genesis, config, etc.).
 
 Example:
-	uptickd testnet --v 4 --output-dir ./.testnets
+	evmosd testnet --v 4 --output-dir ./.testnets
 	`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+
 			args := startArgs{}
 			args.outputDir, _ = cmd.Flags().GetString(flagOutputDir)
 			args.chainID, _ = cmd.Flags().GetString(flags.FlagChainID)
@@ -210,8 +215,9 @@ func initTestnetFiles(
 	genBalIterator banktypes.GenesisBalancesIterator,
 	args initArgs,
 ) error {
+
 	if args.chainID == "" {
-		args.chainID = fmt.Sprintf("uptick_%d-1", tmrand.Int63n(9999999999999)+1)
+		args.chainID = fmt.Sprintf("evmos_%d-1", tmrand.Int63n(9999999999999)+1)
 	}
 
 	nodeIDs := make([]string, args.numValidators)
@@ -263,7 +269,7 @@ func initTestnetFiles(
 		memo := fmt.Sprintf("%s@%s:26656", nodeIDs[i], ip)
 		genFiles = append(genFiles, nodeConfig.GenesisFile())
 
-		kb, err := keyring.New(sdk.KeyringServiceName(), args.keyringBackend, nodeDir, inBuf, hd.EthSecp256k1Option())
+		kb, err := keyring.New(sdk.KeyringServiceName(), args.keyringBackend, nodeDir, inBuf, clientCtx.Codec, hd.EthSecp256k1Option())
 		if err != nil {
 			return err
 		}
@@ -298,13 +304,10 @@ func initTestnetFiles(
 		}
 
 		genBalances = append(genBalances, banktypes.Balance{Address: addr.String(), Coins: coins.Sort()})
-		genAccounts = append(
-			genAccounts,
-			&ethermint.EthAccount{
-				BaseAccount: authtypes.NewBaseAccount(addr, nil, 0, 0),
-				CodeHash:    common.BytesToHash(evmtypes.EmptyCodeHash).Hex(),
-			},
-		)
+		genAccounts = append(genAccounts, &ethermint.EthAccount{
+			BaseAccount: authtypes.NewBaseAccount(addr, nil, 0, 0),
+			CodeHash:    common.BytesToHash(evmtypes.EmptyCodeHash).Hex(),
+		})
 
 		valTokens := sdk.TokensFromConsensusPower(100, ethermint.PowerReduction)
 		createValMsg, err := stakingtypes.NewMsgCreateValidator(
@@ -348,7 +351,9 @@ func initTestnetFiles(
 
 		customAppTemplate, customAppConfig := config.AppConfig(cmdcfg.BaseDenom)
 		srvconfig.SetConfigTemplate(customAppTemplate)
-		if err := sdkserver.InterceptConfigsPreRunHandler(cmd, customAppTemplate, customAppConfig); err != nil {
+		customTMConfig := initTendermintConfig()
+
+		if err := sdkserver.InterceptConfigsPreRunHandler(cmd, customAppTemplate, customAppConfig, customTMConfig); err != nil {
 			return err
 		}
 
@@ -359,18 +364,11 @@ func initTestnetFiles(
 		return err
 	}
 
-	if err := collectGenFiles(
-		clientCtx,
-		nodeConfig,
-		args.chainID,
-		nodeIDs,
-		valPubKeys,
-		args.numValidators,
-		args.outputDir,
-		args.nodeDirPrefix,
-		args.nodeDaemonHome,
-		genBalIterator,
-	); err != nil {
+	err := collectGenFiles(
+		clientCtx, nodeConfig, args.chainID, nodeIDs, valPubKeys, args.numValidators,
+		args.outputDir, args.nodeDirPrefix, args.nodeDaemonHome, genBalIterator,
+	)
+	if err != nil {
 		return err
 	}
 
@@ -381,7 +379,7 @@ func initTestnetFiles(
 func initGenFiles(
 	clientCtx client.Context,
 	mbm module.BasicManager,
-	chainID string,
+	chainID,
 	coinDenom string,
 	genAccounts []authtypes.GenesisAccount,
 	genBalances []banktypes.Balance,
@@ -414,17 +412,11 @@ func initGenFiles(
 	stakingGenState.Params.BondDenom = coinDenom
 	appGenState[stakingtypes.ModuleName] = clientCtx.Codec.MustMarshalJSON(&stakingGenState)
 
-	var govGenState govtypes.GenesisState
+	var govGenState govv1.GenesisState
 	clientCtx.Codec.MustUnmarshalJSON(appGenState[govtypes.ModuleName], &govGenState)
 
 	govGenState.DepositParams.MinDeposit[0].Denom = coinDenom
 	appGenState[govtypes.ModuleName] = clientCtx.Codec.MustMarshalJSON(&govGenState)
-
-	var mintGenState mintypes.GenesisState
-	clientCtx.Codec.MustUnmarshalJSON(appGenState[mintypes.ModuleName], &mintGenState)
-
-	mintGenState.Params.MintDenom = coinDenom
-	appGenState[mintypes.ModuleName] = clientCtx.Codec.MustMarshalJSON(&mintGenState)
 
 	var crisisGenState crisistypes.GenesisState
 	clientCtx.Codec.MustUnmarshalJSON(appGenState[crisistypes.ModuleName], &crisisGenState)
@@ -459,16 +451,9 @@ func initGenFiles(
 }
 
 func collectGenFiles(
-	clientCtx client.Context,
-	nodeConfig *tmconfig.Config,
-	chainID string,
-	nodeIDs []string,
-	valPubKeys []cryptotypes.PubKey,
-	numValidators int,
-	outputDir string,
-	nodeDirPrefix string,
-	nodeDaemonHome string,
-	genBalIterator banktypes.GenesisBalancesIterator,
+	clientCtx client.Context, nodeConfig *tmconfig.Config, chainID string,
+	nodeIDs []string, valPubKeys []cryptotypes.PubKey, numValidators int,
+	outputDir, nodeDirPrefix, nodeDaemonHome string, genBalIterator banktypes.GenesisBalancesIterator,
 ) error {
 	var appState json.RawMessage
 	genTime := tmtime.Now()

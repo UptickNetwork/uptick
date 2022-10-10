@@ -3,7 +3,7 @@
     "info": {
       "title": "Uptick Chain - Legacy REST and gRPC Gateway docs",
       "description": "A REST interface for state queries, legacy transactions",
-      "version": "0.2.0"
+      "version": "0.2.1"
     },
     "apis": [
       {

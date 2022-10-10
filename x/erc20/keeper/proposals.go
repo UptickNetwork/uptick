@@ -38,7 +38,7 @@ func (k Keeper) RegisterCoin(ctx sdk.Context, coinMetadata banktypes.Metadata) (
 		)
 	}
 
-	//comment out the verify Metadata
+	//modify the naming rules of the ibc proposal
 	//if err := k.verifyMetadata(ctx, coinMetadata); err != nil {
 	//	return nil, sdkerrors.Wrapf(types.ErrInternalTokenPair, "coin metadata is invalid %s", coinMetadata.Name)
 	//}
@@ -73,7 +73,7 @@ func (k Keeper) DeployERC20Contract(
 	ctx sdk.Context,
 	coinMetadata banktypes.Metadata,
 ) (common.Address, error) {
-
+	//modify decimal digit setting logic
 	decimals := uint8(coinMetadata.DenomUnits[1].Exponent)
 	ctorArgs, err := contracts.ERC20MinterBurnerDecimalsContract.ABI.Pack(
 		"",
@@ -81,7 +81,6 @@ func (k Keeper) DeployERC20Contract(
 		coinMetadata.Symbol,
 		decimals,
 	)
-
 	if err != nil {
 		return common.Address{}, sdkerrors.Wrapf(types.ErrABIPack, "coin metadata is invalid %s: %s", coinMetadata.Name, err.Error())
 	}

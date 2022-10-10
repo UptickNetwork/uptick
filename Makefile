@@ -460,7 +460,7 @@ containerProtoGen=cosmos-sdk-proto-gen-$(containerProtoVer)
 containerProtoGenSwagger=cosmos-sdk-proto-gen-swagger-$(containerProtoVer)
 containerProtoFmt=cosmos-sdk-proto-fmt-$(containerProtoVer)
 
-proto-all: proto-format proto-lint proto-gen
+proto-all: proto-gen
 
 proto-gen:
 	@echo "Generating Protobuf files"
@@ -538,13 +538,13 @@ ifeq ($(OS),Windows_NT)
 	mkdir localnet-setup &
 	@$(MAKE) localnet-build
 
-	IF not exist "build/node0/$(UPTICK_BINARY)/config/genesis.json" docker run --rm -v $(CURDIR)/build\uptick\Z uptickd/node "./uptickd testnet --v 4 -o /uptick --keyring-backend=test --ip-addresses uptickdnode0,uptickdnode1,uptickdnode2,uptickdnode3"
+	IF not exist "build/node0/$(UPTICK_BINARY)/config/genesis.json" docker run --rm -v $(CURDIR)/build\uptick\Z uptick/node "./uptickd testnet --v 4 -o /uptick --keyring-backend=test --ip-addresses uptickdnode0,uptickdnode1,uptickdnode2,uptickdnode3"
 	docker-compose up -d
 else
 	mkdir -p localnet-setup
 	@$(MAKE) localnet-build
 
-	if ! [ -f localnet-setup/node0/$(UPTICK_BINARY)/config/genesis.json ]; then docker run --rm -v $(CURDIR)/localnet-setup:/uptick:Z uptickd/node "./uptickd testnet --v 4 -o /uptick --keyring-backend=test --ip-addresses uptickdnode0,uptickdnode1,uptickdnode2,uptickdnode3"; fi
+	if ! [ -f localnet-setup/node0/$(UPTICK_BINARY)/config/genesis.json ]; then docker run --rm -v $(CURDIR)/localnet-setup:/uptick:Z uptick/node "./uptickd testnet --v 4 -o /uptick --keyring-backend=test --ip-addresses uptickdnode0,uptickdnode1,uptickdnode2,uptickdnode3"; fi
 	docker-compose up -d
 endif
 
@@ -561,15 +561,15 @@ localnet-clean:
 localnet-unsafe-reset:
 	docker-compose down
 ifeq ($(OS),Windows_NT)
-	@docker run --rm -v $(CURDIR)\localnet-setup\node0\uptickd:uptick\Z uptickd/node "./uptickd unsafe-reset-all --home=/uptick"
-	@docker run --rm -v $(CURDIR)\localnet-setup\node1\uptickd:uptick\Z uptickd/node "./uptickd unsafe-reset-all --home=/uptick"
-	@docker run --rm -v $(CURDIR)\localnet-setup\node2\uptickd:uptick\Z uptickd/node "./uptickd unsafe-reset-all --home=/uptick"
-	@docker run --rm -v $(CURDIR)\localnet-setup\node3\uptickd:uptick\Z uptickd/node "./uptickd unsafe-reset-all --home=/uptick"
+	@docker run --rm -v $(CURDIR)\localnet-setup\node0\uptickd:uptick\Z uptick/node "./uptickd unsafe-reset-all --home=/uptick"
+	@docker run --rm -v $(CURDIR)\localnet-setup\node1\uptickd:uptick\Z uptick/node "./uptickd unsafe-reset-all --home=/uptick"
+	@docker run --rm -v $(CURDIR)\localnet-setup\node2\uptickd:uptick\Z uptick/node "./uptickd unsafe-reset-all --home=/uptick"
+	@docker run --rm -v $(CURDIR)\localnet-setup\node3\uptickd:uptick\Z uptick/node "./uptickd unsafe-reset-all --home=/uptick"
 else
-	@docker run --rm -v $(CURDIR)/localnet-setup/node0/uptickd:/uptick:Z uptickd/node "./uptickd unsafe-reset-all --home=/uptick"
-	@docker run --rm -v $(CURDIR)/localnet-setup/node1/uptickd:/uptick:Z uptickd/node "./uptickd unsafe-reset-all --home=/uptick"
-	@docker run --rm -v $(CURDIR)/localnet-setup/node2/uptickd:/uptick:Z uptickd/node "./uptickd unsafe-reset-all --home=/uptick"
-	@docker run --rm -v $(CURDIR)/localnet-setup/node3/uptickd:/uptick:Z uptickd/node "./uptickd unsafe-reset-all --home=/uptick"
+	@docker run --rm -v $(CURDIR)/localnet-setup/node0/uptickd:/uptick:Z uptick/node "./uptickd unsafe-reset-all --home=/uptick"
+	@docker run --rm -v $(CURDIR)/localnet-setup/node1/uptickd:/uptick:Z uptick/node "./uptickd unsafe-reset-all --home=/uptick"
+	@docker run --rm -v $(CURDIR)/localnet-setup/node2/uptickd:/uptick:Z uptick/node "./uptickd unsafe-reset-all --home=/uptick"
+	@docker run --rm -v $(CURDIR)/localnet-setup/node3/uptickd:/uptick:Z uptick/node "./uptickd unsafe-reset-all --home=/uptick"
 endif
 
 # Clean testnet

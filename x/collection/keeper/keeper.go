@@ -8,8 +8,8 @@ import (
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 
 	"github.com/UptickNetwork/uptick/x/collection/types"
-	"github.com/UptickNetwork/uptick/x/nft"
-	nftkeeper "github.com/UptickNetwork/uptick/x/nft/keeper"
+	"github.com/cosmos/cosmos-sdk/x/nft"
+	nftkeeper "github.com/cosmos/cosmos-sdk/x/nft/keeper"
 )
 
 // Keeper maintains the link to data storage and exposes getter/setter methods for the various parts of the state machine
@@ -28,7 +28,7 @@ func NewKeeper(cdc codec.Codec,
 	return Keeper{
 		storeKey: storeKey,
 		cdc:      cdc,
-		nk:       nftkeeper.NewKeeper(storeKey, cdc, ak, bk),
+		nk:       nftkeeper.NewKeeper(storeKey,cdc,ak, bk),
 	}
 }
 

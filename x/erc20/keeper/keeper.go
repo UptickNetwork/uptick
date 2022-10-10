@@ -3,8 +3,9 @@ package keeper
 import (
 	"fmt"
 
-	porttypes "github.com/cosmos/ibc-go/v3/modules/core/05-port/types"
+	porttypes "github.com/cosmos/ibc-go/v5/modules/core/05-port/types"
 
+	storetypes "github.com/cosmos/cosmos-sdk/store/types"
 	"github.com/tendermint/tendermint/libs/log"
 
 	"github.com/cosmos/cosmos-sdk/codec"
@@ -16,7 +17,7 @@ import (
 
 // Keeper of this module maintains collections of erc20.
 type Keeper struct {
-	storeKey   sdk.StoreKey
+	storeKey   storetypes.StoreKey
 	cdc        codec.BinaryCodec
 	paramstore paramtypes.Subspace
 
@@ -28,8 +29,8 @@ type Keeper struct {
 
 // NewKeeper creates new instances of the erc20 Keeper
 func NewKeeper(
-	storeKey sdk.StoreKey,
 	cdc codec.BinaryCodec,
+	storeKey storetypes.StoreKey,
 	ps paramtypes.Subspace,
 	ak types.AccountKeeper,
 	bk types.BankKeeper,

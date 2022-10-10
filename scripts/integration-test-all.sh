@@ -17,7 +17,7 @@ RPC_PORT="854"
 IP_ADDR="0.0.0.0"
 
 KEY="mykey"
-CHAINID="uptick_7000-1"
+CHAINID="uptick_7777-1"
 MONIKER="mymoniker"
 
 ## default port prefixes for uptickd
