@@ -39,75 +39,18 @@ uptickd config chain-id uptick_7000-1
 We need to initialize the node to create all the necessary validator and node configuration files:
 
 ```bash
+# initialize node configurations
 uptickd init <your_custom_moniker> --chain-id uptick_7000-1
+
+# download testnel public config.toml、app.toml and genesis.json
+curl -o $HOME/.uptickd/config/config.toml https://raw.githubusercontent.com/UptickNetwork/uptick-testnet/main/uptick_7000-1/config.toml
+curl -o $HOME/.uptickd/config/genesis.json https://raw.githubusercontent.com/UptickNetwork/uptick-testnet/main/uptick_7000-1/genesis.json
+curl -o $HOME/.uptickd/config/app.toml https://raw.githubusercontent.com/UptickNetwork/uptick-testnet/main/uptick_7000-1/app.toml
+#download node data and replace data file
+wget https://download.uptick.network/download/uptick/testnet/node/data/data.tar.gz
+
 ```
 
-::: danger
-Monikers can contain only ASCII characters. Using Unicode characters will render your node unreachable.
-:::
-
-By default, the `init` command creates your `~/.uptickd` (i.e `$HOME`) directory with subfolders `config/` and `data/`.
-In the `config` directory, the most important files for configuration are `app.toml` and `config.toml`.
-
-## Genesis & Seeds
-
-### Copy the Genesis File
-
-Check the `genesis.json` file from the [`testnets`](https://github.com/UptickNetwork/uptick-testnet) repository and copy it over to the `config` directory: `~/.uptickd/config/genesis.json`. This is a genesis file with the chain-id and genesis accounts balances.
-
-```bash
-curl https://raw.githubusercontent.com/UptickNetwork/uptick-testnet/main/uptick_7000-1/genesis.json > ~/.uptickd/config/genesis.json
-```
-
-Then verify the correctness of the genesis configuration file:
-
-```bash
-uptickd validate-genesis
-```
-
-### Add Seed Nodes
-
-Your node needs to know how to find [peers](https://docs.tendermint.com/master/tendermint-core/using-tendermint.html#peers). You'll need to add healthy [seed nodes](https://docs.tendermint.com/master/tendermint-core/using-tendermint.html#seed) to `$HOME/.uptickd/config/config.toml`. The [`testnets`](https://github.com/UptickNetwork/uptick-testnet) repo contains links to some seed nodes.
-
-Edit the file located in `~/.uptickd/config/config.toml` and the `seeds` to the following:
-
-```toml
-#######################################################
-###           P2P Configuration Options             ###
-#######################################################
-[p2p]
-
-# ...
-
-# Comma separated list of seed nodes to connect to
-seeds = "<node-id>@<ip>:<p2p port>"
-```
-
-You can use the following code to get seeds from the repo and add it to your config:
-
-```bash
-SEEDS=`curl -sL https://raw.githubusercontent.com/UptickNetwork/uptick-testnet/main/uptick_7000-1/seeds.txt | awk '{print $1}' | paste -s -d, -`
-sed -i.bak -e "s/^seeds =.*/seeds = \"$SEEDS\"/" ~/.uptickd/config/config.toml
-```
-
-:::tip
-For more information on seeds and peers, you can the Tendermint [P2P documentation](https://docs.tendermint.com/master/spec/p2p/peer.html).
-:::
-
-### Add Persistent Peers
-
-We can set the [`persistent_peers`](https://docs.tendermint.com/master/tendermint-core/using-tendermint.html#persistent-peer) field in `~/.uptickd/config/config.toml` to specify peers that your node will maintain persistent connections with. You can retrieve them from the list of
-available peers on the [`testnets`](https://github.com/UptickNetwork/uptick-testnet) repo.
-
-```bash
-PEERS=`curl -sL https://raw.githubusercontent.com/UptickNetwork/uptick-testnet/main/uptick_7000-1/peers.txt | sort -R | head -n 10 | awk '{print $1}' | paste -s -d, -`
-```
-
-Use `sed` to include them into the configuration. You can also add them manually:
-
-```bash
-sed -i.bak -e "s/^persistent_peers *=.*/persistent_peers = \"$PEERS\"/" ~/.uptickd/config/config.toml
-```
 ## Start testnet
 
 The final step is to [start the nodes](./../quickstart/run_node#start-node). Once enough voting power (+2/3) from the genesis validators is up-and-running, the testnet will start producing blocks.
@@ -115,6 +58,21 @@ The final step is to [start the nodes](./../quickstart/run_node#start-node). Onc
 ```bash
 uptickd start
 ```
+
+##  Install script
+```bash
+wget https://raw.githubusercontent.com/UptickNetwork/uptick-testnet/main/uptick_7000-1/node.sh && chmod +x node.sh
+./node.sh
+
+```
+
+
+:::warning
+In the test phase 2, due to the misoperation during the upgrade of the historical version v0.2.1 to v0.2.2, the AppHash inconsistency problem occurred in the blockchain 16335.So Synchronizing data from scratch is not supported and a node snapshot is required to synchronize data in this test phase.
+In addition, the State-Sync is not supported in this version (0.2.3). This synchronization will be supported in the next version.
+:::
+
+
 ## Run a Testnet Validator
 
 Claim your testnet {{ $themeConfig.project.testnet_denom }} on the [faucet](./faucet.md) using your validator account address and submit your validator account address:
@@ -133,8 +91,8 @@ uptickd tx staking create-validator \
   --commission-max-rate="0.20" \
   --commission-max-change-rate="0.01" \
   --min-self-delegation="1000000" \
-  --gas="300000" \
-  --from=node0 \
+  --gas="1000000auptick" \
+  --from=<wallet name> \
   -y \
   -b block
 ```
