@@ -2,7 +2,6 @@ package keeper
 
 import (
 	"encoding/json"
-	"fmt"
 	"math/big"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -72,8 +71,6 @@ func (k Keeper) QueryERC721(
 	if err != nil {
 		return types.ERC721Data{}, err
 	}
-
-	fmt.Printf("###################CallEVM name : %v+ \n",res)
 
 	if err := erc721.UnpackIntoInterface(&nameRes, "name", res.Ret); err != nil {
 		return types.ERC721Data{}, sdkerrors.Wrapf(
@@ -183,7 +180,6 @@ func (k Keeper) QueryERC721TokenOwner(
 
 	erc721 := contracts.ERC721PresetMinterPauserAutoIdsContract.ABI
 
-	fmt.Printf("################### QueryERC721TokenOwner tokenID %v+ \n",tokenID)
 	// Name
 	res, err := k.CallEVM(ctx, erc721, types.ModuleAddress, contract, false, "ownerOf", tokenID)
 	if err != nil {
@@ -209,21 +205,17 @@ func (k Keeper) CallEVM(
 	args ...interface{},
 ) (*evmtypes.MsgEthereumTxResponse, error) {
 
-	fmt.Printf("################### CallEVM method 0 %v+,args %v+ \n",method,args)
 	data, err := abi.Pack(method, args...)
 	if err != nil {
-		fmt.Println("################### CallEVM method 0.1 error")
 		return nil, sdkerrors.Wrap(
 			types.ErrABIPack,
 			sdkerrors.Wrap(err, "failed to create transaction data").Error(),
 		)
 	}
 
-	fmt.Printf("################### CallEVM method 1 from : %v+,contract %v+ data %v+ commit  %v+\n",from,contract,data,commit)
 	resp, err := k.CallEVMWithData(ctx, from, &contract, data, commit)
 	if err != nil {
 
-		fmt.Println("################### CallEVM method 1.1 error")
 		return nil, sdkerrors.Wrapf(err, "contract call failed: method '%s', contract '%s'", method, contract)
 	}
 	return resp, nil
