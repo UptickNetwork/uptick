@@ -27,5 +27,5 @@ COPY --from=build-env /go/src/github.com/UptickNetwork/uptick/scripts/start-dock
 
 EXPOSE 26656 26657 1317 8545 8546
 
-# Run evmosd by default, omit entrypoint to ease using container with evmosd
+# Run uptickd by default, omit entrypoint to ease using container with uptickd
 ENTRYPOINT ["/bin/bash", "-c"]

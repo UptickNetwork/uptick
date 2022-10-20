@@ -187,6 +187,7 @@ require (
 
 replace (
 	github.com/99designs/keyring => github.com/cosmos/keyring v1.1.7-0.20210622111912-ef00f8ac3d76
+	github.com/cosmos/iavl => github.com/uptSmart/iavl v0.19.0-plus
 	github.com/cosmos/ibc-go/v5 => github.com/uptSmart/ibc-go/v5 v5.0.0-nft.0.20220919001233-7a9f083d2ae7
 	github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
 )
