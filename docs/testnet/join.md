@@ -47,7 +47,7 @@ curl -o $HOME/.uptickd/config/config.toml https://raw.githubusercontent.com/Upti
 curl -o $HOME/.uptickd/config/genesis.json https://raw.githubusercontent.com/UptickNetwork/uptick-testnet/main/uptick_7000-1/genesis.json
 curl -o $HOME/.uptickd/config/app.toml https://raw.githubusercontent.com/UptickNetwork/uptick-testnet/main/uptick_7000-1/app.toml
 #download node data and replace data file
-wget https://download.uptick.network/download/uptick/testnet/node/data/data.tar.gz
+wget http://download.uptick.network/download/uptick/testnet/node/data/data.tar.gz
 
 ```
 
@@ -68,8 +68,7 @@ wget https://raw.githubusercontent.com/UptickNetwork/uptick-testnet/main/uptick_
 
 
 :::warning
-In the test phase 2, due to the misoperation during the upgrade of the historical version v0.2.1 to v0.2.2, the AppHash inconsistency problem occurred in the blockchain 16335.So Synchronizing data from scratch is not supported and a node snapshot is required to synchronize data in this test phase.
-In addition, the State-Sync is not supported in this version (0.2.3). This synchronization will be supported in the next version.
+[In the test phase 2, the AppHash inconsistency problem occurred in the blockchain 16335.So Synchronizing data from scratch is not supported and a node snapshot is required to synchronize data in this test phase. In addition, the State-Sync is not supported in this version (0.2.3). This synchronization will be supported in the next version.]
 :::
 
 
@@ -85,14 +84,14 @@ For more details on how to configure your validator, follow the validator [setup
 uptickd tx staking create-validator \
   --amount=5000000000000000000auptick \
   --pubkey=$(uptickd tendermint show-validator) \
-  --moniker="UptickBuilder" \
+  --moniker=<$moniker>" \
   --chain-id=uptick_7000-1 \
   --commission-rate="0.10" \
   --commission-max-rate="0.20" \
   --commission-max-change-rate="0.01" \
   --min-self-delegation="1000000" \
-  --gas="1000000auptick" \
-  --from=<wallet name> \
+  --gas="auto" \
+  --from=<$wallet name> \
   -y \
   -b block
 ```
