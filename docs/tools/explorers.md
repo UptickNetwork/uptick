@@ -26,4 +26,8 @@ The [Uptick EVM explorer](https://evm-explorer.testnet.uptick.network/) is the E
 
 ![Big Dipper](./img/big_dipper.png)
 
-The [Uptick Cosmos-based explorer](https://explorer.testnet.uptick.network/) is the Cosmos explorer for Uptick. The Cosmos-based explorer allows users to view Uptick activity within the Cosmos ecosystem. This explorer allows users to query transactions, delegations, IBC token transfers, and other Cosmos-related Uptick activity. Users can also view tokeneconomics and governance data using the Uptick Cosmos-based explorer.
+### Uptick Cosmos-based Explorer (GN)
+
+![GN](./img/ng.png)
+
+The [Uptick Cosmos-based Explorer (Ping-hub)](https://explorer.testnet.uptick.network/) and [Uptick Cosmos-based Explorer (GN)](https://uptick.explorers.guru/) is the Cosmos explorer for Uptick. The Cosmos-based explorer allows users to view Uptick activity within the Cosmos ecosystem. This explorer allows users to query transactions, delegations, IBC token transfers, and other Cosmos-related Uptick activity. Users can also view tokeneconomics and governance data using the Uptick Cosmos-based explorer.
