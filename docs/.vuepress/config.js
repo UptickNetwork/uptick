@@ -193,6 +193,10 @@ module.exports = {
               path: 'https://explorer.testnet.uptick.network'
             },
             {
+              title: 'GN (Cosmos)',
+              path: 'https://uptick.explorers.guru'
+            },
+            {
               title: 'Blockscout (EVM)',
               path: 'https://evm-explorer.testnet.uptick.network/'
             },
