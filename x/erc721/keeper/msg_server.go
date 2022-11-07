@@ -99,7 +99,6 @@ func (k Keeper) ConvertERC721(
 		return nil, err
 	}
 
-	fmt.Printf("################### erc721 : %v+,bigTokenId :%v+,ContractAddress %v+ \n", erc721, bigTokenId,msg.ContractAddress)
 	owner, err := k.QueryERC721TokenOwner(ctx, erc721, bigTokenId)
 	if err != nil {
 		return nil, err
@@ -208,8 +207,6 @@ func (k Keeper) convertNFTNativeERC721(
 	tokenID := string(k.GetNFTPairByNFTID(ctx, msg.NftId))
 	// sender := common.Address{msg.Sender}
 
-	fmt.Printf("################### convertNFTNativeERC721 0 sender %v+ ,receiver %v+, NftId %v+ \n",sender,receiver,msg.NftId)
-	// Unescrow Token and send to receiver
 	res, err := k.CallEVM(ctx, erc721, types.ModuleAddress, contract, true, "safeTransferFrom",receiver,receiver, msg.NftId)
 	if err != nil {
 		return nil, err
@@ -315,7 +312,6 @@ func (k Keeper) convertERC721NativeERC721(
 	}
 
 	// Escrow tokens on module account
-	fmt.Printf("################### convertERC721NativeERC721 1 sender %v+ ,receiver %v+, NftId %v+ \n",sender,types.ModuleAddress,msg.TokenId)
 	res, err := k.CallEVM(ctx, erc721, sender, contract, true, "safeTransferFrom", sender,types.ModuleAddress, bigTokenId)
 	if err != nil {
 		return nil, err

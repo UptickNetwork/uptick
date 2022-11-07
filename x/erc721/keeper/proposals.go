@@ -1,7 +1,6 @@
 package keeper
 
 import (
-	"fmt"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 
@@ -86,8 +85,6 @@ func (k Keeper) CreateNFTClass(ctx sdk.Context, contract common.Address) (*nft.C
 
 	classID := types.CreateClassID(strContract)
 
- 	fmt.Printf("################### classID is %v+ \n",classID)
-	fmt.Printf("################### ctx is %v+ \n",ctx)
 	// Check if class already exists
 	if found := k.nftKeeper.HasClass(ctx, classID); found {
 		return nil, sdkerrors.Wrap(types.ErrInternalTokenPair, "class already exist")

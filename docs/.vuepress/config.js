@@ -62,7 +62,7 @@ module.exports = {
       rpc_url_local: 'http://localhost:8545/',
       chain_id: '未定',
       testnet_chain_id: '7000',
-      latest_version: 'v0.2.2',
+      latest_version: 'v0.2.3',
       version_number: '1',
       testnet_version_number: '2',
       cosmos_block_explorer_url: 'https://explorer.testnet.uptick.network/',
@@ -191,6 +191,10 @@ module.exports = {
             {
               title: 'Uptick (Cosmos)',
               path: 'https://explorer.testnet.uptick.network'
+            },
+            {
+              title: 'GN (Cosmos)',
+              path: 'https://uptick.explorers.guru'
             },
             {
               title: 'Blockscout (EVM)',
