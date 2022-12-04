@@ -8,7 +8,11 @@ import (
 
 // constants
 const (
-	// module name
+
+	// DefaultPrefix prefix
+	DefaultPrefix = "uptick"
+
+	// ModuleName module name
 	ModuleName = "erc721"
 
 	// StoreKey to be used when creating the KVStore

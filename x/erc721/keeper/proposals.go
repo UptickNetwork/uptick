@@ -1,47 +1,34 @@
 package keeper
 
 import (
+	"fmt"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
-
 	"github.com/ethereum/go-ethereum/common"
-
-	"github.com/cosmos/cosmos-sdk/x/nft"
 
 	"github.com/UptickNetwork/uptick/x/erc721/types"
 )
 
 // RegisterNFT deploys an erc721 contract and creates the token pair for the existing cosmos coin
-func (k Keeper) RegisterNFT(ctx sdk.Context, class nft.Class) (*types.TokenPair, error) {
-	// Check if the conversion is globally enabled
-	params := k.GetParams(ctx)
-	if !params.EnableErc721 {
-		return nil, sdkerrors.Wrap(
-			types.ErrERC721Disabled, "registration is currently disabled by governance",
-		)
-	}
+func (k Keeper) RegisterNFT(ctx sdk.Context, msg *types.MsgConvertNFT) (*types.TokenPair, error) {
 
-	if !k.nftKeeper.HasClass(ctx, class.Id) {
-		return nil, sdkerrors.Wrapf(
-			types.ErrClassNotExist, "nft class not exist: %s", class.Id,
-		)
-	}
-
+	fmt.Printf("xxl 02 RegisterNFT start \n")
 	// Check if class is already registered
-	if k.IsClassRegistered(ctx, class.Id) {
+	if k.IsClassRegistered(ctx, msg.ClassId) {
 		return nil, sdkerrors.Wrapf(
-			types.ErrTokenPairAlreadyExists, "class ID already registered: %s", class.Id,
+			types.ErrTokenPairAlreadyExists, "class ID already registered: %s", msg.ClassId,
 		)
 	}
 
-	addr, err := k.DeployERC721Contract(ctx, class)
+	fmt.Printf("xxl 02 RegisterNFT %v \n", msg)
+	addr, err := k.DeployERC721Contract(ctx, msg)
 	if err != nil {
 		return nil, sdkerrors.Wrap(
 			err, "failed to create wrapped coin denom metadata for ERC721",
 		)
 	}
 
-	pair := types.NewTokenPair(addr, class.Id, true, types.OWNER_MODULE)
+	pair := types.NewTokenPair(addr, msg.ClassId, true, types.OWNER_MODULE)
 	k.SetTokenPair(ctx, pair)
 	k.SetClassMap(ctx, pair.ClassId, pair.GetID())
 	k.SetERC721Map(ctx, common.HexToAddress(pair.Erc721Address), pair.GetID())
@@ -50,63 +37,60 @@ func (k Keeper) RegisterNFT(ctx sdk.Context, class nft.Class) (*types.TokenPair,
 }
 
 // RegisterERC721 creates a Cosmos coin and registers the token pair between the nft and the ERC721
-func (k Keeper) RegisterERC721(ctx sdk.Context, contract common.Address) (*types.TokenPair, error) {
-	// Check if the conversion is globally enabled
-	params := k.GetParams(ctx)
-	if !params.EnableErc721 {
-		return nil, sdkerrors.Wrap(types.ErrERC721Disabled, "registration is currently disabled by governance")
-	}
+func (k Keeper) RegisterERC721(ctx sdk.Context, msg *types.MsgConvertERC721) (*types.TokenPair, error) {
 
+	fmt.Printf("xxl 01 RegisterERC721 001 start \n")
 	// Check if ERC721 is already registered
+	contract := common.HexToAddress(msg.ContractAddress)
 	if k.IsERC721Registered(ctx, contract) {
-		return nil, sdkerrors.Wrapf(types.ErrTokenPairAlreadyExists, "token ERC721 contract already registered: %s", contract.String())
+		return nil, sdkerrors.Wrapf(types.ErrTokenPairAlreadyExists,
+			"token ERC721 contract already registered: %s", contract.String())
 	}
 
-	class, err := k.CreateNFTClass(ctx, contract)
+	fmt.Printf("xxl 01 RegisterERC721 002 CreateNFTClass start  \n")
+
+	err := k.CreateNFTClass(ctx, msg)
 	if err != nil {
-		return nil, sdkerrors.Wrap(err, "failed to create wrapped coin denom metadata for ERC721")
+		return nil, sdkerrors.Wrap(err,
+			"failed to create wrapped coin denom metadata for ERC721")
 	}
+	fmt.Printf("xxl 01 RegisterERC721 003 CreateNFTClass class end \n")
 
-	pair := types.NewTokenPair(contract, class.Id, true, types.OWNER_EXTERNAL)
+	pair := types.NewTokenPair(contract, msg.ClassId, true, types.OWNER_EXTERNAL)
 	k.SetTokenPair(ctx, pair)
 	k.SetClassMap(ctx, pair.ClassId, pair.GetID())
 	k.SetERC721Map(ctx, common.HexToAddress(pair.Erc721Address), pair.GetID())
+
 	return &pair, nil
 }
 
-// CreateCoinMetadata generates the metadata to represent the ERC721 token on evmos.
-func (k Keeper) CreateNFTClass(ctx sdk.Context, contract common.Address) (*nft.Class, error) {
-	strContract := contract.String()
+// CreateNFTClass generates the metadata to represent the ERC721 token .
+func (k Keeper) CreateNFTClass(ctx sdk.Context, msg *types.MsgConvertERC721) error {
 
+	fmt.Printf("xxl 01 CreateNFTClass 001 start \n")
+	contract := common.HexToAddress(msg.ContractAddress)
 	erc721Data, err := k.QueryERC721(ctx, contract)
 	if err != nil {
-		return nil, err
+		return err
+	}
+	fmt.Printf("xxl 01 CreateNFTClass 002 %v \n", erc721Data)
+
+	if k.IsClassRegistered(ctx, msg.ClassId) {
+		return sdkerrors.Wrapf(types.ErrInternalTokenPair, "nft class already registered: %s", msg.ClassId)
 	}
 
-	classID := types.CreateClassID(strContract)
-
-	// Check if class already exists
-	if found := k.nftKeeper.HasClass(ctx, classID); found {
-		return nil, sdkerrors.Wrap(types.ErrInternalTokenPair, "class already exist")
+	// XXL TODO
+	// func (k Keeper) SaveDenom(ctx types.Context, id string, name string, schema string,
+	// symbol string, creator types.AccAddress, mintRestricted bool, updateRestricted bool,
+	// description string, uri string, uriHash string, data string) error
+	err = k.nftKeeper.SaveDenom(ctx, msg.ClassId, erc721Data.Name, "",
+		erc721Data.Symbol, sdk.MustAccAddressFromBech32(msg.Sender), false, false,
+		"internal nft from erc721", "", "", "")
+	if err != nil {
+		return err
 	}
 
-	if k.IsClassRegistered(ctx, classID) {
-		return nil, sdkerrors.Wrapf(types.ErrInternalTokenPair, "nft class already registered: %s", classID)
-	}
-
-	class := nft.Class{
-		Id:          classID,
-		Name:        erc721Data.Name,
-		Symbol:      erc721Data.Symbol,
-		Description: "internal nft from erc721",
-		Uri:         "",
-		UriHash:     "",
-		Data:        nil,
-	}
-
-	_ = k.nftKeeper.SaveClass(ctx, class)
-
-	return &class, nil
+	return nil
 }
 
 // ToggleConversion toggles conversion for a given token pair
