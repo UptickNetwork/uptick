@@ -1,6 +1,7 @@
 package keeper
 
 import (
+	"fmt"
 	"github.com/cosmos/cosmos-sdk/store/prefix"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
@@ -29,10 +30,19 @@ func (k Keeper) GetTokenPairs(ctx sdk.Context) []types.TokenPair {
 
 // GetTokenPairID returns the pair id from either of the registered tokens.
 func (k Keeper) GetTokenPairID(ctx sdk.Context, token string) []byte {
+
+	fmt.Printf("xxl 01 GetTokenPairID 001 start token %v \n",token)
+
 	if common.IsHexAddress(token) {
+		fmt.Printf("xxl 01 GetTokenPairID 002 IsHexAddress true \n")
+
 		addr := common.HexToAddress(token)
+		fmt.Printf("xxl 01 GetTokenPairID 003 address %v \n",addr)
 		return k.GetERC721Map(ctx, addr)
 	}
+
+	fmt.Printf("xxl 01 GetTokenPairID 004 IsHexAddress false \n")
+
 	return k.GetClassMap(ctx, token)
 }
 

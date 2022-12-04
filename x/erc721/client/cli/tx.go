@@ -39,22 +39,45 @@ func NewTxCmd() *cobra.Command {
 // NewConvertNFTCmd returns a CLI command handler for converting a Cosmos coin
 func NewConvertNFTCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "convert-nft [nft_id] [receiver_hex]",
+		Use:   "convert-nft [class_id] [nft_id] [contract_address] [token_id] [receiver_hex]",
 		Short: "Convert a Cosmos nft to erc721. When the receiver [optional] is omitted, the erc721 tokens are transferred to the sender.",
-		Args:  cobra.RangeArgs(1, 2),
+		Args:  cobra.RangeArgs(4, 5),
 		RunE: func(cmd *cobra.Command, args []string) error {
+
+			fmt.Printf("xxl 02 NewConvertNFTCmd 000 start \n")
 			cliCtx, err := client.GetClientTxContext(cmd)
 			if err != nil {
 				return err
 			}
 
-			nftID := args[0]
+			classID := args[0]
+			if len(classID) == 0 {
+				return fmt.Errorf("classID can not be empty")
+			}
+
+			nftID := args[1]
+			if len(nftID) == 0 {
+				return fmt.Errorf("classID can not be empty")
+			}
+
+			contract := args[2]
+			fmt.Printf("xxl 02 NewConvertERC721Cmd 001 %v \n", contract)
+			if len(contract) == 0 {
+				fmt.Printf("xxl 02 NewConvertERC721Cmd come to empty \n")
+				contract = types.CreateContractAddressFromClassID(classID)
+			}
+
+			tokenID := args[3]
+			fmt.Printf("xxl 01 NewConvertERC721Cmd 001 classID : %v \n", tokenID)
+			if len(tokenID) == 0 {
+				fmt.Printf("xxl 01 NewConvertERC721Cmd 002 %v \n", tokenID)
+				tokenID = types.CreateTokenIDFromNFTID(nftID)
+			}
 
 			var receiver string
 			sender := cliCtx.GetFromAddress()
-
-			if len(args) == 2 {
-				receiver = args[1]
+			if len(args) == 5 {
+				receiver = args[4]
 				if err := ethermint.ValidateAddress(receiver); err != nil {
 					return fmt.Errorf("invalid receiver hex address %w", err)
 				}
@@ -63,14 +86,19 @@ func NewConvertNFTCmd() *cobra.Command {
 			}
 
 			msg := &types.MsgConvertNFT{
-				NftId:    nftID,
-				Receiver: receiver,
-				Sender:   sender.String(),
+				ContractAddress: contract,
+				NftId:           nftID,
+				ClassId:         classID,
+				TokenId:         tokenID,
+				Receiver:        receiver,
+				Sender:          sender.String(),
 			}
 
 			if err := msg.ValidateBasic(); err != nil {
 				return err
 			}
+
+			fmt.Printf("xxl 02 NewConvertNFTCmd 002 msg %v \n", msg)
 
 			return tx.GenerateOrBroadcastTxCLI(cliCtx, cmd.Flags(), msg)
 		},
@@ -83,10 +111,14 @@ func NewConvertNFTCmd() *cobra.Command {
 // NewConvertERC721Cmd returns a CLI command handler for converting an erc721
 func NewConvertERC721Cmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "convert-erc721 [contract-address] [token_id] [receiver]",
-		Short: "Convert an erc721 token to Cosmos coin.  When the receiver [optional] is omitted, the Cosmos coins are transferred to the sender.",
-		Args:  cobra.RangeArgs(2, 3),
+		Use: "convert-erc721 [contract_address] [token_id] [class_id] [nft_id] [receiver]",
+		Short: "Convert an erc721 token to Cosmos coin.  " +
+			"When the class_id [optional] is omitted, the Cosmos coins are transferred to default uptick nft class." +
+			"When the receiver [optional] is omitted, the Cosmos coins are transferred to the sender.",
+		Args: cobra.RangeArgs(4, 5),
 		RunE: func(cmd *cobra.Command, args []string) error {
+
+			fmt.Printf("xxl 01 NewConvertERC721Cmd 000 start \n")
 			cliCtx, err := client.GetClientTxContext(cmd)
 			if err != nil {
 				return err
@@ -98,12 +130,29 @@ func NewConvertERC721Cmd() *cobra.Command {
 			}
 
 			tokenID := args[1]
+			if len(tokenID) == 0 {
+				return fmt.Errorf("tokenID can not be empty")
+			}
 
 			from := common.BytesToAddress(cliCtx.GetFromAddress().Bytes())
 
+			classID := args[2]
+			fmt.Printf("xxl 01 NewConvertERC721Cmd 001 classID : %v \n", classID)
+			if len(classID) == 0 {
+				fmt.Printf("xxl 01 NewConvertERC721Cmd 002 %v \n", classID)
+				classID = types.CreateClassIDFromContractAddress(contract)
+			}
+
+			nftID := args[3]
+			fmt.Printf("xxl 01 NewConvertERC721Cmd 001 nftID : %v \n", nftID)
+			if len(nftID) == 0 {
+				fmt.Printf("xxl 01 NewConvertERC721Cmd 002 %v \n", tokenID)
+				nftID = types.CreateNFTIDFromTokenID(tokenID)
+			}
+
 			receiver := cliCtx.GetFromAddress()
-			if len(args) == 3 {
-				receiver, err = sdk.AccAddressFromBech32(args[2])
+			if len(args) == 5 {
+				receiver, err = sdk.AccAddressFromBech32(args[4])
 				if err != nil {
 					return err
 				}
@@ -114,12 +163,15 @@ func NewConvertERC721Cmd() *cobra.Command {
 				TokenId:         tokenID,
 				Receiver:        receiver.String(),
 				Sender:          from.Hex(),
+				ClassId:         classID,
+				NftId:           nftID,
 			}
 
 			if err := msg.ValidateBasic(); err != nil {
 				return err
 			}
 
+			fmt.Printf("xxl 01 NewConvertERC721Cmd 003 msg,%v \n", msg)
 			return tx.GenerateOrBroadcastTxCLI(cliCtx, cmd.Flags(), msg)
 		},
 	}
@@ -128,7 +180,7 @@ func NewConvertERC721Cmd() *cobra.Command {
 	return cmd
 }
 
-// NewRegisterCoinProposalCmd implements the command to submit a community-pool-spend proposal
+// NewRegisterNFTProposalCmd implements the command to submit a community-pool-spend proposal
 func NewRegisterNFTProposalCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "register-nft [class]",
@@ -201,14 +253,14 @@ The proposal details must be supplied via a JSON file.`,
 	return cmd
 }
 
-// NewRegistererc721ProposalCmd implements the command to submit a community-pool-spend proposal
+// NewRegisterERC721ProposalCmd implements the command to submit a community-pool-spend proposal
 func NewRegisterERC721ProposalCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "register-erc721 [erc721-address]",
 		Args:    cobra.ExactArgs(1),
 		Short:   "Submit a proposal to register an erc721 token",
 		Long:    "Submit a proposal to register an erc721 token to the erc721 along with an initial deposit.",
-		Example: fmt.Sprintf("$ %s tx gov submit-proposal register-erc721 <contract-address> --from=<key_or_address>", version.AppName),
+		Example: fmt.Sprintf("$ %s tx gov submit-proposal register-erc721 <contract_address> --from=<key_or_address>", version.AppName),
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			clientCtx, err := client.GetClientTxContext(cmd)

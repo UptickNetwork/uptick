@@ -33,7 +33,7 @@ func init() {
 	gov.RegisterProposalType(ProposalTypeToggleTokenConversion)
 }
 
-// CreateClass generates a string the module name plus the address to avoid conflicts with names staring with a number
+// CreateClassID generates a string the module name plus the address to avoid conflicts with names staring with a number
 func CreateClassID(address string) string {
 	//xxl TODO
 	return fmt.Sprintf("%s-%s", ModuleName, address)
@@ -124,4 +124,26 @@ func (ttcp *ToggleTokenConversionProposal) ValidateBasic() error {
 	}
 
 	return gov.ValidateAbstract(ttcp)
+}
+
+// CreateClassIDFromContractAddress create classId from erc721 address
+func CreateClassIDFromContractAddress(address string) string {
+
+	return fmt.Sprintf("%s-%s", DefaultPrefix, removeAddress0x(address))
+}
+
+// CreateContractAddressFromClassID create classId from erc721 address
+func CreateContractAddressFromClassID(classID string) string {
+	return strings.Replace(classID, DefaultPrefix+"-", "", 1)
+}
+
+// CreateNFTIDFromTokenID create classId from erc721 address
+func CreateNFTIDFromTokenID(id string) string {
+
+	return fmt.Sprintf("%s%s", DefaultPrefix, removeAddress0x(id))
+}
+
+// CreateTokenIDFromNFTID create classId from erc721 address
+func CreateTokenIDFromNFTID(nftID string) string {
+	return strings.Replace(nftID, DefaultPrefix, "", 1)
 }

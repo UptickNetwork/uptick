@@ -1,6 +1,7 @@
 package keeper
 
 import (
+	"fmt"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 
@@ -17,20 +18,16 @@ func (k Keeper) MintingEnabled(
 	token string,
 ) (types.TokenPair, error) {
 
-	params := k.GetParams(ctx)
-	if !params.EnableErc721 {
-		return types.TokenPair{}, sdkerrors.Wrap(
-			types.ErrERC721Disabled, "module is currently disabled by governance",
-		)
-	}
-
+	fmt.Printf("xxl 01 MintingEnabled 001 start token %v \n", token)
 	id := k.GetTokenPairID(ctx, token)
 	if len(id) == 0 {
+
 		return types.TokenPair{}, sdkerrors.Wrapf(
 			types.ErrTokenPairNotFound, "token '%s' not registered by id", token,
 		)
 	}
 
+	fmt.Printf("xxl 01 004 ConvertERC721 id %v \n", id)
 	pair, found := k.GetTokenPair(ctx, id)
 	if !found {
 		return types.TokenPair{}, sdkerrors.Wrapf(
@@ -38,6 +35,7 @@ func (k Keeper) MintingEnabled(
 		)
 	}
 
+	fmt.Printf("xxl 01 MintingEnabled 002 pair %v \n", pair)
 	if !pair.Enabled {
 		return types.TokenPair{}, sdkerrors.Wrapf(
 			types.ErrERC721TokenPairDisabled, "minting token '%s' is not enabled by governance", token,

@@ -81,3 +81,13 @@ func EqualStringSlice(aliasesA, aliasesB []string) bool {
 
 	return true
 }
+
+func removeAddress0x(address string) string{
+
+	strAddress := address
+	if strings.HasPrefix(address,"0x"){
+		strAddress = address[2:]
+	}
+
+	return strAddress
+}

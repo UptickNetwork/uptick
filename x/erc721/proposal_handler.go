@@ -5,8 +5,6 @@ import (
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	gov "github.com/cosmos/cosmos-sdk/x/gov/types/v1beta1"
 
-	"github.com/ethereum/go-ethereum/common"
-
 	"github.com/UptickNetwork/uptick/x/erc721/keeper"
 	"github.com/UptickNetwork/uptick/x/erc721/types"
 )
@@ -29,33 +27,34 @@ func NewErc721ProposalHandler(k *keeper.Keeper) gov.Handler {
 }
 
 func handleRegisterNFTProposal(ctx sdk.Context, k *keeper.Keeper, p *types.RegisterNFTProposal) error {
-	pair, err := k.RegisterNFT(ctx, p.Class)
-	if err != nil {
-		return err
-	}
-	ctx.EventManager().EmitEvent(
-		sdk.NewEvent(
-			types.EventTypeRegisterNFT,
-			sdk.NewAttribute(types.AttributeKeyNFTClass, pair.ClassId),
-			sdk.NewAttribute(types.AttributeKeyERC721Token, pair.Erc721Address),
-		),
-	)
+	//pair, err := k.RegisterNFT(ctx, p.Class)
+	//if err != nil {
+	//	return err
+	//}
+	//ctx.EventManager().EmitEvent(
+	//	sdk.NewEvent(
+	//		types.EventTypeRegisterNFT,
+	//		sdk.NewAttribute(types.AttributeKeyNFTClass, pair.ClassId),
+	//		sdk.NewAttribute(types.AttributeKeyERC721Token, pair.Erc721Address),
+	//	),
+	//)
 
 	return nil
 }
 
 func handleRegisterERC721Proposal(ctx sdk.Context, k *keeper.Keeper, p *types.RegisterERC721Proposal) error {
-	pair, err := k.RegisterERC721(ctx, common.HexToAddress(p.Erc721Address))
-	if err != nil {
-		return err
-	}
-	ctx.EventManager().EmitEvent(
-		sdk.NewEvent(
-			types.EventTypeRegisterERC721,
-			sdk.NewAttribute(types.AttributeKeyNFTClass, pair.ClassId),
-			sdk.NewAttribute(types.AttributeKeyERC721Token, pair.Erc721Address),
-		),
-	)
+
+	//pair, err := k.RegisterERC721(ctx, common.HexToAddress(p.Erc721Address))
+	//if err != nil {
+	//	return err
+	//}
+	//ctx.EventManager().EmitEvent(
+	//	sdk.NewEvent(
+	//		types.EventTypeRegisterERC721,
+	//		sdk.NewAttribute(types.AttributeKeyNFTClass, pair.ClassId),
+	//		sdk.NewAttribute(types.AttributeKeyERC721Token, pair.Erc721Address),
+	//	),
+	//)
 
 	return nil
 }

@@ -2,12 +2,11 @@ package keeper
 
 import (
 	"encoding/json"
+	"fmt"
 	"math/big"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
-	"github.com/cosmos/cosmos-sdk/x/nft"
-
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -21,12 +20,18 @@ import (
 	"github.com/UptickNetwork/uptick/x/erc721/types"
 )
 
-// DeployERC20Contract creates and deploys an ERC20 contract on the EVM with the
+// DeployERC721Contract creates and deploys an ERC20 contract on the EVM with the
 // erc20 module account as owner.
 func (k Keeper) DeployERC721Contract(
 	ctx sdk.Context,
-	class nft.Class,
+	msg *types.MsgConvertNFT,
 ) (common.Address, error) {
+
+	class, err := k.nftKeeper.GetDenomInfo(ctx, msg.ClassId)
+	if err != nil {
+		return common.Address{}, sdkerrors.Wrapf(types.ErrABIPack, "nft class is invalid %s: %s", class.Id, err.Error())
+	}
+
 	ctorArgs, err := contracts.ERC721PresetMinterPauserAutoIdsContract.ABI.Pack(
 		"",
 		class.Name,
@@ -132,10 +137,10 @@ func (k Keeper) QueryERC721Token(
 	}
 
 	// Uri
-	res, err = k.CallEVM(ctx, erc721, types.ModuleAddress, contract, false, "tokenURI", tokenID)
-	if err != nil {
-		return types.ERC721TokenData{}, err
-	}
+	//res, err = k.CallEVM(ctx, erc721, types.ModuleAddress, contract, false, "tokenURI", tokenID)
+	//if err != nil {
+	//	return types.ERC721TokenData{}, err
+	//}
 
 	if err := erc721.UnpackIntoInterface(&symbolRes, "symbol", res.Ret); err != nil {
 		return types.ERC721TokenData{}, sdkerrors.Wrapf(
@@ -205,6 +210,7 @@ func (k Keeper) CallEVM(
 	args ...interface{},
 ) (*evmtypes.MsgEthereumTxResponse, error) {
 
+	fmt.Printf("xxl 01 CallEVM 001 k.CallEVM method %v \n", method)
 	data, err := abi.Pack(method, args...)
 	if err != nil {
 		return nil, sdkerrors.Wrap(
@@ -215,7 +221,7 @@ func (k Keeper) CallEVM(
 
 	resp, err := k.CallEVMWithData(ctx, from, &contract, data, commit)
 	if err != nil {
-
+		fmt.Printf("xxl 01 CallEVM 002 k.CallEVM method %s-%s \n", method, contract)
 		return nil, sdkerrors.Wrapf(err, "contract call failed: method '%s', contract '%s'", method, contract)
 	}
 	return resp, nil
