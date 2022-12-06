@@ -113,7 +113,6 @@ func NewConvertERC721Cmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "convert-erc721 [contract_address] [token_id] [class_id] [nft_id] [receiver]",
 		Short: "Convert an erc721 token to Cosmos coin.  " +
-			"When the class_id [optional] is omitted, the Cosmos coins are transferred to default uptick nft class." +
 			"When the receiver [optional] is omitted, the Cosmos coins are transferred to the sender.",
 		Args: cobra.RangeArgs(4, 5),
 		RunE: func(cmd *cobra.Command, args []string) error {

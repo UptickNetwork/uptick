@@ -26,7 +26,6 @@ func (k Keeper) ConvertNFT(
 	*types.MsgConvertNFTResponse, error,
 ) {
 
-	fmt.Printf("#### xxl 02 ConvertNFT 001 start msg %v \n", msg)
 	ctx := sdk.UnwrapSDKContext(goCtx)
 
 	// Error checked during msg validation
@@ -90,8 +89,14 @@ func (k Keeper) ConvertERC721(
 	ctx := sdk.UnwrapSDKContext(goCtx)
 
 	// Error checked during msg validation
+	fmt.Printf("..xxl 01 before MustAccAddressFromBech32 Receiver %v \n", msg.Receiver)
 	receiver := sdk.MustAccAddressFromBech32(msg.Receiver)
+	fmt.Printf("..xxl 01 after MustAccAddressFromBech32 Receiver %v \n", receiver)
+
+	fmt.Printf("..xxl 01 before HexToAddress Sender %v \n", msg.Sender)
 	sender := common.HexToAddress(msg.Sender)
+	fmt.Printf("..xxl 01 after HexToAddress Sender %v \n", sender)
+
 	fmt.Printf("xxl 01 ConvertERC721 002 receive:%v - sender:%v \n", receiver, sender)
 
 	id := k.GetTokenPairID(ctx, msg.ContractAddress)
@@ -169,7 +174,7 @@ func (k Keeper) convertNFTNativeNFT(
 ) {
 
 	fmt.Printf("xxl 03 convertNFTNativeNFT 001 start \n")
-	erc721 := contracts.ERC721PresetMinterPauserAutoIdsContract.ABI
+	erc721 := contracts.ERC721UpticksContract.ABI
 	contract := pair.GetERC721Contract()
 
 	// Escrow nft on module account
@@ -233,21 +238,27 @@ func (k Keeper) convertNFTNativeERC721(
 ) {
 	fmt.Printf("xxl 02 convertNFTNativeERC721 001 start \n")
 
-	erc721 := contracts.ERC721PresetMinterPauserAutoIdsContract.ABI
+	erc721 := contracts.ERC721UpticksContract.ABI
 	contract := pair.GetERC721Contract()
 
 	// burn nft
-	//if err := k.nftKeeper.Burn(ctx, msg.ClassId, msg.NftId); err != nil {
-	//	return nil, err
-	//}
+	nft := nftTypes.MsgBurnNFT{
+		DenomId: msg.ClassId,
+		Id:      msg.NftId,
+		Sender:  msg.Sender,
+	}
+
+	if _, err := k.nftKeeper.BurnNFT(ctx, &nft); err != nil {
+		return nil, err
+	}
 
 	// query tokenID by given nftID
 	tokenID := string(k.GetNFTPairByNFTID(ctx, msg.NftId))
 	// sender := common.Address{msg.Sender}
 	fmt.Printf("xxl 02 convertNFTNativeERC721 002 %v \n", tokenID)
 
-	fmt.Printf("xxl 02 k.CallEVM 003 erc721:%v,ModuleAddress:%v,contract:%v,receiver:%v, TokenId:%v \n",
-		erc721, types.ModuleAddress, contract, receiver, msg.TokenId,
+	fmt.Printf("xxl 02 k.CallEVM 003 ModuleAddress:%v,contract:%v,receiver:%v, TokenId:%v \n",
+		types.ModuleAddress, contract, receiver, msg.TokenId,
 	)
 	bigTokenId := new(big.Int)
 	_, err := fmt.Sscan(msg.TokenId, bigTokenId)
@@ -255,18 +266,25 @@ func (k Keeper) convertNFTNativeERC721(
 		sdkerrors.Wrapf(sdkerrors.ErrUnauthorized, "%s error scanning value", err)
 		return nil, err
 	}
+	reqInfo, _ := k.QueryERC721Enhance(ctx, contract, bigTokenId)
+	fmt.Printf("xxl 02 reqInfo 004 %v \n", reqInfo)
 
-	//	func (k Keeper) CallEVM(
-	//		ctx sdk.Context,
-	//		abi abi.ABI,
-	//		from, contract common.Address,
-	//		commit bool,
-	//		method string,
-	//		args ...interface{},
-	//) (*evmtypes.MsgEthereumTxResponse, error) {
-	// res, err := k.CallEVM(ctx, erc721, sender, contract, true, "safeTransferFrom", sender, types.ModuleAddress, bigTokenId)
-	// res, err := k.CallEVM(ctx, erc721, types.ModuleAddress, contract, true, "safeTransferFrom", types.ModuleAddress, receiver, bigTokenId)
-	res, err := k.CallEVM(ctx, erc721, receiver, contract, true, "mint", receiver)
+	//res, err := k.CallEVM(ctx, erc721, receiver, contract, true, "mintEnhance",
+	//	receiver,
+	//	bigTokenId,
+	//	reqInfo.Name,
+	//	reqInfo.Uri,
+	//	reqInfo.Data,
+	//	reqInfo.UriHash,
+	//)
+	//xxl 04
+	res, err := k.CallEVM(
+		ctx, erc721, types.ModuleAddress, contract, true,
+		"safeTransferFrom", types.ModuleAddress, receiver, bigTokenId)
+	if err != nil {
+		return nil, err
+	}
+
 	// Mint tokens and send to receiver
 	if err != nil {
 		return nil, err
@@ -319,7 +337,7 @@ func (k Keeper) convertERC721NativeNFT(
 ) (
 	*types.MsgConvertERC721Response, error,
 ) {
-	erc721 := contracts.ERC721PresetMinterPauserAutoIdsContract.ABI
+	erc721 := contracts.ERC721UpticksContract.ABI
 	contract := pair.GetERC721Contract()
 
 	// Burn escrowed tokens
@@ -371,7 +389,7 @@ func (k Keeper) convertERC721NativeERC721(
 ) {
 
 	fmt.Printf("xxl 01 convertERC721NativeERC721 001 start \n")
-	erc721 := contracts.ERC721PresetMinterPauserAutoIdsContract.ABI
+	erc721 := contracts.ERC721UpticksContract.ABI
 	contract := pair.GetERC721Contract()
 
 	bigTokenId := new(big.Int)
@@ -380,20 +398,26 @@ func (k Keeper) convertERC721NativeERC721(
 		sdkerrors.Wrapf(sdkerrors.ErrUnauthorized, "%s error scanning value", err)
 		return nil, err
 	}
-
 	fmt.Printf("xxl 01 convertERC721NativeERC721 002 k.CallEVM \n")
-	// Escrow tokens on module account
-	//res, err := k.CallEVM(ctx, erc721, sender, contract, true, "safeTransferFrom", sender, types.ModuleAddress, bigTokenId)
-	//if err != nil {
-	//	return nil, err
-	//}
+
+	reqInfo, err := k.QueryERC721Enhance(ctx, contract, bigTokenId)
+	fmt.Printf("xxl 01 getEnhanceInfo 026 k.CallEVM res %v \n", reqInfo)
 
 	// Burn escrowed tokens
-	res, err := k.CallEVM(ctx, erc721, sender, contract, true, "burn", bigTokenId)
-	fmt.Printf("xxl 01 convertERC721NativeERC721 003 k.CallEVM %v \n", res)
+	//res, err := k.CallEVM(ctx, erc721, sender, contract, true, "burn", bigTokenId)
+	//fmt.Printf("xxl 01 convertERC721NativeERC721 003 k.CallEVM %v \n", res)
+	//if err != nil {
+	//	//xxl TODO
+	//	fmt.Printf("xxl 01 convertERC721NativeERC721 004 k.CallEVM %v \n", err)
+	//	return nil, err
+	//}
+	// xxl 04
+	// Escrow tokens on module account
+	res, err := k.CallEVM(
+		ctx, erc721, sender, contract, true,
+		"safeTransferFrom", sender, types.ModuleAddress, bigTokenId,
+	)
 	if err != nil {
-		//xxl TODO
-		fmt.Printf("xxl 01 convertERC721NativeERC721 004 k.CallEVM %v \n", err)
 		return nil, err
 	}
 
@@ -411,12 +435,12 @@ func (k Keeper) convertERC721NativeERC721(
 
 	fmt.Printf("xxl 01 convertERC721NativeERC721 003 tokenID \n")
 	nft := nftTypes.MsgMintNFT{
-		Id:        msg.TokenId,
 		DenomId:   msg.ClassId,
-		Name:      "TestTODO",
-		URI:       "UriTODO",
-		Data:      "DataTODO",
-		UriHash:   "UriHashTODO",
+		Id:        msg.NftId,
+		Name:      reqInfo.Name,
+		URI:       reqInfo.Uri,
+		Data:      reqInfo.Data,
+		UriHash:   reqInfo.UriHash,
 		Sender:    msg.Receiver,
 		Recipient: msg.Receiver,
 	}

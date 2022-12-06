@@ -407,7 +407,7 @@ func NewUptick(
 	scopedIBCKeeper := app.CapabilityKeeper.ScopeToModule(ibchost.ModuleName)
 	scopedTransferKeeper := app.CapabilityKeeper.ScopeToModule(ibctransfertypes.ModuleName)
 
-	// scopedNFTTransferKeeper := app.CapabilityKeeper.ScopeToModule(ibcnfttransfertypes.ModuleName)
+	scopedNFTTransferKeeper := app.CapabilityKeeper.ScopeToModule(ibcnfttransfertypes.ModuleName)
 
 	// Applications that wish to enforce statically created ScopedKeepers should call `Seal` after creating
 	// their scoped modules in `NewApp` with `ScopeToModule`
@@ -625,24 +625,16 @@ func NewUptick(
 	// create IBC module from bottom to top of stack
 	transferStack := erc20.NewIBCMiddleware(*app.Erc20Keeper, transferIBCModule)
 
-	//app.InterNFTKeeper = internftkeeper.NewKeeper(
-	//	appCodec,
-	//	keys[internft.StoreKey],
-	//	app.AccountKeeper,
-	//	app.BankKeeper,
-	//)
-	//interTxModule := internftmodule.NewAppModule(appCodec, app.InterNFTKeeper)
-	//
-	//app.IBCNFTTransferKeeper = ibcnfttransferkeeper.NewKeeper(
-	//	appCodec,
-	//	keys[ibcnfttransfertypes.StoreKey],
-	//	app.IBCKeeper.ChannelKeeper,
-	//	app.IBCKeeper.ChannelKeeper,
-	//	&app.IBCKeeper.PortKeeper,
-	//	app.AccountKeeper,
-	//	app.InterNFTKeeper,
-	//	scopedNFTTransferKeeper,
-	//)
+	app.IBCNFTTransferKeeper = ibcnfttransferkeeper.NewKeeper(
+		appCodec,
+		keys[ibcnfttransfertypes.StoreKey],
+		app.IBCKeeper.ChannelKeeper,
+		app.IBCKeeper.ChannelKeeper,
+		&app.IBCKeeper.PortKeeper,
+		app.AccountKeeper,
+		app.NFTKeeper.NewISC721Keeper(),
+		scopedNFTTransferKeeper,
+	)
 
 	nfttransferModule := nfttransfer.NewAppModule(app.IBCNFTTransferKeeper)
 	nfttransferIBCModule := nfttransfer.NewIBCModule(app.IBCNFTTransferKeeper)
@@ -939,7 +931,7 @@ func (app *Uptick) InitChainer(ctx sdk.Context, req abci.RequestInitChain) abci.
 	}
 	app.UpgradeKeeper.SetModuleVersionMap(ctx, app.mm.GetVersionMap())
 
-	//fmt.Printf("xxl ctx %v+ app.appCodec %v+ genesisState %v+ \n",ctx,app.appCodec,genesisState)
+	fmt.Printf("xxl ctx %v+ app.appCodec %v+ genesisState %v+ \n", ctx, app.appCodec, genesisState)
 	return app.mm.InitGenesis(ctx, app.appCodec, genesisState)
 }
 

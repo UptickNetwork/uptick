@@ -1,6 +1,7 @@
 package types
 
 import (
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
 
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
@@ -24,8 +25,10 @@ const (
 
 // ModuleAddress is the native module address for EVM
 var ModuleAddress common.Address
+var AccModuleAddress sdk.AccAddress
 
 func init() {
+	AccModuleAddress = authtypes.NewModuleAddress(ModuleName)
 	ModuleAddress = common.BytesToAddress(authtypes.NewModuleAddress(ModuleName).Bytes())
 }
 

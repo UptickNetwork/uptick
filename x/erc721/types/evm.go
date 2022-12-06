@@ -13,6 +13,25 @@ type ERC721Data struct {
 	Symbol string
 }
 
+// ERC721Enhance represents the ERC721 token details used to map
+// the token to a Cosmos NFT
+type ERC721Enhance struct {
+	Name    string
+	Uri     string
+	Data    string
+	UriHash string
+}
+
+// NewERC721Enhance creates a new ERC721Data instance
+func NewERC721Enhance(name string, uri string, data string, uriHash string) ERC721Enhance {
+	return ERC721Enhance{
+		Name:    name,
+		Uri:     uri,
+		Data:    data,
+		UriHash: uriHash,
+	}
+}
+
 // ERC721StringResponse defines the string value from the call response
 type ERC721StringResponse struct {
 	Value string

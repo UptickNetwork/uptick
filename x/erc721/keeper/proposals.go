@@ -73,7 +73,10 @@ func (k Keeper) CreateNFTClass(ctx sdk.Context, msg *types.MsgConvertERC721) err
 	if err != nil {
 		return err
 	}
-	fmt.Printf("xxl 01 CreateNFTClass 002 %v \n", erc721Data)
+	fmt.Printf(
+		"xxl 01 CreateNFTClass 002 %v ,%v ,%v,%v\n",
+		erc721Data, msg, types.AccModuleAddress, types.ModuleAddress,
+	)
 
 	if k.IsClassRegistered(ctx, msg.ClassId) {
 		return sdkerrors.Wrapf(types.ErrInternalTokenPair, "nft class already registered: %s", msg.ClassId)
@@ -84,7 +87,7 @@ func (k Keeper) CreateNFTClass(ctx sdk.Context, msg *types.MsgConvertERC721) err
 	// symbol string, creator types.AccAddress, mintRestricted bool, updateRestricted bool,
 	// description string, uri string, uriHash string, data string) error
 	err = k.nftKeeper.SaveDenom(ctx, msg.ClassId, erc721Data.Name, "",
-		erc721Data.Symbol, sdk.MustAccAddressFromBech32(msg.Sender), false, false,
+		erc721Data.Symbol, types.AccModuleAddress, false, false,
 		"internal nft from erc721", "", "", "")
 	if err != nil {
 		return err
