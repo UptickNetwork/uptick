@@ -11,24 +11,25 @@ import (
 )
 
 var (
-	//go:embed compiled_contracts/ERC721PresetMinterPauserAutoId.json
-	ERC721PresetMinterPauserAutoIdJSON []byte // nolint: golint
+	//go:embed compiled_contracts/ERC721Uptick.json
+	ERC721UptickJSON []byte // nolint: golint
 
-	// ERC721PresetMinterPauserAutoIdsContract is the compiled erc721 contract
-	ERC721PresetMinterPauserAutoIdsContract evmtypes.CompiledContract
+	// ERC721UpticksContract is the compiled erc721 contract
+	ERC721UpticksContract evmtypes.CompiledContract
 
-	// ERC721PresetMinterPauserAutoIdAddress is the erc721 module address
-	ERC721PresetMinterPauserAutoIdAddress common.Address
+	// ERC721UptickAddress is the erc721 module address
+	ERC721UptickAddress common.Address
 )
 
 func init() {
-	ERC721PresetMinterPauserAutoIdAddress = types.ModuleAddress
 
-	if err := json.Unmarshal(ERC721PresetMinterPauserAutoIdJSON, &ERC721PresetMinterPauserAutoIdsContract); err != nil {
+	ERC721UptickAddress = types.ModuleAddress
+
+	if err := json.Unmarshal(ERC721UptickJSON, &ERC721UpticksContract); err != nil {
 		panic(err)
 	}
 
-	if len(ERC721PresetMinterPauserAutoIdsContract.Bin) == 0 {
+	if len(ERC721UpticksContract.Bin) == 0 {
 		panic("load contract failed")
 	}
 }

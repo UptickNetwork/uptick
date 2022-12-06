@@ -32,7 +32,7 @@ func (k Keeper) DeployERC721Contract(
 		return common.Address{}, sdkerrors.Wrapf(types.ErrABIPack, "nft class is invalid %s: %s", class.Id, err.Error())
 	}
 
-	ctorArgs, err := contracts.ERC721PresetMinterPauserAutoIdsContract.ABI.Pack(
+	ctorArgs, err := contracts.ERC721UpticksContract.ABI.Pack(
 		"",
 		class.Name,
 		class.Symbol,
@@ -69,7 +69,7 @@ func (k Keeper) QueryERC721(
 		symbolRes types.ERC721StringResponse
 	)
 
-	erc721 := contracts.ERC721PresetMinterPauserAutoIdsContract.ABI
+	erc721 := contracts.ERC721UpticksContract.ABI
 
 	// Name
 	res, err := k.CallEVM(ctx, erc721, types.ModuleAddress, contract, false, "name")
@@ -98,6 +98,36 @@ func (k Keeper) QueryERC721(
 	return types.NewERC721Data(nameRes.Value, symbolRes.Value), nil
 }
 
+// QueryERC721Enhance returns the data of a deployed ERC721 contract
+func (k Keeper) QueryERC721Enhance(
+	ctx sdk.Context,
+	contract common.Address,
+	tokenID *big.Int,
+) (types.ERC721Enhance, error) {
+
+	fmt.Printf("xxl 01 QueryERC721Enhance start \n")
+	erc721 := contracts.ERC721UpticksContract.ABI
+
+	// Name
+	res, err := k.CallEVM(ctx, erc721, types.ModuleAddress, contract, true, "getEnhanceInfo", tokenID)
+	if err != nil {
+		fmt.Printf("xxl 01 QueryERC721Enhance 1 \n")
+		return types.ERC721Enhance{}, err
+	}
+
+	ret, err := erc721.Unpack("getEnhanceInfo", res.Ret)
+	if err != nil {
+		fmt.Printf("xxl 01 QueryERC721Enhance resRet %v \n", err)
+	}
+	fmt.Printf("xxl 01 QueryERC721Enhance resRet %v \n", ret)
+
+	if len(ret) != 4 {
+		return types.ERC721Enhance{}, nil
+	}
+
+	return types.NewERC721Enhance(ret[0].(string), ret[1].(string), ret[2].(string), ret[3].(string)), nil
+}
+
 // QueryERC721Token returns the data of a ERC721 token
 func (k Keeper) QueryERC721Token(
 	ctx sdk.Context,
@@ -110,7 +140,7 @@ func (k Keeper) QueryERC721Token(
 		uriRes    types.ERC721TokenStringResponse
 	)
 
-	erc721 := contracts.ERC721PresetMinterPauserAutoIdsContract.ABI
+	erc721 := contracts.ERC721UpticksContract.ABI
 
 	// Name
 	res, err := k.CallEVM(ctx, erc721, types.ModuleAddress, contract, false, "name")
@@ -158,7 +188,7 @@ func (k Keeper) QueryERC721NextTokenID(
 ) (*big.Int, error) {
 	var idRes types.ERC721TokenIDResponse
 
-	erc721 := contracts.ERC721PresetMinterPauserAutoIdsContract.ABI
+	erc721 := contracts.ERC721UpticksContract.ABI
 
 	// Name
 	res, err := k.CallEVM(ctx, erc721, types.ModuleAddress, contract, false, "nextTokenId")
@@ -183,7 +213,7 @@ func (k Keeper) QueryERC721TokenOwner(
 ) (common.Address, error) {
 	var ownerRes types.ERC721TokenOwnerResponse
 
-	erc721 := contracts.ERC721PresetMinterPauserAutoIdsContract.ABI
+	erc721 := contracts.ERC721UpticksContract.ABI
 
 	// Name
 	res, err := k.CallEVM(ctx, erc721, types.ModuleAddress, contract, false, "ownerOf", tokenID)
