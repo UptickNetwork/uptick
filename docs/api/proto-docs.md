@@ -80,10 +80,8 @@
     - [Msg](#uptick.erc20.v1.Msg)
   
 - [uptick/erc721/v1/erc721.proto](#uptick/erc721/v1/erc721.proto)
-    - [RegisterERC721Proposal](#uptick.erc721.v1.RegisterERC721Proposal)
-    - [RegisterNFTProposal](#uptick.erc721.v1.RegisterNFTProposal)
-    - [ToggleTokenConversionProposal](#uptick.erc721.v1.ToggleTokenConversionProposal)
     - [TokenPair](#uptick.erc721.v1.TokenPair)
+    - [UIDPair](#uptick.erc721.v1.UIDPair)
   
     - [Owner](#uptick.erc721.v1.Owner)
   
@@ -1123,60 +1121,6 @@ Msg defines the erc20 Msg service.
 
 
 
-<a name="uptick.erc721.v1.RegisterERC721Proposal"></a>
-
-### RegisterERC721Proposal
-RegisterERC721Proposal is a gov Content type to register a token pair for an
-ERC721 class
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| `title` | [string](#string) |  | title of the proposal |
-| `description` | [string](#string) |  | proposal description |
-| `erc721address` | [string](#string) |  | contract address of ERC721 token |
-
-
-
-
-
-
-<a name="uptick.erc721.v1.RegisterNFTProposal"></a>
-
-### RegisterNFTProposal
-RegisterNFTProposal is a gov Content type to register a token pair for a
-native Cosmos coin.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| `title` | [string](#string) |  | title of the proposal |
-| `description` | [string](#string) |  | proposal description |
-| `class` | [cosmos.nft.v1beta1.Class](#cosmos.nft.v1beta1.Class) |  | nft class of the native Cosmos nft class |
-
-
-
-
-
-
-<a name="uptick.erc721.v1.ToggleTokenConversionProposal"></a>
-
-### ToggleTokenConversionProposal
-ToggleTokenConversionProposal is a gov Content type to toggle the conversion
-of a token pair.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| `title` | [string](#string) |  | title of the proposal |
-| `description` | [string](#string) |  | proposal description |
-| `token` | [string](#string) |  | token identifier can be either the hex contract address of the ERC721 or the Cosmos nft class |
-
-
-
-
-
-
 <a name="uptick.erc721.v1.TokenPair"></a>
 
 ### TokenPair
@@ -1188,8 +1132,22 @@ Cosmos Coin and an ERC721 token address.
 | ----- | ---- | ----- | ----------- |
 | `erc721_address` | [string](#string) |  | address of ERC721 contract token |
 | `class_id` | [string](#string) |  | cosmos nft class ID to be mapped to |
-| `enabled` | [bool](#bool) |  | shows token mapping enable status |
-| `contract_owner` | [Owner](#uptick.erc721.v1.Owner) |  | ERC721 owner address ENUM (0 invalid, 1 ModuleAccount, 2 external address) |
+
+
+
+
+
+
+<a name="uptick.erc721.v1.UIDPair"></a>
+
+### UIDPair
+defines the unique id of nft asset
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| `erc721_did` | [string](#string) |  | address of ERC721 contract token + tokenId |
+| `class_did` | [string](#string) |  | cosmos nft class ID to be mapped to + nftId |
 
 
 
