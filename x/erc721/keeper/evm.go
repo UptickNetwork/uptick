@@ -27,11 +27,13 @@ func (k Keeper) DeployERC721Contract(
 	msg *types.MsgConvertNFT,
 ) (common.Address, error) {
 
+	fmt.Printf("xxl 02 DeployERC721Contract start \n")
 	class, err := k.nftKeeper.GetDenomInfo(ctx, msg.ClassId)
 	if err != nil {
 		return common.Address{}, sdkerrors.Wrapf(types.ErrABIPack, "nft class is invalid %s: %s", class.Id, err.Error())
 	}
 
+	fmt.Printf("xxl 02 DeployERC721Contract class %v \n", class)
 	ctorArgs, err := contracts.ERC721UpticksContract.ABI.Pack(
 		"",
 		class.Name,
@@ -42,20 +44,24 @@ func (k Keeper) DeployERC721Contract(
 		return common.Address{}, sdkerrors.Wrapf(types.ErrABIPack, "nft class is invalid %s: %s", class.Id, err.Error())
 	}
 
+	fmt.Printf("xxl 02 DeployERC721Contract 2 \n")
 	data := make([]byte, len(contracts.ERC20MinterBurnerDecimalsContract.Bin)+len(ctorArgs))
 	copy(data[:len(contracts.ERC20MinterBurnerDecimalsContract.Bin)], contracts.ERC20MinterBurnerDecimalsContract.Bin)
 	copy(data[len(contracts.ERC20MinterBurnerDecimalsContract.Bin):], ctorArgs)
 
+	fmt.Printf("xxl 02 DeployERC721Contract 3 \n")
 	nonce, err := k.accountKeeper.GetSequence(ctx, types.ModuleAddress.Bytes())
 	if err != nil {
 		return common.Address{}, err
 	}
 
+	fmt.Printf("xxl 02 DeployERC721Contract 4 \n")
 	contractAddr := crypto.CreateAddress(types.ModuleAddress, nonce)
 	if _, err = k.CallEVMWithData(ctx, types.ModuleAddress, nil, data, true); err != nil {
 		return common.Address{}, sdkerrors.Wrapf(err, "failed to deploy contract for %s", class.Id)
 	}
 
+	fmt.Printf("xxl 02 DeployERC721Contract 5 \n")
 	return contractAddr, nil
 }
 
@@ -98,41 +104,72 @@ func (k Keeper) QueryERC721(
 	return types.NewERC721Data(nameRes.Value, symbolRes.Value), nil
 }
 
-// QueryERC721Enhance returns the data of a deployed ERC721 contract
-func (k Keeper) QueryERC721Enhance(
+// QueryClassEnhance returns the data of a deployed ERC721 contract
+func (k Keeper) QueryClassEnhance(
 	ctx sdk.Context,
 	contract common.Address,
-	tokenID *big.Int,
-) (types.ERC721Enhance, error) {
+) (types.ClassEnhance, error) {
 
-	fmt.Printf("xxl 01 QueryERC721Enhance start \n")
+	fmt.Printf("xxl 01 QueryClassEnhance start \n")
 	erc721 := contracts.ERC721UpticksContract.ABI
 
 	// Name
-	res, err := k.CallEVM(ctx, erc721, types.ModuleAddress, contract, true, "getEnhanceInfo", tokenID)
+	res, err := k.CallEVM(ctx, erc721, types.ModuleAddress, contract, false, "getClassEnhanceInfo")
 	if err != nil {
-		fmt.Printf("xxl 01 QueryERC721Enhance 1 \n")
-		return types.ERC721Enhance{}, err
+		fmt.Printf("xxl 01 QueryClassEnhance 1 \n")
+		return types.ClassEnhance{}, err
 	}
 
-	ret, err := erc721.Unpack("getEnhanceInfo", res.Ret)
+	ret, err := erc721.Unpack("getClassEnhanceInfo", res.Ret)
 	if err != nil {
-		fmt.Printf("xxl 01 QueryERC721Enhance resRet %v \n", err)
+		fmt.Printf("xxl 01 QueryClassEnhance resRet %v \n", err)
 	}
-	fmt.Printf("xxl 01 QueryERC721Enhance resRet %v \n", ret)
+	fmt.Printf("xxl 01 QueryClassEnhance resRet %v \n", ret)
+
+	if len(ret) != 7 {
+		return types.ClassEnhance{}, nil
+	}
+	
+	return types.NewClassEnhance(
+		ret[0].(string), ret[1].(string), ret[2].(bool), ret[3].(string),
+		ret[4].(bool), ret[5].(string), ret[6].(string),
+	), nil
+}
+
+// QueryNFTEnhance returns the data of a deployed ERC721 contract
+func (k Keeper) QueryNFTEnhance(
+	ctx sdk.Context,
+	contract common.Address,
+	tokenID *big.Int,
+) (types.NFTEnhance, error) {
+
+	fmt.Printf("xxl 01 QueryNFTEnhance start \n")
+	erc721 := contracts.ERC721UpticksContract.ABI
+
+	// Name
+	res, err := k.CallEVM(ctx, erc721, types.ModuleAddress, contract, true, "getNFTEnhanceInfo", tokenID)
+	if err != nil {
+		fmt.Printf("xxl 01 QueryNFTEnhance 1 \n")
+		return types.NFTEnhance{}, err
+	}
+
+	ret, err := erc721.Unpack("getNFTEnhanceInfo", res.Ret)
+	if err != nil {
+		fmt.Printf("xxl 01 QueryNFTEnhance resRet %v \n", err)
+	}
+	fmt.Printf("xxl 01 QueryNFTEnhance resRet %v \n", ret)
 
 	if len(ret) != 4 {
-		return types.ERC721Enhance{}, nil
+		return types.NFTEnhance{}, nil
 	}
 
-	return types.NewERC721Enhance(ret[0].(string), ret[1].(string), ret[2].(string), ret[3].(string)), nil
+	return types.NewNFTEnhance(ret[0].(string), ret[1].(string), ret[2].(string), ret[3].(string)), nil
 }
 
 // QueryERC721Token returns the data of a ERC721 token
 func (k Keeper) QueryERC721Token(
 	ctx sdk.Context,
 	contract common.Address,
-	tokenID *big.Int,
 ) (types.ERC721TokenData, error) {
 	var (
 		nameRes   types.ERC721TokenStringResponse
@@ -166,12 +203,6 @@ func (k Keeper) QueryERC721Token(
 		)
 	}
 
-	// Uri
-	//res, err = k.CallEVM(ctx, erc721, types.ModuleAddress, contract, false, "tokenURI", tokenID)
-	//if err != nil {
-	//	return types.ERC721TokenData{}, err
-	//}
-
 	if err := erc721.UnpackIntoInterface(&symbolRes, "symbol", res.Ret); err != nil {
 		return types.ERC721TokenData{}, sdkerrors.Wrapf(
 			types.ErrABIUnpack, "failed to unpack uri: %s", err.Error(),
@@ -179,30 +210,6 @@ func (k Keeper) QueryERC721Token(
 	}
 
 	return types.NewERC721TokenData(nameRes.Value, symbolRes.Value, uriRes.Value), nil
-}
-
-// QueryERC721NextTokenID returns the next tokenID to mint
-func (k Keeper) QueryERC721NextTokenID(
-	ctx sdk.Context,
-	contract common.Address,
-) (*big.Int, error) {
-	var idRes types.ERC721TokenIDResponse
-
-	erc721 := contracts.ERC721UpticksContract.ABI
-
-	// Name
-	res, err := k.CallEVM(ctx, erc721, types.ModuleAddress, contract, false, "nextTokenId")
-	if err != nil {
-		return nil, err
-	}
-
-	if err := erc721.UnpackIntoInterface(&idRes, "nextTokenId", res.Ret); err != nil {
-		return nil, sdkerrors.Wrapf(
-			types.ErrABIUnpack, "failed to unpack nextTokenId: %s", err.Error(),
-		)
-	}
-
-	return idRes.Value, nil
 }
 
 // QueryERC721TokenOwner returns the owner of given tokenID
@@ -315,25 +322,4 @@ func (k Keeper) CallEVMWithData(
 	}
 
 	return res, nil
-}
-
-// monitorApprovalEvent returns an error if the given transactions logs include
-// an unexpected `Approval` event
-func (k Keeper) monitorApprovalEvent(res *evmtypes.MsgEthereumTxResponse) error {
-	if res == nil || len(res.Logs) == 0 {
-		return nil
-	}
-
-	//logApprovalSig := []byte("Approval(address,address,uint256)")
-	//logApprovalSigHash := crypto.Keccak256Hash(logApprovalSig)
-	//
-	//for _, log := range res.Logs {
-	//	if log.Topics[0] == logApprovalSigHash.Hex() {
-	//		return sdkerrors.Wrapf(
-	//			types.ErrUnexpectedEvent, "unexpected Approval event 1111" ,
-	//		)
-	//	}
-	//}
-
-	return nil
 }

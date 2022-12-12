@@ -125,16 +125,11 @@ import (
 	"github.com/UptickNetwork/uptick/app/ante"
 	authsims "github.com/cosmos/cosmos-sdk/x/auth/simulation"
 
-	//internft "github.com/UptickNetwork/uptick/x/inter-nft"
-	//internftkeeper "github.com/UptickNetwork/uptick/x/inter-nft/keeper"
-	//internftmodule "github.com/UptickNetwork/uptick/x/inter-nft/module"
-
 	nfttransfer "github.com/bianjieai/nft-transfer"
 	ibcnfttransferkeeper "github.com/bianjieai/nft-transfer/keeper"
 	ibcnfttransfertypes "github.com/bianjieai/nft-transfer/types"
 
 	"github.com/UptickNetwork/uptick/x/erc721"
-	erc721client "github.com/UptickNetwork/uptick/x/erc721/client"
 	erc721keeper "github.com/UptickNetwork/uptick/x/erc721/keeper"
 	erc721types "github.com/UptickNetwork/uptick/x/erc721/types"
 
@@ -188,10 +183,6 @@ var (
 				erc20client.RegisterCoinProposalHandler,
 				erc20client.RegisterERC20ProposalHandler,
 				erc20client.ToggleTokenRelayProposalHandler,
-
-				erc721client.RegisterNFTProposalHandler,
-				erc721client.RegisterERC721ProposalHandler,
-				erc721client.ToggleTokenConversionProposalHandler,
 			},
 		),
 
@@ -580,8 +571,7 @@ func NewUptick(
 		AddRoute(distrtypes.RouterKey, distr.NewCommunityPoolSpendProposalHandler(app.DistrKeeper)).
 		AddRoute(upgradetypes.RouterKey, upgrade.NewSoftwareUpgradeProposalHandler(app.UpgradeKeeper)).
 		AddRoute(ibchost.RouterKey, ibcclient.NewClientProposalHandler(app.IBCKeeper.ClientKeeper)).
-		AddRoute(erc20types.RouterKey, erc20.NewErc20ProposalHandler(app.Erc20Keeper)).
-		AddRoute(erc721types.RouterKey, erc721.NewErc721ProposalHandler(&app.Erc721Keeper))
+		AddRoute(erc20types.RouterKey, erc20.NewErc20ProposalHandler(app.Erc20Keeper))
 
 	govConfig := govtypes.DefaultConfig()
 	govKeeper := govkeeper.NewKeeper(
@@ -931,7 +921,6 @@ func (app *Uptick) InitChainer(ctx sdk.Context, req abci.RequestInitChain) abci.
 	}
 	app.UpgradeKeeper.SetModuleVersionMap(ctx, app.mm.GetVersionMap())
 
-	fmt.Printf("xxl ctx %v+ app.appCodec %v+ genesisState %v+ \n", ctx, app.appCodec, genesisState)
 	return app.mm.InitGenesis(ctx, app.appCodec, genesisState)
 }
 
@@ -1126,9 +1115,6 @@ func (app *Uptick) registerUpgradeHandlers() {
 			// Refs:
 			// - https://docs.cosmos.network/master/building-modules/upgrade.html#registering-migrations
 			// - https://docs.cosmos.network/master/migrations/chain-upgrade-guide-044.html#chain-upgrade
-
-			// migrate ERC20 module
-			// vm[erc20types.ModuleName] = 1
 
 			return app.mm.RunMigrations(ctx, app.configurator, vm)
 		})

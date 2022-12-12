@@ -21,14 +21,13 @@ func (k Keeper) RegisterNFT(ctx sdk.Context, msg *types.MsgConvertNFT) (*types.T
 	}
 
 	fmt.Printf("xxl 02 RegisterNFT %v \n", msg)
-	addr, err := k.DeployERC721Contract(ctx, msg)
-	if err != nil {
-		return nil, sdkerrors.Wrap(
-			err, "failed to create wrapped coin denom metadata for ERC721",
-		)
-	}
-
-	pair := types.NewTokenPair(addr, msg.ClassId, true, types.OWNER_MODULE)
+	//addr, err := k.DeployERC721Contract(ctx, msg)
+	//if err != nil {
+	//	return nil, sdkerrors.Wrap(
+	//		err, "failed to create wrapped coin denom metadata for ERC721",
+	//	)
+	//}
+	pair := types.NewTokenPair(common.HexToAddress(msg.ContractAddress), msg.ClassId)
 	k.SetTokenPair(ctx, pair)
 	k.SetClassMap(ctx, pair.ClassId, pair.GetID())
 	k.SetERC721Map(ctx, common.HexToAddress(pair.Erc721Address), pair.GetID())
@@ -55,8 +54,7 @@ func (k Keeper) RegisterERC721(ctx sdk.Context, msg *types.MsgConvertERC721) (*t
 			"failed to create wrapped coin denom metadata for ERC721")
 	}
 	fmt.Printf("xxl 01 RegisterERC721 003 CreateNFTClass class end \n")
-
-	pair := types.NewTokenPair(contract, msg.ClassId, true, types.OWNER_EXTERNAL)
+	pair := types.NewTokenPair(contract, msg.ClassId)
 	k.SetTokenPair(ctx, pair)
 	k.SetClassMap(ctx, pair.ClassId, pair.GetID())
 	k.SetERC721Map(ctx, common.HexToAddress(pair.Erc721Address), pair.GetID())
@@ -73,23 +71,46 @@ func (k Keeper) CreateNFTClass(ctx sdk.Context, msg *types.MsgConvertERC721) err
 	if err != nil {
 		return err
 	}
+
+	classEnhance, err := k.QueryClassEnhance(ctx, contract)
+	if err != nil {
+		// normal logic
+		classEnhance.Uri = ""
+		classEnhance.Data = ""
+		classEnhance.Schema = ""
+		classEnhance.UriHash = ""
+		classEnhance.Description = ""
+		classEnhance.UpdateRestricted = false
+		classEnhance.MintRestricted = false
+	}
+
 	fmt.Printf(
-		"xxl 01 CreateNFTClass 002 %v ,%v ,%v,%v\n",
-		erc721Data, msg, types.AccModuleAddress, types.ModuleAddress,
+		"xxl 01 CreateNFTClass 002 %v ,%v ,%v ,%v,%v\n",
+		erc721Data, classEnhance.Uri, msg, types.AccModuleAddress, types.ModuleAddress,
 	)
 
 	if k.IsClassRegistered(ctx, msg.ClassId) {
 		return sdkerrors.Wrapf(types.ErrInternalTokenPair, "nft class already registered: %s", msg.ClassId)
 	}
 
-	// XXL TODO
-	// func (k Keeper) SaveDenom(ctx types.Context, id string, name string, schema string,
-	// symbol string, creator types.AccAddress, mintRestricted bool, updateRestricted bool,
-	// description string, uri string, uriHash string, data string) error
-	err = k.nftKeeper.SaveDenom(ctx, msg.ClassId, erc721Data.Name, "",
-		erc721Data.Symbol, types.AccModuleAddress, false, false,
-		"internal nft from erc721", "", "", "")
+	fmt.Printf(
+		"xxl 01 CreateNFTClass 003 SaveDenom start\n",
+	)
+
+	_, err = k.nftKeeper.GetDenomInfo(ctx, msg.ClassId)
+	if err == nil {
+		return nil
+	}
+
+	err = k.nftKeeper.SaveDenom(ctx, msg.ClassId, erc721Data.Name, classEnhance.Schema,
+		erc721Data.Symbol, types.AccModuleAddress, classEnhance.MintRestricted, classEnhance.UpdateRestricted,
+		classEnhance.Description, classEnhance.Uri, classEnhance.UriHash, classEnhance.Data)
+
+	fmt.Printf(
+		"xxl 01 CreateNFTClass 004 SaveDenom end \n",
+	)
 	if err != nil {
+		fmt.Printf("xxl 01 CreateNFTClass 005 SaveDenom %v\n", err)
 		return err
 	}
 
@@ -111,8 +132,6 @@ func (k Keeper) ToggleConversion(ctx sdk.Context, token string) (types.TokenPair
 			types.ErrTokenPairNotFound, "token '%s' not registered", token,
 		)
 	}
-
-	pair.Enabled = !pair.Enabled
 
 	k.SetTokenPair(ctx, pair)
 	return pair, nil

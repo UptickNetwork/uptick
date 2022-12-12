@@ -10,12 +10,10 @@ import (
 )
 
 // NewTokenPair returns an instance of TokenPair
-func NewTokenPair(erc721Address common.Address, classID string, enabled bool, contractOwner Owner) TokenPair {
+func NewTokenPair(erc721Address common.Address, classID string) TokenPair {
 	return TokenPair{
 		Erc721Address: erc721Address.String(),
 		ClassId:       classID,
-		Enabled:       true,
-		ContractOwner: contractOwner,
 	}
 }
 
@@ -36,16 +34,4 @@ func (tp TokenPair) Validate() error {
 		return err
 	}
 	return ethermint.ValidateAddress(tp.Erc721Address)
-}
-
-// IsNativeNFT returns true if the owner of the ERC721 contract is the
-// erc721 module account
-func (tp TokenPair) IsNativeNFT() bool {
-	return tp.ContractOwner == OWNER_MODULE
-}
-
-// IsNativeERC721 returns true if the owner of the ERC721 contract not the
-// erc721 module account
-func (tp TokenPair) IsNativeERC721() bool {
-	return tp.ContractOwner == OWNER_EXTERNAL
 }
