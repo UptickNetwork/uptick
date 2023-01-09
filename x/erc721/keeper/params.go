@@ -1,7 +1,6 @@
 package keeper
 
 import (
-	"fmt"
 	"github.com/UptickNetwork/uptick/x/erc721/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
@@ -29,21 +28,16 @@ func (k Keeper) GetClassIDAndNFTID(ctx sdk.Context, msg *types.MsgConvertERC721)
 
 	uTokenID := types.CreateTokenUID(msg.ContractAddress, msg.TokenId)
 	savedNftID, savedClassID := types.GetNFTFromUID(string(k.GetNFTUIDPairByTokenUID(ctx, uTokenID)))
-	fmt.Printf("xxl 03 0 savedNftID %v,savedClassID %v \n", savedNftID, savedClassID)
-	fmt.Printf("xxl 03 1 msg.NftId %v,msg.ClassId %v \n", msg.NftId, msg.ClassId)
 	nftID, err = getNftData(msg.NftId, msg.TokenId, savedNftID, 0)
-	fmt.Printf("xxl 03 2 nftID %v \n", nftID)
 	if err != nil {
 		return "", "", err
 	}
 
 	classID, err = getNftData(msg.ClassId, msg.ContractAddress, savedClassID, 1)
-	fmt.Printf("xxl 03 3 classID %v \n", classID)
 	if err != nil {
 		return "", "", err
 	}
 
-	// return nftID, classID, nil
 	return classID, nftID, nil
 
 }
@@ -59,8 +53,6 @@ func (k Keeper) GetContractAddressAndTokenID(ctx sdk.Context, msg *types.MsgConv
 
 	uNftID := types.CreateNFTUID(msg.ClassId, msg.NftId)
 	savedTokenID, saveContractAddress := types.GetNFTFromUID(string(k.GetTokenUIDPairByNFTUID(ctx, uNftID)))
-	fmt.Printf("xxl 03 savedTokenID %v,savedContractAddress %v \n", savedTokenID, saveContractAddress)
-
 	tokenID, err = getNftData(msg.TokenId, msg.NftId, savedTokenID, 2)
 	if err != nil {
 		return "", "", err

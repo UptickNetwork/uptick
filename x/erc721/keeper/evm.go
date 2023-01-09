@@ -27,13 +27,11 @@ func (k Keeper) DeployERC721Contract(
 	msg *types.MsgConvertNFT,
 ) (common.Address, error) {
 
-	fmt.Printf("xxl 02 DeployERC721Contract start \n")
 	class, err := k.nftKeeper.GetDenomInfo(ctx, msg.ClassId)
 	if err != nil {
 		return common.Address{}, sdkerrors.Wrapf(types.ErrABIPack, "nft class is invalid %s: %s", class.Id, err.Error())
 	}
 
-	fmt.Printf("xxl 02 DeployERC721Contract class %v \n", class)
 	ctorArgs, err := contracts.ERC721UpticksContract.ABI.Pack(
 		"",
 		class.Name,
@@ -44,24 +42,20 @@ func (k Keeper) DeployERC721Contract(
 		return common.Address{}, sdkerrors.Wrapf(types.ErrABIPack, "nft class is invalid %s: %s", class.Id, err.Error())
 	}
 
-	fmt.Printf("xxl 02 DeployERC721Contract 2 \n")
 	data := make([]byte, len(contracts.ERC20MinterBurnerDecimalsContract.Bin)+len(ctorArgs))
 	copy(data[:len(contracts.ERC20MinterBurnerDecimalsContract.Bin)], contracts.ERC20MinterBurnerDecimalsContract.Bin)
 	copy(data[len(contracts.ERC20MinterBurnerDecimalsContract.Bin):], ctorArgs)
 
-	fmt.Printf("xxl 02 DeployERC721Contract 3 \n")
 	nonce, err := k.accountKeeper.GetSequence(ctx, types.ModuleAddress.Bytes())
 	if err != nil {
 		return common.Address{}, err
 	}
 
-	fmt.Printf("xxl 02 DeployERC721Contract 4 \n")
 	contractAddr := crypto.CreateAddress(types.ModuleAddress, nonce)
 	if _, err = k.CallEVMWithData(ctx, types.ModuleAddress, nil, data, true); err != nil {
 		return common.Address{}, sdkerrors.Wrapf(err, "failed to deploy contract for %s", class.Id)
 	}
 
-	fmt.Printf("xxl 02 DeployERC721Contract 5 \n")
 	return contractAddr, nil
 }
 
@@ -110,26 +104,23 @@ func (k Keeper) QueryClassEnhance(
 	contract common.Address,
 ) (types.ClassEnhance, error) {
 
-	fmt.Printf("xxl 01 QueryClassEnhance start \n")
 	erc721 := contracts.ERC721UpticksContract.ABI
 
 	// Name
 	res, err := k.CallEVM(ctx, erc721, types.ModuleAddress, contract, false, "getClassEnhanceInfo")
 	if err != nil {
-		fmt.Printf("xxl 01 QueryClassEnhance 1 \n")
 		return types.ClassEnhance{}, err
 	}
 
 	ret, err := erc721.Unpack("getClassEnhanceInfo", res.Ret)
 	if err != nil {
-		fmt.Printf("xxl 01 QueryClassEnhance resRet %v \n", err)
+		fmt.Printf("QueryClassEnhance resRet %v \n", err)
 	}
-	fmt.Printf("xxl 01 QueryClassEnhance resRet %v \n", ret)
 
 	if len(ret) != 7 {
 		return types.ClassEnhance{}, nil
 	}
-	
+
 	return types.NewClassEnhance(
 		ret[0].(string), ret[1].(string), ret[2].(bool), ret[3].(string),
 		ret[4].(bool), ret[5].(string), ret[6].(string),
@@ -143,21 +134,18 @@ func (k Keeper) QueryNFTEnhance(
 	tokenID *big.Int,
 ) (types.NFTEnhance, error) {
 
-	fmt.Printf("xxl 01 QueryNFTEnhance start \n")
 	erc721 := contracts.ERC721UpticksContract.ABI
 
 	// Name
 	res, err := k.CallEVM(ctx, erc721, types.ModuleAddress, contract, true, "getNFTEnhanceInfo", tokenID)
 	if err != nil {
-		fmt.Printf("xxl 01 QueryNFTEnhance 1 \n")
 		return types.NFTEnhance{}, err
 	}
 
 	ret, err := erc721.Unpack("getNFTEnhanceInfo", res.Ret)
 	if err != nil {
-		fmt.Printf("xxl 01 QueryNFTEnhance resRet %v \n", err)
+		fmt.Printf("QueryNFTEnhance resRet %v \n", err)
 	}
-	fmt.Printf("xxl 01 QueryNFTEnhance resRet %v \n", ret)
 
 	if len(ret) != 4 {
 		return types.NFTEnhance{}, nil
@@ -247,7 +235,6 @@ func (k Keeper) CallEVM(
 	args ...interface{},
 ) (*evmtypes.MsgEthereumTxResponse, error) {
 
-	fmt.Printf("xxl 01 CallEVM 001 k.CallEVM method %v \n", method)
 	data, err := abi.Pack(method, args...)
 	if err != nil {
 		return nil, sdkerrors.Wrap(
@@ -258,7 +245,6 @@ func (k Keeper) CallEVM(
 
 	resp, err := k.CallEVMWithData(ctx, from, &contract, data, commit)
 	if err != nil {
-		fmt.Printf("xxl 01 CallEVM 002 k.CallEVM method %s-%s \n", method, contract)
 		return nil, sdkerrors.Wrapf(err, "contract call failed: method '%s', contract '%s'", method, contract)
 	}
 	return resp, nil
