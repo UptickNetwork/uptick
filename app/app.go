@@ -1108,9 +1108,9 @@ func initParamsKeeper(
 }
 
 func (app *Uptick) registerUpgradeHandlers() {
-	// v0.2.3 upgrade handler
+
 	app.UpgradeKeeper.SetUpgradeHandler(
-		"v0.2.4",
+		"v0.2.5",
 		func(ctx sdk.Context, _ upgradetypes.Plan, vm module.VersionMap) (module.VersionMap, error) {
 			// Refs:
 			// - https://docs.cosmos.network/master/building-modules/upgrade.html#registering-migrations
