@@ -40,7 +40,6 @@ func NewConvertNFTCmd() *cobra.Command {
 		Args:  cobra.RangeArgs(4, 5),
 		RunE: func(cmd *cobra.Command, args []string) error {
 
-			fmt.Printf("xxl 02 NewConvertNFTCmd 000 start \n")
 			cliCtx, err := client.GetClientTxContext(cmd)
 			if err != nil {
 				return err
@@ -57,18 +56,7 @@ func NewConvertNFTCmd() *cobra.Command {
 			}
 
 			contractAddress := args[2]
-			//fmt.Printf("xxl 02 NewConvertERC721Cmd 001 %v \n", contractAddress)
-			//if len(contractAddress) == 0 {
-			//	fmt.Printf("xxl 02 NewConvertERC721Cmd come to empty \n")
-			//	contractAddress = types.CreateContractAddressFromClassID(classID)
-			//}
-
 			tokenID := args[3]
-			//fmt.Printf("xxl 01 NewConvertERC721Cmd 001 classID : %v \n", tokenID)
-			//if len(tokenID) == 0 {
-			//	fmt.Printf("xxl 01 NewConvertERC721Cmd 002 %v \n", tokenID)
-			//	tokenID = types.CreateTokenIDFromNFTID(nftID)
-			//}
 
 			var receiver string
 			sender := cliCtx.GetFromAddress()
@@ -94,8 +82,6 @@ func NewConvertNFTCmd() *cobra.Command {
 				return err
 			}
 
-			fmt.Printf("xxl 02 NewConvertNFTCmd 002 msg %v \n", msg)
-
 			return tx.GenerateOrBroadcastTxCLI(cliCtx, cmd.Flags(), msg)
 		},
 	}
@@ -113,7 +99,6 @@ func NewConvertERC721Cmd() *cobra.Command {
 		Args: cobra.RangeArgs(4, 5),
 		RunE: func(cmd *cobra.Command, args []string) error {
 
-			fmt.Printf("xxl 01 NewConvertERC721Cmd 000 start \n")
 			cliCtx, err := client.GetClientTxContext(cmd)
 			if err != nil {
 				return err
@@ -132,18 +117,7 @@ func NewConvertERC721Cmd() *cobra.Command {
 			from := common.BytesToAddress(cliCtx.GetFromAddress().Bytes())
 
 			classID := args[2]
-			//fmt.Printf("xxl 01 NewConvertERC721Cmd 001 classID : %v \n", classID)
-			//if len(classID) == 0 {
-			//	fmt.Printf("xxl 01 NewConvertERC721Cmd 002 %v \n", classID)
-			//	classID = types.CreateClassIDFromContractAddress(contractAddress)
-			//}
-
 			nftID := args[3]
-			//fmt.Printf("xxl 01 NewConvertERC721Cmd 001 nftID : %v \n", nftID)
-			//if len(nftID) == 0 {
-			//	fmt.Printf("xxl 01 NewConvertERC721Cmd 002 %v \n", tokenID)
-			//	nftID = types.CreateNFTIDFromTokenID(tokenID)
-			//}
 
 			receiver := cliCtx.GetFromAddress()
 			if len(args) == 5 {
@@ -166,7 +140,6 @@ func NewConvertERC721Cmd() *cobra.Command {
 				return err
 			}
 
-			fmt.Printf("xxl 01 NewConvertERC721Cmd 003 msg,%v \n", msg)
 			return tx.GenerateOrBroadcastTxCLI(cliCtx, cmd.Flags(), msg)
 		},
 	}

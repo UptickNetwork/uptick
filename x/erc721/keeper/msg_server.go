@@ -38,21 +38,15 @@ func (k Keeper) ConvertNFT(
 
 	// Error checked during msg validation
 	receiver := common.HexToAddress(msg.Receiver)
-	sender := sdk.MustAccAddressFromBech32(msg.Sender)
-	fmt.Printf("xxl 02 ConvertNFT 002 receive:%v - sender:%v \n", receiver, sender)
 
 	id := k.GetTokenPairID(ctx, msg.ContractAddress)
-	fmt.Printf("xxl 02 ConvertERC721 003 RegisterERC721 %v \n", id)
 	if len(id) == 0 {
-		fmt.Printf("xxl 02 ConvertERC721 004 RegisterERC721 start \n")
 		_, err := k.RegisterNFT(ctx, msg)
 		if err != nil {
 			return nil, err
 		}
-		fmt.Printf("xxl 02 ConvertERC721 005 RegisterERC721 end \n")
 	}
 
-	fmt.Printf("xxl 02 ConvertERC721 006 GetPair start \n")
 	pair, err := k.GetPair(ctx, msg.ClassId)
 	if err != nil {
 		return nil, err
@@ -84,7 +78,7 @@ func (k Keeper) ConvertERC721(
 ) (
 	*types.MsgConvertERC721Response, error,
 ) {
-	fmt.Printf("#### xxl 01 ConvertERC721 001 start msg %v \n", msg)
+
 	ctx := sdk.UnwrapSDKContext(goCtx)
 
 	//classID, nftID
@@ -96,28 +90,20 @@ func (k Keeper) ConvertERC721(
 	msg.NftId = nftID
 
 	// Error checked during msg validation
-	receiver := sdk.MustAccAddressFromBech32(msg.Receiver)
 	sender := common.HexToAddress(msg.Sender)
 
-	fmt.Printf("xxl 01 ConvertERC721 002 receive:%v - sender:%v \n", receiver, sender)
-
 	id := k.GetTokenPairID(ctx, msg.ContractAddress)
-	fmt.Printf("xxl 01 ConvertERC721 003 RegisterERC721 %v \n", id)
 	if len(id) == 0 {
-		fmt.Printf("xxl 01 ConvertERC721 004 RegisterERC721 start \n")
 		_, err := k.RegisterERC721(ctx, msg)
 		if err != nil {
 			return nil, err
 		}
-		fmt.Printf("xxl 01 ConvertERC721 005 RegisterERC721 end \n")
 	}
 
-	fmt.Printf("xxl 01 ConvertERC721 006 GetPair start \n")
 	pair, err := k.GetPair(ctx, msg.ContractAddress)
 	if err != nil {
 		return nil, err
 	}
-	fmt.Printf("xxl 01 ConvertERC721 003 GetPair %v \n", pair)
 
 	// Remove token pair if contract is suicided
 	erc721 := common.HexToAddress(pair.Erc721Address)
@@ -165,7 +151,7 @@ func (k Keeper) convertCosmos2Evm(
 ) (
 	*types.MsgConvertNFTResponse, error,
 ) {
-	fmt.Printf("xxl 02 convertNFTNativeERC721 001 start \n")
+
 	erc721 := contracts.ERC721UpticksContract.ABI
 	contract := pair.GetERC721Contract()
 
@@ -180,7 +166,7 @@ func (k Keeper) convertCosmos2Evm(
 	if err != nil {
 		return nil, err
 	}
-	fmt.Printf("xxl 02 convertEvm2Cosmos 003 TransferNFT \n")
+
 	transferNft := nftTypes.MsgTransferNFT{
 		DenomId:   msg.ClassId,
 		Id:        msg.NftId,
@@ -191,7 +177,6 @@ func (k Keeper) convertCosmos2Evm(
 		Sender:    msg.Sender,
 		Recipient: types.AccModuleAddress.String(),
 	}
-	fmt.Printf("xxl 02 convertEvm2Cosmos 005 TransferNFT %v \n", transferNft)
 	if _, err = k.nftKeeper.TransferNFT(ctx, &transferNft); err != nil {
 		return nil, err
 	}
@@ -199,11 +184,6 @@ func (k Keeper) convertCosmos2Evm(
 	// query tokenID by given nftID
 	tokenID := string(k.GetNFTPairByNFTID(ctx, msg.ClassId, msg.NftId))
 	// sender := common.Address{msg.Sender}
-	fmt.Printf("xxl 02 convertNFTNativeERC721 002 %v \n", tokenID)
-
-	fmt.Printf("xxl 02 k.CallEVM 003 ModuleAddress:%v,contract:%v,receiver:%v, TokenId:%v \n",
-		types.ModuleAddress, contract, receiver, msg.TokenId,
-	)
 
 	//	does token id exist
 	owner, err := k.QueryERC721TokenOwner(ctx, common.HexToAddress(msg.ContractAddress), bigTokenId)
@@ -239,11 +219,7 @@ func (k Keeper) convertCosmos2Evm(
 	if err != nil {
 		return nil, err
 	}
-	fmt.Printf("xxl 02 after CallEVM 004 \n")
-
-	fmt.Printf("xxl 02 k.CallEVM 004 CallEVM end \n")
 	if err != nil {
-		fmt.Printf("xxl 02 k.CallEVM 005 CallEVM err \n")
 		return nil, err
 	}
 
@@ -280,7 +256,6 @@ func (k Keeper) convertEvm2Cosmos(
 	*types.MsgConvertERC721Response, error,
 ) {
 
-	fmt.Printf("xxl 01 convertEvm2Cosmos 001 start \n")
 	erc721 := contracts.ERC721UpticksContract.ABI
 	contract := pair.GetERC721Contract()
 
@@ -290,11 +265,8 @@ func (k Keeper) convertEvm2Cosmos(
 		sdkerrors.Wrapf(sdkerrors.ErrUnauthorized, "%s error scanning value", err)
 		return nil, err
 	}
-	fmt.Printf("xxl 01 convertEvm2Cosmos 002 k.CallEVM \n")
 
 	reqInfo, err := k.QueryNFTEnhance(ctx, contract, bigTokenId)
-	fmt.Printf("xxl 01 getEnhanceInfo 026 k.CallEVM res %v \n", reqInfo)
-
 	_, err = k.CallEVM(
 		ctx, erc721, sender, contract, true,
 		"safeTransferFrom", sender, types.ModuleAddress, bigTokenId,
@@ -312,7 +284,6 @@ func (k Keeper) convertEvm2Cosmos(
 	nftID := string(k.GetNFTPairByTokenID(ctx, msg.ContractAddress, msg.TokenId))
 	if nftID == "" {
 
-		fmt.Printf("xxl 01 convertEvm2Cosmos 003 MintNFT \n")
 		mintNFT := nftTypes.MsgMintNFT{
 			DenomId:   msg.ClassId,
 			Id:        msg.NftId,
@@ -324,13 +295,11 @@ func (k Keeper) convertEvm2Cosmos(
 			Recipient: msg.Receiver,
 		}
 
-		fmt.Printf("xxl 01 convertEvm2Cosmos 005 MsgMintNFT %v \n", mintNFT.Sender)
 		// mint nft
 		if _, err = k.nftKeeper.MintNFT(ctx, &mintNFT); err != nil {
 			return nil, err
 		}
 	} else {
-		fmt.Printf("xxl 01 convertEvm2Cosmos 003 TransferNFT \n")
 		transferNft := nftTypes.MsgTransferNFT{
 			DenomId:   msg.ClassId,
 			Id:        msg.NftId,
@@ -363,6 +332,5 @@ func (k Keeper) convertEvm2Cosmos(
 		},
 	)
 
-	fmt.Printf("xxl 01 convertEvm2Cosmos 004 end \n")
 	return &types.MsgConvertERC721Response{}, nil
 }
