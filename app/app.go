@@ -129,6 +129,8 @@ import (
 	ibcnfttransferkeeper "github.com/bianjieai/nft-transfer/keeper"
 	ibcnfttransfertypes "github.com/bianjieai/nft-transfer/types"
 
+	"github.com/UptickNetwork/uptick/x/internft"
+
 	"github.com/UptickNetwork/uptick/x/erc721"
 	erc721keeper "github.com/UptickNetwork/uptick/x/erc721/keeper"
 	erc721types "github.com/UptickNetwork/uptick/x/erc721/types"
@@ -321,6 +323,7 @@ func NewUptick(
 	appOpts servertypes.AppOptions,
 	baseAppOptions ...func(*baseapp.BaseApp),
 ) *Uptick {
+
 	appCodec := encodingConfig.Codec
 	cdc := encodingConfig.Amino
 	interfaceRegistry := encodingConfig.InterfaceRegistry
@@ -502,19 +505,6 @@ func NewUptick(
 		tkeys[feemarkettypes.TransientKey],
 	)
 
-	// Create Ethermint keepers
-	//app.EvmKeeper = evmkeeper.NewKeeper(
-	//	appCodec,
-	//	keys[evmtypes.StoreKey],
-	//	tkeys[evmtypes.TransientKey],
-	//	app.GetSubspace(evmtypes.ModuleName),
-	//	app.AccountKeeper,
-	//	app.BankKeeper,
-	//	app.StakingKeeper,
-	//	app.FeeMarketKeeper,
-	//	tracer,
-	//)
-
 	app.EvmKeeper = evmkeeper.NewKeeper(
 		appCodec,
 		keys[evmtypes.StoreKey],
@@ -622,11 +612,11 @@ func NewUptick(
 		app.IBCKeeper.ChannelKeeper,
 		&app.IBCKeeper.PortKeeper,
 		app.AccountKeeper,
-		app.NFTKeeper.NewISC721Keeper(),
+		internft.NewInterNftKeeper(appCodec, app.NFTKeeper, app.AccountKeeper),
 		scopedNFTTransferKeeper,
 	)
 
-	nfttransferModule := nfttransfer.NewAppModule(app.IBCNFTTransferKeeper)
+	ibcnfttransferModule := nfttransfer.NewAppModule(app.IBCNFTTransferKeeper)
 	nfttransferIBCModule := nfttransfer.NewIBCModule(app.IBCNFTTransferKeeper)
 
 	// Create static IBC router, add transfer route, then set and seal it
@@ -689,7 +679,7 @@ func NewUptick(
 		erc721.NewAppModule(app.Erc721Keeper, app.AccountKeeper),
 		collection.NewAppModule(app.appCodec, app.CollectionKeeper, app.AccountKeeper, app.BankKeeper),
 
-		nfttransferModule,
+		ibcnfttransferModule,
 		// interTxModule,
 	)
 
@@ -832,6 +822,7 @@ func NewUptick(
 		feemarket.NewAppModule(app.FeeMarketKeeper),
 		collection.NewAppModule(app.appCodec, app.CollectionKeeper, app.AccountKeeper, app.BankKeeper),
 		nftmodule.NewAppModule(appCodec, app.NFTKeeper, app.AccountKeeper, app.BankKeeper),
+		ibcnfttransferModule,
 	)
 
 	app.sm.RegisterStoreDecoders()
