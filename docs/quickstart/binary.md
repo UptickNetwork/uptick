@@ -109,13 +109,13 @@ uptickd config
 
 We can make changes to the default settings upon our choices, so it allows users to set the configuration beforehand all at once, so it would be ready with the same config afterward.
 
-For example, the chain identifier can be changed to `uptick_7000-1` from a blank name by using:
+For example, the chain identifier can be changed to `uptick_7000-2` from a blank name by using:
 
 ```bash
-uptickd config "chain-id" uptick_7000-1
+uptickd config "chain-id" uptick_7000-2
 uptickd config
 {
- "chain-id": "uptick_7000-1",
+ "chain-id": "uptick_7000-2",
  "keyring-backend": "os",
  "output": "text",
  "node": "tcp://localhost:26657",
@@ -135,7 +135,7 @@ Alternatively, we can directly make the changes to the config values in one plac
 
 # The network chain ID
 
-chain-id = "uptick_7000-1"
+chain-id = "uptick_7000-2"
 
 # The keyring's backend, where the keys are stored (os|file|kwallet|pass|test|memory)
 

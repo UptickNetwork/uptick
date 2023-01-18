@@ -101,7 +101,7 @@ export DAEMON_ALLOW_DOWNLOAD_BINARIES=true
 You can now download the "genesis" file for the chain. It is pre-filled with the entire genesis state and gentxs.
 
 ```bash
-curl https://raw.githubusercontent.com/UptickNetwork/uptick-testnet/main/uptick_7000-1/genesis.json > ~/.uptickd/config/genesis.json
+curl https://raw.githubusercontent.com/UptickNetwork/uptick-testnet/main/uptick_7000-2/genesis.json > ~/.uptickd/config/genesis.json
 ```
 
 We recommend using `sha256sum` to check the hash of the genesis.
@@ -116,12 +116,12 @@ echo "2b5164f4bab00263cb424c3d0aa5c47a707184c6ff288322acc4c7e0c5f6f36f  genesis.
 There shouldn't be any chain database yet, but in case there is for some reason, you should reset it. This is a good idea especially if you ran `uptickd start` on an old, broken genesis file.
 
 ```bash
-uptickd unsafe-reset-all
+uptickd tendermint unsafe-reset-all
 ```
 
 #### Ensure that you have set peers
 
-In `~/.uptickd/config/config.toml` you can set your peers. See the [peers.txt](https://github.com/UptickNetwork/uptick-testnet/blob/main/uptick_7000-1/peers.txt) file for a list of up to date peers.
+In `~/.uptickd/config/config.toml` you can set your peers. See the [peers.txt](https://github.com/UptickNetwork/uptick-testnet/blob/main/uptick_7000-2/peers.txt) file for a list of up to date peers.
 
 See the [Add persistent peers section](https://docs.uptick.network/testnet/join.html#add-persistent-peers) in our docs for an automated method, but field should look something like a comma separated string of peers (do not copy this, just an example):
 
