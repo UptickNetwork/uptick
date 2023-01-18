@@ -25,7 +25,7 @@ const (
 	ERC721EventTransfer = "Transfer"
 )
 
-// Event type for Transfer(address from, address to, string tokenID)
+// LogTransfer type for Transfer(address from, address to, string tokenID)
 type LogTransfer struct {
 	From    common.Address
 	To      common.Address

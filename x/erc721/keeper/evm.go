@@ -2,12 +2,11 @@ package keeper
 
 import (
 	"encoding/json"
+	"fmt"
 	"math/big"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
-	"github.com/cosmos/cosmos-sdk/x/nft"
-
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -21,13 +20,19 @@ import (
 	"github.com/UptickNetwork/uptick/x/erc721/types"
 )
 
-// DeployERC20Contract creates and deploys an ERC20 contract on the EVM with the
+// DeployERC721Contract creates and deploys an ERC20 contract on the EVM with the
 // erc20 module account as owner.
 func (k Keeper) DeployERC721Contract(
 	ctx sdk.Context,
-	class nft.Class,
+	msg *types.MsgConvertNFT,
 ) (common.Address, error) {
-	ctorArgs, err := contracts.ERC721PresetMinterPauserAutoIdsContract.ABI.Pack(
+
+	class, err := k.nftKeeper.GetDenomInfo(ctx, msg.ClassId)
+	if err != nil {
+		return common.Address{}, sdkerrors.Wrapf(types.ErrABIPack, "nft class is invalid %s: %s", class.Id, err.Error())
+	}
+
+	ctorArgs, err := contracts.ERC721UpticksContract.ABI.Pack(
 		"",
 		class.Name,
 		class.Symbol,
@@ -64,7 +69,7 @@ func (k Keeper) QueryERC721(
 		symbolRes types.ERC721StringResponse
 	)
 
-	erc721 := contracts.ERC721PresetMinterPauserAutoIdsContract.ABI
+	erc721 := contracts.ERC721UpticksContract.ABI
 
 	// Name
 	res, err := k.CallEVM(ctx, erc721, types.ModuleAddress, contract, false, "name")
@@ -93,11 +98,66 @@ func (k Keeper) QueryERC721(
 	return types.NewERC721Data(nameRes.Value, symbolRes.Value), nil
 }
 
+// QueryClassEnhance returns the data of a deployed ERC721 contract
+func (k Keeper) QueryClassEnhance(
+	ctx sdk.Context,
+	contract common.Address,
+) (types.ClassEnhance, error) {
+
+	erc721 := contracts.ERC721UpticksContract.ABI
+
+	// Name
+	res, err := k.CallEVM(ctx, erc721, types.ModuleAddress, contract, false, "getClassEnhanceInfo")
+	if err != nil {
+		return types.ClassEnhance{}, err
+	}
+
+	ret, err := erc721.Unpack("getClassEnhanceInfo", res.Ret)
+	if err != nil {
+		fmt.Printf("QueryClassEnhance resRet %v \n", err)
+	}
+
+	if len(ret) != 7 {
+		return types.ClassEnhance{}, nil
+	}
+
+	return types.NewClassEnhance(
+		ret[0].(string), ret[1].(string), ret[2].(bool), ret[3].(string),
+		ret[4].(bool), ret[5].(string), ret[6].(string),
+	), nil
+}
+
+// QueryNFTEnhance returns the data of a deployed ERC721 contract
+func (k Keeper) QueryNFTEnhance(
+	ctx sdk.Context,
+	contract common.Address,
+	tokenID *big.Int,
+) (types.NFTEnhance, error) {
+
+	erc721 := contracts.ERC721UpticksContract.ABI
+
+	// Name
+	res, err := k.CallEVM(ctx, erc721, types.ModuleAddress, contract, true, "getNFTEnhanceInfo", tokenID)
+	if err != nil {
+		return types.NFTEnhance{}, err
+	}
+
+	ret, err := erc721.Unpack("getNFTEnhanceInfo", res.Ret)
+	if err != nil {
+		fmt.Printf("QueryNFTEnhance resRet %v \n", err)
+	}
+
+	if len(ret) != 4 {
+		return types.NFTEnhance{}, nil
+	}
+
+	return types.NewNFTEnhance(ret[0].(string), ret[1].(string), ret[2].(string), ret[3].(string)), nil
+}
+
 // QueryERC721Token returns the data of a ERC721 token
 func (k Keeper) QueryERC721Token(
 	ctx sdk.Context,
 	contract common.Address,
-	tokenID *big.Int,
 ) (types.ERC721TokenData, error) {
 	var (
 		nameRes   types.ERC721TokenStringResponse
@@ -105,7 +165,7 @@ func (k Keeper) QueryERC721Token(
 		uriRes    types.ERC721TokenStringResponse
 	)
 
-	erc721 := contracts.ERC721PresetMinterPauserAutoIdsContract.ABI
+	erc721 := contracts.ERC721UpticksContract.ABI
 
 	// Name
 	res, err := k.CallEVM(ctx, erc721, types.ModuleAddress, contract, false, "name")
@@ -131,12 +191,6 @@ func (k Keeper) QueryERC721Token(
 		)
 	}
 
-	// Uri
-	res, err = k.CallEVM(ctx, erc721, types.ModuleAddress, contract, false, "tokenURI", tokenID)
-	if err != nil {
-		return types.ERC721TokenData{}, err
-	}
-
 	if err := erc721.UnpackIntoInterface(&symbolRes, "symbol", res.Ret); err != nil {
 		return types.ERC721TokenData{}, sdkerrors.Wrapf(
 			types.ErrABIUnpack, "failed to unpack uri: %s", err.Error(),
@@ -144,30 +198,6 @@ func (k Keeper) QueryERC721Token(
 	}
 
 	return types.NewERC721TokenData(nameRes.Value, symbolRes.Value, uriRes.Value), nil
-}
-
-// QueryERC721NextTokenID returns the next tokenID to mint
-func (k Keeper) QueryERC721NextTokenID(
-	ctx sdk.Context,
-	contract common.Address,
-) (*big.Int, error) {
-	var idRes types.ERC721TokenIDResponse
-
-	erc721 := contracts.ERC721PresetMinterPauserAutoIdsContract.ABI
-
-	// Name
-	res, err := k.CallEVM(ctx, erc721, types.ModuleAddress, contract, false, "nextTokenId")
-	if err != nil {
-		return nil, err
-	}
-
-	if err := erc721.UnpackIntoInterface(&idRes, "nextTokenId", res.Ret); err != nil {
-		return nil, sdkerrors.Wrapf(
-			types.ErrABIUnpack, "failed to unpack nextTokenId: %s", err.Error(),
-		)
-	}
-
-	return idRes.Value, nil
 }
 
 // QueryERC721TokenOwner returns the owner of given tokenID
@@ -178,7 +208,7 @@ func (k Keeper) QueryERC721TokenOwner(
 ) (common.Address, error) {
 	var ownerRes types.ERC721TokenOwnerResponse
 
-	erc721 := contracts.ERC721PresetMinterPauserAutoIdsContract.ABI
+	erc721 := contracts.ERC721UpticksContract.ABI
 
 	// Name
 	res, err := k.CallEVM(ctx, erc721, types.ModuleAddress, contract, false, "ownerOf", tokenID)
@@ -215,7 +245,6 @@ func (k Keeper) CallEVM(
 
 	resp, err := k.CallEVMWithData(ctx, from, &contract, data, commit)
 	if err != nil {
-
 		return nil, sdkerrors.Wrapf(err, "contract call failed: method '%s', contract '%s'", method, contract)
 	}
 	return resp, nil
@@ -279,25 +308,4 @@ func (k Keeper) CallEVMWithData(
 	}
 
 	return res, nil
-}
-
-// monitorApprovalEvent returns an error if the given transactions logs include
-// an unexpected `Approval` event
-func (k Keeper) monitorApprovalEvent(res *evmtypes.MsgEthereumTxResponse) error {
-	if res == nil || len(res.Logs) == 0 {
-		return nil
-	}
-
-	//logApprovalSig := []byte("Approval(address,address,uint256)")
-	//logApprovalSigHash := crypto.Keccak256Hash(logApprovalSig)
-	//
-	//for _, log := range res.Logs {
-	//	if log.Topics[0] == logApprovalSigHash.Hex() {
-	//		return sdkerrors.Wrapf(
-	//			types.ErrUnexpectedEvent, "unexpected Approval event 1111" ,
-	//		)
-	//	}
-	//}
-
-	return nil
 }

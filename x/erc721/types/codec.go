@@ -24,9 +24,6 @@ func RegisterInterfaces(registry codectypes.InterfaceRegistry) {
 	)
 	registry.RegisterImplementations(
 		(*gov.Content)(nil),
-		&RegisterNFTProposal{},
-		&RegisterERC721Proposal{},
-		&ToggleTokenConversionProposal{},
 	)
 
 	msgservice.RegisterMsgServiceDesc(registry, &_Msg_serviceDesc)

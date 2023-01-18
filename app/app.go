@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/cosmos/cosmos-sdk/x/nft"
+	"github.com/evmos/ethermint/x/evm/vm/geth"
+	nftmodule "github.com/irisnet/irismod/modules/nft/module"
 	"io"
 	"net/http"
 	"os"
@@ -96,7 +99,6 @@ import (
 	porttypes "github.com/cosmos/ibc-go/v5/modules/core/05-port/types"
 	ibchost "github.com/cosmos/ibc-go/v5/modules/core/24-host"
 	ibckeeper "github.com/cosmos/ibc-go/v5/modules/core/keeper"
-	ibctesting "github.com/cosmos/ibc-go/v5/testing"
 
 	_ "github.com/evmos/ethermint/client/docs/statik" // unnamed import of statik for swagger UI support
 	"github.com/evmos/ethermint/encoding"
@@ -121,25 +123,20 @@ import (
 	govv1beta1 "github.com/cosmos/cosmos-sdk/x/gov/types/v1beta1"
 
 	"github.com/UptickNetwork/uptick/app/ante"
-
 	authsims "github.com/cosmos/cosmos-sdk/x/auth/simulation"
 
-	"github.com/cosmos/cosmos-sdk/x/nft"
-	nftkeeper "github.com/cosmos/cosmos-sdk/x/nft/keeper"
-	nftmodule "github.com/cosmos/cosmos-sdk/x/nft/module"
+	nfttransfer "github.com/bianjieai/nft-transfer"
+	ibcnfttransferkeeper "github.com/bianjieai/nft-transfer/keeper"
+	ibcnfttransfertypes "github.com/bianjieai/nft-transfer/types"
 
-	internft "github.com/UptickNetwork/uptick/x/inter-nft"
-	internftkeeper "github.com/UptickNetwork/uptick/x/inter-nft/keeper"
-	internftmodule "github.com/UptickNetwork/uptick/x/inter-nft/module"
-
-	nfttransfer "github.com/cosmos/ibc-go/v5/modules/apps/nft-transfer"
-	ibcnfttransferkeeper "github.com/cosmos/ibc-go/v5/modules/apps/nft-transfer/keeper"
-	ibcnfttransfertypes "github.com/cosmos/ibc-go/v5/modules/apps/nft-transfer/types"
+	"github.com/UptickNetwork/uptick/x/internft"
 
 	"github.com/UptickNetwork/uptick/x/erc721"
-	erc721client "github.com/UptickNetwork/uptick/x/erc721/client"
 	erc721keeper "github.com/UptickNetwork/uptick/x/erc721/keeper"
 	erc721types "github.com/UptickNetwork/uptick/x/erc721/types"
+
+	nftkeeper "github.com/irisnet/irismod/modules/nft/keeper"
+	nfttypes "github.com/irisnet/irismod/modules/nft/types"
 )
 
 func init() {
@@ -188,10 +185,6 @@ var (
 				erc20client.RegisterCoinProposalHandler,
 				erc20client.RegisterERC20ProposalHandler,
 				erc20client.ToggleTokenRelayProposalHandler,
-
-				erc721client.RegisterNFTProposalHandler,
-				erc721client.RegisterERC721ProposalHandler,
-				erc721client.ToggleTokenConversionProposalHandler,
 			},
 		),
 
@@ -212,9 +205,11 @@ var (
 		erc721.AppModuleBasic{},
 
 		collection.AppModuleBasic{},
-		nftmodule.AppModuleBasic{},
-		internftmodule.AppModuleBasic{},
 		nfttransfer.AppModuleBasic{},
+		nftmodule.AppModuleBasic{},
+
+		//internftmodule.AppModuleBasic{},
+		//
 	)
 
 	// module account permissions
@@ -227,12 +222,13 @@ var (
 		govtypes.ModuleName:            {authtypes.Burner},
 		ibctransfertypes.ModuleName:    {authtypes.Minter, authtypes.Burner},
 
-		evmtypes.ModuleName:            {authtypes.Minter, authtypes.Burner}, // used for secure addition and subtraction of balance using module account
-		erc20types.ModuleName:          {authtypes.Minter, authtypes.Burner},
-		erc721types.ModuleName:         nil,
+		evmtypes.ModuleName:    {authtypes.Minter, authtypes.Burner}, // used for secure addition and subtraction of balance using module account
+		erc20types.ModuleName:  {authtypes.Minter, authtypes.Burner},
+		erc721types.ModuleName: nil,
 
-		collectiontypes.ModuleName:     nil,
-		nft.ModuleName:                 nil,
+		collectiontypes.ModuleName: nil,
+		// nfttypes.ModuleName:        nil,
+		nft.ModuleName: nil,
 	}
 
 	// module accounts that are allowed to receive tokens
@@ -244,7 +240,7 @@ var (
 var (
 	_ servertypes.Application = (*Uptick)(nil)
 	_ simapp.App              = (*Uptick)(nil)
-	_ ibctesting.TestingApp   = (*Uptick)(nil)
+	//	_ ibctesting.TestingApp   = (*Uptick)(nil)
 )
 
 // Uptick implements an extended ABCI application. It is an application
@@ -279,9 +275,9 @@ type Uptick struct {
 	ParamsKeeper     paramskeeper.Keeper
 	IBCKeeper        *ibckeeper.Keeper // IBC Keeper must be a pointer in the app, so we can SetRouter on it correctly
 
-	EvidenceKeeper   evidencekeeper.Keeper
-	TransferKeeper   ibctransferkeeper.Keeper
-	FeeGrantKeeper   feegrantkeeper.Keeper
+	EvidenceKeeper evidencekeeper.Keeper
+	TransferKeeper ibctransferkeeper.Keeper
+	FeeGrantKeeper feegrantkeeper.Keeper
 
 	// make scoped keepers public for test purposes
 	ScopedIBCKeeper           capabilitykeeper.ScopedKeeper
@@ -290,7 +286,7 @@ type Uptick struct {
 	ScopedICAHostKeeper       capabilitykeeper.ScopedKeeper
 	ScopedNFTTransferKeeper   capabilitykeeper.ScopedKeeper
 
-	InterNFTKeeper   internftkeeper.Keeper
+	//InterNFTKeeper       internftkeeper.Keeper
 	IBCNFTTransferKeeper ibcnfttransferkeeper.Keeper
 
 	// the module manager
@@ -299,18 +295,18 @@ type Uptick struct {
 	// the configurator
 	configurator module.Configurator
 
-	AuthzKeeper      authzkeeper.Keeper
+	AuthzKeeper authzkeeper.Keeper
 	// Ethermint keepers
 	EvmKeeper       *evmkeeper.Keeper
 	FeeMarketKeeper feemarketkeeper.Keeper
 	// Uptick keepers
-	Erc20Keeper      *erc20keeper.Keeper
-	Erc721Keeper     erc721keeper.Keeper
+	Erc20Keeper  *erc20keeper.Keeper
+	Erc721Keeper erc721keeper.Keeper
 
 	NFTKeeper        nftkeeper.Keeper
 	CollectionKeeper collectionkeeper.Keeper
 	// simulation manager
-	sm *module.SimulationManager
+	sm         *module.SimulationManager
 	tpsCounter *tpsCounter
 }
 
@@ -327,6 +323,7 @@ func NewUptick(
 	appOpts servertypes.AppOptions,
 	baseAppOptions ...func(*baseapp.BaseApp),
 ) *Uptick {
+
 	appCodec := encodingConfig.Codec
 	cdc := encodingConfig.Amino
 	interfaceRegistry := encodingConfig.InterfaceRegistry
@@ -372,12 +369,14 @@ func NewUptick(
 		erc721types.StoreKey,
 		collectiontypes.StoreKey,
 
-		internft.StoreKey,
+		nfttypes.StoreKey,
+
+		// internft.StoreKey,
 		ibcnfttransfertypes.StoreKey,
 	)
 
 	// Add the EVM transient store key
-	tkeys := sdk.NewTransientStoreKeys(paramstypes.TStoreKey, evmtypes.TransientKey,feemarkettypes.TransientKey)
+	tkeys := sdk.NewTransientStoreKeys(paramstypes.TStoreKey, evmtypes.TransientKey, feemarkettypes.TransientKey)
 	memKeys := sdk.NewMemoryStoreKeys(capabilitytypes.MemStoreKey)
 
 	app := &Uptick{
@@ -494,7 +493,7 @@ func NewUptick(
 		appCodec,
 		app.MsgServiceRouter(),
 		app.AccountKeeper,
-    )
+	)
 
 	tracer := cast.ToString(appOpts.Get(srvflags.EVMTracer))
 
@@ -506,7 +505,6 @@ func NewUptick(
 		tkeys[feemarkettypes.TransientKey],
 	)
 
-	// Create Ethermint keepers
 	app.EvmKeeper = evmkeeper.NewKeeper(
 		appCodec,
 		keys[evmtypes.StoreKey],
@@ -514,8 +512,10 @@ func NewUptick(
 		app.GetSubspace(evmtypes.ModuleName),
 		app.AccountKeeper,
 		app.BankKeeper,
-		app.StakingKeeper,
+		&stakingKeeper,
 		app.FeeMarketKeeper,
+		nil,
+		geth.NewEVM,
 		tracer,
 	)
 
@@ -539,8 +539,8 @@ func NewUptick(
 		app.EvmKeeper,
 	)
 	app.NFTKeeper = nftkeeper.NewKeeper(
-		keys[nftkeeper.StoreKey],
 		appCodec,
+		keys[nfttypes.StoreKey],
 		app.AccountKeeper,
 		app.BankKeeper)
 
@@ -561,8 +561,7 @@ func NewUptick(
 		AddRoute(distrtypes.RouterKey, distr.NewCommunityPoolSpendProposalHandler(app.DistrKeeper)).
 		AddRoute(upgradetypes.RouterKey, upgrade.NewSoftwareUpgradeProposalHandler(app.UpgradeKeeper)).
 		AddRoute(ibchost.RouterKey, ibcclient.NewClientProposalHandler(app.IBCKeeper.ClientKeeper)).
-		AddRoute(erc20types.RouterKey, erc20.NewErc20ProposalHandler(app.Erc20Keeper)).
-		AddRoute(erc721types.RouterKey, erc721.NewErc721ProposalHandler(&app.Erc721Keeper))
+		AddRoute(erc20types.RouterKey, erc20.NewErc20ProposalHandler(app.Erc20Keeper))
 
 	govConfig := govtypes.DefaultConfig()
 	govKeeper := govkeeper.NewKeeper(
@@ -606,14 +605,6 @@ func NewUptick(
 	// create IBC module from bottom to top of stack
 	transferStack := erc20.NewIBCMiddleware(*app.Erc20Keeper, transferIBCModule)
 
-	app.InterNFTKeeper = internftkeeper.NewKeeper(
-		appCodec,
-		keys[internft.StoreKey],
-		app.AccountKeeper,
-		app.BankKeeper,
-	)
-	interTxModule := internftmodule.NewAppModule(appCodec, app.InterNFTKeeper)
-
 	app.IBCNFTTransferKeeper = ibcnfttransferkeeper.NewKeeper(
 		appCodec,
 		keys[ibcnfttransfertypes.StoreKey],
@@ -621,18 +612,19 @@ func NewUptick(
 		app.IBCKeeper.ChannelKeeper,
 		&app.IBCKeeper.PortKeeper,
 		app.AccountKeeper,
-		app.InterNFTKeeper,
+		internft.NewInterNftKeeper(appCodec, app.NFTKeeper, app.AccountKeeper),
 		scopedNFTTransferKeeper,
 	)
-	nfttransferModule := nfttransfer.NewAppModule(app.IBCNFTTransferKeeper)
+
+	ibcnfttransferModule := nfttransfer.NewAppModule(app.IBCNFTTransferKeeper)
 	nfttransferIBCModule := nfttransfer.NewIBCModule(app.IBCNFTTransferKeeper)
 
 	// Create static IBC router, add transfer route, then set and seal it
 	ibcRouter := porttypes.NewRouter()
 
 	ibcRouter.AddRoute(ibctransfertypes.ModuleName, transferStack).
-		      //AddRoute(ibctransfertypes.ModuleName, transferIBCModule).
-		      AddRoute(ibcnfttransfertypes.ModuleName, nfttransferIBCModule)
+		//AddRoute(ibctransfertypes.ModuleName, transferIBCModule).
+		AddRoute(ibcnfttransfertypes.ModuleName, nfttransferIBCModule)
 
 	app.IBCKeeper.SetRouter(ibcRouter)
 
@@ -665,7 +657,7 @@ func NewUptick(
 		capability.NewAppModule(appCodec, *app.CapabilityKeeper),
 		crisis.NewAppModule(&app.CrisisKeeper, skipGenesisInvariants),
 		gov.NewAppModule(appCodec, app.GovKeeper, app.AccountKeeper, app.BankKeeper),
-		mint.NewAppModule(appCodec, app.MintKeeper, app.AccountKeeper,nil),
+		mint.NewAppModule(appCodec, app.MintKeeper, app.AccountKeeper, nil),
 		slashing.NewAppModule(appCodec, app.SlashingKeeper, app.AccountKeeper, app.BankKeeper, app.StakingKeeper),
 		distr.NewAppModule(appCodec, app.DistrKeeper, app.AccountKeeper, app.BankKeeper, app.StakingKeeper),
 		staking.NewAppModule(appCodec, app.StakingKeeper, app.AccountKeeper, app.BankKeeper),
@@ -675,6 +667,7 @@ func NewUptick(
 		feegrantmodule.NewAppModule(appCodec, app.AccountKeeper, app.BankKeeper, app.FeeGrantKeeper, app.interfaceRegistry),
 		authzmodule.NewAppModule(appCodec, app.AuthzKeeper, app.AccountKeeper, app.BankKeeper, app.interfaceRegistry),
 
+		nftmodule.NewAppModule(appCodec, app.NFTKeeper, app.AccountKeeper, app.BankKeeper),
 		// ibc modules
 		ibc.NewAppModule(app.IBCKeeper),
 		transferModule,
@@ -684,12 +677,10 @@ func NewUptick(
 		// Uptick app modules
 		erc20.NewAppModule(*app.Erc20Keeper, app.AccountKeeper),
 		erc721.NewAppModule(app.Erc721Keeper, app.AccountKeeper),
-		nftmodule.NewAppModule(appCodec, app.NFTKeeper, app.AccountKeeper, app.BankKeeper, app.interfaceRegistry),
 		collection.NewAppModule(app.appCodec, app.CollectionKeeper, app.AccountKeeper, app.BankKeeper),
 
-		nfttransferModule,
-		interTxModule,
-
+		ibcnfttransferModule,
+		// interTxModule,
 	)
 
 	// During begin block slashing happens after distr.BeginBlocker so that
@@ -723,7 +714,7 @@ func NewUptick(
 		vestingtypes.ModuleName,
 		erc20types.ModuleName,
 		erc721types.ModuleName,
-		nft.ModuleName,
+		nfttypes.ModuleName,
 		collectiontypes.ModuleName,
 
 		ibcnfttransfertypes.ModuleName,
@@ -754,7 +745,7 @@ func NewUptick(
 		vestingtypes.ModuleName,
 		erc20types.ModuleName,
 		erc721types.ModuleName,
-		nft.ModuleName,
+		nfttypes.ModuleName,
 		collectiontypes.ModuleName,
 		ibcnfttransfertypes.ModuleName,
 	)
@@ -795,7 +786,7 @@ func NewUptick(
 		erc721types.ModuleName,
 
 		crisistypes.ModuleName,
-		nft.ModuleName,
+		nfttypes.ModuleName,
 		collectiontypes.ModuleName,
 		ibcnfttransfertypes.ModuleName,
 	)
@@ -817,7 +808,7 @@ func NewUptick(
 		bank.NewAppModule(appCodec, app.BankKeeper, app.AccountKeeper),
 		capability.NewAppModule(appCodec, *app.CapabilityKeeper),
 		gov.NewAppModule(appCodec, app.GovKeeper, app.AccountKeeper, app.BankKeeper),
-		mint.NewAppModule(appCodec, app.MintKeeper, app.AccountKeeper,nil),
+		mint.NewAppModule(appCodec, app.MintKeeper, app.AccountKeeper, nil),
 		staking.NewAppModule(appCodec, app.StakingKeeper, app.AccountKeeper, app.BankKeeper),
 		distr.NewAppModule(appCodec, app.DistrKeeper, app.AccountKeeper, app.BankKeeper, app.StakingKeeper),
 		slashing.NewAppModule(appCodec, app.SlashingKeeper, app.AccountKeeper, app.BankKeeper, app.StakingKeeper),
@@ -829,8 +820,9 @@ func NewUptick(
 		transferModule,
 		evm.NewAppModule(app.EvmKeeper, app.AccountKeeper),
 		feemarket.NewAppModule(app.FeeMarketKeeper),
-		nftmodule.NewAppModule(appCodec, app.NFTKeeper, app.AccountKeeper, app.BankKeeper, app.interfaceRegistry),
 		collection.NewAppModule(app.appCodec, app.CollectionKeeper, app.AccountKeeper, app.BankKeeper),
+		nftmodule.NewAppModule(appCodec, app.NFTKeeper, app.AccountKeeper, app.BankKeeper),
+		ibcnfttransferModule,
 	)
 
 	app.sm.RegisterStoreDecoders()
@@ -898,7 +890,6 @@ func (app *Uptick) EndBlocker(ctx sdk.Context, req abci.RequestEndBlock) abci.Re
 	return app.mm.EndBlock(ctx, req)
 }
 
-
 func (app *Uptick) DeliverTx(req abci.RequestDeliverTx) (res abci.ResponseDeliverTx) {
 	defer func() {
 		// TODO: Record the count along with the code and or reason so as to display
@@ -921,7 +912,6 @@ func (app *Uptick) InitChainer(ctx sdk.Context, req abci.RequestInitChain) abci.
 	}
 	app.UpgradeKeeper.SetModuleVersionMap(ctx, app.mm.GetVersionMap())
 
-	//fmt.Printf("xxl ctx %v+ app.appCodec %v+ genesisState %v+ \n",ctx,app.appCodec,genesisState)
 	return app.mm.InitGenesis(ctx, app.appCodec, genesisState)
 }
 
@@ -1083,7 +1073,7 @@ func initParamsKeeper(
 	appCodec codec.BinaryCodec,
 	legacyAmino *codec.LegacyAmino,
 	key,
-	tkey  storetypes.StoreKey,
+	tkey storetypes.StoreKey,
 ) paramskeeper.Keeper {
 	paramsKeeper := paramskeeper.NewKeeper(appCodec, legacyAmino, key, tkey)
 
@@ -1108,18 +1098,14 @@ func initParamsKeeper(
 	return paramsKeeper
 }
 
-
 func (app *Uptick) registerUpgradeHandlers() {
-	// v0.2.3 upgrade handler
+
 	app.UpgradeKeeper.SetUpgradeHandler(
-		"v0.2.4",
+		"v0.2.5",
 		func(ctx sdk.Context, _ upgradetypes.Plan, vm module.VersionMap) (module.VersionMap, error) {
 			// Refs:
 			// - https://docs.cosmos.network/master/building-modules/upgrade.html#registering-migrations
 			// - https://docs.cosmos.network/master/migrations/chain-upgrade-guide-044.html#chain-upgrade
-
-			// migrate ERC20 module
-			// vm[erc20types.ModuleName] = 1
 
 			return app.mm.RunMigrations(ctx, app.configurator, vm)
 		})
