@@ -29,10 +29,12 @@ func (k Keeper) GetTokenPairs(ctx sdk.Context) []types.TokenPair {
 
 // GetTokenPairID returns the pair id from either of the registered tokens.
 func (k Keeper) GetTokenPairID(ctx sdk.Context, token string) []byte {
+
 	if common.IsHexAddress(token) {
 		addr := common.HexToAddress(token)
 		return k.GetERC721Map(ctx, addr)
 	}
+
 	return k.GetClassMap(ctx, token)
 }
 
@@ -116,32 +118,76 @@ func (k Keeper) IsClassRegistered(ctx sdk.Context, classID string) bool {
 	return store.Has([]byte(classID))
 }
 
-func (k Keeper) SetNFTPairByNFTID(ctx sdk.Context, nftID string, tokenID string) {
-	store := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixNFTPairByNFTID)
-	store.Set([]byte(nftID), []byte(tokenID))
+func (k Keeper) SetNFTPairs(ctx sdk.Context, contractAddress string, tokenID string, classID string, nftID string) {
+
+	// save nft pair
+	if len(k.GetNFTPairByTokenID(ctx, contractAddress, tokenID)) == 0 {
+		k.SetNFTPairByTokenID(ctx, contractAddress, tokenID, classID, nftID)
+	}
+
+	if len(k.GetNFTPairByNFTID(ctx, classID, nftID)) == 0 {
+		k.SetNFTPairByNFTID(ctx, classID, nftID, contractAddress, tokenID)
+	}
 }
 
-func (k Keeper) GetNFTPairByNFTID(ctx sdk.Context, nftID string) []byte {
-	store := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixNFTPairByNFTID)
-	return store.Get([]byte(nftID))
+func (k Keeper) SetNFTPairByTokenID(ctx sdk.Context, contractAddress string, tokenID string, classID string, nftID string) {
+	tokenUID := types.CreateTokenUID(contractAddress, tokenID)
+	nftUID := types.CreateNFTUID(classID, nftID)
+	k.SetNFTUIDPairByTokenUID(ctx, tokenUID, nftUID)
 }
 
-func (k Keeper) DeleteNFTPairByNFTID(ctx sdk.Context, nftID string) {
-	store := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixNFTPairByNFTID)
-	store.Delete([]byte(nftID))
+func (k Keeper) SetNFTUIDPairByTokenUID(ctx sdk.Context, tokenUID string, nftUID string) {
+	store := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixNFTUIDPairByTokenUID)
+	store.Set([]byte(tokenUID), []byte(nftUID))
 }
 
-func (k Keeper) SetNFTPairByTokenID(ctx sdk.Context, tokenID string, nftID string) {
-	store := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixNFTPairByTokenID)
-	store.Set([]byte(tokenID), []byte(nftID))
+func (k Keeper) GetNFTPairByTokenID(ctx sdk.Context, contractAddress string, tokenID string) []byte {
+	tokenUID := types.CreateTokenUID(contractAddress, tokenID)
+	return k.GetNFTUIDPairByTokenUID(ctx, tokenUID)
 }
 
-func (k Keeper) GetNFTPairByTokenID(ctx sdk.Context, tokenID string) []byte {
-	store := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixNFTPairByTokenID)
-	return store.Get([]byte(tokenID))
+func (k Keeper) GetNFTUIDPairByTokenUID(ctx sdk.Context, tokenUID string) []byte {
+	store := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixNFTUIDPairByTokenUID)
+	return store.Get([]byte(tokenUID))
 }
 
-func (k Keeper) DeleteNFTPairByTokenID(ctx sdk.Context, tokenID string) {
-	store := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixNFTPairByTokenID)
-	store.Delete([]byte(tokenID))
+func (k Keeper) DeleteNFTPairByTokenID(ctx sdk.Context, contractAddress string, tokenID string) {
+	tokenUID := types.CreateTokenUID(contractAddress, tokenID)
+	k.DeleteNFTUIDPairByTokenUID(ctx, tokenUID)
+}
+
+func (k Keeper) DeleteNFTUIDPairByTokenUID(ctx sdk.Context, tokenUID string) {
+	store := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixNFTUIDPairByTokenUID)
+	store.Delete([]byte(tokenUID))
+}
+
+func (k Keeper) SetNFTPairByNFTID(ctx sdk.Context, classID string, nftID string, contractAddress string, tokenID string) {
+	nftUID := types.CreateNFTUID(classID, nftID)
+	tokenUID := types.CreateTokenUID(contractAddress, tokenID)
+	k.SetNFTUIDPairByNFTUID(ctx, nftUID, tokenUID)
+}
+
+func (k Keeper) SetNFTUIDPairByNFTUID(ctx sdk.Context, nftUID string, tokenUID string) {
+	store := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixNFTUIDPairByNFTUID)
+	store.Set([]byte(nftUID), []byte(tokenUID))
+}
+
+func (k Keeper) GetNFTPairByNFTID(ctx sdk.Context, classID string, nftID string) []byte {
+	nftUID := types.CreateNFTUID(classID, nftID)
+	return k.GetTokenUIDPairByNFTUID(ctx, nftUID)
+}
+
+func (k Keeper) GetTokenUIDPairByNFTUID(ctx sdk.Context, nftUID string) []byte {
+	store := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixNFTUIDPairByNFTUID)
+	return store.Get([]byte(nftUID))
+}
+
+func (k Keeper) DeleteNFTPairByNFTID(ctx sdk.Context, classID string, nftID string) {
+	nftUID := types.CreateNFTUID(classID, nftID)
+	k.DeleteNFTUIDPairByNFTUID(ctx, nftUID)
+}
+
+func (k Keeper) DeleteNFTUIDPairByNFTUID(ctx sdk.Context, nftUID string) {
+	store := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixNFTUIDPairByNFTUID)
+	store.Delete([]byte(nftUID))
 }

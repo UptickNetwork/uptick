@@ -7,9 +7,10 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 
-	"github.com/UptickNetwork/uptick/x/collection/types"
 	"github.com/cosmos/cosmos-sdk/x/nft"
 	nftkeeper "github.com/cosmos/cosmos-sdk/x/nft/keeper"
+
+	"github.com/irisnet/irismod/modules/nft/types"
 )
 
 // Keeper maintains the link to data storage and exposes getter/setter methods for the various parts of the state machine
@@ -28,7 +29,7 @@ func NewKeeper(cdc codec.Codec,
 	return Keeper{
 		storeKey: storeKey,
 		cdc:      cdc,
-		nk:       nftkeeper.NewKeeper(storeKey,cdc,ak, bk),
+		nk:       nftkeeper.NewKeeper(storeKey, cdc, ak, bk),
 	}
 }
 
@@ -76,8 +77,8 @@ func (k Keeper) MintNFT(
 	}
 
 	nftMetadata := &types.NFTMetadata{
-		Name:        tokenNm,
-		Description: tokenData,
+		Name: tokenNm,
+		Data: tokenData,
 	}
 	data, err := codectypes.NewAnyWithValue(nftMetadata)
 	if err != nil {
@@ -137,7 +138,7 @@ func (k Keeper) EditNFT(
 		}
 
 		if types.Modified(tokenData) {
-			nftMetadata.Description = tokenData
+			nftMetadata.Data = tokenData
 		}
 
 		data, err := codectypes.NewAnyWithValue(&nftMetadata)
@@ -185,7 +186,7 @@ func (k Keeper) TransferOwnership(
 	}
 
 	if types.Modified(tokenData) {
-		nftMetadata.Description = tokenData
+		nftMetadata.Data = tokenData
 		changed = true
 	}
 

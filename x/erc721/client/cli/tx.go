@@ -9,10 +9,6 @@ import (
 	"github.com/cosmos/cosmos-sdk/client/flags"
 	"github.com/cosmos/cosmos-sdk/client/tx"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/version"
-	"github.com/cosmos/cosmos-sdk/x/gov/client/cli"
-	gov "github.com/cosmos/cosmos-sdk/x/gov/types/v1beta1"
-
 	"github.com/ethereum/go-ethereum/common"
 	ethermint "github.com/evmos/ethermint/types"
 
@@ -39,22 +35,33 @@ func NewTxCmd() *cobra.Command {
 // NewConvertNFTCmd returns a CLI command handler for converting a Cosmos coin
 func NewConvertNFTCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "convert-nft [nft_id] [receiver_hex]",
+		Use:   "convert-nft [class_id] [nft_id] [contract_address] [token_id] [receiver_hex]",
 		Short: "Convert a Cosmos nft to erc721. When the receiver [optional] is omitted, the erc721 tokens are transferred to the sender.",
-		Args:  cobra.RangeArgs(1, 2),
+		Args:  cobra.RangeArgs(4, 5),
 		RunE: func(cmd *cobra.Command, args []string) error {
+
 			cliCtx, err := client.GetClientTxContext(cmd)
 			if err != nil {
 				return err
 			}
 
-			nftID := args[0]
+			classID := args[0]
+			if len(classID) == 0 {
+				return fmt.Errorf("classId can not be empty")
+			}
+
+			nftID := args[1]
+			if len(nftID) == 0 {
+				return fmt.Errorf("classId can not be empty")
+			}
+
+			contractAddress := args[2]
+			tokenID := args[3]
 
 			var receiver string
 			sender := cliCtx.GetFromAddress()
-
-			if len(args) == 2 {
-				receiver = args[1]
+			if len(args) == 5 {
+				receiver = args[4]
 				if err := ethermint.ValidateAddress(receiver); err != nil {
 					return fmt.Errorf("invalid receiver hex address %w", err)
 				}
@@ -63,9 +70,12 @@ func NewConvertNFTCmd() *cobra.Command {
 			}
 
 			msg := &types.MsgConvertNFT{
-				NftId:    nftID,
-				Receiver: receiver,
-				Sender:   sender.String(),
+				ContractAddress: contractAddress,
+				NftId:           nftID,
+				ClassId:         classID,
+				TokenId:         tokenID,
+				Receiver:        receiver,
+				Sender:          sender.String(),
 			}
 
 			if err := msg.ValidateBasic(); err != nil {
@@ -83,37 +93,47 @@ func NewConvertNFTCmd() *cobra.Command {
 // NewConvertERC721Cmd returns a CLI command handler for converting an erc721
 func NewConvertERC721Cmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "convert-erc721 [contract-address] [token_id] [receiver]",
-		Short: "Convert an erc721 token to Cosmos coin.  When the receiver [optional] is omitted, the Cosmos coins are transferred to the sender.",
-		Args:  cobra.RangeArgs(2, 3),
+		Use: "convert-erc721 [contract_address] [token_id] [class_id] [nft_id] [receiver]",
+		Short: "Convert an erc721 token to Cosmos coin.  " +
+			"When the receiver [optional] is omitted, the Cosmos coins are transferred to the sender.",
+		Args: cobra.RangeArgs(4, 5),
 		RunE: func(cmd *cobra.Command, args []string) error {
+
 			cliCtx, err := client.GetClientTxContext(cmd)
 			if err != nil {
 				return err
 			}
 
-			contract := args[0]
-			if err := ethermint.ValidateAddress(contract); err != nil {
+			contractAddress := args[0]
+			if err := ethermint.ValidateAddress(contractAddress); err != nil {
 				return fmt.Errorf("invalid erc721 contract address %w", err)
 			}
 
 			tokenID := args[1]
+			if len(tokenID) == 0 {
+				return fmt.Errorf("tokenID can not be empty")
+			}
 
 			from := common.BytesToAddress(cliCtx.GetFromAddress().Bytes())
 
+			classID := args[2]
+			nftID := args[3]
+
 			receiver := cliCtx.GetFromAddress()
-			if len(args) == 3 {
-				receiver, err = sdk.AccAddressFromBech32(args[2])
+			if len(args) == 5 {
+				receiver, err = sdk.AccAddressFromBech32(args[4])
 				if err != nil {
 					return err
 				}
 			}
 
 			msg := &types.MsgConvertERC721{
-				ContractAddress: contract,
+				ContractAddress: contractAddress,
 				TokenId:         tokenID,
 				Receiver:        receiver.String(),
 				Sender:          from.Hex(),
+				ClassId:         classID,
+				NftId:           nftID,
 			}
 
 			if err := msg.ValidateBasic(); err != nil {
@@ -125,211 +145,5 @@ func NewConvertERC721Cmd() *cobra.Command {
 	}
 
 	flags.AddTxFlagsToCmd(cmd)
-	return cmd
-}
-
-// NewRegisterCoinProposalCmd implements the command to submit a community-pool-spend proposal
-func NewRegisterNFTProposalCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "register-nft [class]",
-		Args:  cobra.ExactArgs(1),
-		Short: "Submit a register nft proposal",
-		Long: `Submit a proposal to register a Cosmos nft to the erc721 along with an initial deposit.
-Upon passing, the
-The proposal details must be supplied via a JSON file.`,
-		Example: fmt.Sprintf(`$ %s tx gov submit-proposal register-nft <path/to/class.json> --from=<key_or_address>`, version.AppName),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			clientCtx, err := client.GetClientTxContext(cmd)
-			if err != nil {
-				return err
-			}
-
-			title, err := cmd.Flags().GetString(cli.FlagTitle)
-			if err != nil {
-				return err
-			}
-
-			description, err := cmd.Flags().GetString(cli.FlagDescription)
-			if err != nil {
-				return err
-			}
-
-			depositStr, err := cmd.Flags().GetString(cli.FlagDeposit)
-			if err != nil {
-				return err
-			}
-
-			deposit, err := sdk.ParseCoinsNormalized(depositStr)
-			if err != nil {
-				return err
-			}
-
-			class, err := ParseClass(clientCtx.Codec, args[0])
-			if err != nil {
-				return err
-			}
-
-			from := clientCtx.GetFromAddress()
-
-			content := types.NewRegisterNFTProposal(title, description, class)
-
-			msg, err := gov.NewMsgSubmitProposal(content, deposit, from)
-			if err != nil {
-				return err
-			}
-
-			if err := msg.ValidateBasic(); err != nil {
-				return err
-			}
-
-			return tx.GenerateOrBroadcastTxCLI(clientCtx, cmd.Flags(), msg)
-		},
-	}
-
-	cmd.Flags().String(cli.FlagTitle, "", "title of proposal")
-	cmd.Flags().String(cli.FlagDescription, "", "description of proposal")
-	cmd.Flags().String(cli.FlagDeposit, "1auptick", "deposit of proposal")
-	if err := cmd.MarkFlagRequired(cli.FlagTitle); err != nil {
-		panic(err)
-	}
-	if err := cmd.MarkFlagRequired(cli.FlagDescription); err != nil {
-		panic(err)
-	}
-	if err := cmd.MarkFlagRequired(cli.FlagDeposit); err != nil {
-		panic(err)
-	}
-	return cmd
-}
-
-// NewRegistererc721ProposalCmd implements the command to submit a community-pool-spend proposal
-func NewRegisterERC721ProposalCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "register-erc721 [erc721-address]",
-		Args:    cobra.ExactArgs(1),
-		Short:   "Submit a proposal to register an erc721 token",
-		Long:    "Submit a proposal to register an erc721 token to the erc721 along with an initial deposit.",
-		Example: fmt.Sprintf("$ %s tx gov submit-proposal register-erc721 <contract-address> --from=<key_or_address>", version.AppName),
-		RunE: func(cmd *cobra.Command, args []string) error {
-
-			clientCtx, err := client.GetClientTxContext(cmd)
-			if err != nil {
-				return err
-			}
-
-			title, err := cmd.Flags().GetString(cli.FlagTitle)
-			if err != nil {
-				return err
-			}
-
-			description, err := cmd.Flags().GetString(cli.FlagDescription)
-			if err != nil {
-				return err
-			}
-
-			depositStr, err := cmd.Flags().GetString(cli.FlagDeposit)
-			if err != nil {
-				return err
-			}
-
-			deposit, err := sdk.ParseCoinsNormalized(depositStr)
-			if err != nil {
-				return err
-			}
-
-			erc721Addr := args[0]
-			from := clientCtx.GetFromAddress()
-			content := types.NewRegisterERC721Proposal(title, description, erc721Addr)
-
-			msg, err := gov.NewMsgSubmitProposal(content, deposit, from)
-			if err != nil {
-				return err
-			}
-
-			if err := msg.ValidateBasic(); err != nil {
-				return err
-			}
-
-			return tx.GenerateOrBroadcastTxCLI(clientCtx, cmd.Flags(), msg)
-		},
-	}
-
-	cmd.Flags().String(cli.FlagTitle, "", "title of proposal")
-	cmd.Flags().String(cli.FlagDescription, "", "description of proposal")
-	cmd.Flags().String(cli.FlagDeposit, "1auptick", "deposit of proposal")
-	if err := cmd.MarkFlagRequired(cli.FlagTitle); err != nil {
-		panic(err)
-	}
-	if err := cmd.MarkFlagRequired(cli.FlagDescription); err != nil {
-		panic(err)
-	}
-	if err := cmd.MarkFlagRequired(cli.FlagDeposit); err != nil {
-		panic(err)
-	}
-	return cmd
-}
-
-// NewToggleTokenConversionProposalCmd implements the command to submit a community-pool-spend proposal
-func NewToggleTokenConversionProposalCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "toggle-token-conversion [token]",
-		Args:    cobra.ExactArgs(1),
-		Short:   "Submit a toggle token conversion proposal",
-		Long:    "Submit a proposal to toggle the conversion of a token pair along with an initial deposit.",
-		Example: fmt.Sprintf("$ %s tx gov submit-proposal toggle-token-conversion <denom_or_contract> --from=<key_or_address>", version.AppName),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			clientCtx, err := client.GetClientTxContext(cmd)
-			if err != nil {
-				return err
-			}
-
-			title, err := cmd.Flags().GetString(cli.FlagTitle)
-			if err != nil {
-				return err
-			}
-
-			description, err := cmd.Flags().GetString(cli.FlagDescription)
-			if err != nil {
-				return err
-			}
-
-			depositStr, err := cmd.Flags().GetString(cli.FlagDeposit)
-			if err != nil {
-				return err
-			}
-
-			deposit, err := sdk.ParseCoinsNormalized(depositStr)
-			if err != nil {
-				return err
-			}
-
-			from := clientCtx.GetFromAddress()
-			token := args[0]
-			content := types.NewToggleTokenConversionProposal(title, description, token)
-
-			msg, err := gov.NewMsgSubmitProposal(content, deposit, from)
-			if err != nil {
-				return err
-			}
-
-			if err := msg.ValidateBasic(); err != nil {
-				return err
-			}
-
-			return tx.GenerateOrBroadcastTxCLI(clientCtx, cmd.Flags(), msg)
-		},
-	}
-
-	cmd.Flags().String(cli.FlagTitle, "", "title of proposal")
-	cmd.Flags().String(cli.FlagDescription, "", "description of proposal")
-	cmd.Flags().String(cli.FlagDeposit, "1aevmos", "deposit of proposal")
-	if err := cmd.MarkFlagRequired(cli.FlagTitle); err != nil {
-		panic(err)
-	}
-	if err := cmd.MarkFlagRequired(cli.FlagDescription); err != nil {
-		panic(err)
-	}
-	if err := cmd.MarkFlagRequired(cli.FlagDeposit); err != nil {
-		panic(err)
-	}
 	return cmd
 }
