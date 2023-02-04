@@ -62,7 +62,7 @@ module.exports = {
       rpc_url_local: 'http://localhost:8545/',
       chain_id: '未定',
       testnet_chain_id: '7000',
-      latest_version: 'v0.2.3',
+      latest_version: 'v0.2.4',
       version_number: '1',
       testnet_version_number: '2',
       cosmos_block_explorer_url: 'https://explorer.testnet.uptick.network/',
@@ -139,6 +139,11 @@ module.exports = {
               title: 'Key Management System',
               directory: true,
               path: '/guides/kms'
+            },
+            {
+              title: 'State sync',
+              directory: true,
+              path: '/guides/statesync'
             },
           ]
         },
@@ -226,7 +231,7 @@ module.exports = {
       chat: {
         title: 'Developer Chat',
         text: 'Chat with Uptick developers on Discord.',
-        url: 'https://discord.gg/eStaNHZbm4',
+        url: 'https://discord.gg/8w4GUUUH39',
         bg: 'linear-gradient(103.75deg, #1B1E36 0%, #22253F 100%)'
       },
       forum: {
@@ -287,7 +292,7 @@ module.exports = {
         title: 'Community',
         children: [{
           title: 'Uptick Community',
-          url: 'https://discord.gg/eStaNHZbm4'
+          url: 'https://discord.gg/8w4GUUUH39'
         },
         ]
       }

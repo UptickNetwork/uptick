@@ -241,7 +241,7 @@ make build
 Clean `~/.uptickd` (never do this in a production environment):
 
 ```sh
-./build/uptickd unsafe-reset-all
+./build/uptickd tendermint unsafe-reset-all
 ```
 
 Set up app config:
