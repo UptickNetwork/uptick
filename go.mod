@@ -3,7 +3,7 @@ module github.com/UptickNetwork/uptick
 go 1.18
 
 require (
-	github.com/bianjieai/nft-transfer v1.1.0-beta
+	github.com/bianjieai/nft-transfer v1.1.0-beta.0.20230130023155-3717108661f2
 	github.com/cosmos/cosmos-sdk v0.46.5
 	github.com/cosmos/go-bip39 v1.0.0
 	github.com/cosmos/ibc-go/v5 v5.0.1
