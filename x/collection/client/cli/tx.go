@@ -38,7 +38,7 @@ func NewTxCmd() *cobra.Command {
 	return txCmd
 }
 
-// GetCmdIssueDenom is the CLI command for an IssueDenom transaction
+// GetCmdIssueDenom is the CLI command for an SaveDenom transaction
 func GetCmdIssueDenom() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:  "issue [denom-id]",
@@ -51,6 +51,10 @@ func GetCmdIssueDenom() *cobra.Command {
 				"--mint-restricted=<mint-restricted> "+
 				"--update-restricted=<update-restricted> "+
 				"--schema=<schema-content or path to schema.json> "+
+				"--description=<description> "+
+				"--uri=<uri> "+
+				"--uri-hash=<uri-hash> "+
+				"--data=<data> "+
 				"--chain-id=<chain-id> "+
 				"--fees=<fee>",
 			version.AppName,
@@ -82,8 +86,23 @@ func GetCmdIssueDenom() *cobra.Command {
 			if err != nil {
 				return err
 			}
-
-			optionsContent, err := ioutil.ReadFile(schema) //#nosec
+			uri, err := cmd.Flags().GetString(FlagURI)
+			if err != nil {
+				return err
+			}
+			uriHash, err := cmd.Flags().GetString(FlagURIHash)
+			if err != nil {
+				return err
+			}
+			description, err := cmd.Flags().GetString(FlagDescription)
+			if err != nil {
+				return err
+			}
+			data, err := cmd.Flags().GetString(FlagData)
+			if err != nil {
+				return err
+			}
+			optionsContent, err := ioutil.ReadFile(schema)
 			if err == nil {
 				schema = string(optionsContent)
 			}
@@ -96,6 +115,10 @@ func GetCmdIssueDenom() *cobra.Command {
 				symbol,
 				mintRestricted,
 				updateRestricted,
+				description,
+				uri,
+				uriHash,
+				data,
 			)
 			if err := msg.ValidateBasic(); err != nil {
 				return err
@@ -111,7 +134,7 @@ func GetCmdIssueDenom() *cobra.Command {
 	return cmd
 }
 
-// GetCmdMintNFT is the CLI command for a MintNFT transaction
+// GetCmdMintNFT is the CLI command for a SaveNFT transaction
 func GetCmdMintNFT() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:  "mint [denom-id] [nft-id]",
@@ -119,6 +142,7 @@ func GetCmdMintNFT() *cobra.Command {
 		Example: fmt.Sprintf(
 			"$ %s tx nft mint <denom-id> <nft-id> "+
 				"--uri=<uri> "+
+				"--uri-hash=<uri-hash> "+
 				"--recipient=<recipient> "+
 				"--from=<key-name> "+
 				"--chain-id=<chain-id> "+
@@ -152,11 +176,15 @@ func GetCmdMintNFT() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			tokenURI, err := cmd.Flags().GetString(FlagTokenURI)
+			tokenURI, err := cmd.Flags().GetString(FlagURI)
 			if err != nil {
 				return err
 			}
-			tokenData, err := cmd.Flags().GetString(FlagTokenData)
+			tokenURIHash, err := cmd.Flags().GetString(FlagURIHash)
+			if err != nil {
+				return err
+			}
+			tokenData, err := cmd.Flags().GetString(FlagData)
 			if err != nil {
 				return err
 			}
@@ -166,6 +194,7 @@ func GetCmdMintNFT() *cobra.Command {
 				args[0],
 				tokenName,
 				tokenURI,
+				tokenURIHash,
 				tokenData,
 				sender,
 				recipient,
@@ -190,6 +219,7 @@ func GetCmdEditNFT() *cobra.Command {
 		Example: fmt.Sprintf(
 			"$ %s tx nft edit <denom-id> <nft-id> "+
 				"--uri=<uri> "+
+				"--uri-hash=<uri-hash> "+
 				"--from=<key-name> "+
 				"--chain-id=<chain-id> "+
 				"--fees=<fee>",
@@ -206,11 +236,15 @@ func GetCmdEditNFT() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			tokenURI, err := cmd.Flags().GetString(FlagTokenURI)
+			tokenURI, err := cmd.Flags().GetString(FlagURI)
 			if err != nil {
 				return err
 			}
-			tokenData, err := cmd.Flags().GetString(FlagTokenData)
+			tokenURIHash, err := cmd.Flags().GetString(FlagURIHash)
+			if err != nil {
+				return err
+			}
+			tokenData, err := cmd.Flags().GetString(FlagData)
 			if err != nil {
 				return err
 			}
@@ -219,6 +253,7 @@ func GetCmdEditNFT() *cobra.Command {
 				args[0],
 				tokenName,
 				tokenURI,
+				tokenURIHash,
 				tokenData,
 				clientCtx.GetFromAddress().String(),
 			)
@@ -242,6 +277,7 @@ func GetCmdTransferNFT() *cobra.Command {
 		Example: fmt.Sprintf(
 			"$ %s tx nft transfer <recipient> <denom-id> <nft-id> "+
 				"--uri=<uri> "+
+				"--uri-hash=<uri-hash> "+
 				"--from=<key-name> "+
 				"--chain-id=<chain-id> "+
 				"--fees=<fee>",
@@ -262,11 +298,15 @@ func GetCmdTransferNFT() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			tokenURI, err := cmd.Flags().GetString(FlagTokenURI)
+			tokenURI, err := cmd.Flags().GetString(FlagURI)
 			if err != nil {
 				return err
 			}
-			tokenData, err := cmd.Flags().GetString(FlagTokenData)
+			tokenURIHash, err := cmd.Flags().GetString(FlagURIHash)
+			if err != nil {
+				return err
+			}
+			tokenData, err := cmd.Flags().GetString(FlagData)
 			if err != nil {
 				return err
 			}
@@ -275,6 +315,7 @@ func GetCmdTransferNFT() *cobra.Command {
 				args[1],
 				tokenName,
 				tokenURI,
+				tokenURIHash,
 				tokenData,
 				clientCtx.GetFromAddress().String(),
 				args[0],
@@ -291,7 +332,7 @@ func GetCmdTransferNFT() *cobra.Command {
 	return cmd
 }
 
-// GetCmdBurnNFT is the CLI command for sending a BurnNFT transaction
+// GetCmdBurnNFT is the CLI command for sending a RemoveNFT transaction
 func GetCmdBurnNFT() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:  "burn [denom-id] [nft-id]",
