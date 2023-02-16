@@ -12,7 +12,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 
-	nftTypes "github.com/irisnet/irismod/modules/nft/types"
+	nftTypes "github.com/UptickNetwork/uptick/x/collection/types"
 )
 
 var _ types.MsgServer = &Keeper{}

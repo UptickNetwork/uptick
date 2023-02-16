@@ -6,22 +6,37 @@ import (
 	"github.com/UptickNetwork/uptick/x/collection/types"
 )
 
-// SetCollection saves all NFTs and returns an error if there already exists
-func (k Keeper) SetCollection(ctx sdk.Context, collection types.Collection) error {
-	creator, err := sdk.AccAddressFromBech32(collection.Denom.Creator)
-	if err != nil {
-		return err
-	}
-
+// SaveCollection saves all NFTs and returns an error if there already exists
+func (k Keeper) SaveCollection(ctx sdk.Context, collection types.Collection) error {
 	for _, nft := range collection.NFTs {
-		if err := k.MintNFT(
+		if err := k.SaveNFT(
 			ctx,
-			collection.Denom.ID,
+			collection.Denom.Id,
 			nft.GetID(),
 			nft.GetName(),
 			nft.GetURI(),
+			nft.GetURIHash(),
 			nft.GetData(),
-			creator,
+			nft.GetOwner(),
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// SetCollection saves all NFTs and returns an error if there already exists
+func (k Keeper) SetCollection(ctx sdk.Context, collection types.Collection) error {
+
+	for _, nft := range collection.NFTs {
+		if err := k.SaveNFT(
+			ctx,
+			collection.Denom.Id,
+			nft.GetID(),
+			nft.GetName(),
+			nft.GetURI(),
+			nft.GetURIHash(),
+			nft.GetData(),
 			nft.GetOwner(),
 		); err != nil {
 			return err
@@ -71,3 +86,8 @@ func (k Keeper) GetTotalSupply(ctx sdk.Context, denomID string) uint64 {
 func (k Keeper) GetTotalSupplyOfOwner(ctx sdk.Context, id string, owner sdk.AccAddress) (supply uint64) {
 	return k.nk.GetBalance(ctx, id, owner)
 }
+
+//// GetBalance returns the amount of NFTs by the specified conditions
+//func (k Keeper) GetBalance(ctx sdk.Context, id string, owner sdk.AccAddress) (supply uint64) {
+//	return k.nk.GetBalance(ctx, id, owner)
+//}

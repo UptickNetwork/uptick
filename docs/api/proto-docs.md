@@ -168,6 +168,7 @@ BaseNFT defines a non-fungible token
 | `uri` | [string](#string) |  |  |
 | `data` | [string](#string) |  |  |
 | `owner` | [string](#string) |  |  |
+| `uri_hash` | [string](#string) |  |  |
 
 
 
@@ -205,6 +206,10 @@ Denom defines a type of NFT
 | `symbol` | [string](#string) |  |  |
 | `mint_restricted` | [bool](#bool) |  |  |
 | `update_restricted` | [bool](#bool) |  |  |
+| `description` | [string](#string) |  |  |
+| `uri` | [string](#string) |  |  |
+| `uri_hash` | [string](#string) |  |  |
+| `data` | [string](#string) |  |  |
 
 
 
@@ -223,6 +228,7 @@ Denom defines a type of NFT
 | `schema` | [string](#string) |  |  |
 | `mint_restricted` | [bool](#bool) |  |  |
 | `update_restricted` | [bool](#bool) |  |  |
+| `data` | [string](#string) |  |  |
 
 
 
@@ -254,7 +260,7 @@ IDCollection defines a type of collection with specified ID
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | `name` | [string](#string) |  |  |
-| `description` | [string](#string) |  |  |
+| `data` | [string](#string) |  |  |
 
 
 
@@ -586,6 +592,7 @@ MsgEditNFT defines an SDK message for editing a nft.
 | `uri` | [string](#string) |  |  |
 | `data` | [string](#string) |  |  |
 | `sender` | [string](#string) |  |  |
+| `uri_hash` | [string](#string) |  |  |
 
 
 
@@ -617,6 +624,10 @@ MsgIssueDenom defines an SDK message for creating a new denom.
 | `symbol` | [string](#string) |  |  |
 | `mint_restricted` | [bool](#bool) |  |  |
 | `update_restricted` | [bool](#bool) |  |  |
+| `description` | [string](#string) |  |  |
+| `uri` | [string](#string) |  |  |
+| `uri_hash` | [string](#string) |  |  |
+| `data` | [string](#string) |  |  |
 
 
 
@@ -648,6 +659,7 @@ MsgMintNFT defines an SDK message for creating a new NFT.
 | `data` | [string](#string) |  |  |
 | `sender` | [string](#string) |  |  |
 | `recipient` | [string](#string) |  |  |
+| `uri_hash` | [string](#string) |  |  |
 
 
 
@@ -707,6 +719,7 @@ MsgTransferNFT defines an SDK message for transferring an NFT to recipient.
 | `data` | [string](#string) |  |  |
 | `sender` | [string](#string) |  |  |
 | `recipient` | [string](#string) |  |  |
+| `uri_hash` | [string](#string) |  |  |
 
 
 

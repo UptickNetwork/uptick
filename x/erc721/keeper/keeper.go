@@ -2,8 +2,7 @@ package keeper
 
 import (
 	"fmt"
-	nftkeeper "github.com/irisnet/irismod/modules/nft/keeper"
-
+	nftkeeper "github.com/UptickNetwork/uptick/x/collection/keeper"
 	porttypes "github.com/cosmos/ibc-go/v5/modules/core/05-port/types"
 
 	"github.com/tendermint/tendermint/libs/log"
@@ -34,7 +33,7 @@ func NewKeeper(storeKey storetypes.StoreKey,
 	ps paramtypes.Subspace,
 	ak types.AccountKeeper,
 	nk nftkeeper.Keeper,
-	ek types.EVMKeeper, ) Keeper {
+	ek types.EVMKeeper) Keeper {
 	// set KeyTable if it has not already been set
 	if !ps.HasKeyTable() {
 		ps = ps.WithKeyTable(types.ParamKeyTable())

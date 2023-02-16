@@ -5,8 +5,9 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 
+	nfttypes "github.com/UptickNetwork/uptick/x/collection/types"
+
 	nftkeeper "github.com/cosmos/cosmos-sdk/x/nft/keeper"
-	nfttypes "github.com/irisnet/irismod/modules/nft/types"
 )
 
 type (
