@@ -10,31 +10,36 @@ option (gogoproto.goproto_getters_all) = false;
 message BaseNFT {
   option (gogoproto.equal) = true;
 
-  string id = 1 [ (gogoproto.customname) = "ID" ];
+  string id = 1 ;
   string name = 2;
   string uri = 3 [ (gogoproto.customname) = "URI" ];
   string data = 4;
   string owner = 5;
+  string uri_hash = 6;
 }
 
 message NFTMetadata {
   option (gogoproto.equal) = true;
 
   string name = 1;
-  string description = 2;
+  string data = 2;
 }
 
 // Denom defines a type of NFT
 message Denom {
   option (gogoproto.equal) = true;
 
-  string id = 1 [ (gogoproto.customname) = "ID" ];
+  string id = 1;
   string name = 2;
   string schema = 3;
   string creator = 4;
   string symbol = 5;
   bool mint_restricted = 6;
   bool update_restricted = 7;
+  string description = 8;
+  string uri = 9;
+  string uri_hash = 10;
+  string data = 11;
 }
 
 message DenomMetadata {
@@ -44,6 +49,8 @@ message DenomMetadata {
   string schema = 2;
   bool mint_restricted = 3;
   bool update_restricted = 4;
+  string data = 5;
+
 }
 
 // IDCollection defines a type of collection with specified ID
@@ -52,11 +59,11 @@ message IDCollection {
 
   string denom_id = 1 [
     (gogoproto.moretags) = "yaml:\"denom_id\"",
-    (gogoproto.customname) = "DenomID"
+    (gogoproto.customname) = "DenomId"
   ];
   repeated string token_ids = 2 [
     (gogoproto.moretags) = "yaml:\"token_ids\"",
-    (gogoproto.customname) = "TokenIDs"
+    (gogoproto.customname) = "TokenIds"
   ];
 }
 

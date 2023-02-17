@@ -2,6 +2,7 @@ package types
 
 import (
 	context "context"
+	"github.com/cosmos/cosmos-sdk/x/nft"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
@@ -11,8 +12,6 @@ import (
 
 	"github.com/evmos/ethermint/x/evm/statedb"
 	evmtypes "github.com/evmos/ethermint/x/evm/types"
-
-	"github.com/cosmos/cosmos-sdk/x/nft"
 )
 
 // AccountKeeper defines the expected interface needed to retrieve account info.
@@ -24,13 +23,16 @@ type AccountKeeper interface {
 // NFTKeeper defines the expected interface needed to retrieve account balances.
 type NFTKeeper interface {
 	SaveClass(ctx sdk.Context, class nft.Class) error
+
 	HasClass(ctx sdk.Context, classID string) bool
 	GetClass(ctx sdk.Context, classID string) (nft.Class, bool)
 
 	Mint(ctx sdk.Context, token nft.NFT, receiver sdk.AccAddress) error
 	Burn(ctx sdk.Context, classID string, nftID string) error
 	Transfer(ctx sdk.Context, classID string, nftID string, receiver sdk.AccAddress) error
-	GetNFT(ctx sdk.Context, classID, nftID string) (nft.NFT, bool)
+
+	GetNFT(ctx sdk.Context, denomID string, tokenID string) (nft.NFT, error)
+
 	HasNFT(ctx sdk.Context, classID, id string) bool
 	GetOwner(ctx sdk.Context, classID string, nftID string) sdk.AccAddress
 }

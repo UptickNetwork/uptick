@@ -24,18 +24,19 @@ var (
 	// IsBeginWithAlpha only begin with [a-z]
 	IsBeginWithAlpha = regexp.MustCompile(`^[a-z].*`).MatchString
 
+	idString = `[a-z][a-zA-Z0-9/]{2,127}`
+	regexpID = regexp.MustCompile(fmt.Sprintf(`^%s$`, idString)).MatchString
+
 	keywords          = strings.Join([]string{ReservedIBC}, "|")
 	regexpKeywordsFmt = fmt.Sprintf("^(%s).*", keywords)
 	regexpKeyword     = regexp.MustCompile(regexpKeywordsFmt).MatchString
 )
 
-// ValidateDenomID verifies whether the parameters are legal
+// ValidateDenomID verifies whether the  parameters are legal
 func ValidateDenomID(denomID string) error {
-	if len(denomID) < MinDenomLen || len(denomID) > MaxDenomLen {
-		return sdkerrors.Wrapf(ErrInvalidDenom, "the length of denom(%s) only accepts value [%d, %d]", denomID, MinDenomLen, MaxDenomLen)
-	}
-	if !IsBeginWithAlpha(denomID) || !IsAlphaNumeric(denomID) {
-		return sdkerrors.Wrapf(ErrInvalidDenom, "the denom(%s) only accepts alphanumeric characters, and begin with an english letter", denomID)
+	boolPrifix := strings.HasPrefix(denomID, "tibc-")
+	if !regexpID(denomID) && !boolPrifix {
+		return sdkerrors.Wrapf(ErrInvalidDenom, "denomID can only accept characters that match the regular expression: (%s),but got (%s)", idString, denomID)
 	}
 	return nil
 }
@@ -70,4 +71,16 @@ func ValidateKeywords(denomID string) error {
 		return sdkerrors.Wrapf(ErrInvalidDenom, "invalid denomID: %s, can not begin with keyword: (%s)", denomID, keywords)
 	}
 	return nil
+}
+
+func Modify(origin, target string) string {
+
+	if target == DoNotModify {
+		return origin
+	}
+	return target
+}
+
+func IsIBCDenom(denomID string) bool {
+	return strings.HasPrefix(denomID, "ibc/")
 }
