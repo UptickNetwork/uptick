@@ -1,6 +1,7 @@
 package types
 
 import (
+	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	"github.com/UptickNetwork/uptick/x/collection/exported"
@@ -9,19 +10,20 @@ import (
 var _ exported.NFT = BaseNFT{}
 
 // NewBaseNFT creates a new NFT instance
-func NewBaseNFT(id, name string, owner sdk.AccAddress, uri, data string) BaseNFT {
+func NewBaseNFT(id, name string, owner sdk.AccAddress, uri, uriHash, data string) BaseNFT {
 	return BaseNFT{
-		ID:    id,
-		Name:  name,
-		Owner: owner.String(),
-		URI:   uri,
-		Data:  data,
+		Id:      id,
+		Name:    name,
+		Owner:   owner.String(),
+		URI:     uri,
+		UriHash: uriHash,
+		Data:    data,
 	}
 }
 
 // GetID return the id of BaseNFT
 func (bNFT BaseNFT) GetID() string {
-	return bNFT.ID
+	return bNFT.Id
 }
 
 // GetName return the name of BaseNFT
@@ -40,6 +42,11 @@ func (bNFT BaseNFT) GetURI() string {
 	return bNFT.URI
 }
 
+// GetURIHash return the UriHash of BaseNFT
+func (bnft BaseNFT) GetURIHash() string {
+	return bnft.UriHash
+}
+
 // GetData return the Data of BaseNFT
 func (bNFT BaseNFT) GetData() string {
 	return bNFT.Data
@@ -51,10 +58,14 @@ func (bNFT BaseNFT) GetData() string {
 // NFTs define a list of NFT
 type NFTs []exported.NFT
 
-// NewNFTs creates a new set of NFTs
-func NewNFTs(nfts ...exported.NFT) NFTs {
-	if len(nfts) == 0 {
-		return NFTs{}
+func UnmarshalNFTMetadata(cdc codec.Codec, bz []byte) (NFTMetadata, error) {
+	var nftMetadata NFTMetadata
+	if len(bz) == 0 {
+		return nftMetadata, nil
 	}
-	return NFTs(nfts)
+
+	if err := cdc.Unmarshal(bz, &nftMetadata); err != nil {
+		return nftMetadata, err
+	}
+	return nftMetadata, nil
 }

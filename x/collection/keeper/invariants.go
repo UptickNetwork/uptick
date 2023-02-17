@@ -28,7 +28,7 @@ func SupplyInvariant(k Keeper) sdk.Invariant {
 		}
 
 		for _, collection := range collections {
-			ownersCollectionsSupply[collection.Denom.ID] = uint64(len(collection.NFTs))
+			ownersCollectionsSupply[collection.Denom.Id] = uint64(len(collection.NFTs))
 		}
 
 		for denom, supply := range ownersCollectionsSupply {

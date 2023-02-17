@@ -6,40 +6,32 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
-// NewIDCollection creates a new IDCollection instance
-func NewIDCollection(denomID string, tokenIDs []string) IDCollection {
-	return IDCollection{
-		DenomID:  denomID,
-		TokenIDs: tokenIDs,
-	}
-}
-
 // Supply return the amount of the denom
 func (idc IDCollection) Supply() int {
-	return len(idc.TokenIDs)
+	return len(idc.TokenIds)
 }
 
 // AddID adds an tokenID to the idCollection
 func (idc IDCollection) AddID(tokenID string) IDCollection {
-	idc.TokenIDs = append(idc.TokenIDs, tokenID)
+	idc.TokenIds = append(idc.TokenIds, tokenID)
 	return idc
 }
 
 // ----------------------------------------------------------------------------
-// IDCollections is an array of ID Collections
+// IDCollections is an array of Id Collections
 type IDCollections []IDCollection
 
-// Add adds an ID to the idCollection
-func (idcs IDCollections) Add(denomID, tokenID string) IDCollections {
+// Add adds an Id to the idCollection
+func (idcs IDCollections) Add(DenomId, tokenID string) IDCollections {
 	for i, idc := range idcs {
-		if idc.DenomID == denomID {
+		if idc.DenomId == DenomId {
 			idcs[i] = idc.AddID(tokenID)
 			return idcs
 		}
 	}
 	return append(idcs, IDCollection{
-		DenomID:  denomID,
-		TokenIDs: []string{tokenID},
+		DenomId:  DenomId,
+		TokenIds: []string{tokenID},
 	})
 }
 

@@ -15,7 +15,7 @@ You can customize the local testnet script by changing values for convenience fo
 ```bash
 # customize the name of your key, the chain-id, moniker of the node, keyring backend, and log level
 KEY="mykey"
-CHAINID="uptick_7000-1"
+CHAINID="uptick_7000-2"
 MONIKER="localtestnet"
 KEYRING="test"
 LOGLEVEL="info"
@@ -48,7 +48,7 @@ Before actually running the node, we need to initialize the chain, and most impo
 ```bash
 $MONIKER=testing
 $KEY=mykey
-$CHAINID="uptick_7000-1"
+$CHAINID="uptick_7000-2"
 
 # The argument $MONIKER is the custom username of your node, it should be human-readable.
 uptickd init $MONIKER --chain-id=$CHAINID

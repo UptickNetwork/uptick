@@ -135,7 +135,7 @@ func (m *QueryTokenPairsResponse) GetPagination() *query.PageResponse {
 // QueryTokenPairRequest is the request type for the Query/TokenPair RPC method.
 type QueryTokenPairRequest struct {
 	// token identifier can be either the hex contract address of the ERC721 or
-	// the Cosmos base denomination
+	// the Cosmos nft classID
 	Token string `protobuf:"bytes,1,opt,name=token,proto3" json:"token,omitempty"`
 }
 

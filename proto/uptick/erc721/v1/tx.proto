@@ -30,6 +30,10 @@ message MsgConvertNFT {
   string receiver = 3;
   // cosmos bech32 address from the owner of the given Cosmos coins
   string sender = 4;
+  // ERC721 token contract address registered in a token pair
+  string contract_address = 5;
+  // ERC721 token id registered in a token pair
+  string token_id = 6;
 }
 
 // MsgConvertNFTResponse returns no fields
@@ -46,6 +50,10 @@ message MsgConvertERC721 {
   string receiver = 3;
   // sender hex address from the owner of the given ERC721 tokens
   string sender = 4;
+  // nft classID to cnvert to ERC721
+  string class_id = 5;
+  // nftID to cnvert to ERC721
+  string nft_id = 6;
 }
 
 // MsgConvertERC721Response returns no fields

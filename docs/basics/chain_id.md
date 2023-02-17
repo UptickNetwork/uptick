@@ -13,7 +13,7 @@ Learn about the Uptick chain-id format {synopsis}
 
 | Name                              | Chain ID                                              | Identifier | EIP155 Number                                 | Version Number                                      |
 |-----------------------------------|-------------------------------------------------------|------------|-----------------------------------------------|-----------------------------------------------------|
-| Uptick_7000-1 Testnet                | `uptick_{{ $themeConfig.project.testnet_chain_id }}-1` | `uptick`    | `{{ $themeConfig.project.testnet_chain_id }}` | `1`                                                 |
+| uptick_7000-2 Testnet                | `uptick_{{ $themeConfig.project.testnet_chain_id }}-1` | `uptick`    | `{{ $themeConfig.project.testnet_chain_id }}` | `1`                                                 |
 
 :::
 ::: tab Mainnet
@@ -54,7 +54,7 @@ The following table provides an example where the second row corresponds to an u
 
 | ChainID        | Identifier | EIP155 Number | Version Number |
 |----------------|------------|---------------|----------------|
-| `uptick_7000-1` | uptick      | 7000          | 1              |
+| `uptick_7000-2` | uptick      | 7000          | 1              |
 | `uptick_7000-2` | uptick      | 7000          | 2              |
 | `...`          | ...        | ...           | ...            |
 | `uptick_7000-N` | uptick      | 7000          | N              |

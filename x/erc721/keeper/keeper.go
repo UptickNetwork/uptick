@@ -2,7 +2,7 @@ package keeper
 
 import (
 	"fmt"
-
+	nftkeeper "github.com/UptickNetwork/uptick/x/collection/keeper"
 	porttypes "github.com/cosmos/ibc-go/v5/modules/core/05-port/types"
 
 	"github.com/tendermint/tendermint/libs/log"
@@ -22,20 +22,18 @@ type Keeper struct {
 	paramstore paramtypes.Subspace
 
 	accountKeeper types.AccountKeeper
-	nftKeeper     types.NFTKeeper
+	nftKeeper     nftkeeper.Keeper
 	evmKeeper     types.EVMKeeper
 	ics4Wrapper   porttypes.ICS4Wrapper
 }
 
 // NewKeeper creates new instances of the erc721 Keeper
-func NewKeeper(
-	storeKey storetypes.StoreKey,
+func NewKeeper(storeKey storetypes.StoreKey,
 	cdc codec.BinaryCodec,
 	ps paramtypes.Subspace,
 	ak types.AccountKeeper,
-	nk types.NFTKeeper,
-	ek types.EVMKeeper,
-) Keeper {
+	nk nftkeeper.Keeper,
+	ek types.EVMKeeper) Keeper {
 	// set KeyTable if it has not already been set
 	if !ps.HasKeyTable() {
 		ps = ps.WithKeyTable(types.ParamKeyTable())

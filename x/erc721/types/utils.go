@@ -81,3 +81,58 @@ func EqualStringSlice(aliasesA, aliasesB []string) bool {
 
 	return true
 }
+
+func removeAddress0x(address string) string {
+
+	strAddress := address
+	if strings.HasPrefix(address, "0x") {
+		strAddress = address[2:]
+	}
+
+	return strAddress
+}
+
+// CreateClassIDFromContractAddress create classId from erc721 address
+func CreateClassIDFromContractAddress(address string) string {
+
+	return fmt.Sprintf("%s-%s", DefaultPrefix, removeAddress0x(address))
+}
+
+// CreateContractAddressFromClassID create classId from erc721 address
+func CreateContractAddressFromClassID(classID string) string {
+	return strings.Replace(classID, DefaultPrefix+"-", "", 1)
+}
+
+// CreateNFTIDFromTokenID create classId from erc721 address
+func CreateNFTIDFromTokenID(id string) string {
+
+	return fmt.Sprintf("%s%s", DefaultPrefix, removeAddress0x(id))
+}
+
+// CreateTokenIDFromNFTID create classId from erc721 address
+func CreateTokenIDFromNFTID(nftID string) string {
+
+	return strings.Replace(nftID, DefaultPrefix, "", 1)
+}
+
+//
+func CreateTokenUID(contractAddress string, tokenID string) string {
+
+	return fmt.Sprintf("%s,%s", tokenID, contractAddress)
+}
+
+func CreateNFTUID(classID string, nftID string) string {
+
+	return fmt.Sprintf("%s,%s", nftID, classID)
+}
+
+func GetNFTFromUID(uid string) (string, string) {
+
+	uidArray := strings.Split(uid, ",")
+
+	if len(uidArray) != 2 {
+		return "", ""
+	} else {
+		return uidArray[0], uidArray[1]
+	}
+}

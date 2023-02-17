@@ -25,11 +25,12 @@ const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 
 // BaseNFT defines a non-fungible token
 type BaseNFT struct {
-	ID    string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Name  string `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	URI   string `protobuf:"bytes,3,opt,name=uri,proto3" json:"uri,omitempty"`
-	Data  string `protobuf:"bytes,4,opt,name=data,proto3" json:"data,omitempty"`
-	Owner string `protobuf:"bytes,5,opt,name=owner,proto3" json:"owner,omitempty"`
+	Id      string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name    string `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	URI     string `protobuf:"bytes,3,opt,name=uri,proto3" json:"uri,omitempty"`
+	Data    string `protobuf:"bytes,4,opt,name=data,proto3" json:"data,omitempty"`
+	Owner   string `protobuf:"bytes,5,opt,name=owner,proto3" json:"owner,omitempty"`
+	UriHash string `protobuf:"bytes,6,opt,name=uri_hash,json=uriHash,proto3" json:"uri_hash,omitempty"`
 }
 
 func (m *BaseNFT) Reset()         { *m = BaseNFT{} }
@@ -66,8 +67,8 @@ func (m *BaseNFT) XXX_DiscardUnknown() {
 var xxx_messageInfo_BaseNFT proto.InternalMessageInfo
 
 type NFTMetadata struct {
-	Name        string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Description string `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Data string `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
 }
 
 func (m *NFTMetadata) Reset()         { *m = NFTMetadata{} }
@@ -105,13 +106,17 @@ var xxx_messageInfo_NFTMetadata proto.InternalMessageInfo
 
 // Denom defines a type of NFT
 type Denom struct {
-	ID               string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Id               string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Name             string `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
 	Schema           string `protobuf:"bytes,3,opt,name=schema,proto3" json:"schema,omitempty"`
 	Creator          string `protobuf:"bytes,4,opt,name=creator,proto3" json:"creator,omitempty"`
 	Symbol           string `protobuf:"bytes,5,opt,name=symbol,proto3" json:"symbol,omitempty"`
 	MintRestricted   bool   `protobuf:"varint,6,opt,name=mint_restricted,json=mintRestricted,proto3" json:"mint_restricted,omitempty"`
 	UpdateRestricted bool   `protobuf:"varint,7,opt,name=update_restricted,json=updateRestricted,proto3" json:"update_restricted,omitempty"`
+	Description      string `protobuf:"bytes,8,opt,name=description,proto3" json:"description,omitempty"`
+	Uri              string `protobuf:"bytes,9,opt,name=uri,proto3" json:"uri,omitempty"`
+	UriHash          string `protobuf:"bytes,10,opt,name=uri_hash,json=uriHash,proto3" json:"uri_hash,omitempty"`
+	Data             string `protobuf:"bytes,11,opt,name=data,proto3" json:"data,omitempty"`
 }
 
 func (m *Denom) Reset()         { *m = Denom{} }
@@ -152,6 +157,7 @@ type DenomMetadata struct {
 	Schema           string `protobuf:"bytes,2,opt,name=schema,proto3" json:"schema,omitempty"`
 	MintRestricted   bool   `protobuf:"varint,3,opt,name=mint_restricted,json=mintRestricted,proto3" json:"mint_restricted,omitempty"`
 	UpdateRestricted bool   `protobuf:"varint,4,opt,name=update_restricted,json=updateRestricted,proto3" json:"update_restricted,omitempty"`
+	Data             string `protobuf:"bytes,5,opt,name=data,proto3" json:"data,omitempty"`
 }
 
 func (m *DenomMetadata) Reset()         { *m = DenomMetadata{} }
@@ -189,8 +195,8 @@ var xxx_messageInfo_DenomMetadata proto.InternalMessageInfo
 
 // IDCollection defines a type of collection with specified ID
 type IDCollection struct {
-	DenomID  string   `protobuf:"bytes,1,opt,name=denom_id,json=denomId,proto3" json:"denom_id,omitempty" yaml:"denom_id"`
-	TokenIDs []string `protobuf:"bytes,2,rep,name=token_ids,json=tokenIds,proto3" json:"token_ids,omitempty" yaml:"token_ids"`
+	DenomId  string   `protobuf:"bytes,1,opt,name=denom_id,json=denomId,proto3" json:"denom_id,omitempty" yaml:"denom_id"`
+	TokenIds []string `protobuf:"bytes,2,rep,name=token_ids,json=tokenIds,proto3" json:"token_ids,omitempty" yaml:"token_ids"`
 }
 
 func (m *IDCollection) Reset()         { *m = IDCollection{} }
@@ -319,46 +325,49 @@ func init() {
 }
 
 var fileDescriptor_c0e8630df3683b03 = []byte{
-	// 620 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x94, 0x94, 0x4f, 0x6b, 0x13, 0x4f,
-	0x18, 0xc7, 0x33, 0xc9, 0xe6, 0x4f, 0x27, 0xfd, 0xf7, 0x1b, 0x4a, 0xd9, 0x9f, 0xe2, 0x6e, 0x58,
-	0x14, 0x0b, 0x42, 0x42, 0xeb, 0x41, 0x2c, 0x88, 0xb0, 0x86, 0xc2, 0x1e, 0x8c, 0xb2, 0xa4, 0x17,
-	0x2f, 0x61, 0xbb, 0x33, 0xb6, 0x43, 0xb3, 0x3b, 0x61, 0x67, 0xd2, 0xda, 0x9b, 0x2f, 0x40, 0xc4,
-	0xa3, 0x17, 0xc1, 0x97, 0xd3, 0x63, 0x8f, 0x7a, 0x59, 0x74, 0x73, 0xf1, 0xdc, 0x57, 0x20, 0xf3,
-	0x27, 0xe9, 0x8a, 0x41, 0xf4, 0xf6, 0x3c, 0xcf, 0x7c, 0x9f, 0x3c, 0x9f, 0xef, 0x93, 0x9d, 0x81,
-	0xf7, 0xa6, 0x13, 0x41, 0xe3, 0xd3, 0x5e, 0xcc, 0xc6, 0x63, 0x12, 0x0b, 0xca, 0xd2, 0xde, 0xd9,
-	0x6e, 0x29, 0xeb, 0x4e, 0x32, 0x26, 0x18, 0xda, 0xd2, 0xb2, 0x6e, 0xe9, 0xe0, 0x6c, 0xf7, 0xd6,
-	0xd6, 0x31, 0x3b, 0x66, 0x4a, 0xd0, 0x93, 0x91, 0xd6, 0x7a, 0x6f, 0x01, 0x6c, 0xfa, 0x11, 0x27,
-	0x83, 0x83, 0x21, 0xda, 0x86, 0x55, 0x8a, 0x6d, 0xd0, 0x01, 0x3b, 0x2b, 0x7e, 0xa3, 0xc8, 0xdd,
-	0x6a, 0xd0, 0x0f, 0xab, 0x14, 0x23, 0x04, 0xad, 0x34, 0x4a, 0x88, 0x5d, 0x95, 0x27, 0xa1, 0x8a,
-	0xd1, 0xff, 0xb0, 0x36, 0xcd, 0xa8, 0x5d, 0x53, 0xe2, 0x66, 0x91, 0xbb, 0xb5, 0xc3, 0x30, 0x08,
-	0x65, 0x4d, 0xca, 0x71, 0x24, 0x22, 0xdb, 0xd2, 0x72, 0x19, 0xa3, 0x2d, 0x58, 0x67, 0xe7, 0x29,
-	0xc9, 0xec, 0xba, 0x2a, 0xea, 0x64, 0xdf, 0xfa, 0xf1, 0xd9, 0x05, 0x5e, 0x00, 0xdb, 0x83, 0x83,
-	0xe1, 0x73, 0x22, 0x22, 0x25, 0x9d, 0x4f, 0x03, 0xa5, 0x69, 0x1d, 0xd8, 0xc6, 0x84, 0xc7, 0x19,
-	0x9d, 0x48, 0x37, 0x06, 0xa4, 0x5c, 0x32, 0x3f, 0xf5, 0x15, 0xc0, 0x7a, 0x9f, 0xa4, 0x2c, 0xf9,
-	0x27, 0x2f, 0xdb, 0xb0, 0xc1, 0xe3, 0x13, 0x92, 0x44, 0xda, 0x4e, 0x68, 0x32, 0x64, 0xc3, 0x66,
-	0x9c, 0x91, 0x48, 0xb0, 0xcc, 0x78, 0x99, 0xa7, 0xaa, 0xe3, 0x22, 0x39, 0x62, 0x63, 0xe3, 0xc7,
-	0x64, 0xe8, 0x3e, 0xdc, 0x48, 0x68, 0x2a, 0x46, 0x19, 0xe1, 0x22, 0xa3, 0xb1, 0x20, 0xd8, 0x6e,
-	0x74, 0xc0, 0x4e, 0x2b, 0x5c, 0x97, 0xe5, 0x70, 0x51, 0x45, 0x0f, 0xe0, 0x7f, 0xd3, 0x09, 0x8e,
-	0x04, 0x29, 0x4b, 0x9b, 0x4a, 0xba, 0xa9, 0x0f, 0x6e, 0xc4, 0xc6, 0xdb, 0x27, 0x00, 0xd7, 0x94,
-	0xb7, 0xc5, 0xa6, 0x4a, 0x7c, 0xe0, 0x77, 0x3e, 0xed, 0xa8, 0xfa, 0x8b, 0xa3, 0x25, 0x7c, 0xb5,
-	0xbf, 0xe7, 0xb3, 0xfe, 0xc8, 0xf7, 0x1e, 0xc0, 0xd5, 0xa0, 0xff, 0x6c, 0xf1, 0xcd, 0xa1, 0xc7,
-	0xb0, 0x85, 0x25, 0xef, 0x68, 0xf1, 0x47, 0x38, 0x45, 0xee, 0x36, 0x95, 0x87, 0xa0, 0x7f, 0x9d,
-	0xbb, 0x1b, 0x17, 0x51, 0x32, 0xde, 0xf7, 0xe6, 0x22, 0x2f, 0x6c, 0xaa, 0x30, 0xc0, 0xe8, 0x09,
-	0x5c, 0x11, 0xec, 0x94, 0xa4, 0x23, 0x8a, 0xb9, 0x5d, 0xed, 0xd4, 0x76, 0x56, 0xfc, 0x4e, 0x91,
-	0xbb, 0xad, 0xa1, 0x2c, 0x06, 0x7d, 0x7e, 0x9d, 0xbb, 0x9b, 0xba, 0x79, 0x21, 0xf3, 0xc2, 0x96,
-	0x8a, 0x03, 0xcc, 0x0d, 0xd0, 0x47, 0x00, 0xeb, 0x2f, 0xe4, 0x77, 0x26, 0x17, 0x15, 0x61, 0x9c,
-	0x11, 0xce, 0xe7, 0x8b, 0x32, 0x29, 0x62, 0x70, 0x9d, 0xe2, 0xd1, 0xcd, 0x45, 0xd1, 0xd3, 0xda,
-	0x7b, 0x5e, 0x77, 0xd9, 0x1d, 0xea, 0x96, 0xfd, 0xf9, 0x77, 0x2f, 0x73, 0xb7, 0x52, 0xe4, 0xee,
-	0x5a, 0xb9, 0x2a, 0xd1, 0xda, 0x1a, 0x8d, 0xe2, 0x98, 0x7b, 0xe1, 0x1a, 0xc5, 0xa5, 0x53, 0x83,
-	0xf6, 0x0e, 0x40, 0x58, 0xda, 0xd4, 0x23, 0x58, 0x57, 0xce, 0x15, 0x5d, 0x7b, 0xef, 0xf6, 0xf2,
-	0xe1, 0x6a, 0x71, 0xbe, 0x25, 0xa7, 0x86, 0x5a, 0x8f, 0x9e, 0x42, 0x2b, 0x7d, 0x2d, 0xe6, 0xd0,
-	0x77, 0x96, 0xf7, 0x99, 0xeb, 0xed, 0xaf, 0x1a, 0x5e, 0x6b, 0x70, 0x30, 0xe4, 0xa1, 0x6a, 0xd4,
-	0x38, 0xfe, 0xcb, 0xcb, 0xef, 0x4e, 0xe5, 0xb2, 0x70, 0xc0, 0x55, 0xe1, 0x80, 0x6f, 0x85, 0x03,
-	0x3e, 0xcc, 0x9c, 0xca, 0xd5, 0xcc, 0xa9, 0x7c, 0x99, 0x39, 0x95, 0x57, 0x7b, 0xc7, 0x54, 0x9c,
-	0x4c, 0x8f, 0xba, 0x31, 0x4b, 0x7a, 0x87, 0x6a, 0xc0, 0x80, 0x88, 0x73, 0x96, 0x9d, 0xf6, 0xcc,
-	0x73, 0xf4, 0xa6, 0xfc, 0x20, 0x89, 0x8b, 0x09, 0xe1, 0x47, 0x0d, 0xf5, 0xba, 0x3c, 0xfc, 0x19,
-	0x00, 0x00, 0xff, 0xff, 0x82, 0xc7, 0xc1, 0xef, 0xb2, 0x04, 0x00, 0x00,
+	// 662 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x8c, 0x54, 0x4d, 0x6b, 0xdb, 0x4a,
+	0x14, 0xb5, 0x64, 0x39, 0xb2, 0xaf, 0xf3, 0xf5, 0x86, 0xf0, 0x50, 0xde, 0xe3, 0x49, 0x46, 0xbc,
+	0xd2, 0x40, 0xc1, 0x26, 0xe9, 0xa2, 0x34, 0xa5, 0x14, 0xd4, 0x10, 0xea, 0x45, 0xdd, 0x22, 0x9c,
+	0x4d, 0x37, 0x46, 0xd1, 0x4c, 0xe3, 0x21, 0x96, 0xc6, 0x48, 0xe3, 0xa4, 0xf9, 0x0f, 0xa5, 0x14,
+	0xba, 0xe9, 0xb2, 0x7f, 0xa1, 0xd0, 0x1f, 0x91, 0x65, 0x96, 0x5d, 0x89, 0x56, 0xd9, 0x74, 0x9d,
+	0x5f, 0x50, 0x34, 0x23, 0x39, 0x13, 0xe2, 0x42, 0x76, 0x73, 0xcf, 0x3d, 0xd7, 0xf7, 0x9c, 0x33,
+	0xd6, 0xc0, 0xbd, 0xd9, 0x94, 0xd3, 0xf0, 0xb8, 0x17, 0xb2, 0xc9, 0x84, 0x84, 0x9c, 0xb2, 0xb8,
+	0x77, 0xb2, 0xad, 0x54, 0xdd, 0x69, 0xc2, 0x38, 0x43, 0x1b, 0x92, 0xd6, 0x55, 0x1a, 0x27, 0xdb,
+	0xff, 0x6c, 0x1c, 0xb1, 0x23, 0x26, 0x08, 0xbd, 0xe2, 0x24, 0xb9, 0xee, 0x27, 0x0d, 0x4c, 0x2f,
+	0x48, 0xc9, 0x60, 0x7f, 0x88, 0x56, 0x41, 0xa7, 0xd8, 0xd2, 0x3a, 0xda, 0x56, 0xcb, 0xd7, 0x29,
+	0x46, 0x08, 0x8c, 0x38, 0x88, 0x88, 0xa5, 0x0b, 0x44, 0x9c, 0xd1, 0x26, 0xd4, 0x67, 0x09, 0xb5,
+	0xea, 0x05, 0xe4, 0x99, 0x79, 0xe6, 0xd4, 0x0f, 0xfc, 0xbe, 0x5f, 0x60, 0x05, 0x1d, 0x07, 0x3c,
+	0xb0, 0x0c, 0x49, 0x2f, 0xce, 0x68, 0x03, 0x1a, 0xec, 0x34, 0x26, 0x89, 0xd5, 0x10, 0xa0, 0x2c,
+	0xd0, 0x26, 0x34, 0x67, 0x09, 0x1d, 0x8d, 0x83, 0x74, 0x6c, 0x2d, 0x89, 0x86, 0x39, 0x4b, 0xe8,
+	0x8b, 0x20, 0x1d, 0xef, 0x1a, 0xbf, 0xbe, 0x38, 0x9a, 0xfb, 0x04, 0xda, 0x83, 0xfd, 0xe1, 0x4b,
+	0xc2, 0x03, 0xf1, 0x2b, 0x95, 0x10, 0x4d, 0x11, 0x52, 0x6d, 0xd3, 0xaf, 0xb7, 0x95, 0xc3, 0xdf,
+	0x74, 0x68, 0xec, 0x91, 0x98, 0x45, 0x77, 0x32, 0xf4, 0x37, 0x2c, 0xa5, 0xe1, 0x98, 0x44, 0x81,
+	0xf4, 0xe4, 0x97, 0x15, 0xb2, 0xc0, 0x0c, 0x13, 0x12, 0x70, 0x96, 0x94, 0x86, 0xaa, 0x52, 0x4c,
+	0x9c, 0x45, 0x87, 0x6c, 0x52, 0x9a, 0x2a, 0x2b, 0x74, 0x1f, 0xd6, 0x22, 0x1a, 0xf3, 0x51, 0x42,
+	0x52, 0x9e, 0xd0, 0x90, 0x13, 0x2c, 0xcc, 0x35, 0xfd, 0xd5, 0x02, 0xf6, 0xe7, 0x28, 0x7a, 0x00,
+	0x7f, 0xcd, 0xa6, 0x38, 0xe0, 0x44, 0xa5, 0x9a, 0x82, 0xba, 0x2e, 0x1b, 0x0a, 0xb9, 0x03, 0x6d,
+	0x4c, 0xd2, 0x30, 0xa1, 0xd3, 0xe2, 0x22, 0xad, 0xa6, 0x58, 0xa9, 0x42, 0x68, 0x5d, 0x5e, 0x49,
+	0x4b, 0x74, 0xc4, 0x4d, 0xa8, 0xf9, 0xc2, 0x8d, 0x7c, 0xe7, 0xb1, 0xb5, 0x6f, 0xc5, 0xf6, 0x55,
+	0x83, 0x15, 0x11, 0xdb, 0x3c, 0x76, 0x25, 0x02, 0xed, 0x76, 0x04, 0x32, 0x34, 0xfd, 0x46, 0x68,
+	0x0b, 0x22, 0xa8, 0xdf, 0x3d, 0x02, 0xe3, 0x0f, 0x11, 0x54, 0x9a, 0x1b, 0xb7, 0x34, 0x7f, 0xd0,
+	0x60, 0xb9, 0xbf, 0xf7, 0x7c, 0xfe, 0x3f, 0x47, 0x8f, 0xa1, 0x89, 0x0b, 0x0f, 0xa3, 0xea, 0xde,
+	0x3d, 0x3b, 0xcf, 0x1c, 0x53, 0xf8, 0xea, 0xe3, 0xab, 0xcc, 0x59, 0x3b, 0x0b, 0xa2, 0xc9, 0xae,
+	0x5b, 0x91, 0x5c, 0xdf, 0xc4, 0xb2, 0x87, 0x9e, 0x42, 0x8b, 0xb3, 0x63, 0x12, 0x8f, 0x28, 0x4e,
+	0x2d, 0xbd, 0x53, 0xdf, 0x6a, 0x79, 0x9d, 0x3c, 0x73, 0x9a, 0xc3, 0x02, 0xec, 0xe3, 0xf4, 0x2a,
+	0x73, 0xd6, 0xe5, 0xf0, 0x9c, 0xe6, 0xfa, 0x4d, 0x5e, 0x76, 0x4b, 0x41, 0x9f, 0x35, 0x68, 0xbc,
+	0x12, 0xff, 0x71, 0x0b, 0xcc, 0x00, 0xe3, 0x84, 0xa4, 0x69, 0x15, 0x5e, 0x59, 0x22, 0x06, 0xab,
+	0x14, 0x8f, 0xae, 0x3f, 0x4e, 0xb9, 0xad, 0xbd, 0xe3, 0x76, 0x17, 0x7d, 0xb7, 0x5d, 0xd5, 0x9f,
+	0xf7, 0xff, 0x79, 0xe6, 0xd4, 0xf2, 0xcc, 0x59, 0x51, 0xd1, 0x42, 0x5a, 0x5b, 0x4a, 0xa3, 0x38,
+	0x4c, 0x5d, 0x7f, 0x85, 0x62, 0xa5, 0x5b, 0x4a, 0x7b, 0xaf, 0x01, 0x28, 0x49, 0x3d, 0x82, 0x86,
+	0x70, 0x2e, 0xd4, 0xb5, 0x77, 0xfe, 0x5d, 0xbc, 0x5c, 0x04, 0xe7, 0x19, 0xc5, 0x56, 0x5f, 0xf2,
+	0xd1, 0x33, 0x30, 0xe2, 0xb7, 0xbc, 0x12, 0xfd, 0xdf, 0xe2, 0xb9, 0xf2, 0x49, 0xf1, 0x96, 0x4b,
+	0xbd, 0xc6, 0x60, 0x7f, 0x98, 0xfa, 0x62, 0x50, 0xca, 0xf1, 0x5e, 0x9f, 0xff, 0xb4, 0x6b, 0xe7,
+	0xb9, 0xad, 0x5d, 0xe4, 0xb6, 0xf6, 0x23, 0xb7, 0xb5, 0x8f, 0x97, 0x76, 0xed, 0xe2, 0xd2, 0xae,
+	0x7d, 0xbf, 0xb4, 0x6b, 0x6f, 0x76, 0x8e, 0x28, 0x1f, 0xcf, 0x0e, 0xbb, 0x21, 0x8b, 0x7a, 0x07,
+	0x62, 0xc1, 0x80, 0xf0, 0x53, 0x96, 0x1c, 0xf7, 0xca, 0x27, 0xf0, 0x9d, 0xfa, 0x08, 0xf2, 0xb3,
+	0x29, 0x49, 0x0f, 0x97, 0xc4, 0x8b, 0xf6, 0xf0, 0x77, 0x00, 0x00, 0x00, 0xff, 0xff, 0x61, 0x8c,
+	0x9a, 0x88, 0x26, 0x05, 0x00, 0x00,
 }
 
 func (this *BaseNFT) Equal(that interface{}) bool {
@@ -380,7 +389,7 @@ func (this *BaseNFT) Equal(that interface{}) bool {
 	} else if this == nil {
 		return false
 	}
-	if this.ID != that1.ID {
+	if this.Id != that1.Id {
 		return false
 	}
 	if this.Name != that1.Name {
@@ -393,6 +402,9 @@ func (this *BaseNFT) Equal(that interface{}) bool {
 		return false
 	}
 	if this.Owner != that1.Owner {
+		return false
+	}
+	if this.UriHash != that1.UriHash {
 		return false
 	}
 	return true
@@ -419,7 +431,7 @@ func (this *NFTMetadata) Equal(that interface{}) bool {
 	if this.Name != that1.Name {
 		return false
 	}
-	if this.Description != that1.Description {
+	if this.Data != that1.Data {
 		return false
 	}
 	return true
@@ -443,7 +455,7 @@ func (this *Denom) Equal(that interface{}) bool {
 	} else if this == nil {
 		return false
 	}
-	if this.ID != that1.ID {
+	if this.Id != that1.Id {
 		return false
 	}
 	if this.Name != that1.Name {
@@ -462,6 +474,18 @@ func (this *Denom) Equal(that interface{}) bool {
 		return false
 	}
 	if this.UpdateRestricted != that1.UpdateRestricted {
+		return false
+	}
+	if this.Description != that1.Description {
+		return false
+	}
+	if this.Uri != that1.Uri {
+		return false
+	}
+	if this.UriHash != that1.UriHash {
+		return false
+	}
+	if this.Data != that1.Data {
 		return false
 	}
 	return true
@@ -497,6 +521,9 @@ func (this *DenomMetadata) Equal(that interface{}) bool {
 	if this.UpdateRestricted != that1.UpdateRestricted {
 		return false
 	}
+	if this.Data != that1.Data {
+		return false
+	}
 	return true
 }
 func (this *IDCollection) Equal(that interface{}) bool {
@@ -518,14 +545,14 @@ func (this *IDCollection) Equal(that interface{}) bool {
 	} else if this == nil {
 		return false
 	}
-	if this.DenomID != that1.DenomID {
+	if this.DenomId != that1.DenomId {
 		return false
 	}
-	if len(this.TokenIDs) != len(that1.TokenIDs) {
+	if len(this.TokenIds) != len(that1.TokenIds) {
 		return false
 	}
-	for i := range this.TokenIDs {
-		if this.TokenIDs[i] != that1.TokenIDs[i] {
+	for i := range this.TokenIds {
+		if this.TokenIds[i] != that1.TokenIds[i] {
 			return false
 		}
 	}
@@ -615,6 +642,13 @@ func (m *BaseNFT) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if len(m.UriHash) > 0 {
+		i -= len(m.UriHash)
+		copy(dAtA[i:], m.UriHash)
+		i = encodeVarintCollection(dAtA, i, uint64(len(m.UriHash)))
+		i--
+		dAtA[i] = 0x32
+	}
 	if len(m.Owner) > 0 {
 		i -= len(m.Owner)
 		copy(dAtA[i:], m.Owner)
@@ -643,10 +677,10 @@ func (m *BaseNFT) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		i--
 		dAtA[i] = 0x12
 	}
-	if len(m.ID) > 0 {
-		i -= len(m.ID)
-		copy(dAtA[i:], m.ID)
-		i = encodeVarintCollection(dAtA, i, uint64(len(m.ID)))
+	if len(m.Id) > 0 {
+		i -= len(m.Id)
+		copy(dAtA[i:], m.Id)
+		i = encodeVarintCollection(dAtA, i, uint64(len(m.Id)))
 		i--
 		dAtA[i] = 0xa
 	}
@@ -673,10 +707,10 @@ func (m *NFTMetadata) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if len(m.Description) > 0 {
-		i -= len(m.Description)
-		copy(dAtA[i:], m.Description)
-		i = encodeVarintCollection(dAtA, i, uint64(len(m.Description)))
+	if len(m.Data) > 0 {
+		i -= len(m.Data)
+		copy(dAtA[i:], m.Data)
+		i = encodeVarintCollection(dAtA, i, uint64(len(m.Data)))
 		i--
 		dAtA[i] = 0x12
 	}
@@ -710,6 +744,34 @@ func (m *Denom) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if len(m.Data) > 0 {
+		i -= len(m.Data)
+		copy(dAtA[i:], m.Data)
+		i = encodeVarintCollection(dAtA, i, uint64(len(m.Data)))
+		i--
+		dAtA[i] = 0x5a
+	}
+	if len(m.UriHash) > 0 {
+		i -= len(m.UriHash)
+		copy(dAtA[i:], m.UriHash)
+		i = encodeVarintCollection(dAtA, i, uint64(len(m.UriHash)))
+		i--
+		dAtA[i] = 0x52
+	}
+	if len(m.Uri) > 0 {
+		i -= len(m.Uri)
+		copy(dAtA[i:], m.Uri)
+		i = encodeVarintCollection(dAtA, i, uint64(len(m.Uri)))
+		i--
+		dAtA[i] = 0x4a
+	}
+	if len(m.Description) > 0 {
+		i -= len(m.Description)
+		copy(dAtA[i:], m.Description)
+		i = encodeVarintCollection(dAtA, i, uint64(len(m.Description)))
+		i--
+		dAtA[i] = 0x42
+	}
 	if m.UpdateRestricted {
 		i--
 		if m.UpdateRestricted {
@@ -758,10 +820,10 @@ func (m *Denom) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		i--
 		dAtA[i] = 0x12
 	}
-	if len(m.ID) > 0 {
-		i -= len(m.ID)
-		copy(dAtA[i:], m.ID)
-		i = encodeVarintCollection(dAtA, i, uint64(len(m.ID)))
+	if len(m.Id) > 0 {
+		i -= len(m.Id)
+		copy(dAtA[i:], m.Id)
+		i = encodeVarintCollection(dAtA, i, uint64(len(m.Id)))
 		i--
 		dAtA[i] = 0xa
 	}
@@ -788,6 +850,13 @@ func (m *DenomMetadata) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if len(m.Data) > 0 {
+		i -= len(m.Data)
+		copy(dAtA[i:], m.Data)
+		i = encodeVarintCollection(dAtA, i, uint64(len(m.Data)))
+		i--
+		dAtA[i] = 0x2a
+	}
 	if m.UpdateRestricted {
 		i--
 		if m.UpdateRestricted {
@@ -845,19 +914,19 @@ func (m *IDCollection) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if len(m.TokenIDs) > 0 {
-		for iNdEx := len(m.TokenIDs) - 1; iNdEx >= 0; iNdEx-- {
-			i -= len(m.TokenIDs[iNdEx])
-			copy(dAtA[i:], m.TokenIDs[iNdEx])
-			i = encodeVarintCollection(dAtA, i, uint64(len(m.TokenIDs[iNdEx])))
+	if len(m.TokenIds) > 0 {
+		for iNdEx := len(m.TokenIds) - 1; iNdEx >= 0; iNdEx-- {
+			i -= len(m.TokenIds[iNdEx])
+			copy(dAtA[i:], m.TokenIds[iNdEx])
+			i = encodeVarintCollection(dAtA, i, uint64(len(m.TokenIds[iNdEx])))
 			i--
 			dAtA[i] = 0x12
 		}
 	}
-	if len(m.DenomID) > 0 {
-		i -= len(m.DenomID)
-		copy(dAtA[i:], m.DenomID)
-		i = encodeVarintCollection(dAtA, i, uint64(len(m.DenomID)))
+	if len(m.DenomId) > 0 {
+		i -= len(m.DenomId)
+		copy(dAtA[i:], m.DenomId)
+		i = encodeVarintCollection(dAtA, i, uint64(len(m.DenomId)))
 		i--
 		dAtA[i] = 0xa
 	}
@@ -972,7 +1041,7 @@ func (m *BaseNFT) Size() (n int) {
 	}
 	var l int
 	_ = l
-	l = len(m.ID)
+	l = len(m.Id)
 	if l > 0 {
 		n += 1 + l + sovCollection(uint64(l))
 	}
@@ -992,6 +1061,10 @@ func (m *BaseNFT) Size() (n int) {
 	if l > 0 {
 		n += 1 + l + sovCollection(uint64(l))
 	}
+	l = len(m.UriHash)
+	if l > 0 {
+		n += 1 + l + sovCollection(uint64(l))
+	}
 	return n
 }
 
@@ -1005,7 +1078,7 @@ func (m *NFTMetadata) Size() (n int) {
 	if l > 0 {
 		n += 1 + l + sovCollection(uint64(l))
 	}
-	l = len(m.Description)
+	l = len(m.Data)
 	if l > 0 {
 		n += 1 + l + sovCollection(uint64(l))
 	}
@@ -1018,7 +1091,7 @@ func (m *Denom) Size() (n int) {
 	}
 	var l int
 	_ = l
-	l = len(m.ID)
+	l = len(m.Id)
 	if l > 0 {
 		n += 1 + l + sovCollection(uint64(l))
 	}
@@ -1044,6 +1117,22 @@ func (m *Denom) Size() (n int) {
 	if m.UpdateRestricted {
 		n += 2
 	}
+	l = len(m.Description)
+	if l > 0 {
+		n += 1 + l + sovCollection(uint64(l))
+	}
+	l = len(m.Uri)
+	if l > 0 {
+		n += 1 + l + sovCollection(uint64(l))
+	}
+	l = len(m.UriHash)
+	if l > 0 {
+		n += 1 + l + sovCollection(uint64(l))
+	}
+	l = len(m.Data)
+	if l > 0 {
+		n += 1 + l + sovCollection(uint64(l))
+	}
 	return n
 }
 
@@ -1067,6 +1156,10 @@ func (m *DenomMetadata) Size() (n int) {
 	if m.UpdateRestricted {
 		n += 2
 	}
+	l = len(m.Data)
+	if l > 0 {
+		n += 1 + l + sovCollection(uint64(l))
+	}
 	return n
 }
 
@@ -1076,12 +1169,12 @@ func (m *IDCollection) Size() (n int) {
 	}
 	var l int
 	_ = l
-	l = len(m.DenomID)
+	l = len(m.DenomId)
 	if l > 0 {
 		n += 1 + l + sovCollection(uint64(l))
 	}
-	if len(m.TokenIDs) > 0 {
-		for _, s := range m.TokenIDs {
+	if len(m.TokenIds) > 0 {
+		for _, s := range m.TokenIds {
 			l = len(s)
 			n += 1 + l + sovCollection(uint64(l))
 		}
@@ -1162,7 +1255,7 @@ func (m *BaseNFT) Unmarshal(dAtA []byte) error {
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field ID", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field Id", wireType)
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
@@ -1190,7 +1283,7 @@ func (m *BaseNFT) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.ID = string(dAtA[iNdEx:postIndex])
+			m.Id = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 2:
 			if wireType != 2 {
@@ -1320,6 +1413,38 @@ func (m *BaseNFT) Unmarshal(dAtA []byte) error {
 			}
 			m.Owner = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
+		case 6:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field UriHash", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowCollection
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthCollection
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthCollection
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.UriHash = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipCollection(dAtA[iNdEx:])
@@ -1404,7 +1529,7 @@ func (m *NFTMetadata) Unmarshal(dAtA []byte) error {
 			iNdEx = postIndex
 		case 2:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Description", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field Data", wireType)
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
@@ -1432,7 +1557,7 @@ func (m *NFTMetadata) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Description = string(dAtA[iNdEx:postIndex])
+			m.Data = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
@@ -1486,7 +1611,7 @@ func (m *Denom) Unmarshal(dAtA []byte) error {
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field ID", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field Id", wireType)
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
@@ -1514,7 +1639,7 @@ func (m *Denom) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.ID = string(dAtA[iNdEx:postIndex])
+			m.Id = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 2:
 			if wireType != 2 {
@@ -1684,6 +1809,134 @@ func (m *Denom) Unmarshal(dAtA []byte) error {
 				}
 			}
 			m.UpdateRestricted = bool(v != 0)
+		case 8:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Description", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowCollection
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthCollection
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthCollection
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Description = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 9:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Uri", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowCollection
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthCollection
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthCollection
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Uri = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 10:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field UriHash", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowCollection
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthCollection
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthCollection
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.UriHash = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 11:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Data", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowCollection
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthCollection
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthCollection
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Data = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipCollection(dAtA[iNdEx:])
@@ -1838,6 +2091,38 @@ func (m *DenomMetadata) Unmarshal(dAtA []byte) error {
 				}
 			}
 			m.UpdateRestricted = bool(v != 0)
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Data", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowCollection
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthCollection
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthCollection
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Data = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipCollection(dAtA[iNdEx:])
@@ -1890,7 +2175,7 @@ func (m *IDCollection) Unmarshal(dAtA []byte) error {
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field DenomID", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field DenomId", wireType)
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
@@ -1918,11 +2203,11 @@ func (m *IDCollection) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.DenomID = string(dAtA[iNdEx:postIndex])
+			m.DenomId = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 2:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field TokenIDs", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field TokenIds", wireType)
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
@@ -1950,7 +2235,7 @@ func (m *IDCollection) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.TokenIDs = append(m.TokenIDs, string(dAtA[iNdEx:postIndex]))
+			m.TokenIds = append(m.TokenIds, string(dAtA[iNdEx:postIndex]))
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

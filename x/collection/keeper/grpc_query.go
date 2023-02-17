@@ -8,13 +8,14 @@ import (
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
+	"github.com/cosmos/cosmos-sdk/x/nft"
 
 	"github.com/UptickNetwork/uptick/x/collection/types"
-	"github.com/cosmos/cosmos-sdk/x/nft"
 )
 
 var _ types.QueryServer = Keeper{}
 
+// Supply queries the total supply of a given denom or owner
 func (k Keeper) Supply(c context.Context, request *types.QuerySupplyRequest) (*types.QuerySupplyResponse, error) {
 	ctx := sdk.UnwrapSDKContext(c)
 
@@ -32,11 +33,12 @@ func (k Keeper) Supply(c context.Context, request *types.QuerySupplyRequest) (*t
 	return &types.QuerySupplyResponse{Amount: supply}, nil
 }
 
+// NFTsOfOwner queries the NFTs of the specified owner
 func (k Keeper) NFTsOfOwner(c context.Context, request *types.QueryNFTsOfOwnerRequest) (*types.QueryNFTsOfOwnerResponse, error) {
 	r := &nft.QueryNFTsRequest{
 		ClassId:    request.DenomId,
 		Owner:      request.Owner,
-		Pagination: request.Pagination,
+		Pagination: shapePageRequest(request.Pagination),
 	}
 
 	result, err := k.nk.NFTs(c, r)
@@ -45,10 +47,10 @@ func (k Keeper) NFTsOfOwner(c context.Context, request *types.QueryNFTsOfOwnerRe
 	}
 
 	var denomMap = make(map[string][]string)
-	var denoms = make([]string, 0, len(result.Nfts))
-
+	var denoms []string
 	for _, token := range result.Nfts {
-		if len(denomMap[token.ClassId]) == 0 {
+		if denomMap[token.ClassId] == nil {
+			denomMap[token.ClassId] = []string{}
 			denoms = append(denoms, token.ClassId)
 		}
 		denomMap[token.ClassId] = append(denomMap[token.ClassId], token.Id)
@@ -56,7 +58,10 @@ func (k Keeper) NFTsOfOwner(c context.Context, request *types.QueryNFTsOfOwnerRe
 
 	var idc []types.IDCollection
 	for _, denomID := range denoms {
-		idc = append(idc, types.IDCollection{DenomID: denomID, TokenIDs: denomMap[denomID]})
+		idc = append(idc, types.IDCollection{
+			DenomId:  denomID,
+			TokenIds: denomMap[denomID],
+		})
 	}
 
 	response := &types.QueryNFTsOfOwnerResponse{
@@ -70,6 +75,7 @@ func (k Keeper) NFTsOfOwner(c context.Context, request *types.QueryNFTsOfOwnerRe
 	return response, nil
 }
 
+// Collection queries the NFTs of the specified denom
 func (k Keeper) Collection(c context.Context, request *types.QueryCollectionRequest) (*types.QueryCollectionResponse, error) {
 	ctx := sdk.UnwrapSDKContext(c)
 	denom, err := k.GetDenomInfo(ctx, request.DenomId)
@@ -79,7 +85,7 @@ func (k Keeper) Collection(c context.Context, request *types.QueryCollectionRequ
 
 	r := &nft.QueryNFTsRequest{
 		ClassId:    request.DenomId,
-		Pagination: request.Pagination,
+		Pagination: shapePageRequest(request.Pagination),
 	}
 
 	result, err := k.nk.NFTs(c, r)
@@ -91,17 +97,18 @@ func (k Keeper) Collection(c context.Context, request *types.QueryCollectionRequ
 	for _, token := range result.Nfts {
 		owner := k.nk.GetOwner(ctx, request.DenomId, token.Id)
 
-		var nftMetadata types.NFTMetadata
-		if err := k.cdc.Unmarshal(token.Data.GetValue(), &nftMetadata); err != nil {
+		nftMetadata, err := types.UnmarshalNFTMetadata(k.cdc, token.Data.GetValue())
+		if err != nil {
 			return nil, err
 		}
 
 		nfts = append(nfts, types.BaseNFT{
-			ID:    token.Id,
-			URI:   token.Uri,
-			Name:  nftMetadata.Name,
-			Owner: owner.String(),
-			Data:  nftMetadata.Description,
+			Id:      token.Id,
+			URI:     token.Uri,
+			UriHash: token.UriHash,
+			Name:    nftMetadata.Name,
+			Owner:   owner.String(),
+			Data:    nftMetadata.Data,
 		})
 	}
 
@@ -118,6 +125,7 @@ func (k Keeper) Collection(c context.Context, request *types.QueryCollectionRequ
 	return response, nil
 }
 
+// Denom queries the definition of a given denom
 func (k Keeper) Denom(c context.Context, request *types.QueryDenomRequest) (*types.QueryDenomResponse, error) {
 	ctx := sdk.UnwrapSDKContext(c)
 	denom, err := k.GetDenomInfo(ctx, request.DenomId)
@@ -127,11 +135,12 @@ func (k Keeper) Denom(c context.Context, request *types.QueryDenomRequest) (*typ
 	return &types.QueryDenomResponse{Denom: denom}, nil
 }
 
+// Denoms queries all the denoms
 func (k Keeper) Denoms(c context.Context, req *types.QueryDenomsRequest) (*types.QueryDenomsResponse, error) {
 	ctx := sdk.UnwrapSDKContext(c)
 
 	result, err := k.nk.Classes(c, &nft.QueryClassesRequest{
-		Pagination: req.Pagination,
+		Pagination: shapePageRequest(req.Pagination),
 	})
 	if err != nil {
 		return nil, err
@@ -152,6 +161,7 @@ func (k Keeper) Denoms(c context.Context, req *types.QueryDenomsRequest) (*types
 	}, nil
 }
 
+// NFT queries the NFT for the given denom and token ID
 func (k Keeper) NFT(c context.Context, request *types.QueryNFTRequest) (*types.QueryNFTResponse, error) {
 	ctx := sdk.UnwrapSDKContext(c)
 
