@@ -1096,8 +1096,6 @@ func (app *Uptick) registerUpgradeHandlers() {
 			// Refs:
 			// - https://docs.cosmos.network/master/building-modules/upgrade.html#registering-migrations
 			// - https://docs.cosmos.network/master/migrations/chain-upgrade-guide-044.html#chain-upgrade
-
-			fmt.Printf("xxl come upgrade handle ....")
 			gs := ibcnfttransfertypes.DefaultGenesisState()
 			bz, err := ibcnfttransfertypes.ModuleCdc.MarshalJSON(gs)
 			if err != nil {
@@ -1105,9 +1103,6 @@ func (app *Uptick) registerUpgradeHandlers() {
 			}
 			_ = app.mm.Modules[ibcnfttransfertypes.ModuleName].InitGenesis(
 				ctx, ibcnfttransfertypes.ModuleCdc, bz)
-
-			// ibcnfttransferkeeper.Keeper.InitGenesis(ctx, gs)
-			// app.IBCNFTTransferKeeper.InitGenesis()
 
 			return app.mm.RunMigrations(ctx, app.configurator, vm)
 		})
