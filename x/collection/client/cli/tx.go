@@ -44,7 +44,7 @@ func GetCmdIssueDenom() *cobra.Command {
 		Use:  "issue [denom-id]",
 		Long: "Issue a new denom.",
 		Example: fmt.Sprintf(
-			"$ %s tx nft issue <denom-id> "+
+			"$ %s tx collection issue <denom-id> "+
 				"--from=<key-name> "+
 				"--name=<denom-name> "+
 				"--symbol=<denom-symbol> "+
@@ -140,7 +140,7 @@ func GetCmdMintNFT() *cobra.Command {
 		Use:  "mint [denom-id] [nft-id]",
 		Long: "Mint an NFT and set the owner to the recipient.",
 		Example: fmt.Sprintf(
-			"$ %s tx nft mint <denom-id> <nft-id> "+
+			"$ %s tx collection mint <denom-id> <nft-id> "+
 				"--uri=<uri> "+
 				"--uri-hash=<uri-hash> "+
 				"--recipient=<recipient> "+
@@ -217,7 +217,7 @@ func GetCmdEditNFT() *cobra.Command {
 		Use:  "edit [denom-id] [nft-id]",
 		Long: "Edit the token data of an NFT.",
 		Example: fmt.Sprintf(
-			"$ %s tx nft edit <denom-id> <nft-id> "+
+			"$ %s tx collection edit <denom-id> <nft-id> "+
 				"--uri=<uri> "+
 				"--uri-hash=<uri-hash> "+
 				"--from=<key-name> "+
@@ -275,7 +275,7 @@ func GetCmdTransferNFT() *cobra.Command {
 		Use:  "transfer [recipient] [denom-id] [nft-id]",
 		Long: "Transfer an NFT to a recipient.",
 		Example: fmt.Sprintf(
-			"$ %s tx nft transfer <recipient> <denom-id> <nft-id> "+
+			"$ %s tx collection transfer <recipient> <denom-id> <nft-id> "+
 				"--uri=<uri> "+
 				"--uri-hash=<uri-hash> "+
 				"--from=<key-name> "+
@@ -338,7 +338,7 @@ func GetCmdBurnNFT() *cobra.Command {
 		Use:  "burn [denom-id] [nft-id]",
 		Long: "Burn an NFT.",
 		Example: fmt.Sprintf(
-			"$ %s tx nft burn <denom-id> <nft-id> "+
+			"$ %s tx collection burn <denom-id> <nft-id> "+
 				"--from=<key-name> "+
 				"--chain-id=<chain-id> "+
 				"--fees=<fee>",
@@ -373,7 +373,7 @@ func GetCmdTransferDenom() *cobra.Command {
 		Use:  "transfer-denom [recipient] [denom-id]",
 		Long: "Transfer an Denom to a recipient.",
 		Example: fmt.Sprintf(
-			"$ %s tx nft transfer-denom <recipient> <denom-id> "+
+			"$ %s tx collection transfer-denom <recipient> <denom-id> "+
 				"--from=<key-name> "+
 				"--chain-id=<chain-id> "+
 				"--fees=<fee>",
