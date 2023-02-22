@@ -39,7 +39,7 @@ func GetCmdQuerySupply() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "supply [denom-id]",
 		Long:    "total supply of a collection or owner of NFTs.",
-		Example: fmt.Sprintf("$ %s query nft supply <denom-id>", version.AppName),
+		Example: fmt.Sprintf("$ %s query collection supply <denom-id>", version.AppName),
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clientCtx, err := client.GetClientTxContext(cmd)
@@ -82,7 +82,7 @@ func GetCmdQueryOwner() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "owner [address]",
 		Long:    "Get the NFTs owned by an account address.",
-		Example: fmt.Sprintf("$ %s query nft owner <address> --denom-id=<denom-id>", version.AppName),
+		Example: fmt.Sprintf("$ %s query collection owner <address> --denom-id=<denom-id>", version.AppName),
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clientCtx, err := client.GetClientTxContext(cmd)
@@ -125,7 +125,7 @@ func GetCmdQueryCollection() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "collection [denom-id]",
 		Long:    "Get all the NFTs from a given collection.",
-		Example: fmt.Sprintf("$ %s query nft collection <denom-id>", version.AppName),
+		Example: fmt.Sprintf("$ %s query collection collection <denom-id>", version.AppName),
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clientCtx, err := client.GetClientTxContext(cmd)
@@ -162,7 +162,7 @@ func GetCmdQueryDenoms() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "denoms",
 		Long:    "Query all denominations of all collections of NFTs.",
-		Example: fmt.Sprintf("$ %s query nft denoms", version.AppName),
+		Example: fmt.Sprintf("$ %s query collection denoms", version.AppName),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clientCtx, err := client.GetClientTxContext(cmd)
 			if err != nil {
@@ -191,7 +191,7 @@ func GetCmdQueryDenom() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "denom [denom-id]",
 		Long:    "Query the denom by the specified denom id.",
-		Example: fmt.Sprintf("$ %s query nft denom <denom-id>", version.AppName),
+		Example: fmt.Sprintf("$ %s query collection denom <denom-id>", version.AppName),
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clientCtx, err := client.GetClientTxContext(cmd)
@@ -220,7 +220,7 @@ func GetCmdQueryNFT() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "token [denom-id] [nft-id]",
 		Long:    "Query a single NFT from a collection.",
-		Example: fmt.Sprintf("$ %s query nft token <denom-id> <nft-id>", version.AppName),
+		Example: fmt.Sprintf("$ %s query collection token <denom-id> <nft-id>", version.AppName),
 		Args:    cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clientCtx, err := client.GetClientTxContext(cmd)
