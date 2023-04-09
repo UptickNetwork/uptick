@@ -92,6 +92,7 @@ import (
 	ibc "github.com/cosmos/ibc-go/v5/modules/core"
 	ibcclient "github.com/cosmos/ibc-go/v5/modules/core/02-client"
 	ibcclientclient "github.com/cosmos/ibc-go/v5/modules/core/02-client/client"
+	ibcclienttypes "github.com/cosmos/ibc-go/v5/modules/core/02-client/types"
 
 	porttypes "github.com/cosmos/ibc-go/v5/modules/core/05-port/types"
 	ibchost "github.com/cosmos/ibc-go/v5/modules/core/24-host"
@@ -227,12 +228,12 @@ var (
 		govtypes.ModuleName:            {authtypes.Burner},
 		ibctransfertypes.ModuleName:    {authtypes.Minter, authtypes.Burner},
 
-		evmtypes.ModuleName:            {authtypes.Minter, authtypes.Burner}, // used for secure addition and subtraction of balance using module account
-		erc20types.ModuleName:          {authtypes.Minter, authtypes.Burner},
-		erc721types.ModuleName:         nil,
+		evmtypes.ModuleName:    {authtypes.Minter, authtypes.Burner}, // used for secure addition and subtraction of balance using module account
+		erc20types.ModuleName:  {authtypes.Minter, authtypes.Burner},
+		erc721types.ModuleName: nil,
 
-		collectiontypes.ModuleName:     nil,
-		nft.ModuleName:                 nil,
+		collectiontypes.ModuleName: nil,
+		nft.ModuleName:             nil,
 	}
 
 	// module accounts that are allowed to receive tokens
@@ -279,9 +280,9 @@ type Uptick struct {
 	ParamsKeeper     paramskeeper.Keeper
 	IBCKeeper        *ibckeeper.Keeper // IBC Keeper must be a pointer in the app, so we can SetRouter on it correctly
 
-	EvidenceKeeper   evidencekeeper.Keeper
-	TransferKeeper   ibctransferkeeper.Keeper
-	FeeGrantKeeper   feegrantkeeper.Keeper
+	EvidenceKeeper evidencekeeper.Keeper
+	TransferKeeper ibctransferkeeper.Keeper
+	FeeGrantKeeper feegrantkeeper.Keeper
 
 	// make scoped keepers public for test purposes
 	ScopedIBCKeeper           capabilitykeeper.ScopedKeeper
@@ -290,7 +291,7 @@ type Uptick struct {
 	ScopedICAHostKeeper       capabilitykeeper.ScopedKeeper
 	ScopedNFTTransferKeeper   capabilitykeeper.ScopedKeeper
 
-	InterNFTKeeper   internftkeeper.Keeper
+	InterNFTKeeper       internftkeeper.Keeper
 	IBCNFTTransferKeeper ibcnfttransferkeeper.Keeper
 
 	// the module manager
@@ -299,18 +300,18 @@ type Uptick struct {
 	// the configurator
 	configurator module.Configurator
 
-	AuthzKeeper      authzkeeper.Keeper
+	AuthzKeeper authzkeeper.Keeper
 	// Ethermint keepers
 	EvmKeeper       *evmkeeper.Keeper
 	FeeMarketKeeper feemarketkeeper.Keeper
 	// Uptick keepers
-	Erc20Keeper      *erc20keeper.Keeper
-	Erc721Keeper     erc721keeper.Keeper
+	Erc20Keeper  *erc20keeper.Keeper
+	Erc721Keeper erc721keeper.Keeper
 
 	NFTKeeper        nftkeeper.Keeper
 	CollectionKeeper collectionkeeper.Keeper
 	// simulation manager
-	sm *module.SimulationManager
+	sm         *module.SimulationManager
 	tpsCounter *tpsCounter
 }
 
@@ -377,7 +378,7 @@ func NewUptick(
 	)
 
 	// Add the EVM transient store key
-	tkeys := sdk.NewTransientStoreKeys(paramstypes.TStoreKey, evmtypes.TransientKey,feemarkettypes.TransientKey)
+	tkeys := sdk.NewTransientStoreKeys(paramstypes.TStoreKey, evmtypes.TransientKey, feemarkettypes.TransientKey)
 	memKeys := sdk.NewMemoryStoreKeys(capabilitytypes.MemStoreKey)
 
 	app := &Uptick{
@@ -494,7 +495,7 @@ func NewUptick(
 		appCodec,
 		app.MsgServiceRouter(),
 		app.AccountKeeper,
-    )
+	)
 
 	tracer := cast.ToString(appOpts.Get(srvflags.EVMTracer))
 
@@ -560,7 +561,8 @@ func NewUptick(
 		AddRoute(paramproposal.RouterKey, params.NewParamChangeProposalHandler(app.ParamsKeeper)).
 		AddRoute(distrtypes.RouterKey, distr.NewCommunityPoolSpendProposalHandler(app.DistrKeeper)).
 		AddRoute(upgradetypes.RouterKey, upgrade.NewSoftwareUpgradeProposalHandler(app.UpgradeKeeper)).
-		AddRoute(ibchost.RouterKey, ibcclient.NewClientProposalHandler(app.IBCKeeper.ClientKeeper)).
+		// AddRoute(ibchost.RouterKey, ibcclient.NewClientProposalHandler(app.IBCKeeper.ClientKeeper)).
+		AddRoute(ibcclienttypes.RouterKey, ibcclient.NewClientProposalHandler(app.IBCKeeper.ClientKeeper)).
 		AddRoute(erc20types.RouterKey, erc20.NewErc20ProposalHandler(app.Erc20Keeper)).
 		AddRoute(erc721types.RouterKey, erc721.NewErc721ProposalHandler(&app.Erc721Keeper))
 
@@ -631,8 +633,8 @@ func NewUptick(
 	ibcRouter := porttypes.NewRouter()
 
 	ibcRouter.AddRoute(ibctransfertypes.ModuleName, transferStack).
-		      //AddRoute(ibctransfertypes.ModuleName, transferIBCModule).
-		      AddRoute(ibcnfttransfertypes.ModuleName, nfttransferIBCModule)
+		//AddRoute(ibctransfertypes.ModuleName, transferIBCModule).
+		AddRoute(ibcnfttransfertypes.ModuleName, nfttransferIBCModule)
 
 	app.IBCKeeper.SetRouter(ibcRouter)
 
@@ -665,7 +667,7 @@ func NewUptick(
 		capability.NewAppModule(appCodec, *app.CapabilityKeeper),
 		crisis.NewAppModule(&app.CrisisKeeper, skipGenesisInvariants),
 		gov.NewAppModule(appCodec, app.GovKeeper, app.AccountKeeper, app.BankKeeper),
-		mint.NewAppModule(appCodec, app.MintKeeper, app.AccountKeeper,nil),
+		mint.NewAppModule(appCodec, app.MintKeeper, app.AccountKeeper, nil),
 		slashing.NewAppModule(appCodec, app.SlashingKeeper, app.AccountKeeper, app.BankKeeper, app.StakingKeeper),
 		distr.NewAppModule(appCodec, app.DistrKeeper, app.AccountKeeper, app.BankKeeper, app.StakingKeeper),
 		staking.NewAppModule(appCodec, app.StakingKeeper, app.AccountKeeper, app.BankKeeper),
@@ -689,7 +691,6 @@ func NewUptick(
 
 		nfttransferModule,
 		interTxModule,
-
 	)
 
 	// During begin block slashing happens after distr.BeginBlocker so that
@@ -817,7 +818,7 @@ func NewUptick(
 		bank.NewAppModule(appCodec, app.BankKeeper, app.AccountKeeper),
 		capability.NewAppModule(appCodec, *app.CapabilityKeeper),
 		gov.NewAppModule(appCodec, app.GovKeeper, app.AccountKeeper, app.BankKeeper),
-		mint.NewAppModule(appCodec, app.MintKeeper, app.AccountKeeper,nil),
+		mint.NewAppModule(appCodec, app.MintKeeper, app.AccountKeeper, nil),
 		staking.NewAppModule(appCodec, app.StakingKeeper, app.AccountKeeper, app.BankKeeper),
 		distr.NewAppModule(appCodec, app.DistrKeeper, app.AccountKeeper, app.BankKeeper, app.StakingKeeper),
 		slashing.NewAppModule(appCodec, app.SlashingKeeper, app.AccountKeeper, app.BankKeeper, app.StakingKeeper),
@@ -898,7 +899,6 @@ func (app *Uptick) EndBlocker(ctx sdk.Context, req abci.RequestEndBlock) abci.Re
 	return app.mm.EndBlock(ctx, req)
 }
 
-
 func (app *Uptick) DeliverTx(req abci.RequestDeliverTx) (res abci.ResponseDeliverTx) {
 	defer func() {
 		// TODO: Record the count along with the code and or reason so as to display
@@ -921,7 +921,6 @@ func (app *Uptick) InitChainer(ctx sdk.Context, req abci.RequestInitChain) abci.
 	}
 	app.UpgradeKeeper.SetModuleVersionMap(ctx, app.mm.GetVersionMap())
 
-	//fmt.Printf("xxl ctx %v+ app.appCodec %v+ genesisState %v+ \n",ctx,app.appCodec,genesisState)
 	return app.mm.InitGenesis(ctx, app.appCodec, genesisState)
 }
 
@@ -1083,7 +1082,7 @@ func initParamsKeeper(
 	appCodec codec.BinaryCodec,
 	legacyAmino *codec.LegacyAmino,
 	key,
-	tkey  storetypes.StoreKey,
+	tkey storetypes.StoreKey,
 ) paramskeeper.Keeper {
 	paramsKeeper := paramskeeper.NewKeeper(appCodec, legacyAmino, key, tkey)
 
@@ -1107,7 +1106,6 @@ func initParamsKeeper(
 	paramsKeeper.Subspace(erc721types.ModuleName)
 	return paramsKeeper
 }
-
 
 func (app *Uptick) registerUpgradeHandlers() {
 	// v0.2.3 upgrade handler
