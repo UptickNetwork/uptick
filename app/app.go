@@ -125,6 +125,10 @@ import (
 	ibcnfttransferkeeper "github.com/bianjieai/nft-transfer/keeper"
 	ibcnfttransfertypes "github.com/bianjieai/nft-transfer/types"
 
+	//internft "github.com/UptickNetwork/uptick/x/inter-nft"
+	//internftkeeper "github.com/UptickNetwork/uptick/x/inter-nft/keeper"
+	//internftmodule "github.com/UptickNetwork/uptick/x/inter-nft/module"
+
 	"github.com/UptickNetwork/uptick/x/internft"
 
 	"github.com/UptickNetwork/uptick/x/erc721"
@@ -204,8 +208,6 @@ var (
 		nftmodule.AppModuleBasic{},
 		nfttransfer.AppModuleBasic{},
 		nftmodule.AppModuleBasic{},
-
-		//internftmodule.AppModuleBasic{},
 		//
 	)
 
@@ -283,7 +285,6 @@ type Uptick struct {
 	ScopedICAHostKeeper       capabilitykeeper.ScopedKeeper
 	ScopedNFTTransferKeeper   capabilitykeeper.ScopedKeeper
 
-	//InterNFTKeeper       internftkeeper.Keeper
 	IBCNFTTransferKeeper ibcnfttransferkeeper.Keeper
 
 	// the module manager
@@ -610,7 +611,6 @@ func NewUptick(
 		internft.NewInterNftKeeper(appCodec, app.NFTKeeper, app.AccountKeeper),
 		scopedNFTTransferKeeper,
 	)
-
 	ibcnfttransferModule := nfttransfer.NewAppModule(app.IBCNFTTransferKeeper)
 	nfttransferIBCModule := nfttransfer.NewIBCModule(app.IBCNFTTransferKeeper)
 
@@ -672,7 +672,6 @@ func NewUptick(
 		nftmodule.NewAppModule(app.appCodec, app.NFTKeeper, app.AccountKeeper, app.BankKeeper),
 
 		ibcnfttransferModule,
-		// interTxModule,
 	)
 
 	// During begin block slashing happens after distr.BeginBlocker so that

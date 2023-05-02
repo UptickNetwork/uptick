@@ -1,6 +1,7 @@
 package types
 
 import (
+	"encoding/hex"
 	"fmt"
 	"regexp"
 	"strings"
@@ -100,6 +101,7 @@ func CreateClassIDFromContractAddress(address string) string {
 
 // CreateContractAddressFromClassID create classId from erc721 address
 func CreateContractAddressFromClassID(classID string) string {
+
 	return strings.Replace(classID, DefaultPrefix+"-", "", 1)
 }
 
@@ -112,7 +114,9 @@ func CreateNFTIDFromTokenID(id string) string {
 // CreateTokenIDFromNFTID create classId from erc721 address
 func CreateTokenIDFromNFTID(nftID string) string {
 
-	return strings.Replace(nftID, DefaultPrefix, "", 1)
+	ret := strings.Replace(nftID, DefaultPrefix+"-", "", 1)
+	return "0x" + hex.EncodeToString([]byte(ret))
+	// return strings.Replace(nftID, DefaultPrefix, "", 1)
 }
 
 //
