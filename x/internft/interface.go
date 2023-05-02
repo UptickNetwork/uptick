@@ -6,7 +6,6 @@ import (
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 
 	nfttypes "github.com/UptickNetwork/uptick/x/collection/types"
-
 	nftkeeper "github.com/cosmos/cosmos-sdk/x/nft/keeper"
 )
 

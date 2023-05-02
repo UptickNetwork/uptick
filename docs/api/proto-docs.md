@@ -1372,11 +1372,11 @@ nft.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | `contract_address` | [string](#string) |  | ERC721 token contract address registered in a token pair |
-| `token_id` | [string](#string) |  | tokenID to convert |
+| `token_ids` | [string](#string) | repeated | tokenID to convert |
 | `receiver` | [string](#string) |  | bech32 address to receive native Cosmos coins |
 | `sender` | [string](#string) |  | sender hex address from the owner of the given ERC721 tokens |
 | `class_id` | [string](#string) |  | nft classID to cnvert to ERC721 |
-| `nft_id` | [string](#string) |  | nftID to cnvert to ERC721 |
+| `nft_ids` | [string](#string) | repeated | nftID to cnvert to ERC721 |
 
 
 
@@ -1402,11 +1402,11 @@ MsgConvertNFT defines a Msg to convert a native Cosmos nft to a ERC721 token
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | `class_id` | [string](#string) |  | nft classID to cnvert to ERC721 |
-| `nft_id` | [string](#string) |  | nftID to cnvert to ERC721 |
+| `nft_ids` | [string](#string) | repeated | nftID to cnvert to ERC721 |
 | `receiver` | [string](#string) |  | recipient hex address to receive ERC721 token |
 | `sender` | [string](#string) |  | cosmos bech32 address from the owner of the given Cosmos coins |
 | `contract_address` | [string](#string) |  | ERC721 token contract address registered in a token pair |
-| `token_id` | [string](#string) |  | ERC721 token id registered in a token pair |
+| `token_ids` | [string](#string) | repeated | ERC721 token id registered in a token pair |
 
 
 

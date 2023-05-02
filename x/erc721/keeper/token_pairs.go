@@ -1,6 +1,7 @@
 package keeper
 
 import (
+	"fmt"
 	"github.com/cosmos/cosmos-sdk/store/prefix"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
@@ -121,18 +122,21 @@ func (k Keeper) IsClassRegistered(ctx sdk.Context, classID string) bool {
 func (k Keeper) SetNFTPairs(ctx sdk.Context, contractAddress string, tokenID string, classID string, nftID string) {
 
 	// save nft pair
-	if len(k.GetNFTPairByTokenID(ctx, contractAddress, tokenID)) == 0 {
-		k.SetNFTPairByTokenID(ctx, contractAddress, tokenID, classID, nftID)
+	if len(k.GetNFTPairByContractTokenID(ctx, contractAddress, tokenID)) == 0 {
+		k.SetNFTPairByContractTokenID(ctx, contractAddress, tokenID, classID, nftID)
 	}
 
-	if len(k.GetNFTPairByNFTID(ctx, classID, nftID)) == 0 {
-		k.SetNFTPairByNFTID(ctx, classID, nftID, contractAddress, tokenID)
+	if len(k.GetNFTPairByClassNFTID(ctx, classID, nftID)) == 0 {
+		k.SetNFTPairByClassNFTID(ctx, classID, nftID, contractAddress, tokenID)
 	}
 }
 
-func (k Keeper) SetNFTPairByTokenID(ctx sdk.Context, contractAddress string, tokenID string, classID string, nftID string) {
+func (k Keeper) SetNFTPairByContractTokenID(ctx sdk.Context, contractAddress string, tokenID string, classID string, nftID string) {
+
 	tokenUID := types.CreateTokenUID(contractAddress, tokenID)
 	nftUID := types.CreateNFTUID(classID, nftID)
+	fmt.Printf("###xxl 0 SetNFTPairByContractTokenID tokenUID %v,nftUID %v \n", tokenUID, nftUID)
+
 	k.SetNFTUIDPairByTokenUID(ctx, tokenUID, nftUID)
 }
 
@@ -141,7 +145,7 @@ func (k Keeper) SetNFTUIDPairByTokenUID(ctx sdk.Context, tokenUID string, nftUID
 	store.Set([]byte(tokenUID), []byte(nftUID))
 }
 
-func (k Keeper) GetNFTPairByTokenID(ctx sdk.Context, contractAddress string, tokenID string) []byte {
+func (k Keeper) GetNFTPairByContractTokenID(ctx sdk.Context, contractAddress string, tokenID string) []byte {
 	tokenUID := types.CreateTokenUID(contractAddress, tokenID)
 	return k.GetNFTUIDPairByTokenUID(ctx, tokenUID)
 }
@@ -161,9 +165,12 @@ func (k Keeper) DeleteNFTUIDPairByTokenUID(ctx sdk.Context, tokenUID string) {
 	store.Delete([]byte(tokenUID))
 }
 
-func (k Keeper) SetNFTPairByNFTID(ctx sdk.Context, classID string, nftID string, contractAddress string, tokenID string) {
+func (k Keeper) SetNFTPairByClassNFTID(ctx sdk.Context, classID string, nftID string, contractAddress string, tokenID string) {
+
 	nftUID := types.CreateNFTUID(classID, nftID)
 	tokenUID := types.CreateTokenUID(contractAddress, tokenID)
+	fmt.Printf("###xxl 1 SetNFTPairByClassNFTID nftUID %v,tokenUID %v \n", nftUID, tokenUID)
+
 	k.SetNFTUIDPairByNFTUID(ctx, nftUID, tokenUID)
 }
 
@@ -172,7 +179,7 @@ func (k Keeper) SetNFTUIDPairByNFTUID(ctx sdk.Context, nftUID string, tokenUID s
 	store.Set([]byte(nftUID), []byte(tokenUID))
 }
 
-func (k Keeper) GetNFTPairByNFTID(ctx sdk.Context, classID string, nftID string) []byte {
+func (k Keeper) GetNFTPairByClassNFTID(ctx sdk.Context, classID string, nftID string) []byte {
 	nftUID := types.CreateNFTUID(classID, nftID)
 	return k.GetTokenUIDPairByNFTUID(ctx, nftUID)
 }

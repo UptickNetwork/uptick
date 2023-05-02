@@ -1,6 +1,7 @@
 package keeper
 
 import (
+	"fmt"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
@@ -119,6 +120,7 @@ func (k Keeper) TransferOwnership(ctx sdk.Context, denomID,
 	tokenChanged := types.Modified(tokenURI) || types.Modified(tokenURIHash)
 	tokenMetadataChanged := types.Modified(tokenNm) || types.Modified(tokenData)
 
+	fmt.Printf("###xxl UpdateRestricted %v,tokenChanged %v,tokenMetadataChanged %v \n", denom, tokenChanged, tokenMetadataChanged)
 	if denom.UpdateRestricted && (tokenChanged || tokenMetadataChanged) {
 		return sdkerrors.Wrapf(sdkerrors.ErrUnauthorized, "It is restricted to update NFT under this denom %s", denom.Id)
 	}
