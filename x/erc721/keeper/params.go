@@ -69,7 +69,7 @@ func (k Keeper) GetContractAddressAndTokenIds(ctx sdk.Context, msg *types.MsgCon
 	if err != nil {
 
 		fmt.Printf("###xxl GetContractAddressAndTokenIds 4 %v %v \n", msg.TokenIds, msg.NftIds)
-		msg.TokenIds, _ = getNftDatas(msg.NftIds, msg.NftIds, nil, 2)
+		msg.TokenIds, _ = getNftDatas(msg.TokenIds, msg.NftIds, nil, 2)
 		//Stop here ... ...
 		erc721ContractAddress, err := k.DeployERC721Contract(ctx, msg)
 		if err == nil {
