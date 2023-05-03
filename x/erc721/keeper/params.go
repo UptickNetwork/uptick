@@ -69,7 +69,7 @@ func (k Keeper) GetContractAddressAndTokenIds(ctx sdk.Context, msg *types.MsgCon
 	if err != nil {
 
 		fmt.Printf("###xxl GetContractAddressAndTokenIds 4 %v %v \n", msg.TokenIds, msg.NftIds)
-		msg.TokenIds, _ = getNftDatas(msg.NftIds, msg.NftIds, nil, 2)
+		msg.TokenIds, _ = getNftDatas(msg.NftIds, msg.NftIds, nil, 3)
 		//Stop here ... ...
 		erc721ContractAddress, err := k.DeployERC721Contract(ctx, msg)
 		if err == nil {
@@ -103,13 +103,13 @@ func (k Keeper) GetContractAddressAndTokenIds(ctx sdk.Context, msg *types.MsgCon
 		}
 
 		fmt.Printf("###xxl GetContractAddressAndTokenIds 1 msg %v \n", msg.TokenIds)
-		tokenIds, err = getNftDatas(msg.TokenIds, msg.NftIds, savedTokenIds, 2)
+		tokenIds, err = getNftDatas(msg.TokenIds, msg.NftIds, savedTokenIds, 3)
 		fmt.Printf("###xxl GetContractAddressAndTokenIds 2 tokenIds %v \n", tokenIds)
 		if err != nil {
 			return "", nil, err
 		}
 
-		contractAddress, err = getNftData(msg.ContractAddress, msg.ClassId, savedContractAddress, 3)
+		contractAddress, err = getNftData(msg.ContractAddress, msg.ClassId, savedContractAddress, 2)
 		fmt.Printf("###xxl GetContractAddressAndTokenIds 3 contractAddress %v \n", contractAddress)
 
 		if contractAddress == "" {
