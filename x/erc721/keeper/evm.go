@@ -27,13 +27,11 @@ func (k Keeper) DeployERC721Contract(
 	msg *types.MsgConvertNFT,
 ) (common.Address, error) {
 
-	fmt.Printf("###xxl DeployERC721Contract 0 \n")
 	class, err := k.nftKeeper.GetDenomInfo(ctx, msg.ClassId)
 	if err != nil {
 		return common.Address{}, sdkerrors.Wrapf(types.ErrABIPack, "nft class is invalid %s: %s", class.Id, err.Error())
 	}
 
-	fmt.Printf("###xxl DeployERC721Contract 1 class %v \n", class)
 	ctorArgs, err := contracts.ERC721UpticksContract.ABI.Pack(
 		"",
 		class.Name,
@@ -50,24 +48,20 @@ func (k Keeper) DeployERC721Contract(
 		return common.Address{}, sdkerrors.Wrapf(types.ErrABIPack, "nft class is invalid %s: %s", class.Id, err.Error())
 	}
 
-	fmt.Printf("###xxl DeployERC721Contract 2 \n")
 	data := make([]byte, len(contracts.ERC721UpticksContract.Bin)+len(ctorArgs))
 	copy(data[:len(contracts.ERC721UpticksContract.Bin)], contracts.ERC721UpticksContract.Bin)
 	copy(data[len(contracts.ERC721UpticksContract.Bin):], ctorArgs)
 
-	fmt.Printf("###xxl DeployERC721Contract 3 \n")
 	nonce, err := k.accountKeeper.GetSequence(ctx, types.ModuleAddress.Bytes())
 	if err != nil {
 		return common.Address{}, err
 	}
 
-	fmt.Printf("###xxl DeployERC721Contract 4 \n")
 	contractAddr := crypto.CreateAddress(types.ModuleAddress, nonce)
 	if _, err = k.CallEVMWithData(ctx, types.ModuleAddress, nil, data, true); err != nil {
 		return common.Address{}, sdkerrors.Wrapf(err, "failed to deploy contract for %s", class.Id)
 	}
 
-	fmt.Printf("###xxl DeployERC721Contract 5 \n")
 	return contractAddr, nil
 }
 

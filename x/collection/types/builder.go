@@ -106,7 +106,6 @@ func (cb ClassBuilder) Build(classID, classURI, classData string) (nft.Class, er
 
 	classDataBz, err := Base64.DecodeString(classData)
 
-	fmt.Printf("###xxl Build 0 \n")
 	if err != nil {
 		return nft.Class{}, err
 	}
@@ -144,17 +143,12 @@ func (cb ClassBuilder) Build(classID, classURI, classData string) (nft.Class, er
 			Data:        any,
 		}, nil
 	}
-	fmt.Printf("###xxl Build dataMap 1 %v\n", dataMap)
 
 	if v, ok := dataMap[ClassKeyName]; ok {
 
-		fmt.Printf("###xxl Build name 1.1.1 %v\n", ClassKeyName)
 		if vMap, ok := v.(map[string]interface{}); ok {
 
-			fmt.Printf("###xxl Build name 1.1.2 %v\n", vMap)
 			if vStr, ok := vMap[KeyMediaFieldValue].(string); ok {
-
-				fmt.Printf("###xxl Build name 1.1.3 %v\n", vStr)
 				name = vStr
 				delete(dataMap, ClassKeyName)
 			}
@@ -163,13 +157,10 @@ func (cb ClassBuilder) Build(classID, classURI, classData string) (nft.Class, er
 
 	if v, ok := dataMap[ClassKeySymbol]; ok {
 
-		fmt.Printf("###xxl Build ClassKeySymbol 1.2.1 %v\n", ClassKeySymbol)
 		if vMap, ok := v.(map[string]interface{}); ok {
 
-			fmt.Printf("###xxl Build name 1.2.2 %v\n", vMap)
 			if vStr, ok := vMap[KeyMediaFieldValue].(string); ok {
 
-				fmt.Printf("###xxl Build name 1.2.3 %v\n", vStr)
 				symbol = vStr
 				delete(dataMap, ClassKeySymbol)
 			}
@@ -253,15 +244,6 @@ func (cb ClassBuilder) Build(classID, classURI, classData string) (nft.Class, er
 	if err != nil {
 		return nft.Class{}, err
 	}
-	fmt.Printf("###xxl Build dataMap 2 %v\n", nft.Class{
-		Id:          classID,
-		Uri:         classURI,
-		Name:        name,
-		Symbol:      symbol,
-		Description: description,
-		UriHash:     uriHash,
-		Data:        any,
-	})
 
 	return nft.Class{
 		Id:          classID,

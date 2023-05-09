@@ -2,7 +2,7 @@
 
 BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
 COMMIT := $(shell git log -1 --format='%H')
-VERSION := v0.2.6
+VERSION := v0.2.7
 
 # don't override user values
 ifeq (,$(VERSION))

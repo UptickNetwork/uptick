@@ -2,7 +2,7 @@ swagger: '2.0'
 info:
   title: Uptick Chain - Legacy REST and gRPC Gateway docs
   description: A REST interface for state queries, legacy transactions
-  version: 0.2.1
+  version: 0.2.7
 paths:
   /ethermint/evm/v1/account/{address}:
     get:
@@ -14234,6 +14234,1292 @@ paths:
           format: boolean
       tags:
         - Query
+  /ibc/apps/transfer/v1/denom_hashes/{trace}:
+    get:
+      summary: DenomHash queries a denomination hash information.
+      operationId: DenomHash
+      responses:
+        '200':
+          description: A successful response.
+          schema:
+            type: object
+            properties:
+              hash:
+                type: string
+                description: hash (in hex format) of the denomination trace information.
+            description: >-
+              QueryDenomHashResponse is the response type for the
+              Query/DenomHash RPC
+
+              method.
+        default:
+          description: An unexpected error response
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+              code:
+                type: integer
+                format: int32
+              message:
+                type: string
+              details:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    type_url:
+                      type: string
+                    value:
+                      type: string
+                      format: byte
+      parameters:
+        - name: trace
+          description: The denomination trace ([port_id]/[channel_id])+/[denom]
+          in: path
+          required: true
+          type: string
+      tags:
+        - Query
+  /ibc/apps/transfer/v1/denom_traces:
+    get:
+      summary: DenomTraces queries all denomination traces.
+      operationId: DenomTraces
+      responses:
+        '200':
+          description: A successful response.
+          schema:
+            type: object
+            properties:
+              denom_traces:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    path:
+                      type: string
+                      description: >-
+                        path defines the chain of port/channel identifiers used
+                        for tracing the
+
+                        source of the fungible token.
+                    base_denom:
+                      type: string
+                      description: base denomination of the relayed fungible token.
+                  description: >-
+                    DenomTrace contains the base denomination for ICS20 fungible
+                    tokens and the
+
+                    source tracing information path.
+                description: denom_traces returns all denominations trace information.
+              pagination:
+                description: pagination defines the pagination in the response.
+                type: object
+                properties:
+                  next_key:
+                    type: string
+                    format: byte
+                    title: |-
+                      next_key is the key to be passed to PageRequest.key to
+                      query the next page most efficiently
+                  total:
+                    type: string
+                    format: uint64
+                    title: >-
+                      total is total number of results available if
+                      PageRequest.count_total
+
+                      was set, its value is undefined otherwise
+            description: >-
+              QueryConnectionsResponse is the response type for the
+              Query/DenomTraces RPC
+
+              method.
+        default:
+          description: An unexpected error response
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+              code:
+                type: integer
+                format: int32
+              message:
+                type: string
+              details:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    type_url:
+                      type: string
+                    value:
+                      type: string
+                      format: byte
+      parameters:
+        - name: pagination.key
+          description: |-
+            key is a value returned in PageResponse.next_key to begin
+            querying the next page most efficiently. Only one of offset or key
+            should be set.
+          in: query
+          required: false
+          type: string
+          format: byte
+        - name: pagination.offset
+          description: >-
+            offset is a numeric offset that can be used when key is unavailable.
+
+            It is less efficient than using key. Only one of offset or key
+            should
+
+            be set.
+          in: query
+          required: false
+          type: string
+          format: uint64
+        - name: pagination.limit
+          description: >-
+            limit is the total number of results to be returned in the result
+            page.
+
+            If left empty it will default to a value to be set by each app.
+          in: query
+          required: false
+          type: string
+          format: uint64
+        - name: pagination.count_total
+          description: >-
+            count_total is set to true  to indicate that the result set should
+            include
+
+            a count of the total number of items available for pagination in
+            UIs.
+
+            count_total is only respected when offset is used. It is ignored
+            when key
+
+            is set.
+          in: query
+          required: false
+          type: boolean
+          format: boolean
+        - name: pagination.reverse
+          description: >-
+            reverse is set to true if results are to be returned in the
+            descending
+
+            order.
+
+
+            Since: cosmos-sdk 0.43
+          in: query
+          required: false
+          type: boolean
+          format: boolean
+      tags:
+        - Query
+  /ibc/apps/transfer/v1/denom_traces/{hash}:
+    get:
+      summary: DenomTrace queries a denomination trace information.
+      operationId: DenomTrace
+      responses:
+        '200':
+          description: A successful response.
+          schema:
+            type: object
+            properties:
+              denom_trace:
+                type: object
+                properties:
+                  path:
+                    type: string
+                    description: >-
+                      path defines the chain of port/channel identifiers used
+                      for tracing the
+
+                      source of the fungible token.
+                  base_denom:
+                    type: string
+                    description: base denomination of the relayed fungible token.
+                description: >-
+                  DenomTrace contains the base denomination for ICS20 fungible
+                  tokens and the
+
+                  source tracing information path.
+            description: >-
+              QueryDenomTraceResponse is the response type for the
+              Query/DenomTrace RPC
+
+              method.
+        default:
+          description: An unexpected error response
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+              code:
+                type: integer
+                format: int32
+              message:
+                type: string
+              details:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    type_url:
+                      type: string
+                    value:
+                      type: string
+                      format: byte
+      parameters:
+        - name: hash
+          description: hash (in hex format) of the denomination trace information.
+          in: path
+          required: true
+          type: string
+      tags:
+        - Query
+  /ibc/apps/transfer/v1/params:
+    get:
+      summary: Params queries all parameters of the ibc-transfer module.
+      operationId: ibcTransferParams
+      responses:
+        '200':
+          description: A successful response.
+          schema:
+            type: object
+            properties:
+              params:
+                description: params defines the parameters of the module.
+                type: object
+                properties:
+                  send_enabled:
+                    type: boolean
+                    format: boolean
+                    description: >-
+                      send_enabled enables or disables all cross-chain token
+                      transfers from this
+
+                      chain.
+                  receive_enabled:
+                    type: boolean
+                    format: boolean
+                    description: >-
+                      receive_enabled enables or disables all cross-chain token
+                      transfers to this
+
+                      chain.
+            description: >-
+              QueryParamsResponse is the response type for the Query/Params RPC
+              method.
+        default:
+          description: An unexpected error response
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+              code:
+                type: integer
+                format: int32
+              message:
+                type: string
+              details:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    type_url:
+                      type: string
+                    value:
+                      type: string
+                      format: byte
+      tags:
+        - Query
+  /ibc/apps/nft_transfer/v1/channels/{channel_id}/ports/{port_id}/escrow_address:
+    get:
+      summary: >-
+        EscrowAddress returns the escrow address for a particular port and
+        channel
+
+        id.
+      operationId: EscrowAddress
+      responses:
+        '200':
+          description: A successful response.
+          schema:
+            type: object
+            properties:
+              escrow_address:
+                type: string
+                title: the escrow account address
+            description: >-
+              QueryEscrowAddressResponse is the response type of the
+              EscrowAddress RPC
+
+              method.
+        default:
+          description: An unexpected error response
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+              code:
+                type: integer
+                format: int32
+              message:
+                type: string
+              details:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    type_url:
+                      type: string
+                    value:
+                      type: string
+                      format: byte
+      parameters:
+        - name: channel_id
+          description: unique channel identifier
+          in: path
+          required: true
+          type: string
+        - name: port_id
+          description: unique port identifier
+          in: path
+          required: true
+          type: string
+      tags:
+        - Query
+  /ibc/apps/nft_transfer/v1/class_hashes/{trace}:
+    get:
+      summary: ClassHash queries a class hash information.
+      operationId: ClassHash
+      responses:
+        '200':
+          description: A successful response.
+          schema:
+            type: object
+            properties:
+              hash:
+                type: string
+                description: hash (in hex format) of the denomination trace information.
+            description: >-
+              QueryClassHashResponse is the response type for the
+              Query/ClassHash RPC
+
+              method.
+        default:
+          description: An unexpected error response
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+              code:
+                type: integer
+                format: int32
+              message:
+                type: string
+              details:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    type_url:
+                      type: string
+                    value:
+                      type: string
+                      format: byte
+      parameters:
+        - name: trace
+          description: The class trace ([port_id]/[channel_id])+/[denom]
+          in: path
+          required: true
+          type: string
+      tags:
+        - Query
+  /ibc/apps/nft_transfer/v1/class_traces:
+    get:
+      summary: ClassTraces queries all class traces.
+      operationId: ClassTraces
+      responses:
+        '200':
+          description: A successful response.
+          schema:
+            type: object
+            properties:
+              class_traces:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    path:
+                      type: string
+                      description: >-
+                        path defines the chain of port/channel identifiers used
+                        for tracing the
+
+                        source of the non-fungible token.
+                    base_class_id:
+                      type: string
+                      description: base classID of the relayed non-fungible token.
+                  description: >-
+                    ClassTrace contains the base classID for ICS721 non-fungible
+                    tokens and the
+
+                    source tracing information path.
+                description: class_traces returns all class trace information.
+              pagination:
+                description: pagination defines the pagination in the response.
+                type: object
+                properties:
+                  next_key:
+                    type: string
+                    format: byte
+                    title: |-
+                      next_key is the key to be passed to PageRequest.key to
+                      query the next page most efficiently
+                  total:
+                    type: string
+                    format: uint64
+                    title: >-
+                      total is total number of results available if
+                      PageRequest.count_total
+
+                      was set, its value is undefined otherwise
+            description: >-
+              QueryClassTracesResponse is the response type for the
+              Query/ClassTraces RPC
+
+              method.
+        default:
+          description: An unexpected error response
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+              code:
+                type: integer
+                format: int32
+              message:
+                type: string
+              details:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    type_url:
+                      type: string
+                    value:
+                      type: string
+                      format: byte
+      parameters:
+        - name: pagination.key
+          description: |-
+            key is a value returned in PageResponse.next_key to begin
+            querying the next page most efficiently. Only one of offset or key
+            should be set.
+          in: query
+          required: false
+          type: string
+          format: byte
+        - name: pagination.offset
+          description: >-
+            offset is a numeric offset that can be used when key is unavailable.
+
+            It is less efficient than using key. Only one of offset or key
+            should
+
+            be set.
+          in: query
+          required: false
+          type: string
+          format: uint64
+        - name: pagination.limit
+          description: >-
+            limit is the total number of results to be returned in the result
+            page.
+
+            If left empty it will default to a value to be set by each app.
+          in: query
+          required: false
+          type: string
+          format: uint64
+        - name: pagination.count_total
+          description: >-
+            count_total is set to true  to indicate that the result set should
+            include
+
+            a count of the total number of items available for pagination in
+            UIs.
+
+            count_total is only respected when offset is used. It is ignored
+            when key
+
+            is set.
+          in: query
+          required: false
+          type: boolean
+          format: boolean
+        - name: pagination.reverse
+          description: >-
+            reverse is set to true if results are to be returned in the
+            descending
+
+            order.
+
+
+            Since: cosmos-sdk 0.43
+          in: query
+          required: false
+          type: boolean
+          format: boolean
+      tags:
+        - Query
+  /ibc/apps/nft_transfer/v1/class_traces/{hash}:
+    get:
+      summary: ClassTrace queries a class trace information.
+      operationId: ClassTrace
+      responses:
+        '200':
+          description: A successful response.
+          schema:
+            type: object
+            properties:
+              class_trace:
+                type: object
+                properties:
+                  path:
+                    type: string
+                    description: >-
+                      path defines the chain of port/channel identifiers used
+                      for tracing the
+
+                      source of the non-fungible token.
+                  base_class_id:
+                    type: string
+                    description: base classID of the relayed non-fungible token.
+                description: >-
+                  ClassTrace contains the base classID for ICS721 non-fungible
+                  tokens and the
+
+                  source tracing information path.
+            description: >-
+              QueryClassTraceResponse is the response type for the
+              Query/ClassDenom RPC
+
+              method.
+        default:
+          description: An unexpected error response
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+              code:
+                type: integer
+                format: int32
+              message:
+                type: string
+              details:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    type_url:
+                      type: string
+                    value:
+                      type: string
+                      format: byte
+      parameters:
+        - name: hash
+          description: >-
+            hash (in hex format) or classID (full classID with ibc prefix) of
+            the
+
+            denomination trace information.
+          in: path
+          required: true
+          type: string
+      tags:
+        - Query
+  /uptick/collection/collections/{denom_id}:
+    get:
+      summary: Collection queries the NFTs of the specified denom
+      operationId: Collection
+      responses:
+        '200':
+          description: A successful response.
+          schema:
+            type: object
+            properties:
+              collection:
+                type: object
+                properties:
+                  denom:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      name:
+                        type: string
+                      schema:
+                        type: string
+                      creator:
+                        type: string
+                      symbol:
+                        type: string
+                      mint_restricted:
+                        type: boolean
+                        format: boolean
+                      update_restricted:
+                        type: boolean
+                        format: boolean
+                      description:
+                        type: string
+                      uri:
+                        type: string
+                      uri_hash:
+                        type: string
+                      data:
+                        type: string
+                    title: Denom defines a type of NFT
+                  nfts:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        name:
+                          type: string
+                        uri:
+                          type: string
+                        data:
+                          type: string
+                        owner:
+                          type: string
+                        uri_hash:
+                          type: string
+                      title: BaseNFT defines a non-fungible token
+                title: Collection defines a type of collection
+              pagination:
+                type: object
+                properties:
+                  next_key:
+                    type: string
+                    format: byte
+                    title: |-
+                      next_key is the key to be passed to PageRequest.key to
+                      query the next page most efficiently
+                  total:
+                    type: string
+                    format: uint64
+                    title: >-
+                      total is total number of results available if
+                      PageRequest.count_total
+
+                      was set, its value is undefined otherwise
+                description: >-
+                  PageResponse is to be embedded in gRPC response messages where
+                  the
+
+                  corresponding request message has used PageRequest.
+
+                   message SomeResponse {
+                           repeated Bar results = 1;
+                           PageResponse page = 2;
+                   }
+            title: >-
+              QueryCollectionResponse is the response type for the
+              Query/Collection RPC
+
+              method
+        default:
+          description: An unexpected error response
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+              code:
+                type: integer
+                format: int32
+              message:
+                type: string
+              details:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    type_url:
+                      type: string
+                    value:
+                      type: string
+                      format: byte
+      parameters:
+        - name: denom_id
+          in: path
+          required: true
+          type: string
+        - name: pagination.key
+          description: |-
+            key is a value returned in PageResponse.next_key to begin
+            querying the next page most efficiently. Only one of offset or key
+            should be set.
+          in: query
+          required: false
+          type: string
+          format: byte
+        - name: pagination.offset
+          description: >-
+            offset is a numeric offset that can be used when key is unavailable.
+
+            It is less efficient than using key. Only one of offset or key
+            should
+
+            be set.
+          in: query
+          required: false
+          type: string
+          format: uint64
+        - name: pagination.limit
+          description: >-
+            limit is the total number of results to be returned in the result
+            page.
+
+            If left empty it will default to a value to be set by each app.
+          in: query
+          required: false
+          type: string
+          format: uint64
+        - name: pagination.count_total
+          description: >-
+            count_total is set to true  to indicate that the result set should
+            include
+
+            a count of the total number of items available for pagination in
+            UIs.
+
+            count_total is only respected when offset is used. It is ignored
+            when key
+
+            is set.
+          in: query
+          required: false
+          type: boolean
+          format: boolean
+        - name: pagination.reverse
+          description: >-
+            reverse is set to true if results are to be returned in the
+            descending
+
+            order.
+
+
+            Since: cosmos-sdk 0.43
+          in: query
+          required: false
+          type: boolean
+          format: boolean
+      tags:
+        - Query
+  /uptick/collection/collections/{denom_id}/supply:
+    get:
+      summary: Supply queries the total supply of a given denom or owner
+      operationId: Supply
+      responses:
+        '200':
+          description: A successful response.
+          schema:
+            type: object
+            properties:
+              amount:
+                type: string
+                format: uint64
+            title: >-
+              QuerySupplyResponse is the response type for the Query/Supply RPC
+              method
+        default:
+          description: An unexpected error response
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+              code:
+                type: integer
+                format: int32
+              message:
+                type: string
+              details:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    type_url:
+                      type: string
+                    value:
+                      type: string
+                      format: byte
+      parameters:
+        - name: denom_id
+          in: path
+          required: true
+          type: string
+        - name: owner
+          in: query
+          required: false
+          type: string
+      tags:
+        - Query
+  /uptick/collection/nft/denoms:
+    get:
+      summary: Denoms queries all the denoms
+      operationId: Denoms
+      responses:
+        '200':
+          description: A successful response.
+          schema:
+            type: object
+            properties:
+              denoms:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    name:
+                      type: string
+                    schema:
+                      type: string
+                    creator:
+                      type: string
+                    symbol:
+                      type: string
+                    mint_restricted:
+                      type: boolean
+                      format: boolean
+                    update_restricted:
+                      type: boolean
+                      format: boolean
+                    description:
+                      type: string
+                    uri:
+                      type: string
+                    uri_hash:
+                      type: string
+                    data:
+                      type: string
+                  title: Denom defines a type of NFT
+              pagination:
+                type: object
+                properties:
+                  next_key:
+                    type: string
+                    format: byte
+                    title: |-
+                      next_key is the key to be passed to PageRequest.key to
+                      query the next page most efficiently
+                  total:
+                    type: string
+                    format: uint64
+                    title: >-
+                      total is total number of results available if
+                      PageRequest.count_total
+
+                      was set, its value is undefined otherwise
+                description: >-
+                  PageResponse is to be embedded in gRPC response messages where
+                  the
+
+                  corresponding request message has used PageRequest.
+
+                   message SomeResponse {
+                           repeated Bar results = 1;
+                           PageResponse page = 2;
+                   }
+            title: >-
+              QueryDenomsResponse is the response type for the Query/Denoms RPC
+              method
+        default:
+          description: An unexpected error response
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+              code:
+                type: integer
+                format: int32
+              message:
+                type: string
+              details:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    type_url:
+                      type: string
+                    value:
+                      type: string
+                      format: byte
+      parameters:
+        - name: pagination.key
+          description: |-
+            key is a value returned in PageResponse.next_key to begin
+            querying the next page most efficiently. Only one of offset or key
+            should be set.
+          in: query
+          required: false
+          type: string
+          format: byte
+        - name: pagination.offset
+          description: >-
+            offset is a numeric offset that can be used when key is unavailable.
+
+            It is less efficient than using key. Only one of offset or key
+            should
+
+            be set.
+          in: query
+          required: false
+          type: string
+          format: uint64
+        - name: pagination.limit
+          description: >-
+            limit is the total number of results to be returned in the result
+            page.
+
+            If left empty it will default to a value to be set by each app.
+          in: query
+          required: false
+          type: string
+          format: uint64
+        - name: pagination.count_total
+          description: >-
+            count_total is set to true  to indicate that the result set should
+            include
+
+            a count of the total number of items available for pagination in
+            UIs.
+
+            count_total is only respected when offset is used. It is ignored
+            when key
+
+            is set.
+          in: query
+          required: false
+          type: boolean
+          format: boolean
+        - name: pagination.reverse
+          description: >-
+            reverse is set to true if results are to be returned in the
+            descending
+
+            order.
+
+
+            Since: cosmos-sdk 0.43
+          in: query
+          required: false
+          type: boolean
+          format: boolean
+      tags:
+        - Query
+  /uptick/collection/nft/denoms/{denom_id}:
+    get:
+      summary: Denom queries the definition of a given denom
+      operationId: Denom
+      responses:
+        '200':
+          description: A successful response.
+          schema:
+            type: object
+            properties:
+              denom:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  name:
+                    type: string
+                  schema:
+                    type: string
+                  creator:
+                    type: string
+                  symbol:
+                    type: string
+                  mint_restricted:
+                    type: boolean
+                    format: boolean
+                  update_restricted:
+                    type: boolean
+                    format: boolean
+                  description:
+                    type: string
+                  uri:
+                    type: string
+                  uri_hash:
+                    type: string
+                  data:
+                    type: string
+                title: Denom defines a type of NFT
+            title: >-
+              QueryDenomResponse is the response type for the Query/Denom RPC
+              method
+        default:
+          description: An unexpected error response
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+              code:
+                type: integer
+                format: int32
+              message:
+                type: string
+              details:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    type_url:
+                      type: string
+                    value:
+                      type: string
+                      format: byte
+      parameters:
+        - name: denom_id
+          in: path
+          required: true
+          type: string
+      tags:
+        - Query
+  /uptick/collection/nfts:
+    get:
+      summary: NFTsOfOwner queries the NFTs of the specified owner
+      operationId: NFTsOfOwner
+      responses:
+        '200':
+          description: A successful response.
+          schema:
+            type: object
+            properties:
+              owner:
+                type: object
+                properties:
+                  address:
+                    type: string
+                  id_collections:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        denom_id:
+                          type: string
+                        token_ids:
+                          type: array
+                          items:
+                            type: string
+                      title: >-
+                        IDCollection defines a type of collection with specified
+                        ID
+                title: Owner defines a type of owner
+              pagination:
+                type: object
+                properties:
+                  next_key:
+                    type: string
+                    format: byte
+                    title: |-
+                      next_key is the key to be passed to PageRequest.key to
+                      query the next page most efficiently
+                  total:
+                    type: string
+                    format: uint64
+                    title: >-
+                      total is total number of results available if
+                      PageRequest.count_total
+
+                      was set, its value is undefined otherwise
+                description: >-
+                  PageResponse is to be embedded in gRPC response messages where
+                  the
+
+                  corresponding request message has used PageRequest.
+
+                   message SomeResponse {
+                           repeated Bar results = 1;
+                           PageResponse page = 2;
+                   }
+            title: >-
+              QueryNFTsOfOwnerResponse is the response type for the Query/Owner
+              RPC method
+        default:
+          description: An unexpected error response
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+              code:
+                type: integer
+                format: int32
+              message:
+                type: string
+              details:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    type_url:
+                      type: string
+                    value:
+                      type: string
+                      format: byte
+      parameters:
+        - name: denom_id
+          in: query
+          required: false
+          type: string
+        - name: owner
+          in: query
+          required: false
+          type: string
+        - name: pagination.key
+          description: |-
+            key is a value returned in PageResponse.next_key to begin
+            querying the next page most efficiently. Only one of offset or key
+            should be set.
+          in: query
+          required: false
+          type: string
+          format: byte
+        - name: pagination.offset
+          description: >-
+            offset is a numeric offset that can be used when key is unavailable.
+
+            It is less efficient than using key. Only one of offset or key
+            should
+
+            be set.
+          in: query
+          required: false
+          type: string
+          format: uint64
+        - name: pagination.limit
+          description: >-
+            limit is the total number of results to be returned in the result
+            page.
+
+            If left empty it will default to a value to be set by each app.
+          in: query
+          required: false
+          type: string
+          format: uint64
+        - name: pagination.count_total
+          description: >-
+            count_total is set to true  to indicate that the result set should
+            include
+
+            a count of the total number of items available for pagination in
+            UIs.
+
+            count_total is only respected when offset is used. It is ignored
+            when key
+
+            is set.
+          in: query
+          required: false
+          type: boolean
+          format: boolean
+        - name: pagination.reverse
+          description: >-
+            reverse is set to true if results are to be returned in the
+            descending
+
+            order.
+
+
+            Since: cosmos-sdk 0.43
+          in: query
+          required: false
+          type: boolean
+          format: boolean
+      tags:
+        - Query
+  /uptick/collection/nfts/{denom_id}/{token_id}:
+    get:
+      summary: NFT queries the NFT for the given denom and token ID
+      operationId: NFT
+      responses:
+        '200':
+          description: A successful response.
+          schema:
+            type: object
+            properties:
+              nft:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  name:
+                    type: string
+                  uri:
+                    type: string
+                  data:
+                    type: string
+                  owner:
+                    type: string
+                  uri_hash:
+                    type: string
+                title: BaseNFT defines a non-fungible token
+            title: QueryNFTResponse is the response type for the Query/NFT RPC method
+        default:
+          description: An unexpected error response
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+              code:
+                type: integer
+                format: int32
+              message:
+                type: string
+              details:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    type_url:
+                      type: string
+                    value:
+                      type: string
+                      format: byte
+      parameters:
+        - name: denom_id
+          in: path
+          required: true
+          type: string
+        - name: token_id
+          in: path
+          required: true
+          type: string
+      tags:
+        - Query
 definitions:
   ethermint.evm.v1.ChainConfig:
     type: object
@@ -21551,3 +22837,630 @@ definitions:
       Consensus captures the consensus rules for processing a block in the
       blockchain, including all blockchain data structures and the rules of the
       application's state transition machine.
+  ibc.applications.transfer.v1.DenomTrace:
+    type: object
+    properties:
+      path:
+        type: string
+        description: >-
+          path defines the chain of port/channel identifiers used for tracing
+          the
+
+          source of the fungible token.
+      base_denom:
+        type: string
+        description: base denomination of the relayed fungible token.
+    description: >-
+      DenomTrace contains the base denomination for ICS20 fungible tokens and
+      the
+
+      source tracing information path.
+  ibc.applications.transfer.v1.Params:
+    type: object
+    properties:
+      send_enabled:
+        type: boolean
+        format: boolean
+        description: >-
+          send_enabled enables or disables all cross-chain token transfers from
+          this
+
+          chain.
+      receive_enabled:
+        type: boolean
+        format: boolean
+        description: >-
+          receive_enabled enables or disables all cross-chain token transfers to
+          this
+
+          chain.
+    description: >-
+      Params defines the set of IBC transfer parameters.
+
+      NOTE: To prevent a single token from being transferred, set the
+
+      TransfersEnabled parameter to true and then set the bank module's
+      SendEnabled
+
+      parameter for the denomination to false.
+  ibc.applications.transfer.v1.QueryDenomHashResponse:
+    type: object
+    properties:
+      hash:
+        type: string
+        description: hash (in hex format) of the denomination trace information.
+    description: |-
+      QueryDenomHashResponse is the response type for the Query/DenomHash RPC
+      method.
+  ibc.applications.transfer.v1.QueryDenomTraceResponse:
+    type: object
+    properties:
+      denom_trace:
+        type: object
+        properties:
+          path:
+            type: string
+            description: >-
+              path defines the chain of port/channel identifiers used for
+              tracing the
+
+              source of the fungible token.
+          base_denom:
+            type: string
+            description: base denomination of the relayed fungible token.
+        description: >-
+          DenomTrace contains the base denomination for ICS20 fungible tokens
+          and the
+
+          source tracing information path.
+    description: |-
+      QueryDenomTraceResponse is the response type for the Query/DenomTrace RPC
+      method.
+  ibc.applications.transfer.v1.QueryDenomTracesResponse:
+    type: object
+    properties:
+      denom_traces:
+        type: array
+        items:
+          type: object
+          properties:
+            path:
+              type: string
+              description: >-
+                path defines the chain of port/channel identifiers used for
+                tracing the
+
+                source of the fungible token.
+            base_denom:
+              type: string
+              description: base denomination of the relayed fungible token.
+          description: >-
+            DenomTrace contains the base denomination for ICS20 fungible tokens
+            and the
+
+            source tracing information path.
+        description: denom_traces returns all denominations trace information.
+      pagination:
+        description: pagination defines the pagination in the response.
+        type: object
+        properties:
+          next_key:
+            type: string
+            format: byte
+            title: |-
+              next_key is the key to be passed to PageRequest.key to
+              query the next page most efficiently
+          total:
+            type: string
+            format: uint64
+            title: >-
+              total is total number of results available if
+              PageRequest.count_total
+
+              was set, its value is undefined otherwise
+    description: >-
+      QueryConnectionsResponse is the response type for the Query/DenomTraces
+      RPC
+
+      method.
+  ibc.applications.transfer.v1.QueryParamsResponse:
+    type: object
+    properties:
+      params:
+        description: params defines the parameters of the module.
+        type: object
+        properties:
+          send_enabled:
+            type: boolean
+            format: boolean
+            description: >-
+              send_enabled enables or disables all cross-chain token transfers
+              from this
+
+              chain.
+          receive_enabled:
+            type: boolean
+            format: boolean
+            description: >-
+              receive_enabled enables or disables all cross-chain token
+              transfers to this
+
+              chain.
+    description: QueryParamsResponse is the response type for the Query/Params RPC method.
+  ibc.applications.nft_transfer.v1.ClassTrace:
+    type: object
+    properties:
+      path:
+        type: string
+        description: >-
+          path defines the chain of port/channel identifiers used for tracing
+          the
+
+          source of the non-fungible token.
+      base_class_id:
+        type: string
+        description: base classID of the relayed non-fungible token.
+    description: >-
+      ClassTrace contains the base classID for ICS721 non-fungible tokens and
+      the
+
+      source tracing information path.
+  ibc.applications.nft_transfer.v1.QueryClassHashResponse:
+    type: object
+    properties:
+      hash:
+        type: string
+        description: hash (in hex format) of the denomination trace information.
+    description: |-
+      QueryClassHashResponse is the response type for the Query/ClassHash RPC
+      method.
+  ibc.applications.nft_transfer.v1.QueryClassTraceResponse:
+    type: object
+    properties:
+      class_trace:
+        type: object
+        properties:
+          path:
+            type: string
+            description: >-
+              path defines the chain of port/channel identifiers used for
+              tracing the
+
+              source of the non-fungible token.
+          base_class_id:
+            type: string
+            description: base classID of the relayed non-fungible token.
+        description: >-
+          ClassTrace contains the base classID for ICS721 non-fungible tokens
+          and the
+
+          source tracing information path.
+    description: |-
+      QueryClassTraceResponse is the response type for the Query/ClassDenom RPC
+      method.
+  ibc.applications.nft_transfer.v1.QueryClassTracesResponse:
+    type: object
+    properties:
+      class_traces:
+        type: array
+        items:
+          type: object
+          properties:
+            path:
+              type: string
+              description: >-
+                path defines the chain of port/channel identifiers used for
+                tracing the
+
+                source of the non-fungible token.
+            base_class_id:
+              type: string
+              description: base classID of the relayed non-fungible token.
+          description: >-
+            ClassTrace contains the base classID for ICS721 non-fungible tokens
+            and the
+
+            source tracing information path.
+        description: class_traces returns all class trace information.
+      pagination:
+        description: pagination defines the pagination in the response.
+        type: object
+        properties:
+          next_key:
+            type: string
+            format: byte
+            title: |-
+              next_key is the key to be passed to PageRequest.key to
+              query the next page most efficiently
+          total:
+            type: string
+            format: uint64
+            title: >-
+              total is total number of results available if
+              PageRequest.count_total
+
+              was set, its value is undefined otherwise
+    description: >-
+      QueryClassTracesResponse is the response type for the Query/ClassTraces
+      RPC
+
+      method.
+  ibc.applications.nft_transfer.v1.QueryEscrowAddressResponse:
+    type: object
+    properties:
+      escrow_address:
+        type: string
+        title: the escrow account address
+    description: |-
+      QueryEscrowAddressResponse is the response type of the EscrowAddress RPC
+      method.
+  uptick.collection.v1.BaseNFT:
+    type: object
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+      uri:
+        type: string
+      data:
+        type: string
+      owner:
+        type: string
+      uri_hash:
+        type: string
+    title: BaseNFT defines a non-fungible token
+  uptick.collection.v1.Collection:
+    type: object
+    properties:
+      denom:
+        type: object
+        properties:
+          id:
+            type: string
+          name:
+            type: string
+          schema:
+            type: string
+          creator:
+            type: string
+          symbol:
+            type: string
+          mint_restricted:
+            type: boolean
+            format: boolean
+          update_restricted:
+            type: boolean
+            format: boolean
+          description:
+            type: string
+          uri:
+            type: string
+          uri_hash:
+            type: string
+          data:
+            type: string
+        title: Denom defines a type of NFT
+      nfts:
+        type: array
+        items:
+          type: object
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            uri:
+              type: string
+            data:
+              type: string
+            owner:
+              type: string
+            uri_hash:
+              type: string
+          title: BaseNFT defines a non-fungible token
+    title: Collection defines a type of collection
+  uptick.collection.v1.Denom:
+    type: object
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+      schema:
+        type: string
+      creator:
+        type: string
+      symbol:
+        type: string
+      mint_restricted:
+        type: boolean
+        format: boolean
+      update_restricted:
+        type: boolean
+        format: boolean
+      description:
+        type: string
+      uri:
+        type: string
+      uri_hash:
+        type: string
+      data:
+        type: string
+    title: Denom defines a type of NFT
+  uptick.collection.v1.IDCollection:
+    type: object
+    properties:
+      denom_id:
+        type: string
+      token_ids:
+        type: array
+        items:
+          type: string
+    title: IDCollection defines a type of collection with specified ID
+  uptick.collection.v1.Owner:
+    type: object
+    properties:
+      address:
+        type: string
+      id_collections:
+        type: array
+        items:
+          type: object
+          properties:
+            denom_id:
+              type: string
+            token_ids:
+              type: array
+              items:
+                type: string
+          title: IDCollection defines a type of collection with specified ID
+    title: Owner defines a type of owner
+  uptick.collection.v1.QueryCollectionResponse:
+    type: object
+    properties:
+      collection:
+        type: object
+        properties:
+          denom:
+            type: object
+            properties:
+              id:
+                type: string
+              name:
+                type: string
+              schema:
+                type: string
+              creator:
+                type: string
+              symbol:
+                type: string
+              mint_restricted:
+                type: boolean
+                format: boolean
+              update_restricted:
+                type: boolean
+                format: boolean
+              description:
+                type: string
+              uri:
+                type: string
+              uri_hash:
+                type: string
+              data:
+                type: string
+            title: Denom defines a type of NFT
+          nfts:
+            type: array
+            items:
+              type: object
+              properties:
+                id:
+                  type: string
+                name:
+                  type: string
+                uri:
+                  type: string
+                data:
+                  type: string
+                owner:
+                  type: string
+                uri_hash:
+                  type: string
+              title: BaseNFT defines a non-fungible token
+        title: Collection defines a type of collection
+      pagination:
+        type: object
+        properties:
+          next_key:
+            type: string
+            format: byte
+            title: |-
+              next_key is the key to be passed to PageRequest.key to
+              query the next page most efficiently
+          total:
+            type: string
+            format: uint64
+            title: >-
+              total is total number of results available if
+              PageRequest.count_total
+
+              was set, its value is undefined otherwise
+        description: |-
+          PageResponse is to be embedded in gRPC response messages where the
+          corresponding request message has used PageRequest.
+
+           message SomeResponse {
+                   repeated Bar results = 1;
+                   PageResponse page = 2;
+           }
+    title: |-
+      QueryCollectionResponse is the response type for the Query/Collection RPC
+      method
+  uptick.collection.v1.QueryDenomResponse:
+    type: object
+    properties:
+      denom:
+        type: object
+        properties:
+          id:
+            type: string
+          name:
+            type: string
+          schema:
+            type: string
+          creator:
+            type: string
+          symbol:
+            type: string
+          mint_restricted:
+            type: boolean
+            format: boolean
+          update_restricted:
+            type: boolean
+            format: boolean
+          description:
+            type: string
+          uri:
+            type: string
+          uri_hash:
+            type: string
+          data:
+            type: string
+        title: Denom defines a type of NFT
+    title: QueryDenomResponse is the response type for the Query/Denom RPC method
+  uptick.collection.v1.QueryDenomsResponse:
+    type: object
+    properties:
+      denoms:
+        type: array
+        items:
+          type: object
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            schema:
+              type: string
+            creator:
+              type: string
+            symbol:
+              type: string
+            mint_restricted:
+              type: boolean
+              format: boolean
+            update_restricted:
+              type: boolean
+              format: boolean
+            description:
+              type: string
+            uri:
+              type: string
+            uri_hash:
+              type: string
+            data:
+              type: string
+          title: Denom defines a type of NFT
+      pagination:
+        type: object
+        properties:
+          next_key:
+            type: string
+            format: byte
+            title: |-
+              next_key is the key to be passed to PageRequest.key to
+              query the next page most efficiently
+          total:
+            type: string
+            format: uint64
+            title: >-
+              total is total number of results available if
+              PageRequest.count_total
+
+              was set, its value is undefined otherwise
+        description: |-
+          PageResponse is to be embedded in gRPC response messages where the
+          corresponding request message has used PageRequest.
+
+           message SomeResponse {
+                   repeated Bar results = 1;
+                   PageResponse page = 2;
+           }
+    title: QueryDenomsResponse is the response type for the Query/Denoms RPC method
+  uptick.collection.v1.QueryNFTResponse:
+    type: object
+    properties:
+      nft:
+        type: object
+        properties:
+          id:
+            type: string
+          name:
+            type: string
+          uri:
+            type: string
+          data:
+            type: string
+          owner:
+            type: string
+          uri_hash:
+            type: string
+        title: BaseNFT defines a non-fungible token
+    title: QueryNFTResponse is the response type for the Query/NFT RPC method
+  uptick.collection.v1.QueryNFTsOfOwnerResponse:
+    type: object
+    properties:
+      owner:
+        type: object
+        properties:
+          address:
+            type: string
+          id_collections:
+            type: array
+            items:
+              type: object
+              properties:
+                denom_id:
+                  type: string
+                token_ids:
+                  type: array
+                  items:
+                    type: string
+              title: IDCollection defines a type of collection with specified ID
+        title: Owner defines a type of owner
+      pagination:
+        type: object
+        properties:
+          next_key:
+            type: string
+            format: byte
+            title: |-
+              next_key is the key to be passed to PageRequest.key to
+              query the next page most efficiently
+          total:
+            type: string
+            format: uint64
+            title: >-
+              total is total number of results available if
+              PageRequest.count_total
+
+              was set, its value is undefined otherwise
+        description: |-
+          PageResponse is to be embedded in gRPC response messages where the
+          corresponding request message has used PageRequest.
+
+           message SomeResponse {
+                   repeated Bar results = 1;
+                   PageResponse page = 2;
+           }
+    title: >-
+      QueryNFTsOfOwnerResponse is the response type for the Query/Owner RPC
+      method
+  uptick.collection.v1.QuerySupplyResponse:
+    type: object
+    properties:
+      amount:
+        type: string
+        format: uint64
+    title: QuerySupplyResponse is the response type for the Query/Supply RPC method

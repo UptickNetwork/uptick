@@ -3,7 +3,7 @@ module github.com/UptickNetwork/uptick
 go 1.18
 
 require (
-	github.com/bianjieai/nft-transfer v1.1.1-beta
+	github.com/bianjieai/nft-transfer v1.1.2-beta
 	github.com/cosmos/cosmos-sdk v0.46.5
 	github.com/cosmos/go-bip39 v1.0.0
 	github.com/cosmos/ibc-go/v5 v5.0.1
@@ -33,22 +33,10 @@ require (
 require (
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
 	cosmossdk.io/math v1.0.0-beta.3 // indirect
-	github.com/Masterminds/goutils v1.1.1 // indirect
-	github.com/Masterminds/semver v1.5.0 // indirect
-	github.com/Masterminds/sprig v2.22.0+incompatible // indirect
-	github.com/aokoli/goutils v1.1.1 // indirect
 	github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e // indirect
-	github.com/envoyproxy/protoc-gen-validate v1.0.0 // indirect
 	github.com/go-logr/logr v1.2.3 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.2.3 // indirect
-	github.com/huandu/xstrings v1.4.0 // indirect
-	github.com/imdario/mergo v0.3.15 // indirect
 	github.com/manifoldco/promptui v0.9.0 // indirect
-	github.com/mitchellh/copystructure v1.2.0 // indirect
-	github.com/mitchellh/reflectwalk v1.0.2 // indirect
-	github.com/mwitkow/go-proto-validators v0.3.2 // indirect
-	github.com/pseudomuto/protoc-gen-doc v1.5.1 // indirect
-	github.com/pseudomuto/protokit v0.2.1 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
 	golang.org/x/exp v0.0.0-20220722155223-a9213eeb770e // indirect

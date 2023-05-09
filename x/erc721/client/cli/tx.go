@@ -78,7 +78,6 @@ func NewConvertNFTCmd() *cobra.Command {
 				Receiver:        receiver,
 				Sender:          sender.String(),
 			}
-			fmt.Printf("###xxl 01 NewConvertNFTCmd %v \n", msg)
 
 			if err := msg.ValidateBasic(); err != nil {
 				return err
@@ -141,9 +140,6 @@ func NewConvertERC721Cmd() *cobra.Command {
 			if err := msg.ValidateBasic(); err != nil {
 				return err
 			}
-
-			fmt.Printf("###xxl NewConvertERC721Cmd %v \n", msg)
-
 			return tx.GenerateOrBroadcastTxCLI(cliCtx, cmd.Flags(), msg)
 		},
 	}

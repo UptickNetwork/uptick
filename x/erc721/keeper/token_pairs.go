@@ -1,7 +1,6 @@
 package keeper
 
 import (
-	"fmt"
 	"github.com/cosmos/cosmos-sdk/store/prefix"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
@@ -135,7 +134,6 @@ func (k Keeper) SetNFTPairByContractTokenID(ctx sdk.Context, contractAddress str
 
 	tokenUID := types.CreateTokenUID(contractAddress, tokenID)
 	nftUID := types.CreateNFTUID(classID, nftID)
-	fmt.Printf("###xxl 0 SetNFTPairByContractTokenID tokenUID %v,nftUID %v \n", tokenUID, nftUID)
 
 	k.SetNFTUIDPairByTokenUID(ctx, tokenUID, nftUID)
 }
@@ -169,7 +167,6 @@ func (k Keeper) SetNFTPairByClassNFTID(ctx sdk.Context, classID string, nftID st
 
 	nftUID := types.CreateNFTUID(classID, nftID)
 	tokenUID := types.CreateTokenUID(contractAddress, tokenID)
-	fmt.Printf("###xxl 1 SetNFTPairByClassNFTID nftUID %v,tokenUID %v \n", nftUID, tokenUID)
 
 	k.SetNFTUIDPairByNFTUID(ctx, nftUID, tokenUID)
 }

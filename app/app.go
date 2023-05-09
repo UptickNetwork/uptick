@@ -604,6 +604,7 @@ func NewUptick(
 	app.IBCNFTTransferKeeper = ibcnfttransferkeeper.NewKeeper(
 		appCodec,
 		keys[ibcnfttransfertypes.StoreKey],
+		app.GetSubspace(ibctransfertypes.ModuleName),
 		app.IBCKeeper.ChannelKeeper,
 		app.IBCKeeper.ChannelKeeper,
 		&app.IBCKeeper.PortKeeper,
@@ -1090,7 +1091,7 @@ func initParamsKeeper(
 func (app *Uptick) registerUpgradeHandlers() {
 
 	app.UpgradeKeeper.SetUpgradeHandler(
-		"v0.2.6",
+		"v0.2.7",
 		func(ctx sdk.Context, _ upgradetypes.Plan, vm module.VersionMap) (module.VersionMap, error) {
 			// Refs:
 			// - https://docs.cosmos.network/master/building-modules/upgrade.html#registering-migrations
