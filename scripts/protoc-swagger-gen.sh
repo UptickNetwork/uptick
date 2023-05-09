@@ -3,11 +3,13 @@
 set -eo pipefail
 
 mkdir -p ./tmp-swagger-gen
+
 proto_dirs=$(find ./proto ./third_party/proto -path -prune -o -name '*.proto' -print0 | xargs -0 -n1 dirname | sort | uniq)
 for dir in $proto_dirs; do
 
     # generate swagger files (filter query files)
     query_file=$(find "${dir}" -maxdepth 1 \( -name 'query.proto' -o -name 'service.proto' \))
+    # echo "2.5.2 $query_file"
     if [[ ! -z "$query_file" ]]; then
         buf protoc \
             -I "proto" \

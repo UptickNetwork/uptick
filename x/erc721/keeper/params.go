@@ -1,7 +1,6 @@
 package keeper
 
 import (
-	"fmt"
 	"github.com/UptickNetwork/uptick/x/erc721/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
@@ -33,8 +32,7 @@ func (k Keeper) GetClassIDAndNFTID(ctx sdk.Context, msg *types.MsgConvertERC721)
 
 		uTokenId := types.CreateTokenUID(msg.ContractAddress, tokenId)
 		savedNftId, savedClassId := types.GetNFTFromUID(string(k.GetNFTUIDPairByTokenUID(ctx, uTokenId)))
-		//
-		fmt.Printf("###xxl GetClassIDAndNFTID 1 savedNftId %v,savedClassId %v \n", savedNftId, savedClassId)
+
 		nftOrg = ""
 		if len(msg.NftIds) > i {
 			nftOrg = msg.NftIds[i]
@@ -68,14 +66,11 @@ func (k Keeper) GetContractAddressAndTokenIds(ctx sdk.Context, msg *types.MsgCon
 	pair, err := k.GetPair(ctx, msg.ClassId)
 	if err != nil {
 
-		fmt.Printf("###xxl GetContractAddressAndTokenIds 4 %v %v \n", msg.TokenIds, msg.NftIds)
 		msg.TokenIds, _ = getNftDatas(msg.TokenIds, msg.NftIds, nil, 2)
 		//Stop here ... ...
 		erc721ContractAddress, err := k.DeployERC721Contract(ctx, msg)
 		if err == nil {
 			contractAddress = erc721ContractAddress.String()
-		} else {
-			fmt.Printf("###xxl GetContractAddressAndTokenIds 6 %v \n", err)
 		}
 
 		return contractAddress, msg.TokenIds, nil
@@ -91,26 +86,20 @@ func (k Keeper) GetContractAddressAndTokenIds(ctx sdk.Context, msg *types.MsgCon
 		for _, nftId := range msg.NftIds {
 
 			uNftID := types.CreateNFTUID(msg.ClassId, nftId)
-			fmt.Printf("###xxl GetContractAddressAndTokenIds 0 uNftID %v \n", uNftID)
 
 			savedTokenId, tempContractAddress = types.GetNFTFromUID(string(k.GetTokenUIDPairByNFTUID(ctx, uNftID)))
 			if tempContractAddress != "" {
 				savedContractAddress = tempContractAddress
 			}
-			fmt.Printf("###xxl GetContractAddressAndTokenIds 1 savedTokenId %v,saveContractAddress %v \n", savedTokenId, savedContractAddress)
-
 			savedTokenIds = append(savedTokenIds, savedTokenId)
 		}
 
-		fmt.Printf("###xxl GetContractAddressAndTokenIds 1 msg %v \n", msg.TokenIds)
 		tokenIds, err = getNftDatas(msg.TokenIds, msg.NftIds, savedTokenIds, 2)
-		fmt.Printf("###xxl GetContractAddressAndTokenIds 2 tokenIds %v \n", tokenIds)
 		if err != nil {
 			return "", nil, err
 		}
 
 		contractAddress, err = getNftData(msg.ContractAddress, msg.ClassId, savedContractAddress, 3)
-		fmt.Printf("###xxl GetContractAddressAndTokenIds 3 contractAddress %v \n", contractAddress)
 
 		if contractAddress == "" {
 			contractAddress = pair.Erc721Address
@@ -131,7 +120,6 @@ func getNftDatas(nftOrgs []string, nftPairOrgs []string, nftSaveds []string, nft
 	var nftSaved = ""
 	var nftOrg = ""
 	nftLen := len(nftPairOrgs)
-	fmt.Printf("###xxl getNftDatas nftOrgs %v,Len %v \n", nftOrgs, nftLen)
 	for n := 0; n < nftLen; n++ {
 		if nftSaveds != nil {
 			nftSaved = nftSaveds[n]
@@ -139,7 +127,6 @@ func getNftDatas(nftOrgs []string, nftPairOrgs []string, nftSaveds []string, nft
 		if nftOrgs != nil && nftLen == len(nftOrgs) {
 			nftOrg = nftOrgs[n]
 		}
-		fmt.Printf("###xxl getNftDatas nftOrgs %v,nftPairOrgs %v,nftSaved %v \n", nftOrg, nftPairOrgs[n], nftSaved)
 
 		ret, err := getNftData(nftOrg, nftPairOrgs[n], nftSaved, nftType)
 		if err != nil {
@@ -178,8 +165,6 @@ func getNftData(nftOrg string, nftPairOrg string, nftSaved string, nftType int) 
 
 // createNftDataByType nftType 0:nftId 1:classId 2:contract address 3:tokenId
 func createNftDataByType(nftOrg string, nftType int) string {
-
-	fmt.Printf("###xxl createNftDataByType 0 nftOrg %v nftType %v \n", nftOrg, nftType)
 
 	switch nftType {
 	case 0:
