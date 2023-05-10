@@ -46,9 +46,6 @@ func ValidateTokenID(tokenID string) error {
 	if len(tokenID) < MinDenomLen || len(tokenID) > MaxDenomLen {
 		return sdkerrors.Wrapf(ErrInvalidTokenID, "the length of nft id(%s) only accepts value [%d, %d]", tokenID, MinDenomLen, MaxDenomLen)
 	}
-	if !IsBeginWithAlpha(tokenID) || !IsAlphaNumeric(tokenID) {
-		return sdkerrors.Wrapf(ErrInvalidTokenID, "nft id(%s) only accepts alphanumeric characters, and begin with an english letter", tokenID)
-	}
 	return nil
 }
 
