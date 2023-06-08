@@ -94,7 +94,6 @@ import (
 	ibc "github.com/cosmos/ibc-go/v5/modules/core"
 	ibcclient "github.com/cosmos/ibc-go/v5/modules/core/02-client"
 	ibcclientclient "github.com/cosmos/ibc-go/v5/modules/core/02-client/client"
-	ibcclienttypes "github.com/cosmos/ibc-go/v5/modules/core/02-client/types"
 
 	porttypes "github.com/cosmos/ibc-go/v5/modules/core/05-port/types"
 	ibchost "github.com/cosmos/ibc-go/v5/modules/core/24-host"
@@ -121,16 +120,6 @@ import (
 
 	"github.com/UptickNetwork/uptick/app/ante"
 	authsims "github.com/cosmos/cosmos-sdk/x/auth/simulation"
-
-	nfttransfer "github.com/bianjieai/nft-transfer"
-	ibcnfttransferkeeper "github.com/bianjieai/nft-transfer/keeper"
-	ibcnfttransfertypes "github.com/bianjieai/nft-transfer/types"
-
-	//internft "github.com/UptickNetwork/uptick/x/inter-nft"
-	//internftkeeper "github.com/UptickNetwork/uptick/x/inter-nft/keeper"
-	//internftmodule "github.com/UptickNetwork/uptick/x/inter-nft/module"
-
-	"github.com/UptickNetwork/uptick/x/internft"
 
 	"github.com/UptickNetwork/uptick/x/erc721"
 	erc721keeper "github.com/UptickNetwork/uptick/x/erc721/keeper"
@@ -207,8 +196,9 @@ var (
 		erc721.AppModuleBasic{},
 
 		nftmodule.AppModuleBasic{},
-		nfttransfer.AppModuleBasic{},
 		nftmodule.AppModuleBasic{},
+
+		//internftmodule.AppModuleBasic{},
 		//
 	)
 
@@ -227,7 +217,8 @@ var (
 		erc721types.ModuleName: nil,
 
 		nfttypes.ModuleName: nil,
-		nft.ModuleName:      nil,
+		// nfttypes.ModuleName:        nil,
+		nft.ModuleName: nil,
 	}
 
 	// module accounts that are allowed to receive tokens
@@ -284,8 +275,6 @@ type Uptick struct {
 	ScopedICAControllerKeeper capabilitykeeper.ScopedKeeper
 	ScopedICAHostKeeper       capabilitykeeper.ScopedKeeper
 	ScopedNFTTransferKeeper   capabilitykeeper.ScopedKeeper
-
-	IBCNFTTransferKeeper ibcnfttransferkeeper.Keeper
 
 	// the module manager
 	mm *module.Manager
@@ -365,10 +354,6 @@ func NewUptick(
 		erc20types.StoreKey,
 		erc721types.StoreKey,
 		nfttypes.StoreKey,
-
-		// nfttypes.StoreKey,
-		// internft.StoreKey,
-		ibcnfttransfertypes.StoreKey,
 	)
 
 	// Add the EVM transient store key
@@ -396,8 +381,6 @@ func NewUptick(
 
 	scopedIBCKeeper := app.CapabilityKeeper.ScopeToModule(ibchost.ModuleName)
 	scopedTransferKeeper := app.CapabilityKeeper.ScopeToModule(ibctransfertypes.ModuleName)
-
-	scopedNFTTransferKeeper := app.CapabilityKeeper.ScopeToModule(ibcnfttransfertypes.ModuleName)
 
 	// Applications that wish to enforce statically created ScopedKeepers should call `Seal` after creating
 	// their scoped modules in `NewApp` with `ScopeToModule`
@@ -556,8 +539,7 @@ func NewUptick(
 		AddRoute(paramproposal.RouterKey, params.NewParamChangeProposalHandler(app.ParamsKeeper)).
 		AddRoute(distrtypes.RouterKey, distr.NewCommunityPoolSpendProposalHandler(app.DistrKeeper)).
 		AddRoute(upgradetypes.RouterKey, upgrade.NewSoftwareUpgradeProposalHandler(app.UpgradeKeeper)).
-		// AddRoute(ibchost.RouterKey, ibcclient.NewClientProposalHandler(app.IBCKeeper.ClientKeeper)).
-		AddRoute(ibcclienttypes.RouterKey, ibcclient.NewClientProposalHandler(app.IBCKeeper.ClientKeeper)).
+		AddRoute(ibchost.RouterKey, ibcclient.NewClientProposalHandler(app.IBCKeeper.ClientKeeper)).
 		AddRoute(erc20types.RouterKey, erc20.NewErc20ProposalHandler(app.Erc20Keeper))
 
 	govConfig := govtypes.DefaultConfig()
@@ -602,26 +584,9 @@ func NewUptick(
 	// create IBC module from bottom to top of stack
 	transferStack := erc20.NewIBCMiddleware(*app.Erc20Keeper, transferIBCModule)
 
-	app.IBCNFTTransferKeeper = ibcnfttransferkeeper.NewKeeper(
-		appCodec,
-		keys[ibcnfttransfertypes.StoreKey],
-		app.GetSubspace(ibctransfertypes.ModuleName),
-		app.IBCKeeper.ChannelKeeper,
-		app.IBCKeeper.ChannelKeeper,
-		&app.IBCKeeper.PortKeeper,
-		app.AccountKeeper,
-		internft.NewInterNftKeeper(appCodec, app.NFTKeeper, app.AccountKeeper),
-		scopedNFTTransferKeeper,
-	)
-	ibcnfttransferModule := nfttransfer.NewAppModule(app.IBCNFTTransferKeeper)
-	nfttransferIBCModule := nfttransfer.NewIBCModule(app.IBCNFTTransferKeeper)
-
 	// Create static IBC router, add transfer route, then set and seal it
 	ibcRouter := porttypes.NewRouter()
-
-	ibcRouter.AddRoute(ibctransfertypes.ModuleName, transferStack).
-		//AddRoute(ibctransfertypes.ModuleName, transferIBCModule).
-		AddRoute(ibcnfttransfertypes.ModuleName, nfttransferIBCModule)
+	ibcRouter.AddRoute(ibctransfertypes.ModuleName, transferStack)
 
 	app.IBCKeeper.SetRouter(ibcRouter)
 
@@ -673,7 +638,7 @@ func NewUptick(
 		erc721.NewAppModule(app.Erc721Keeper, app.AccountKeeper),
 		nftmodule.NewAppModule(app.appCodec, app.NFTKeeper, app.AccountKeeper, app.BankKeeper),
 
-		ibcnfttransferModule,
+		// interTxModule,
 	)
 
 	// During begin block slashing happens after distr.BeginBlocker so that
@@ -708,8 +673,6 @@ func NewUptick(
 		erc20types.ModuleName,
 		erc721types.ModuleName,
 		nfttypes.ModuleName,
-
-		ibcnfttransfertypes.ModuleName,
 	)
 
 	// NOTE: fee market module must go last in order to retrieve the block gas used.
@@ -738,7 +701,6 @@ func NewUptick(
 		erc20types.ModuleName,
 		erc721types.ModuleName,
 		nfttypes.ModuleName,
-		ibcnfttransfertypes.ModuleName,
 	)
 
 	// NOTE: The genutils module must occur after staking so that pools are
@@ -778,7 +740,6 @@ func NewUptick(
 
 		crisistypes.ModuleName,
 		nfttypes.ModuleName,
-		ibcnfttransfertypes.ModuleName,
 	)
 
 	app.mm.RegisterInvariants(&app.CrisisKeeper)
@@ -813,7 +774,6 @@ func NewUptick(
 		//nftmodule.NewAppModule(app.appCodec, app.CollectionKeeper, app.AccountKeeper, app.BankKeeper),
 
 		nftmodule.NewAppModule(appCodec, app.NFTKeeper, app.AccountKeeper, app.BankKeeper),
-		ibcnfttransferModule,
 	)
 
 	app.sm.RegisterStoreDecoders()
@@ -1092,19 +1052,11 @@ func initParamsKeeper(
 func (app *Uptick) registerUpgradeHandlers() {
 
 	app.UpgradeKeeper.SetUpgradeHandler(
-		"v0.2.7",
+		"v0.2.8",
 		func(ctx sdk.Context, _ upgradetypes.Plan, vm module.VersionMap) (module.VersionMap, error) {
 			// Refs:
 			// - https://docs.cosmos.network/master/building-modules/upgrade.html#registering-migrations
-			// - https://docs.cosmos.network/master/migrations/chain-upgrade-guide-044.html#chain-upgrade
-			gs := ibcnfttransfertypes.DefaultGenesisState()
-			bz, err := ibcnfttransfertypes.ModuleCdc.MarshalJSON(gs)
-			if err != nil {
-				panic(fmt.Errorf("failed to ModuleCdc %s: %w", ibcnfttransfertypes.ModuleName, err))
-			}
-			_ = app.mm.Modules[ibcnfttransfertypes.ModuleName].InitGenesis(
-				ctx, ibcnfttransfertypes.ModuleCdc, bz)
-
+			// - https://docs.cosmos.network/master/migrations/chain-upgrade-guide-044.html#chain-upgrad
 			return app.mm.RunMigrations(ctx, app.configurator, vm)
 		})
 
