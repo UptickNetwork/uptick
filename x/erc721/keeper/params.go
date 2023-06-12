@@ -18,54 +18,125 @@ func (k Keeper) SetParams(ctx sdk.Context, params types.Params) {
 }
 
 // GetClassIDAndNFTID sets the erc20 parameters to the param space.
-func (k Keeper) GetClassIDAndNFTID(ctx sdk.Context, msg *types.MsgConvertERC721) (string, string, error) {
+func (k Keeper) GetClassIDAndNFTID(ctx sdk.Context, msg *types.MsgConvertERC721) (string, []string, error) {
 
 	var (
-		nftID   string
-		classID string
+		nftIds  []string
+		nftId   string
+		classId string
 		err     error
+		nftOrg  string
 	)
 
-	uTokenID := types.CreateTokenUID(msg.ContractAddress, msg.TokenId)
-	savedNftID, savedClassID := types.GetNFTFromUID(string(k.GetNFTUIDPairByTokenUID(ctx, uTokenID)))
-	nftID, err = getNftData(msg.NftId, msg.TokenId, savedNftID, 0)
-	if err != nil {
-		return "", "", err
+	for i, tokenId := range msg.TokenIds {
+
+		uTokenId := types.CreateTokenUID(msg.ContractAddress, tokenId)
+		savedNftId, savedClassId := types.GetNFTFromUID(string(k.GetNFTUIDPairByTokenUID(ctx, uTokenId)))
+
+		nftOrg = ""
+		if len(msg.NftIds) > i {
+			nftOrg = msg.NftIds[i]
+		}
+		nftId, err = getNftData(nftOrg, tokenId, savedNftId, 0)
+
+		nftIds = append(nftIds, nftId)
+		if err != nil {
+			return "", nil, err
+		}
+
+		classId, err = getNftData(msg.ClassId, msg.ContractAddress, savedClassId, 1)
+		if err != nil {
+			return "", nil, err
+		}
 	}
 
-	classID, err = getNftData(msg.ClassId, msg.ContractAddress, savedClassID, 1)
-	if err != nil {
-		return "", "", err
-	}
-
-	return classID, nftID, nil
+	return classId, nftIds, nil
 
 }
 
-// GetContractAddressAndTokenID sets the erc20 parameters to the param space.
-func (k Keeper) GetContractAddressAndTokenID(ctx sdk.Context, msg *types.MsgConvertNFT) (string, string, error) {
+// GetContractAddressAndTokenIds sets the erc721 parameters to the param space.
+func (k Keeper) GetContractAddressAndTokenIds(ctx sdk.Context, msg *types.MsgConvertNFT) (string, []string, error) {
 
 	var (
 		contractAddress string
-		tokenID         string
+		tokenIds        []string
 		err             error
 	)
 
-	uNftID := types.CreateNFTUID(msg.ClassId, msg.NftId)
-	savedTokenID, saveContractAddress := types.GetNFTFromUID(string(k.GetTokenUIDPairByNFTUID(ctx, uNftID)))
-	tokenID, err = getNftData(msg.TokenId, msg.NftId, savedTokenID, 2)
+	pair, err := k.GetPair(ctx, msg.ClassId)
 	if err != nil {
-		return "", "", err
+
+		msg.TokenIds, _ = getNftDatas(msg.TokenIds, msg.NftIds, nil, 2)
+		//Stop here ... ...
+		erc721ContractAddress, err := k.DeployERC721Contract(ctx, msg)
+		if err == nil {
+			contractAddress = erc721ContractAddress.String()
+		}
+
+		return contractAddress, msg.TokenIds, nil
+
+	} else {
+		var (
+			savedTokenIds        []string
+			savedContractAddress string
+			savedTokenId         string
+			tempContractAddress  string
+		)
+
+		for _, nftId := range msg.NftIds {
+
+			uNftID := types.CreateNFTUID(msg.ClassId, nftId)
+
+			savedTokenId, tempContractAddress = types.GetNFTFromUID(string(k.GetTokenUIDPairByNFTUID(ctx, uNftID)))
+			if tempContractAddress != "" {
+				savedContractAddress = tempContractAddress
+			}
+			savedTokenIds = append(savedTokenIds, savedTokenId)
+		}
+
+		tokenIds, err = getNftDatas(msg.TokenIds, msg.NftIds, savedTokenIds, 2)
+		if err != nil {
+			return "", nil, err
+		}
+
+		contractAddress, err = getNftData(msg.ContractAddress, msg.ClassId, savedContractAddress, 3)
+
+		if contractAddress == "" {
+			contractAddress = pair.Erc721Address
+		}
+
+		if err != nil {
+			return "", nil, err
+		}
+		return contractAddress, tokenIds, nil
+
 	}
 
-	contractAddress, err = getNftData(msg.ContractAddress, msg.ClassId, saveContractAddress, 3)
-	if err != nil {
-		return "", "", err
+}
+
+func getNftDatas(nftOrgs []string, nftPairOrgs []string, nftSaveds []string, nftType int) ([]string, error) {
+
+	var rets []string
+	var nftSaved = ""
+	var nftOrg = ""
+	nftLen := len(nftPairOrgs)
+	for n := 0; n < nftLen; n++ {
+		if nftSaveds != nil {
+			nftSaved = nftSaveds[n]
+		}
+		if nftOrgs != nil && nftLen == len(nftOrgs) {
+			nftOrg = nftOrgs[n]
+		}
+
+		ret, err := getNftData(nftOrg, nftPairOrgs[n], nftSaved, nftType)
+		if err != nil {
+			return nil, err
+		} else {
+			rets = append(rets, ret)
+		}
 	}
 
-	// return tokenID, contractAddress, nil
-	return contractAddress, tokenID, nil
-
+	return rets, nil
 }
 
 // getNftData nftType 0:nftId 1:classId 2:contract address 3:tokenId

@@ -17,16 +17,6 @@ const (
 	TypeMsgConvertERC721 = "convert_ERC721"
 )
 
-// NewMsgConvertNFT creates a new instance of MsgConvertNFT
-func NewMsgConvertNFT(classID string, nftID string, receiver common.Address, sender sdk.AccAddress) *MsgConvertNFT { // nolint: interfacer
-	return &MsgConvertNFT{
-		ClassId:  classID,
-		NftId:    nftID,
-		Receiver: receiver.Hex(),
-		Sender:   sender.String(),
-	}
-}
-
 // Route should return the name of the module
 func (msg MsgConvertNFT) Route() string { return RouterKey }
 
@@ -53,16 +43,6 @@ func (msg *MsgConvertNFT) GetSignBytes() []byte {
 func (msg MsgConvertNFT) GetSigners() []sdk.AccAddress {
 	addr := sdk.MustAccAddressFromBech32(msg.Sender)
 	return []sdk.AccAddress{addr}
-}
-
-// NewMsgConvertERC721 creates a new instance of MsgConvertERC721
-func NewMsgConvertERC721(tokenID string, receiver sdk.AccAddress, contract, sender common.Address) *MsgConvertERC721 { // nolint: interfacer
-	return &MsgConvertERC721{
-		ContractAddress: contract.String(),
-		TokenId:         tokenID,
-		Receiver:        receiver.String(),
-		Sender:          sender.Hex(),
-	}
 }
 
 // Route should return the name of the module
