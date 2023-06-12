@@ -60,7 +60,7 @@ module.exports = {
       rpc_url: 'http://localhost:8545/',
       rpc_url_testnet: 'https://peer1.testnet.uptick.network:8645/',
       rpc_url_local: 'http://localhost:8545/',
-      chain_id: '未定',
+      chain_id: '117',
       testnet_chain_id: '7000',
       latest_version: 'v0.2.4',
       version_number: '1',
@@ -163,6 +163,21 @@ module.exports = {
           ]
         },
         {
+          title: 'Mainnet',
+          children: [
+            {
+              title: 'Join Mainnet',
+              directory: false,
+              path: '/mainnet/join'
+            },
+            {
+              title: 'Block Explorers',
+              directory: false,
+              path: '/mainnet/explorer'
+            },
+          ]
+        },
+        {
           title: 'Testnet',
           children: [
             {
@@ -174,6 +189,11 @@ module.exports = {
               title: 'Token Faucet',
               directory: false,
               path: '/testnet/faucet'
+            },
+            {
+              title: 'Block Explorers',
+              directory: false,
+              path: '/testnet/explorer'
             },
             {
               title: 'Deploy Node on Cloud',
@@ -189,23 +209,6 @@ module.exports = {
             directory: true,
             path: '/modules'
           }]
-        },
-        {
-          title: 'Block Explorers',
-          children: [
-            {
-              title: 'Uptick (Cosmos)',
-              path: 'https://explorer.testnet.uptick.network'
-            },
-            {
-              title: 'GN (Cosmos)',
-              path: 'https://uptick.explorers.guru'
-            },
-            {
-              title: 'Blockscout (EVM)',
-              path: 'https://evm-explorer.testnet.uptick.network/'
-            },
-          ]
         },
         {
           title: 'Resources',

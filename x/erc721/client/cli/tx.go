@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -35,7 +36,7 @@ func NewTxCmd() *cobra.Command {
 // NewConvertNFTCmd returns a CLI command handler for converting a Cosmos coin
 func NewConvertNFTCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "convert-nft [class_id] [nft_id] [contract_address] [token_id] [receiver_hex]",
+		Use:   "convert-nft [class_id] [nft_ids] [contract_address] [token_ids] [receiver_hex]",
 		Short: "Convert a Cosmos nft to erc721. When the receiver [optional] is omitted, the erc721 tokens are transferred to the sender.",
 		Args:  cobra.RangeArgs(4, 5),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -50,13 +51,13 @@ func NewConvertNFTCmd() *cobra.Command {
 				return fmt.Errorf("classId can not be empty")
 			}
 
-			nftID := args[1]
-			if len(nftID) == 0 {
-				return fmt.Errorf("classId can not be empty")
+			nftIDs := strings.Split(args[1], ",")
+			if len(nftIDs) == 0 {
+				return fmt.Errorf("nftID can not be empty")
 			}
 
 			contractAddress := args[2]
-			tokenID := args[3]
+			tokenIDs := strings.Split(args[3], ",")
 
 			var receiver string
 			sender := cliCtx.GetFromAddress()
@@ -71,9 +72,9 @@ func NewConvertNFTCmd() *cobra.Command {
 
 			msg := &types.MsgConvertNFT{
 				ContractAddress: contractAddress,
-				NftId:           nftID,
+				NftIds:          nftIDs,
 				ClassId:         classID,
-				TokenId:         tokenID,
+				TokenIds:        tokenIDs,
 				Receiver:        receiver,
 				Sender:          sender.String(),
 			}
@@ -93,7 +94,7 @@ func NewConvertNFTCmd() *cobra.Command {
 // NewConvertERC721Cmd returns a CLI command handler for converting an erc721
 func NewConvertERC721Cmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use: "convert-erc721 [contract_address] [token_id] [class_id] [nft_id] [receiver]",
+		Use: "convert-erc721 [contract_address] [token_ids] [class_id] [nft_ids] [receiver]",
 		Short: "Convert an erc721 token to Cosmos coin.  " +
 			"When the receiver [optional] is omitted, the Cosmos coins are transferred to the sender.",
 		Args: cobra.RangeArgs(4, 5),
@@ -109,15 +110,15 @@ func NewConvertERC721Cmd() *cobra.Command {
 				return fmt.Errorf("invalid erc721 contract address %w", err)
 			}
 
-			tokenID := args[1]
-			if len(tokenID) == 0 {
+			tokenIDs := strings.Split(args[1], ",")
+			if len(tokenIDs) == 0 {
 				return fmt.Errorf("tokenID can not be empty")
 			}
 
 			from := common.BytesToAddress(cliCtx.GetFromAddress().Bytes())
 
 			classID := args[2]
-			nftID := args[3]
+			nftIDs := strings.Split(args[3], ",")
 
 			receiver := cliCtx.GetFromAddress()
 			if len(args) == 5 {
@@ -129,17 +130,16 @@ func NewConvertERC721Cmd() *cobra.Command {
 
 			msg := &types.MsgConvertERC721{
 				ContractAddress: contractAddress,
-				TokenId:         tokenID,
+				TokenIds:        tokenIDs,
 				Receiver:        receiver.String(),
 				Sender:          from.Hex(),
 				ClassId:         classID,
-				NftId:           nftID,
+				NftIds:          nftIDs,
 			}
 
 			if err := msg.ValidateBasic(); err != nil {
 				return err
 			}
-
 			return tx.GenerateOrBroadcastTxCLI(cliCtx, cmd.Flags(), msg)
 		},
 	}

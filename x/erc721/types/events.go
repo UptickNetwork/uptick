@@ -17,9 +17,9 @@ const (
 	EventTypeToggleTokenConversion = "toggle_token_conversion" // #nosec
 
 	AttributeKeyNFTClass      = "nft_class"
-	AttributeKeyNFTID         = "nft_id"
-	AttributeKeyERC721Token   = "erc721_token"    // #nosec
-	AttributeKeyERC721TokenID = "erc721_token_id" // #nosec
+	AttributeKeyNFTID         = "nft_ids"
+	AttributeKeyERC721Token   = "erc721_token"     // #nosec
+	AttributeKeyERC721TokenID = "erc721_token_ids" // #nosec
 	AttributeKeyReceiver      = "receiver"
 
 	ERC721EventTransfer = "Transfer"

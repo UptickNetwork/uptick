@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	Namespace          = "uptickd:"
+	Namespace          = "irismod:"
 	KeyMediaFieldValue = "value"
 )
 
@@ -103,7 +103,9 @@ func (cb ClassBuilder) BuildMetadata(class nft.Class) (string, error) {
 
 // Build create a class from ics721 packetData
 func (cb ClassBuilder) Build(classID, classURI, classData string) (nft.Class, error) {
+
 	classDataBz, err := Base64.DecodeString(classData)
+
 	if err != nil {
 		return nft.Class{}, err
 	}
@@ -141,8 +143,11 @@ func (cb ClassBuilder) Build(classID, classURI, classData string) (nft.Class, er
 			Data:        any,
 		}, nil
 	}
+
 	if v, ok := dataMap[ClassKeyName]; ok {
+
 		if vMap, ok := v.(map[string]interface{}); ok {
+
 			if vStr, ok := vMap[KeyMediaFieldValue].(string); ok {
 				name = vStr
 				delete(dataMap, ClassKeyName)
@@ -151,8 +156,11 @@ func (cb ClassBuilder) Build(classID, classURI, classData string) (nft.Class, er
 	}
 
 	if v, ok := dataMap[ClassKeySymbol]; ok {
+
 		if vMap, ok := v.(map[string]interface{}); ok {
+
 			if vStr, ok := vMap[KeyMediaFieldValue].(string); ok {
+
 				symbol = vStr
 				delete(dataMap, ClassKeySymbol)
 			}

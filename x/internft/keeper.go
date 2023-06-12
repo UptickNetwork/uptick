@@ -11,6 +11,7 @@ import (
 	nfttransfer "github.com/bianjieai/nft-transfer/types"
 
 	nftkeeper "github.com/UptickNetwork/uptick/x/collection/keeper"
+
 	"github.com/UptickNetwork/uptick/x/collection/types"
 )
 
@@ -107,7 +108,6 @@ func (ik InterNftKeeper) Transfer(
 
 // GetClass implement the method of ICS721Keeper.GetClass
 func (ik InterNftKeeper) GetClass(ctx sdk.Context, classID string) (nfttransfer.Class, bool) {
-
 	class, exist := ik.nk.GetClass(ctx, classID)
 	if !exist {
 		return nil, false
@@ -118,7 +118,6 @@ func (ik InterNftKeeper) GetClass(ctx sdk.Context, classID string) (nfttransfer.
 		ik.Logger(ctx).Error("encode class data failed")
 		return nil, false
 	}
-
 	return InterClass{
 		ID:   classID,
 		URI:  class.Uri,
