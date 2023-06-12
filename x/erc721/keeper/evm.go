@@ -20,7 +20,7 @@ import (
 	"github.com/UptickNetwork/uptick/x/erc721/types"
 )
 
-// DeployERC721Contract creates and deploys an ERC20 contract on the EVM with the
+// DeployERC721Contract creates and deploys an ERC721 contract on the EVM with the
 // erc20 module account as owner.
 func (k Keeper) DeployERC721Contract(
 	ctx sdk.Context,
@@ -37,14 +37,20 @@ func (k Keeper) DeployERC721Contract(
 		class.Name,
 		class.Symbol,
 		class.Uri,
+		class.Data,
+		class.Description,
+		class.MintRestricted,
+		class.Schema,
+		class.UpdateRestricted,
+		class.UriHash,
 	)
 	if err != nil {
 		return common.Address{}, sdkerrors.Wrapf(types.ErrABIPack, "nft class is invalid %s: %s", class.Id, err.Error())
 	}
 
-	data := make([]byte, len(contracts.ERC20MinterBurnerDecimalsContract.Bin)+len(ctorArgs))
-	copy(data[:len(contracts.ERC20MinterBurnerDecimalsContract.Bin)], contracts.ERC20MinterBurnerDecimalsContract.Bin)
-	copy(data[len(contracts.ERC20MinterBurnerDecimalsContract.Bin):], ctorArgs)
+	data := make([]byte, len(contracts.ERC721UpticksContract.Bin)+len(ctorArgs))
+	copy(data[:len(contracts.ERC721UpticksContract.Bin)], contracts.ERC721UpticksContract.Bin)
+	copy(data[len(contracts.ERC721UpticksContract.Bin):], ctorArgs)
 
 	nonce, err := k.accountKeeper.GetSequence(ctx, types.ModuleAddress.Bytes())
 	if err != nil {

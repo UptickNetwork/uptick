@@ -13,14 +13,14 @@ Learn about the Uptick chain-id format {synopsis}
 
 | Name                              | Chain ID                                              | Identifier | EIP155 Number                                 | Version Number                                      |
 |-----------------------------------|-------------------------------------------------------|------------|-----------------------------------------------|-----------------------------------------------------|
-| uptick_7000-2 Testnet                | `uptick_{{ $themeConfig.project.testnet_chain_id }}-1` | `uptick`    | `{{ $themeConfig.project.testnet_chain_id }}` | `1`                                                 |
+| uptick_7000-2 Testnet                | `uptick_{{ $themeConfig.project.testnet_chain_id }}-2` | `uptick`    | `{{ $themeConfig.project.testnet_chain_id }}` | `2`                                                 |
 
 :::
 ::: tab Mainnet
 
 | Name                                            | Chain ID                                      | Identifier | EIP155 Number                         | Version Number                            |
 |-------------------------------------------------|-----------------------------------------------|------------|---------------------------------------|-------------------------------------------|
-| Uptick {{ $themeConfig.project.version_number }} | `uptick_{{ $themeConfig.project.chain_id }}-1` | `uptick`    | `{{ $themeConfig.project.chain_id }}` | {{ $themeConfig.project.version_number }} |
+| Uptick | `uptick_{{ $themeConfig.project.chain_id }}-1` | `uptick`    | `{{ $themeConfig.project.chain_id }}` | {{ $themeConfig.project.version_number }} |
 :::
 ::::
 
@@ -54,7 +54,5 @@ The following table provides an example where the second row corresponds to an u
 
 | ChainID        | Identifier | EIP155 Number | Version Number |
 |----------------|------------|---------------|----------------|
-| `uptick_7000-2` | uptick      | 7000          | 1              |
-| `uptick_7000-2` | uptick      | 7000          | 2              |
-| `...`          | ...        | ...           | ...            |
-| `uptick_7000-N` | uptick      | 7000          | N              |
+| `uptick_117-1` | uptick      | 117          | 1              |
+

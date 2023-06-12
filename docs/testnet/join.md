@@ -14,6 +14,16 @@ You specify the network you want to join by setting the **genesis file** and **s
 |------------------|-----------------------------------|--------------------------------------------------------------------------|-------------------------------------------------------|
 | `uptick_7000-2`   | Uptick Testnet | [uptick_7000-2 testnet](https://github.com/UptickNetwork/uptick-testnet/tree/main/uptick_7000-2) | [`v0.2.x`](https://github.com/UptickNetwork/uptick/releases) |
 
+## Public Endpoints
+
+- GRPC: 52.220.252.160:9090
+
+- RPC: http://52.220.252.160:26657
+
+- REST: http://52.220.252.160:1317
+
+- JSON RPC: http://52.220.252.160:8545
+
 ## Install `uptickd`
 
 Follow the [installation](./../quickstart/installation) document to install the {{ $themeConfig.project.name }} binary `{{ $themeConfig.project.binary }}`.
