@@ -51,7 +51,7 @@ You should see something similar to the following:
 
 ```bash
 acquiring test network lock
-preparing test network with chain-id "uptick_1276974-1"
+preparing test network with chain-id "origin_1170-1"
 
 
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
