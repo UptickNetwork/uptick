@@ -61,7 +61,7 @@ uptickd tx staking create-validator
     --commission-max-change-rate="0.01"
     --min-self-delegation "1"
     --moniker "validator"
-    --chain-id "uptick_7000-2"
+    --chain-id "origin_1170-1"
     --gas auto
     --node tcp://127.0.0.1:26647
 ```
