@@ -791,6 +791,7 @@ func NewUptick(
 
 	maxGasWanted := cast.ToUint64(appOpts.Get(srvflags.EVMMaxTxGasWanted))
 	options := ante.HandlerOptions{
+		Cdc:             app.appCodec,
 		AccountKeeper:   app.AccountKeeper,
 		BankKeeper:      app.BankKeeper,
 		IBCKeeper:       app.IBCKeeper,
