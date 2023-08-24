@@ -1228,7 +1228,7 @@ func (app *Uptick) registerUpgradeHandlers() {
 	case upgradeVersion:
 
 		storeUpgrades = &storetypes.StoreUpgrades{
-			Added: []string{wasm.ModuleName, icatypes.ModuleName},
+			Added: []string{wasm.ModuleName, icatypes.ModuleName, icahosttypes.SubModuleName},
 		}
 	}
 
