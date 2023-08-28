@@ -13,6 +13,9 @@ import (
 
 	ethante "github.com/evmos/ethermint/app/ante"
 	evmtypes "github.com/evmos/ethermint/x/evm/types"
+
+	wasmTypes "github.com/CosmWasm/wasmd/x/wasm/types"
+	storetypes "github.com/cosmos/cosmos-sdk/store/types"
 )
 
 // HandlerOptions defines the list of module keepers required to run the Evmos
@@ -30,6 +33,9 @@ type HandlerOptions struct {
 	Cdc             codec.BinaryCodec
 	MaxTxGasWanted  uint64
 	TxFeeChecker    ante.TxFeeChecker
+
+	TxCounterStoreKey storetypes.StoreKey
+	WasmConfig        wasmTypes.WasmConfig
 }
 
 // Validate checks if the keepers are defined

@@ -3,6 +3,7 @@ module github.com/UptickNetwork/uptick
 go 1.18
 
 require (
+	github.com/CosmWasm/wasmd v0.28.0
 	github.com/bianjieai/nft-transfer v1.1.2-beta
 	github.com/cosmos/cosmos-sdk v0.46.13
 	github.com/cosmos/go-bip39 v1.0.0
@@ -33,10 +34,12 @@ require (
 require (
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
 	cosmossdk.io/math v1.0.0-rc.0 // indirect
+	github.com/CosmWasm/wasmvm v1.0.0 // indirect
 	github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e // indirect
 	github.com/cometbft/cometbft-db v0.7.0 // indirect
 	github.com/cosmos/gogoproto v1.4.3 // indirect
 	github.com/go-logr/logr v1.2.3 // indirect
+	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.2.3 // indirect
 	github.com/manifoldco/promptui v0.9.0 // indirect
 	github.com/tecbot/gorocksdb v0.0.0-20191217155057-f0fad39f321c // indirect
@@ -155,7 +158,7 @@ require (
 	github.com/pelletier/go-toml/v2 v2.0.7 // indirect
 	github.com/petermattis/goid v0.0.0-20230317030725-371a4b8eda08 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/prometheus/client_golang v1.14.0 // indirect
+	github.com/prometheus/client_golang v1.14.0
 	github.com/prometheus/client_model v0.3.0 // indirect
 	github.com/prometheus/common v0.42.0 // indirect
 	github.com/prometheus/procfs v0.9.0 // indirect
@@ -201,6 +204,7 @@ require (
 
 replace (
 	github.com/99designs/keyring => github.com/cosmos/keyring v1.1.7-0.20210622111912-ef00f8ac3d76
+	github.com/CosmWasm/wasmd => github.com/notional-labs/wasmd v0.25.1-0.20220801160312-3a00b3e1846c
 	github.com/confio/ics23/go => github.com/cosmos/cosmos-sdk/ics23/go v0.8.0
 
 	github.com/evmos/ethermint => github.com/bianjieai/ethermint v0.20.0-irishub-2

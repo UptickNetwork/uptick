@@ -13,7 +13,7 @@ Learn about the Uptick chain-id format {synopsis}
 
 | Name                              | Chain ID                                              | Identifier | EIP155 Number                                 | Version Number                                      |
 |-----------------------------------|-------------------------------------------------------|------------|-----------------------------------------------|-----------------------------------------------------|
-| uptick_7000-2 Testnet                | `uptick_{{ $themeConfig.project.testnet_chain_id }}-2` | `uptick`    | `{{ $themeConfig.project.testnet_chain_id }}` | `2`                                                 |
+| Uptick Origin Testnet                | `origin_{{ $themeConfig.project.testnet_chain_id }}-1` | `uptick`    | `{{ $themeConfig.project.testnet_chain_id }}` | `1`                                                 |
 
 :::
 ::: tab Mainnet
@@ -52,7 +52,19 @@ The format for specifying and Uptick compatible chain-id in genesis is the follo
 
 The following table provides an example where the second row corresponds to an upgrade from the first one:
 
+:::: tabs
+::: tab Testnets
+
+| ChainID        | Identifier | EIP155 Number | Version Number |
+|----------------|------------|---------------|----------------|
+| `origin_1170-1` | uptick      | 1170          | 1              |
+
+:::
+::: tab Mainnet
+
 | ChainID        | Identifier | EIP155 Number | Version Number |
 |----------------|------------|---------------|----------------|
 | `uptick_117-1` | uptick      | 117          | 1              |
 
+:::
+::::
