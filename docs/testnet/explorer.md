@@ -6,8 +6,8 @@ order: 3
 
 ## cosmos
 
-[Uptick](https://explorer.testnet.uptick.network)
+[Uptick](https://explorer.origin.uptick.network)
 
 ## EVM
 
-[Blockscout](https://evm-explorer.testnet.uptick.network)
+[Blockscout](https://evm-explorer.origin.uptick.network)

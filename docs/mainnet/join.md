@@ -82,7 +82,7 @@ curl -o $HOME/.uptickd/config/genesis.json https://raw.githubusercontent.com/Upt
 # Configure State sync
 [statesync]
 enable = true
-rpc_servers = "http://18.138.220.30:26657,http://18.141.43.191:26657"
+rpc_servers = "https://rpc.uptick.nodestake.top:443,https://rpc.uptick.nodestake.top:443"
 trust_height = 12000
 trust_hash = "dee636061e072ba3e0fee408718b7aff97bd8d4a2a27c695c8d4c8b87081d698"
 trust_period = "168h"  # 2/3 of unbonding time

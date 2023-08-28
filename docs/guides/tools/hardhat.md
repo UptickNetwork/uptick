@@ -107,7 +107,7 @@ module.exports = {
     hardhat: {
     },
     testnet: {
-      url: "http://peer1.testnet.uptick.network:8545",
+      url: "https://json-rpc.origin.uptick.network",
       accounts: [privateKey1, privateKey2, ...]
     }
   },
@@ -169,14 +169,14 @@ Hardhat also lets you manually specify a target network via the `--network <your
 ::: tab Local Node
 
 ```bash
-npx hardhat run --network {{ $themeConfig.project.rpc_url_local }} scripts/sample-script.js
+npx hardhat run --network http://localhost:8545 scripts/sample-script.js
 ```
 
 :::
 ::: tab Testnet
 
 ```bash
-npx hardhat run --network {{ $themeConfig.project.rpc_url_testnet }} scripts/sample-script.js
+npx hardhat run --network https://json-rpc.origin.uptick.network scripts/sample-script.js
 ```
 
 :::

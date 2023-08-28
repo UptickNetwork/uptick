@@ -3,10 +3,14 @@ package main
 import (
 	"errors"
 	"fmt"
-	tmcfg "github.com/tendermint/tendermint/config"
 	"io"
 	"os"
 	"path/filepath"
+
+	"github.com/CosmWasm/wasmd/x/wasm"
+	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
+	"github.com/prometheus/client_golang/prometheus"
+	tmcfg "github.com/tendermint/tendermint/config"
 
 	"github.com/spf13/cast"
 	"github.com/spf13/cobra"
@@ -246,12 +250,19 @@ func (a appCreator) newApp(logger log.Logger, db dbm.DB, traceStore io.Writer, a
 		panic(err)
 	}
 
+	var wasmOpts []wasm.Option
+	if cast.ToBool(appOpts.Get("telemetry.enabled")) {
+		wasmOpts = append(wasmOpts, wasmkeeper.WithVMCacheMetrics(prometheus.DefaultRegisterer))
+	}
+
 	uptickApp := app.NewUptick(
 		logger, db, traceStore, true, skipUpgradeHeights,
 		cast.ToString(appOpts.Get(flags.FlagHome)),
 		cast.ToUint(appOpts.Get(sdkserver.FlagInvCheckPeriod)),
 		a.encCfg,
+		app.GetEnabledProposals(),
 		appOpts,
+		wasmOpts,
 		baseapp.SetPruning(pruningOpts),
 		baseapp.SetMinGasPrices(cast.ToString(appOpts.Get(sdkserver.FlagMinGasPrices))),
 		baseapp.SetHaltHeight(cast.ToUint64(appOpts.Get(sdkserver.FlagHaltHeight))),
@@ -281,18 +292,20 @@ func (a appCreator) appExport(
 ) (servertypes.ExportedApp, error) {
 	var uptickApp *app.Uptick
 	homePath, ok := appOpts.Get(flags.FlagHome).(string)
+	var emptyWasmOpts []wasm.Option
 	if !ok || homePath == "" {
 		return servertypes.ExportedApp{}, errors.New("application home not set")
 	}
 
 	if height != -1 {
-		uptickApp = app.NewUptick(logger, db, traceStore, false, map[int64]bool{}, "", uint(1), a.encCfg, appOpts)
-
+		// uptickApp = app.NewUptick(logger, db, traceStore, false, map[int64]bool{}, "", uint(1), a.encCfg, appOpts)
+		uptickApp = app.NewUptick(logger, db, traceStore, false, map[int64]bool{}, "", uint(1), a.encCfg, app.GetEnabledProposals(), appOpts, emptyWasmOpts)
 		if err := uptickApp.LoadHeight(height); err != nil {
 			return servertypes.ExportedApp{}, err
 		}
 	} else {
-		uptickApp = app.NewUptick(logger, db, traceStore, true, map[int64]bool{}, "", uint(1), a.encCfg, appOpts)
+		// uptickApp = app.NewUptick(logger, db, traceStore, true, map[int64]bool{}, "", uint(1), a.encCfg, appOpts)
+		uptickApp = app.NewUptick(logger, db, traceStore, true, map[int64]bool{}, "", uint(1), a.encCfg, app.GetEnabledProposals(), appOpts, emptyWasmOpts)
 	}
 
 	return uptickApp.ExportAppStateAndValidators(forZeroHeight, jailAllowedAddrs)
