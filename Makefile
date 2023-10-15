@@ -2,7 +2,8 @@
 
 BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
 COMMIT := $(shell git log -1 --format='%H')
-VERSION := v0.2.11
+VERSION := v0.2.12
+
 
 # don't override user values
 ifeq (,$(VERSION))
@@ -204,7 +205,7 @@ $(RUNSIM):
 statik: $(STATIK)
 $(STATIK):
 	@echo "Installing statik..."
-	@(cd /tmp && go get github.com/rakyll/statik@v0.1.6)
+	@(cd /tmp && go install github.com/rakyll/statik@v0.1.6)
 
 contract-tools:
 ifeq (, $(shell which stringer))

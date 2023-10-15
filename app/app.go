@@ -8,10 +8,13 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
+	"github.com/CosmWasm/wasmd/x/wasm"
+	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
 	"github.com/cosmos/cosmos-sdk/x/nft"
+	icacontrollertypes "github.com/cosmos/ibc-go/v5/modules/apps/27-interchain-accounts/controller/types"
 	"github.com/evmos/ethermint/x/evm/vm/geth"
-
 	"github.com/gorilla/mux"
 	"github.com/rakyll/statik/fs"
 	"github.com/spf13/cast"
@@ -31,8 +34,10 @@ import (
 	"github.com/cosmos/cosmos-sdk/server/api"
 	"github.com/cosmos/cosmos-sdk/server/config"
 	servertypes "github.com/cosmos/cosmos-sdk/server/types"
+
 	"github.com/cosmos/cosmos-sdk/simapp"
 	simappparams "github.com/cosmos/cosmos-sdk/simapp/params"
+
 	storetypes "github.com/cosmos/cosmos-sdk/store/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
@@ -101,7 +106,6 @@ import (
 	ibchost "github.com/cosmos/ibc-go/v5/modules/core/24-host"
 	ibckeeper "github.com/cosmos/ibc-go/v5/modules/core/keeper"
 
-	_ "github.com/evmos/ethermint/client/docs/statik" // unnamed import of statik for swagger UI support
 	"github.com/evmos/ethermint/encoding"
 	srvflags "github.com/evmos/ethermint/server/flags"
 	ethermint "github.com/evmos/ethermint/types"
@@ -123,6 +127,12 @@ import (
 	"github.com/UptickNetwork/uptick/app/ante"
 	authsims "github.com/cosmos/cosmos-sdk/x/auth/simulation"
 
+	nfttransfer "github.com/bianjieai/nft-transfer"
+	ibcnfttransferkeeper "github.com/bianjieai/nft-transfer/keeper"
+	ibcnfttransfertypes "github.com/bianjieai/nft-transfer/types"
+
+	"github.com/UptickNetwork/uptick/x/internft"
+
 	"github.com/UptickNetwork/uptick/x/erc721"
 	erc721keeper "github.com/UptickNetwork/uptick/x/erc721/keeper"
 	erc721types "github.com/UptickNetwork/uptick/x/erc721/types"
@@ -131,17 +141,16 @@ import (
 	nftmodule "github.com/UptickNetwork/uptick/x/collection/module"
 	nfttypes "github.com/UptickNetwork/uptick/x/collection/types"
 
+	"github.com/UptickNetwork/uptick/x/cw721"
+	cw721keeper "github.com/UptickNetwork/uptick/x/cw721/keeper"
+	cw721types "github.com/UptickNetwork/uptick/x/cw721/types"
+
+	store "github.com/cosmos/cosmos-sdk/store/types"
 	ica "github.com/cosmos/ibc-go/v5/modules/apps/27-interchain-accounts"
 	icahost "github.com/cosmos/ibc-go/v5/modules/apps/27-interchain-accounts/host"
 	icahostkeeper "github.com/cosmos/ibc-go/v5/modules/apps/27-interchain-accounts/host/keeper"
 	icahosttypes "github.com/cosmos/ibc-go/v5/modules/apps/27-interchain-accounts/host/types"
 	icatypes "github.com/cosmos/ibc-go/v5/modules/apps/27-interchain-accounts/types"
-
-	"strings"
-
-	"github.com/CosmWasm/wasmd/x/wasm"
-	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
-	"github.com/prometheus/client_golang/prometheus"
 
 	_ "github.com/UptickNetwork/uptick/client/docs/statik"
 )
@@ -235,10 +244,12 @@ var (
 		feemarket.AppModuleBasic{},
 		erc20.AppModuleBasic{},
 		erc721.AppModuleBasic{},
+		cw721.AppModuleBasic{},
 
 		nftmodule.AppModuleBasic{},
+		nfttransfer.AppModuleBasic{},
 		nftmodule.AppModuleBasic{},
-
+		//
 		wasm.AppModuleBasic{},
 		ica.AppModuleBasic{},
 	)
@@ -256,9 +267,9 @@ var (
 		evmtypes.ModuleName:    {authtypes.Minter, authtypes.Burner}, // used for secure addition and subtraction of balance using module account
 		erc20types.ModuleName:  {authtypes.Minter, authtypes.Burner},
 		erc721types.ModuleName: nil,
+		cw721types.ModuleName:  nil,
 
 		nfttypes.ModuleName: nil,
-		// nfttypes.ModuleName:        nil,
 		nft.ModuleName:      nil,
 		wasm.ModuleName:     {authtypes.Burner},
 		icatypes.ModuleName: nil,
@@ -269,17 +280,6 @@ var (
 		distrtypes.ModuleName: true,
 	}
 )
-
-func GetWasmOpts(appOpts servertypes.AppOptions) []wasm.Option {
-	var wasmOpts []wasm.Option
-	if cast.ToBool(appOpts.Get("telemetry.enabled")) {
-		wasmOpts = append(wasmOpts, wasmkeeper.WithVMCacheMetrics(prometheus.DefaultRegisterer))
-	}
-
-	wasmOpts = append(wasmOpts, wasmkeeper.WithGasRegister(NewUptickWasmGasRegister()))
-
-	return wasmOpts
-}
 
 var (
 	_ servertypes.Application = (*Uptick)(nil)
@@ -322,7 +322,8 @@ type Uptick struct {
 	EvidenceKeeper evidencekeeper.Keeper
 	TransferKeeper ibctransferkeeper.Keeper
 	FeeGrantKeeper feegrantkeeper.Keeper
-	ICAHostKeeper  icahostkeeper.Keeper
+
+	ICAHostKeeper icahostkeeper.Keeper
 
 	// make scoped keepers public for test purposes
 	ScopedIBCKeeper           capabilitykeeper.ScopedKeeper
@@ -330,6 +331,8 @@ type Uptick struct {
 	ScopedICAControllerKeeper capabilitykeeper.ScopedKeeper
 	ScopedICAHostKeeper       capabilitykeeper.ScopedKeeper
 	ScopedNFTTransferKeeper   capabilitykeeper.ScopedKeeper
+
+	IBCNFTTransferKeeper ibcnfttransferkeeper.Keeper
 
 	// the module manager
 	mm *module.Manager
@@ -344,15 +347,18 @@ type Uptick struct {
 	// Uptick keepers
 	Erc20Keeper  *erc20keeper.Keeper
 	Erc721Keeper erc721keeper.Keeper
+	Cw721Keeper  cw721keeper.Keeper
 
 	NFTKeeper nftkeeper.Keeper
+
+	// this line is used by starport scaffolding # stargate/app/keeperDeclaration
+	wasmKeeper             wasm.Keeper
+	wasmPermissionedKeeper wasmkeeper.PermissionedKeeper
+	scopedWasmKeeper       capabilitykeeper.ScopedKeeper
+
 	// simulation manager
 	sm         *module.SimulationManager
 	tpsCounter *tpsCounter
-
-	// this line is used by starport scaffolding # stargate/app/keeperDeclaration
-	wasmKeeper       wasm.Keeper
-	scopedWasmKeeper capabilitykeeper.ScopedKeeper
 }
 
 // NewUptick returns a reference to a new initialized Ethermint application.
@@ -411,8 +417,11 @@ func NewUptick(
 		// uptick keys
 		erc20types.StoreKey,
 		erc721types.StoreKey,
+		cw721types.StoreKey,
 		nfttypes.StoreKey,
 
+		// nfttypes.StoreKey,
+		ibcnfttransfertypes.StoreKey,
 		icahosttypes.StoreKey,
 		wasm.StoreKey,
 	)
@@ -444,6 +453,7 @@ func NewUptick(
 	scopedICAHostKeeper := app.CapabilityKeeper.ScopeToModule(icahosttypes.SubModuleName)
 	scopedTransferKeeper := app.CapabilityKeeper.ScopeToModule(ibctransfertypes.ModuleName)
 
+	scopedNFTTransferKeeper := app.CapabilityKeeper.ScopeToModule(ibcnfttransfertypes.ModuleName)
 	scopedWasmKeeper := app.CapabilityKeeper.ScopeToModule(wasm.ModuleName)
 	// Applications that wish to enforce statically created ScopedKeepers should call `Seal` after creating
 	// their scoped modules in `NewApp` with `ScopeToModule`
@@ -602,8 +612,8 @@ func NewUptick(
 		AddRoute(paramproposal.RouterKey, params.NewParamChangeProposalHandler(app.ParamsKeeper)).
 		AddRoute(distrtypes.RouterKey, distr.NewCommunityPoolSpendProposalHandler(app.DistrKeeper)).
 		AddRoute(upgradetypes.RouterKey, upgrade.NewSoftwareUpgradeProposalHandler(app.UpgradeKeeper)).
+		// AddRoute(ibchost.RouterKey, ibcclient.NewClientProposalHandler(app.IBCKeeper.ClientKeeper)).
 		AddRoute(ibcclienttypes.RouterKey, ibcclient.NewClientProposalHandler(app.IBCKeeper.ClientKeeper)).
-		AddRoute(ibchost.RouterKey, ibcclient.NewClientProposalHandler(app.IBCKeeper.ClientKeeper)).
 		AddRoute(erc20types.RouterKey, erc20.NewErc20ProposalHandler(app.Erc20Keeper))
 
 	// register wasm gov proposal types
@@ -654,6 +664,20 @@ func NewUptick(
 	// create IBC module from bottom to top of stack
 	transferStack := erc20.NewIBCMiddleware(*app.Erc20Keeper, transferIBCModule)
 
+	app.IBCNFTTransferKeeper = ibcnfttransferkeeper.NewKeeper(
+		appCodec,
+		keys[ibcnfttransfertypes.StoreKey],
+		app.GetSubspace(ibctransfertypes.ModuleName),
+		app.IBCKeeper.ChannelKeeper,
+		app.IBCKeeper.ChannelKeeper,
+		&app.IBCKeeper.PortKeeper,
+		app.AccountKeeper,
+		internft.NewInterNftKeeper(appCodec, app.NFTKeeper, app.AccountKeeper),
+		scopedNFTTransferKeeper,
+	)
+	ibcnfttransferModule := nfttransfer.NewAppModule(app.IBCNFTTransferKeeper)
+	nfttransferIBCModule := nfttransfer.NewIBCModule(app.IBCNFTTransferKeeper)
+
 	app.ICAHostKeeper = icahostkeeper.NewKeeper(
 		appCodec,
 		keys[icahosttypes.StoreKey],
@@ -673,7 +697,7 @@ func NewUptick(
 
 	wasmConfig, err := wasm.ReadWasmConfig(appOpts)
 	if err != nil {
-		panic(err)
+		panic("error while reading wasm config: " + err.Error())
 	}
 
 	// The last arguments can contain custom message handlers, and custom query handlers,
@@ -699,12 +723,23 @@ func NewUptick(
 		wasmOpts...,
 	)
 
+	app.Cw721Keeper = cw721keeper.NewKeeper(
+		keys[cw721types.StoreKey],
+		appCodec,
+		app.GetSubspace(cw721types.ModuleName),
+		app.AccountKeeper,
+		app.NFTKeeper,
+		app.wasmKeeper,
+		&app.wasmPermissionedKeeper,
+	)
+
 	// Create static IBC router, add transfer route, then set and seal it
 	ibcRouter := porttypes.NewRouter()
-	ibcRouter.
-		AddRoute(ibctransfertypes.ModuleName, transferStack).
-		AddRoute(icahosttypes.SubModuleName, icaHostIBCModule).
-		AddRoute(wasm.ModuleName, wasm.NewIBCHandler(app.wasmKeeper, app.IBCKeeper.ChannelKeeper))
+
+	ibcRouter.AddRoute(ibctransfertypes.ModuleName, transferStack).
+		AddRoute(wasm.ModuleName, wasm.NewIBCHandler(app.wasmKeeper, app.IBCKeeper.ChannelKeeper)).
+		AddRoute(ibcnfttransfertypes.ModuleName, nfttransferIBCModule).
+		AddRoute(icahosttypes.SubModuleName, icaHostIBCModule)
 
 	app.IBCKeeper.SetRouter(ibcRouter)
 
@@ -745,7 +780,6 @@ func NewUptick(
 		authzmodule.NewAppModule(appCodec, app.AuthzKeeper, app.AccountKeeper, app.BankKeeper, app.interfaceRegistry),
 
 		nftmodule.NewAppModule(appCodec, app.NFTKeeper, app.AccountKeeper, app.BankKeeper),
-		wasm.NewAppModule(appCodec, &app.wasmKeeper, app.StakingKeeper, app.AccountKeeper, app.BankKeeper),
 		// ibc modules
 		ibc.NewAppModule(app.IBCKeeper),
 		transferModule,
@@ -755,9 +789,10 @@ func NewUptick(
 		// Uptick app modules
 		erc20.NewAppModule(*app.Erc20Keeper, app.AccountKeeper),
 		erc721.NewAppModule(app.Erc721Keeper, app.AccountKeeper),
+		cw721.NewAppModule(app.Cw721Keeper, app.AccountKeeper),
 		nftmodule.NewAppModule(app.appCodec, app.NFTKeeper, app.AccountKeeper, app.BankKeeper),
 
-		// interTxModule,
+		ibcnfttransferModule,
 		icaModule,
 		// this line is used by starport scaffolding # stargate/app/appModule
 		wasm.NewAppModule(appCodec, &app.wasmKeeper, app.StakingKeeper, app.AccountKeeper, app.BankKeeper),
@@ -794,7 +829,10 @@ func NewUptick(
 		vestingtypes.ModuleName,
 		erc20types.ModuleName,
 		erc721types.ModuleName,
+		cw721types.ModuleName,
 		nfttypes.ModuleName,
+
+		ibcnfttransfertypes.ModuleName,
 		icatypes.ModuleName,
 		wasm.ModuleName,
 	)
@@ -824,7 +862,9 @@ func NewUptick(
 		vestingtypes.ModuleName,
 		erc20types.ModuleName,
 		erc721types.ModuleName,
+		cw721types.ModuleName,
 		nfttypes.ModuleName,
+		ibcnfttransfertypes.ModuleName,
 		icatypes.ModuleName,
 		wasm.ModuleName,
 	)
@@ -863,9 +903,10 @@ func NewUptick(
 
 		erc20types.ModuleName,
 		erc721types.ModuleName,
-
+		cw721types.ModuleName,
 		crisistypes.ModuleName,
 		nfttypes.ModuleName,
+		ibcnfttransfertypes.ModuleName,
 		icatypes.ModuleName,
 		wasm.ModuleName,
 	)
@@ -900,9 +941,9 @@ func NewUptick(
 		evm.NewAppModule(app.EvmKeeper, app.AccountKeeper),
 		feemarket.NewAppModule(app.FeeMarketKeeper),
 		//nftmodule.NewAppModule(app.appCodec, app.CollectionKeeper, app.AccountKeeper, app.BankKeeper),
-
 		wasm.NewAppModule(appCodec, &app.wasmKeeper, app.StakingKeeper, app.AccountKeeper, app.BankKeeper),
 		nftmodule.NewAppModule(appCodec, app.NFTKeeper, app.AccountKeeper, app.BankKeeper),
+		ibcnfttransferModule,
 	)
 
 	app.sm.RegisterStoreDecoders()
@@ -918,7 +959,6 @@ func NewUptick(
 
 	maxGasWanted := cast.ToUint64(appOpts.Get(srvflags.EVMMaxTxGasWanted))
 	options := ante.HandlerOptions{
-		Cdc:               app.appCodec,
 		AccountKeeper:     app.AccountKeeper,
 		BankKeeper:        app.BankKeeper,
 		IBCKeeper:         app.IBCKeeper,
@@ -945,8 +985,21 @@ func NewUptick(
 			wasmkeeper.NewWasmSnapshotter(app.CommitMultiStore(), &app.wasmKeeper),
 		)
 		if err != nil {
-			panic(fmt.Errorf("failed to register snapshot extension: ", err.Error()))
+			panic("failed to register snapshot extension: " + err.Error())
 		}
+	}
+
+	upgradeInfo, err := app.UpgradeKeeper.ReadUpgradeInfoFromDisk()
+	if err != nil {
+		panic(err)
+	}
+
+	if upgradeInfo.Name == "multiverse" && !app.UpgradeKeeper.IsSkipHeight(upgradeInfo.Height) {
+		storeUpgrades := store.StoreUpgrades{
+			Added: []string{icacontrollertypes.StoreKey, icahosttypes.StoreKey},
+		}
+
+		app.SetStoreLoader(upgradetypes.UpgradeStoreLoader(upgradeInfo.Height, &storeUpgrades))
 	}
 
 	if loadLatest {
@@ -1001,6 +1054,8 @@ func (app *Uptick) DeliverTx(req abci.RequestDeliverTx) (res abci.ResponseDelive
 // InitChainer updates at chain initialization
 func (app *Uptick) InitChainer(ctx sdk.Context, req abci.RequestInitChain) abci.ResponseInitChain {
 	var genesisState simapp.GenesisState
+	// var genesisState GenesisState
+
 	if err := json.Unmarshal(req.AppStateBytes, &genesisState); err != nil {
 		panic(err)
 	}
@@ -1093,12 +1148,10 @@ func (app *Uptick) SimulationManager() *module.SimulationManager {
 // RegisterAPIRoutes registers all application module routes with the provided
 // API server.
 func (app *Uptick) RegisterAPIRoutes(apiSvr *api.Server, apiConfig config.APIConfig) {
-
 	clientCtx := apiSvr.ClientCtx
 
 	// Register new tx routes from grpc-gateway.
 	authtx.RegisterGRPCGatewayRoutes(clientCtx, apiSvr.GRPCGatewayRouter)
-
 	// Register new tendermint queries routes from grpc-gateway.
 	tmservice.RegisterGRPCGatewayRoutes(clientCtx, apiSvr.GRPCGatewayRouter)
 
@@ -1155,8 +1208,7 @@ func (app *Uptick) GetTxConfig() client.TxConfig {
 
 // RegisterSwaggerAPI registers swagger route with API Server
 func RegisterSwaggerAPI(_ client.Context, rtr *mux.Router) {
-
-	statikFS, err := fs.New()
+	statikFS, err := fs.NewWithNamespace("uptick")
 	if err != nil {
 		panic(err)
 	}
@@ -1192,6 +1244,7 @@ func initParamsKeeper(
 	// uptick subspaces
 	paramsKeeper.Subspace(erc20types.ModuleName)
 	paramsKeeper.Subspace(erc721types.ModuleName)
+	paramsKeeper.Subspace(cw721types.ModuleName)
 	paramsKeeper.Subspace(icahosttypes.SubModuleName)
 	paramsKeeper.Subspace(wasm.ModuleName)
 
@@ -1200,13 +1253,22 @@ func initParamsKeeper(
 
 func (app *Uptick) registerUpgradeHandlers() {
 
-	upgradeVersion := "v0.2.11"
+	upgradeVersion := "v0.2.12"
 	app.UpgradeKeeper.SetUpgradeHandler(
 		upgradeVersion,
 		func(ctx sdk.Context, _ upgradetypes.Plan, vm module.VersionMap) (module.VersionMap, error) {
+
 			// Refs:
 			// - https://docs.cosmos.network/master/building-modules/upgrade.html#registering-migrations
-			// - https://docs.cosmos.network/master/migrations/chain-upgrade-guide-044.html#chain-upgrad
+			// - https://docs.cosmos.network/master/migrations/chain-upgrade-guide-044.html#chain-upgrade
+			//gs := ibcnfttransfertypes.DefaultGenesisState()
+			//bz, err := ibcnfttransfertypes.ModuleCdc.MarshalJSON(gs)
+			//if err != nil {
+			//	panic(fmt.Errorf("failed to ModuleCdc %s: %w", ibcnfttransfertypes.ModuleName, err))
+			//}
+			//_ = app.mm.Modules[ibcnfttransfertypes.ModuleName].InitGenesis(
+			//	ctx, ibcnfttransfertypes.ModuleCdc, bz)
+
 			return app.mm.RunMigrations(ctx, app.configurator, vm)
 		})
 
@@ -1222,18 +1284,19 @@ func (app *Uptick) registerUpgradeHandlers() {
 		return
 	}
 
-	var storeUpgrades *storetypes.StoreUpgrades
-
-	switch upgradeInfo.Name {
-	case upgradeVersion:
-
-		storeUpgrades = &storetypes.StoreUpgrades{
-			Added: []string{wasm.ModuleName, icatypes.ModuleName, icahosttypes.SubModuleName},
-		}
-	}
-
-	if storeUpgrades != nil {
-		// configure store loader that checks if version == upgradeHeight and applies store upgrades
-		app.SetStoreLoader(upgradetypes.UpgradeStoreLoader(upgradeInfo.Height, storeUpgrades))
-	}
+	//var storeUpgrades *storetypes.StoreUpgrades
+	//
+	////switch upgradeInfo.Name {
+	////case upgradeVersion:
+	////	// add revenue module for testnet (v7 -> v8)
+	////	storeUpgrades = &storetypes.StoreUpgrades{
+	////		Added: []string{cw721types.ModuleName},
+	////	}
+	////}
+	//
+	//if storeUpgrades != nil {
+	//
+	//	// configure store loader that checks if version == upgradeHeight and applies store upgrades
+	//	app.SetStoreLoader(upgradetypes.UpgradeStoreLoader(upgradeInfo.Height, storeUpgrades))
+	//}
 }

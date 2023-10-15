@@ -3,9 +3,10 @@ package keeper
 import (
 	"context"
 	"fmt"
-	"github.com/UptickNetwork/uptick/x/collection/exported"
 	"math/big"
 	"strings"
+
+	"github.com/UptickNetwork/uptick/x/collection/exported"
 
 	"github.com/ethereum/go-ethereum/common"
 
@@ -139,9 +140,9 @@ func (k Keeper) ConvertERC721(
 
 // convertCosmos2Evm handles the nft conversion for a native ERC721 token
 // pair:
-//  - escrow nft on module account
-//  - unescrow nft that have been previously escrowed with ConvertERC721 and send to receiver
-//  - burn escrowed nft
+//   - escrow nft on module account
+//   - unescrow nft that have been previously escrowed with ConvertERC721 and send to receiver
+//   - burn escrowed nft
 func (k Keeper) convertCosmos2Evm(
 	ctx sdk.Context,
 	pair types.TokenPair,
@@ -158,6 +159,7 @@ func (k Keeper) convertCosmos2Evm(
 
 	erc721 := contracts.ERC721UpticksContract.ABI
 	contract := pair.GetERC721Contract()
+	msg.ContractAddress = contract.String()
 
 	for i, tokenId := range msg.TokenIds {
 		bigTokenId := new(big.Int)
@@ -191,7 +193,7 @@ func (k Keeper) convertCosmos2Evm(
 		owner, err := k.QueryERC721TokenOwner(ctx, common.HexToAddress(msg.ContractAddress), bigTokenIds[i])
 		if err != nil {
 			// mint
-			// mint enhance
+			// mint enhance )
 			_, err = k.CallEVM(
 				ctx, erc721, types.ModuleAddress, contract, true,
 				"mintEnhance", receiver, bigTokenIds[i], reqInfo.GetName(), reqInfo.GetURI(), reqInfo.GetData(), reqInfo.GetURIHash())
@@ -199,7 +201,7 @@ func (k Keeper) convertCosmos2Evm(
 				// mint normal
 				_, err = k.CallEVM(
 					ctx, erc721, receiver, contract, true,
-					"mint", receiver, bigTokenIds[i])
+					"mint", receiver, bigTokenIds[i], reqInfo.GetURI())
 				if err != nil {
 					return nil, err
 				}
@@ -224,6 +226,7 @@ func (k Keeper) convertCosmos2Evm(
 	}
 
 	for i, tokenId := range msg.TokenIds {
+
 		k.SetNFTPairs(ctx, msg.ContractAddress, tokenId, msg.ClassId, msg.NftIds[i])
 	}
 
@@ -246,8 +249,8 @@ func (k Keeper) convertCosmos2Evm(
 
 // convertEvm2Cosmos handles the erc721 conversion for a native erc721 token
 // pair:
-//  - escrow tokens on module account
-//  - mint nft to the receiver: nftId: tokenAddress|tokenID
+//   - escrow tokens on module account
+//   - mint nft to the receiver: nftId: tokenAddress|tokenID
 func (k Keeper) convertEvm2Cosmos(
 	ctx sdk.Context,
 	pair types.TokenPair,

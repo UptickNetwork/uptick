@@ -15,7 +15,7 @@ You can customize the local testnet script by changing values for convenience fo
 ```bash
 # customize the name of your key, the chain-id, moniker of the node, keyring backend, and log level
 KEY="mykey"
-CHAINID="origin_1170-1"
+CHAINID="uptick_7000-2"
 MONIKER="localtestnet"
 KEYRING="test"
 LOGLEVEL="info"
@@ -29,7 +29,7 @@ uptickd gentx $KEY 1000000000000000000000auptick --keyring-backend $KEYRING --ch
 ```
 
 The default configuration will generate a single validator localnet with the chain-id
-`origin_1170-1` and one predefined account (`mykey`) with some allocated funds at the genesis.
+`uptickd-1` and one predefined account (`mykey`) with some allocated funds at the genesis.
 
 You can start the local chain using:
 
@@ -48,7 +48,7 @@ Before actually running the node, we need to initialize the chain, and most impo
 ```bash
 $MONIKER=testing
 $KEY=mykey
-$CHAINID="origin_1170-1"
+$CHAINID="uptick_7000-2"
 
 # The argument $MONIKER is the custom username of your node, it should be human-readable.
 uptickd init $MONIKER --chain-id=$CHAINID

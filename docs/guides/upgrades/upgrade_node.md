@@ -33,14 +33,13 @@ Verify that everything is OK. If you get something like the following, you've su
 ```bash
 $ uptickd version --long
 
-build_tags: netgo,ledger
-commit: e6d56ca87afddb7e89088f7c440e5728cac47327
-cosmos_sdk_version: v0.46.9
-go: go version go1.19.9 linux/amd64
 name: uptick
 server_name: uptickd
-version: v0.2.7
-
+version: 0.1.0
+commit: d477e775a2596701ea215a4570e8ea9669d76edf
+build_tags: netgo,ledger
+go: go version go1.17 darwin/amd64
+...
 ```
 
 If the software version does not match, then please check your $PATH to ensure the correct uptickd is running.
@@ -102,14 +101,14 @@ export DAEMON_ALLOW_DOWNLOAD_BINARIES=true
 You can now download the "genesis" file for the chain. It is pre-filled with the entire genesis state and gentxs.
 
 ```bash
-curl https://raw.githubusercontent.com/UptickNetwork/uptick-testnet/main/origin_1170-1/config/genesis.json > ~/.uptickd/config/genesis.json
+curl https://raw.githubusercontent.com/UptickNetwork/uptick-testnet/main/uptick_7000-2/genesis.json > ~/.uptickd/config/genesis.json
 ```
 
 We recommend using `sha256sum` to check the hash of the genesis.
 
 ```bash
 cd ~/.uptickd/config
-echo "d78958818abc969ba70dc801e0044c6cc02121cf5baae088258392f1ea72aacc  genesis.json" | sha256sum -c
+echo "2b5164f4bab00263cb424c3d0aa5c47a707184c6ff288322acc4c7e0c5f6f36f  genesis.json" | sha256sum -c
 ```
 
 #### Reset Chain Database
@@ -122,12 +121,12 @@ uptickd tendermint unsafe-reset-all
 
 #### Ensure that you have set peers
 
-In `~/.uptickd/config/config.toml` you can set your peers. See the [peers.txt](https://github.com/UptickNetwork/uptick-testnet/blob/main/origin_1170-1/config/peers.md) file for a list of up to date peers.
+In `~/.uptickd/config/config.toml` you can set your peers. See the [peers.txt](https://github.com/UptickNetwork/uptick-testnet/blob/main/uptick_7000-2/peers.txt) file for a list of up to date peers.
 
 See the [Add persistent peers section](https://docs.uptick.network/testnet/join.html#add-persistent-peers) in our docs for an automated method, but field should look something like a comma separated string of peers (do not copy this, just an example):
 
 ```bash
-persistent_peers = "9b7b2fb9d1416f9feadf5a58b29de0bc150d974d@65.109.89.5:30656"
+persistent_peers = "5576b0160761fe81ccdf88e06031a01bc8643d51@195.201.108.97:24656,13e850d14610f966de38fc2f925f6dc35c7f4bf4@176.9.60.27:26656,38eb4984f89899a5d8d1f04a79b356f15681bb78@18.169.155.159:26656,59c4351009223b3652674bd5ee4324926a5a11aa@51.15.133.26:26656,3a5a9022c8aa2214a7af26ebbfac49b77e34e5c5@65.108.1.46:26656,4fc0bea2044c9fd1ea8cc987119bb8bdff91aaf3@65.21.246.124:26656,6624238168de05893ca74c2b0270553189810aa7@95.216.100.80:26656,9d247286cd407dc8d07502240245f836e18c0517@149.248.32.208:26656,37d59371f7578101dee74d5a26c86128a229b8bf@194.163.172.168:26656,b607050b4e5b06e52c12fcf2db6930fd0937ef3b@95.217.107.96:26656,7a6bbbb6f6146cb11aebf77039089cd038003964@94.130.54.247:26656"
 ```
 
 You can share your peer with
@@ -144,10 +143,10 @@ If you are relying on just seed node and no persistent peers or a low amount of 
 
 ```bash
 # Maximum number of inbound peers
-max_num_inbound_peers = 40
+max_num_inbound_peers = 200
 
 # Maximum number of outbound peers to connect to, excluding persistent peers
-max_num_outbound_peers = 40
+max_num_outbound_peers = 100
 ```
 
 #### Start your node

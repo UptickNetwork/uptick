@@ -2,6 +2,7 @@ package ante
 
 import (
 	"github.com/cosmos/cosmos-sdk/codec"
+	storetypes "github.com/cosmos/cosmos-sdk/store/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/cosmos/cosmos-sdk/types/tx/signing"
@@ -15,7 +16,6 @@ import (
 	evmtypes "github.com/evmos/ethermint/x/evm/types"
 
 	wasmTypes "github.com/CosmWasm/wasmd/x/wasm/types"
-	storetypes "github.com/cosmos/cosmos-sdk/store/types"
 )
 
 // HandlerOptions defines the list of module keepers required to run the Evmos
@@ -25,17 +25,16 @@ type HandlerOptions struct {
 	BankKeeper    evmtypes.BankKeeper
 	IBCKeeper     *ibckeeper.Keeper
 	//FeeMarketKeeper evmtypes.FeeMarketKeeper
-	FeeMarketKeeper ethante.FeeMarketKeeper
-	EvmKeeper       ethante.EVMKeeper
-	FeegrantKeeper  ante.FeegrantKeeper
-	SignModeHandler authsigning.SignModeHandler
-	SigGasConsumer  func(meter sdk.GasMeter, sig signing.SignatureV2, params authtypes.Params) error
-	Cdc             codec.BinaryCodec
-	MaxTxGasWanted  uint64
-	TxFeeChecker    ante.TxFeeChecker
-
+	FeeMarketKeeper   ethante.FeeMarketKeeper
+	EvmKeeper         ethante.EVMKeeper
+	FeegrantKeeper    ante.FeegrantKeeper
+	SignModeHandler   authsigning.SignModeHandler
+	SigGasConsumer    func(meter sdk.GasMeter, sig signing.SignatureV2, params authtypes.Params) error
 	TxCounterStoreKey storetypes.StoreKey
 	WasmConfig        wasmTypes.WasmConfig
+	Cdc               codec.BinaryCodec
+	MaxTxGasWanted    uint64
+	TxFeeChecker      ante.TxFeeChecker
 }
 
 // Validate checks if the keepers are defined
@@ -115,8 +114,6 @@ func newCosmosAnteHandlerEip712(options HandlerOptions) sdk.AnteHandler {
 		ante.NewSetPubKeyDecorator(options.AccountKeeper),
 		ante.NewValidateSigCountDecorator(options.AccountKeeper),
 		ante.NewSigGasConsumeDecorator(options.AccountKeeper, options.SigGasConsumer),
-		// Note: signature verification uses EIP instead of the cosmos signature validator
-		// ethante.NewEip712SigVerificationDecorator(options.AccountKeeper, options.SignModeHandler),
 		ante.NewIncrementSequenceDecorator(options.AccountKeeper),
 		ibcante.NewRedundantRelayDecorator(options.IBCKeeper),
 		ethante.NewGasWantedDecorator(options.EvmKeeper, options.FeeMarketKeeper),
