@@ -247,7 +247,7 @@ Clean `~/.uptickd` (never do this in a production environment):
 Set up app config:
 
 ```sh
-./build/uptickd config chain-id origin_1170-1
+./build/uptickd config chain-id test_9000-1
 ./build/uptickd config keyring-backend test
 ./build/uptickd config broadcast-mode block
 ```
@@ -257,7 +257,7 @@ Initialize the node and overwrite any previous genesis file (never do this in a 
 <!-- TODO: init does not read chain-id from config -->
 
 ```sh
-./build/uptickd testnet init-files --chain-id origin_1170-1 --keyring-backend test --v 1 --output-dir ./.mytestnet
+./build/uptickd testnet init-files --chain-id test_9000-1 --keyring-backend test --v 1 --output-dir ./.mytestnet
 cp -r .mytestnet/node0/uptickd/ ~/.uptickd/
 ```
 
@@ -317,11 +317,11 @@ cp ./build/uptickd $DAEMON_HOME/cosmovisor/upgrades/v0.2/bin
 
 Open a new terminal window and submit an upgrade proposal along with a deposit and a vote (these commands must be run within 20 seconds of each other):
 ```sh
-./build/uptickd tx gov submit-proposal software-upgrade v0.2 --title upgrade --description upgrade --upgrade-height 50 --from node0 --yes --keyring-backend test --keyring-dir ~/.uptickd --chain-id origin_1170-1 -b block
+./build/uptickd tx gov submit-proposal software-upgrade v0.2 --title upgrade --description upgrade --upgrade-height 50 --from node0 --yes --keyring-backend test --keyring-dir ~/.uptickd --chain-id test_9000-1 -b block
 
-./build/uptickd tx gov deposit 1 100000000000000000auptick -y --from node0 --yes --keyring-backend test --keyring-dir ~/.uptickd --chain-id origin_1170-1 -b block
+./build/uptickd tx gov deposit 1 100000000000000000auptick -y --from node0 --yes --keyring-backend test --keyring-dir ~/.uptickd --chain-id test_9000-1 -b block
 
-./build/uptickd tx gov vote 1 yes --from node0 --yes --keyring-backend test --keyring-dir ~/.uptickd --chain-id origin_1170-1 -b block
+./build/uptickd tx gov vote 1 yes --from node0 --yes --keyring-backend test --keyring-dir ~/.uptickd --chain-id test_9000-1 -b block
 ```
 
 ### check log

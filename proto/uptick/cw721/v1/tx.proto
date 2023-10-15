@@ -1,0 +1,60 @@
+syntax = "proto3";
+package uptick.cw721.v1;
+
+import "google/api/annotations.proto";
+import "gogoproto/gogo.proto";
+
+option go_package = "github.com/UptickNetwork/uptick/x/cw721/types";
+
+// Msg defines the cw721 Msg service.
+service Msg {
+  // ConvertNFT mints a CW721 representation of the native Cosmos nft
+  // that is registered on the token mapping.
+  rpc ConvertNFT(MsgConvertNFT) returns (MsgConvertNFTResponse) {
+    option (google.api.http).get = "/uptick/cw721/v1/tx/convert_nft";
+  };
+  // ConvertCW721 mints a native Cosmos coin representation of the CW721 token
+  // contract that is registered on the token mapping.
+  rpc ConvertCW721(MsgConvertCW721) returns (MsgConvertCW721Response) {
+    option (google.api.http).get = "/uptick/cw721/v1/tx/convert_cw721";
+  };
+}
+
+// MsgConvertNFT defines a Msg to convert a native Cosmos nft to a CW721 token
+message MsgConvertNFT {
+  // nft classID to cnvert to CW721
+  string class_id = 1;
+  // nftID to cnvert to CW721
+  repeated string nft_ids = 2;
+  // recipient hex address to receive CW721 token
+  string receiver = 3;
+  // cosmos bech32 address from the owner of the given Cosmos coins
+  string sender = 4;
+  // CW721 token contract address registered in a token pair
+  string contract_address = 5;
+  // CW721 token id registered in a token pair
+  repeated string token_ids = 6;
+}
+
+// MsgConvertNFTResponse returns no fields
+message MsgConvertNFTResponse {}
+
+// MsgConvertCW721 defines a Msg to convert a CW721 token to a native Cosmos
+// nft.
+message MsgConvertCW721 {
+  // CW721 token contract address registered in a token pair
+  string contract_address = 1;
+  // tokenID to convert
+  repeated string token_ids = 2;
+  // bech32 address to receive native Cosmos coins
+  string receiver = 3;
+  // sender hex address from the owner of the given CW721 tokens
+  string sender = 4;
+  // nft classID to cnvert to CW721
+  string class_id = 5;
+  // nftID to cnvert to CW721
+  repeated string nft_ids = 6;
+}
+
+// MsgConvertCW721Response returns no fields
+message MsgConvertCW721Response {}

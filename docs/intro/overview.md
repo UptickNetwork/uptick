@@ -41,6 +41,6 @@ software to seamlessly deploy smart contracts which interact with the rest of th
 
 | Property                     | Value                                                |
 |------------------------------|------------------------------------------------------|
-| Uptick Origin Testnet                | `{{ $themeConfig.project.testnet_chain_id }}`        |
-| Uptick Mainnet                 | `{{ $themeConfig.project.chain_id }}`                |
+| Uptick Testnet                | `{{ $themeConfig.project.testnet_chain_id }}`        |
+| Uptick Mainnet (not yet live) | `{{ $themeConfig.project.chain_id }}`                |
 | Block Time                   | ~7 seconds                                           |

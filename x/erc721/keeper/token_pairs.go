@@ -122,12 +122,15 @@ func (k Keeper) SetNFTPairs(ctx sdk.Context, contractAddress string, tokenID str
 
 	// save nft pair
 	if len(k.GetNFTPairByContractTokenID(ctx, contractAddress, tokenID)) == 0 {
+
 		k.SetNFTPairByContractTokenID(ctx, contractAddress, tokenID, classID, nftID)
 	}
 
 	if len(k.GetNFTPairByClassNFTID(ctx, classID, nftID)) == 0 {
+
 		k.SetNFTPairByClassNFTID(ctx, classID, nftID, contractAddress, tokenID)
 	}
+
 }
 
 func (k Keeper) SetNFTPairByContractTokenID(ctx sdk.Context, contractAddress string, tokenID string, classID string, nftID string) {
@@ -172,6 +175,7 @@ func (k Keeper) SetNFTPairByClassNFTID(ctx sdk.Context, classID string, nftID st
 }
 
 func (k Keeper) SetNFTUIDPairByNFTUID(ctx sdk.Context, nftUID string, tokenUID string) {
+
 	store := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixNFTUIDPairByNFTUID)
 	store.Set([]byte(nftUID), []byte(tokenUID))
 }

@@ -3,14 +3,13 @@ package main
 import (
 	"errors"
 	"fmt"
-	"io"
-	"os"
-	"path/filepath"
-
 	"github.com/CosmWasm/wasmd/x/wasm"
 	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
 	"github.com/prometheus/client_golang/prometheus"
 	tmcfg "github.com/tendermint/tendermint/config"
+	"io"
+	"os"
+	"path/filepath"
 
 	"github.com/spf13/cast"
 	"github.com/spf13/cobra"
@@ -298,13 +297,12 @@ func (a appCreator) appExport(
 	}
 
 	if height != -1 {
-		// uptickApp = app.NewUptick(logger, db, traceStore, false, map[int64]bool{}, "", uint(1), a.encCfg, appOpts)
 		uptickApp = app.NewUptick(logger, db, traceStore, false, map[int64]bool{}, "", uint(1), a.encCfg, app.GetEnabledProposals(), appOpts, emptyWasmOpts)
+
 		if err := uptickApp.LoadHeight(height); err != nil {
 			return servertypes.ExportedApp{}, err
 		}
 	} else {
-		// uptickApp = app.NewUptick(logger, db, traceStore, true, map[int64]bool{}, "", uint(1), a.encCfg, appOpts)
 		uptickApp = app.NewUptick(logger, db, traceStore, true, map[int64]bool{}, "", uint(1), a.encCfg, app.GetEnabledProposals(), appOpts, emptyWasmOpts)
 	}
 

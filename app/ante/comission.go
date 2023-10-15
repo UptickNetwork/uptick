@@ -9,7 +9,7 @@ import (
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 )
 
-var minCommission = sdk.NewDecWithPrec(0, 2) // 5%
+var minCommission = sdk.NewDecWithPrec(0, 2) // 0%
 
 // ValidatorCommissionDecorator validates that the validator commission is always
 // greater or equal than the min commission rate

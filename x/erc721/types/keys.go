@@ -37,8 +37,6 @@ const (
 	prefixTokenPair = iota + 1
 	prefixTokenPairByERC721
 	prefixTokenPairByClass
-	//prefixNFTPairByNFTID
-	//prefixNFTPairByTokenID
 
 	prefixNFTUIDPairByNFTUID
 	prefixNFTUIDPairByTokenUID

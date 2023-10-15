@@ -177,11 +177,11 @@ moniker="NODE_NAME"
 ## Use commands below for Testnet setup
 
 ```bash
-SNAP_RPC1="http://18.138.220.30:26657"
-SNAP_RPC="http://18.141.43.191:26657"
-CHAIN_ID="uptick_117-1"
-PEER="e6eb810c0495bc3c9e562f92b349458e7c5ec073@18.138.220.30:26656,2daad11330246926e80163d58cf6dd19ef413040@18.141.43.191:26656"
-curl -o $HOME/.uptickd/config/genesis.json https://raw.githubusercontent.com/UptickNetwork/uptick-mainnet/master/uptick_117-1/genesis.json
+SNAP_RPC1="https://uptick-testnet-rpc.brocha.in:443"
+SNAP_RPC="https://peer0.testnet.uptick.network:36657"
+CHAIN_ID="uptick_7000-2"
+PEER="f97a75fb69d3a5fe893dca7c8d238ccc0bd66a8f@uptick-seed.p2p.brocha.in:30554,eecdfb17919e59f36e5ae6cec2c98eeeac05c0f2@peer0.testnet.uptick.network:26656"
+wget -O $HOME/genesis.json https://raw.githubusercontent.com/UptickNetwork/uptick-testnet/main/uptick_7000-2/genesis.json
 ```
 
 
@@ -193,6 +193,11 @@ Node init
 uptickd init $moniker --chain-id $CHAIN_ID
 ```
 
+Move genesis file to .uptickd/config folder
+
+```bash
+mv $HOME/genesis.json ~/.uptickd/config/
+```
 
 Reset the node
 

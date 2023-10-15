@@ -65,9 +65,8 @@ func (k Keeper) GetContractAddressAndTokenIds(ctx sdk.Context, msg *types.MsgCon
 
 	pair, err := k.GetPair(ctx, msg.ClassId)
 	if err != nil {
-
 		msg.TokenIds, _ = getNftDatas(msg.TokenIds, msg.NftIds, nil, 2)
-		//Stop here ... ...
+
 		erc721ContractAddress, err := k.DeployERC721Contract(ctx, msg)
 		if err == nil {
 			contractAddress = erc721ContractAddress.String()
@@ -76,6 +75,7 @@ func (k Keeper) GetContractAddressAndTokenIds(ctx sdk.Context, msg *types.MsgCon
 		return contractAddress, msg.TokenIds, nil
 
 	} else {
+
 		var (
 			savedTokenIds        []string
 			savedContractAddress string
@@ -108,6 +108,7 @@ func (k Keeper) GetContractAddressAndTokenIds(ctx sdk.Context, msg *types.MsgCon
 		if err != nil {
 			return "", nil, err
 		}
+
 		return contractAddress, tokenIds, nil
 
 	}
