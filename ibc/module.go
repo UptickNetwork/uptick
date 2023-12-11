@@ -21,6 +21,7 @@ func NewModule(app porttypes.IBCModule) *Module {
 		app: app,
 	}
 }
+
 //
 //// OnChanOpenInit implements the Module interface
 //// It calls the underlying app's OnChanOpenInit callback.

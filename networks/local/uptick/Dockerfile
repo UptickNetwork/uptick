@@ -1,4 +1,5 @@
-FROM golang:stretch as build-env
+# FROM golang:stretch as build-env
+FROM golang:1.20-bullseye as build-env
 
 # Install minimum necessary dependencies
 ENV PACKAGES curl make git libc-dev bash gcc
@@ -12,10 +13,10 @@ WORKDIR /go/src/github.com/UptickNetwork/uptick
 COPY . .
 
 # build Ethermint
-RUN make build-linux
+RUN make build
 
 # Final image
-FROM golang:1.17 as final
+FROM golang:1.20-bullseye as final
 
 WORKDIR /
 

@@ -18,7 +18,7 @@ func (k Keeper) RegisterNFT(ctx sdk.Context, msg *types.MsgConvertNFT) (*types.T
 		)
 	}
 
-	pair := types.NewTokenPair(common.HexToAddress(msg.ContractAddress), msg.ClassId)
+	pair := types.NewTokenPair(common.HexToAddress(msg.EvmContractAddress), msg.ClassId)
 	k.SetTokenPair(ctx, pair)
 	k.SetClassMap(ctx, pair.ClassId, pair.GetID())
 	k.SetERC721Map(ctx, common.HexToAddress(pair.Erc721Address), pair.GetID())
@@ -30,7 +30,7 @@ func (k Keeper) RegisterNFT(ctx sdk.Context, msg *types.MsgConvertNFT) (*types.T
 func (k Keeper) RegisterERC721(ctx sdk.Context, msg *types.MsgConvertERC721) (*types.TokenPair, error) {
 
 	// Check if ERC721 is already registered
-	contract := common.HexToAddress(msg.ContractAddress)
+	contract := common.HexToAddress(msg.EvmContractAddress)
 	if k.IsERC721Registered(ctx, contract) {
 		return nil, sdkerrors.Wrapf(types.ErrTokenPairAlreadyExists,
 			"token ERC721 contract already registered: %s", contract.String())
@@ -53,7 +53,7 @@ func (k Keeper) RegisterERC721(ctx sdk.Context, msg *types.MsgConvertERC721) (*t
 // CreateNFTClass generates the metadata to represent the ERC721 token .
 func (k Keeper) CreateNFTClass(ctx sdk.Context, msg *types.MsgConvertERC721) error {
 
-	contract := common.HexToAddress(msg.ContractAddress)
+	contract := common.HexToAddress(msg.EvmContractAddress)
 	erc721Data, err := k.QueryERC721(ctx, contract)
 	if err != nil {
 		return err

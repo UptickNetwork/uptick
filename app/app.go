@@ -141,10 +141,6 @@ import (
 	nftmodule "github.com/UptickNetwork/uptick/x/collection/module"
 	nfttypes "github.com/UptickNetwork/uptick/x/collection/types"
 
-	"github.com/UptickNetwork/uptick/x/cw721"
-	cw721keeper "github.com/UptickNetwork/uptick/x/cw721/keeper"
-	cw721types "github.com/UptickNetwork/uptick/x/cw721/types"
-
 	store "github.com/cosmos/cosmos-sdk/store/types"
 	ica "github.com/cosmos/ibc-go/v5/modules/apps/27-interchain-accounts"
 	icahost "github.com/cosmos/ibc-go/v5/modules/apps/27-interchain-accounts/host"
@@ -244,7 +240,6 @@ var (
 		feemarket.AppModuleBasic{},
 		erc20.AppModuleBasic{},
 		erc721.AppModuleBasic{},
-		cw721.AppModuleBasic{},
 
 		nftmodule.AppModuleBasic{},
 		nfttransfer.AppModuleBasic{},
@@ -267,7 +262,6 @@ var (
 		evmtypes.ModuleName:    {authtypes.Minter, authtypes.Burner}, // used for secure addition and subtraction of balance using module account
 		erc20types.ModuleName:  {authtypes.Minter, authtypes.Burner},
 		erc721types.ModuleName: nil,
-		cw721types.ModuleName:  nil,
 
 		nfttypes.ModuleName: nil,
 		nft.ModuleName:      nil,
@@ -347,9 +341,11 @@ type Uptick struct {
 	// Uptick keepers
 	Erc20Keeper  *erc20keeper.Keeper
 	Erc721Keeper erc721keeper.Keeper
-	Cw721Keeper  cw721keeper.Keeper
 
 	NFTKeeper nftkeeper.Keeper
+
+	//Add ICS721 for nft ibc transfer
+	// ICS721Keeper ibcnfttransferkeeper.Keeper
 
 	// this line is used by starport scaffolding # stargate/app/keeperDeclaration
 	wasmKeeper             wasm.Keeper
@@ -417,7 +413,6 @@ func NewUptick(
 		// uptick keys
 		erc20types.StoreKey,
 		erc721types.StoreKey,
-		cw721types.StoreKey,
 		nfttypes.StoreKey,
 
 		// nfttypes.StoreKey,
@@ -443,6 +438,7 @@ func NewUptick(
 
 	// init params keeper and subspaces
 	app.ParamsKeeper = initParamsKeeper(appCodec, cdc, keys[paramstypes.StoreKey], tkeys[paramstypes.TStoreKey])
+
 	// set the BaseApp's parameter store
 	bApp.SetParamStore(app.ParamsKeeper.Subspace(baseapp.Paramspace).WithKeyTable(paramstypes.ConsensusParamsKeyTable()))
 
@@ -596,15 +592,6 @@ func NewUptick(
 		app.AccountKeeper,
 		app.BankKeeper)
 
-	app.Erc721Keeper = erc721keeper.NewKeeper(
-		keys[erc721types.StoreKey],
-		appCodec,
-		app.GetSubspace(erc721types.ModuleName),
-		app.AccountKeeper,
-		app.NFTKeeper,
-		app.EvmKeeper,
-	)
-
 	// register the proposal types
 	// govRouter := govtypes.NewRouter()
 	govRouter := govv1beta1.NewRouter()
@@ -658,16 +645,16 @@ func NewUptick(
 		scopedTransferKeeper,
 	)
 	app.Erc20Keeper.SetICS4Wrapper(app.IBCKeeper.ChannelKeeper)
+	app.Erc20Keeper.SetIBCKeeper(app.TransferKeeper)
 
 	transferModule := transfer.NewAppModule(app.TransferKeeper)
 	transferIBCModule := transfer.NewIBCModule(app.TransferKeeper)
-	// create IBC module from bottom to top of stack
 	transferStack := erc20.NewIBCMiddleware(*app.Erc20Keeper, transferIBCModule)
 
 	app.IBCNFTTransferKeeper = ibcnfttransferkeeper.NewKeeper(
 		appCodec,
 		keys[ibcnfttransfertypes.StoreKey],
-		app.GetSubspace(ibctransfertypes.ModuleName),
+		ibctransfertypes.ModuleName,
 		app.IBCKeeper.ChannelKeeper,
 		app.IBCKeeper.ChannelKeeper,
 		&app.IBCKeeper.PortKeeper,
@@ -675,8 +662,16 @@ func NewUptick(
 		internft.NewInterNftKeeper(appCodec, app.NFTKeeper, app.AccountKeeper),
 		scopedNFTTransferKeeper,
 	)
-	ibcnfttransferModule := nfttransfer.NewAppModule(app.IBCNFTTransferKeeper)
-	nfttransferIBCModule := nfttransfer.NewIBCModule(app.IBCNFTTransferKeeper)
+
+	app.Erc721Keeper = erc721keeper.NewKeeper(
+		keys[erc721types.StoreKey],
+		appCodec,
+		app.GetSubspace(erc721types.ModuleName),
+		app.AccountKeeper,
+		app.NFTKeeper,
+		app.EvmKeeper,
+		app.IBCNFTTransferKeeper,
+	)
 
 	app.ICAHostKeeper = icahostkeeper.NewKeeper(
 		appCodec,
@@ -723,22 +718,18 @@ func NewUptick(
 		wasmOpts...,
 	)
 
-	app.Cw721Keeper = cw721keeper.NewKeeper(
-		keys[cw721types.StoreKey],
-		appCodec,
-		app.GetSubspace(cw721types.ModuleName),
-		app.AccountKeeper,
-		app.NFTKeeper,
-		app.wasmKeeper,
-		&app.wasmPermissionedKeeper,
-	)
+	ibcnfttransferModule := nfttransfer.NewAppModule(app.IBCNFTTransferKeeper)
+	nftTransferIBCModule := nfttransfer.NewIBCModule(app.IBCNFTTransferKeeper)
+	ercTransferStack := erc721.NewIBCMiddleware(app.Erc721Keeper, nftTransferIBCModule)
+	// cwTransferStack := cw721.NewIBCMiddleware(app.Cw721Keeper, ercTransferStack)
 
 	// Create static IBC router, add transfer route, then set and seal it
 	ibcRouter := porttypes.NewRouter()
 
 	ibcRouter.AddRoute(ibctransfertypes.ModuleName, transferStack).
 		AddRoute(wasm.ModuleName, wasm.NewIBCHandler(app.wasmKeeper, app.IBCKeeper.ChannelKeeper)).
-		AddRoute(ibcnfttransfertypes.ModuleName, nfttransferIBCModule).
+		AddRoute(ibcnfttransfertypes.ModuleName, ercTransferStack).
+		// AddRoute(ibcnfttransfertypes.ModuleName, cwTransferStack).
 		AddRoute(icahosttypes.SubModuleName, icaHostIBCModule)
 
 	app.IBCKeeper.SetRouter(ibcRouter)
@@ -789,7 +780,6 @@ func NewUptick(
 		// Uptick app modules
 		erc20.NewAppModule(*app.Erc20Keeper, app.AccountKeeper),
 		erc721.NewAppModule(app.Erc721Keeper, app.AccountKeeper),
-		cw721.NewAppModule(app.Cw721Keeper, app.AccountKeeper),
 		nftmodule.NewAppModule(app.appCodec, app.NFTKeeper, app.AccountKeeper, app.BankKeeper),
 
 		ibcnfttransferModule,
@@ -829,7 +819,6 @@ func NewUptick(
 		vestingtypes.ModuleName,
 		erc20types.ModuleName,
 		erc721types.ModuleName,
-		cw721types.ModuleName,
 		nfttypes.ModuleName,
 
 		ibcnfttransfertypes.ModuleName,
@@ -862,7 +851,6 @@ func NewUptick(
 		vestingtypes.ModuleName,
 		erc20types.ModuleName,
 		erc721types.ModuleName,
-		cw721types.ModuleName,
 		nfttypes.ModuleName,
 		ibcnfttransfertypes.ModuleName,
 		icatypes.ModuleName,
@@ -903,7 +891,6 @@ func NewUptick(
 
 		erc20types.ModuleName,
 		erc721types.ModuleName,
-		cw721types.ModuleName,
 		crisistypes.ModuleName,
 		nfttypes.ModuleName,
 		ibcnfttransfertypes.ModuleName,
@@ -1244,7 +1231,6 @@ func initParamsKeeper(
 	// uptick subspaces
 	paramsKeeper.Subspace(erc20types.ModuleName)
 	paramsKeeper.Subspace(erc721types.ModuleName)
-	paramsKeeper.Subspace(cw721types.ModuleName)
 	paramsKeeper.Subspace(icahosttypes.SubModuleName)
 	paramsKeeper.Subspace(wasm.ModuleName)
 
@@ -1253,7 +1239,7 @@ func initParamsKeeper(
 
 func (app *Uptick) registerUpgradeHandlers() {
 
-	upgradeVersion := "v0.2.12"
+	upgradeVersion := "v0.2.14"
 	app.UpgradeKeeper.SetUpgradeHandler(
 		upgradeVersion,
 		func(ctx sdk.Context, _ upgradetypes.Plan, vm module.VersionMap) (module.VersionMap, error) {

@@ -2,21 +2,86 @@ package keeper
 
 import (
 	"context"
+	"fmt"
+	ibctransfertypes "github.com/cosmos/ibc-go/v5/modules/apps/transfer/types"
+	channeltypes "github.com/cosmos/ibc-go/v5/modules/core/04-channel/types"
 	"math/big"
+	"strings"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 
+	"github.com/UptickNetwork/uptick/contracts"
+	"github.com/UptickNetwork/uptick/x/erc20/types"
+	transfertypes "github.com/cosmos/ibc-go/v5/modules/apps/transfer/types"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	evmtypes "github.com/evmos/ethermint/x/evm/types"
 
-	"github.com/UptickNetwork/uptick/contracts"
-	"github.com/UptickNetwork/uptick/x/erc20/types"
+	appType "github.com/UptickNetwork/uptick/types"
 )
 
 var _ types.MsgServer = &Keeper{}
+
+// TransferERC20 converts ERC20 tokens into native Cosmos nft for both
+// Cosmos-native and ERC20 TokenPair Owners and transfer through IBC
+func (k Keeper) TransferERC20(
+	goCtx context.Context,
+	msg *types.MsgTransferERC20,
+) (
+	*types.MsgTransferERC20Response, error,
+) {
+
+	fmt.Printf("xxl: 01---- %v \n", msg)
+	cosmosSender, err := appType.ConvertAddressEvm2Cosmos(msg.EvmSender)
+	if err != nil {
+
+		fmt.Printf("xxl: 02---- %v \n", err)
+		return nil, err
+	}
+	ctx := sdk.UnwrapSDKContext(goCtx)
+
+	convertMsg := types.MsgConvertERC20{
+		ContractAddress: msg.EvmContractAddress,
+		Amount:          msg.Amount,
+		Receiver:        cosmosSender,
+		Sender:          msg.EvmSender,
+	}
+	k.ConvertERC20(ctx, &convertMsg)
+
+	receiver, err := sdk.AccAddressFromBech32(cosmosSender)
+	if err != nil {
+
+		fmt.Printf("xxl: 03---- %v \n", err)
+		return nil, err
+	}
+	sender := common.HexToAddress(msg.EvmSender)
+	pair, err := k.MintingEnabled(ctx, sender.Bytes(), receiver, msg.EvmContractAddress)
+	if err != nil {
+		return nil, err
+	}
+
+	coins := sdk.Coins{sdk.Coin{Denom: pair.Denom, Amount: msg.Amount}}
+	ibcMsg := ibctransfertypes.MsgTransfer{
+		SourcePort:       msg.SourcePort,
+		SourceChannel:    msg.SourceChannel,
+		Sender:           cosmosSender,
+		Token:            coins[0],
+		Receiver:         msg.CosmosReceiver,
+		TimeoutHeight:    msg.TimeoutHeight,
+		TimeoutTimestamp: msg.TimeoutTimestamp,
+		Memo:             msg.Memo + types.TransferERC20Memo,
+	}
+	_, err = k.ibcKeeper.Transfer(goCtx, &ibcMsg)
+	if err != nil {
+		fmt.Printf("xxl:---- 04 %v\n", err)
+		return nil, err
+	}
+
+	return &types.MsgTransferERC20Response{}, nil
+
+}
 
 // ConvertCoin converts Cosmos-native Coins into ERC20 tokens for both
 // Cosmos-native and ERC20 TokenPair Owners
@@ -104,9 +169,9 @@ func (k Keeper) ConvertERC20(
 
 // convertCoinNativeCoin handles the Coin conversion flow for a native coin
 // token pair:
-//  - Escrow Coins on module account (Coins are not burned)
-//  - Mint Tokens and send to receiver
-//  - Check if token balance increased by amount
+//   - Escrow Coins on module account (Coins are not burned)
+//   - Mint Tokens and send to receiver
+//   - Check if token balance increased by amount
 func (k Keeper) convertCoinNativeCoin(
 	ctx sdk.Context,
 	pair types.TokenPair,
@@ -160,10 +225,10 @@ func (k Keeper) convertCoinNativeCoin(
 }
 
 // convertERC20NativeCoin handles the erc20 conversion flow for a native coin token pair:
-//  - Burn escrowed tokens
-//  - Unescrow coins that have been previously escrowed with ConvertCoin
-//  - Check if coin balance increased by amount
-//  - Check if token balance decreased by amount
+//   - Burn escrowed tokens
+//   - Unescrow coins that have been previously escrowed with ConvertCoin
+//   - Check if coin balance increased by amount
+//   - Check if token balance decreased by amount
 func (k Keeper) convertERC20NativeCoin(
 	ctx sdk.Context,
 	pair types.TokenPair,
@@ -229,12 +294,12 @@ func (k Keeper) convertERC20NativeCoin(
 }
 
 // convertERC20NativeToken handles the erc20 conversion flow for a native erc20 token pair:
-//  - Escrow tokens on module account (Don't burn as module is not contract owner)
-//  - Mint coins on module
-//  - Send minted coins to the receiver
-//  - Check if coin balance increased by amount
-//  - Check if token balance decreased by amount
-//  - Check for unexpected `appove` event in logs
+//   - Escrow tokens on module account (Don't burn as module is not contract owner)
+//   - Mint coins on module
+//   - Send minted coins to the receiver
+//   - Check if coin balance increased by amount
+//   - Check if token balance decreased by amount
+//   - Check for unexpected `appove` event in logs
 func (k Keeper) convertERC20NativeToken(
 	ctx sdk.Context,
 	pair types.TokenPair,
@@ -326,11 +391,11 @@ func (k Keeper) convertERC20NativeToken(
 
 // convertCoinNativeERC20 handles the Coin conversion flow for a native ERC20
 // token pair:
-//  - Escrow Coins on module account
-//  - Unescrow Tokens that have been previously escrowed with ConvertERC20 and send to receiver
-//  - Burn escrowed Coins
-//  - Check if token balance increased by amount
-//  - Check for unexpected `appove` event in logs
+//   - Escrow Coins on module account
+//   - Unescrow Tokens that have been previously escrowed with ConvertERC20 and send to receiver
+//   - Burn escrowed Coins
+//   - Check if token balance increased by amount
+//   - Check for unexpected `appove` event in logs
 func (k Keeper) convertCoinNativeERC20(
 	ctx sdk.Context,
 	pair types.TokenPair,
@@ -447,5 +512,44 @@ func (k Keeper) monitorApprovalEvent(res *evmtypes.MsgEthereumTxResponse) error 
 		}
 	}
 
+	return nil
+}
+
+// refundPacketToken will unescrow and send back the tokens back to sender
+// if the sending chain was the source chain. Otherwise, the sent tokens
+// were burnt in the original send so new tokens are minted and sent to
+// the sending address.
+func (k Keeper) refundPacketToken(ctx sdk.Context, packet channeltypes.Packet, data transfertypes.FungibleTokenPacketData) error {
+	// NOTE: packet data type already checked in handler.go
+	if !strings.Contains(data.Memo, types.TransferERC20Memo) {
+		return nil
+	}
+
+	// parse the transfer amount
+	transferAmount, ok := sdk.NewIntFromString(data.Amount)
+	if !ok {
+		return sdkerrors.Wrapf(transfertypes.ErrInvalidAmount, "unable to parse transfer amount (%s) into math.Int", data.Amount)
+	}
+
+	// decode the sender address
+	evmSender, err := appType.ConvertAddressCosmos2Evm(data.Sender)
+	if err != nil {
+		return err
+	}
+	erc20 := contracts.ERC20MinterBurnerDecimalsContract.ABI
+	trace := transfertypes.ParseDenomTrace(data.Denom)
+
+	id := k.GetDenomMap(ctx, trace.IBCDenom())
+	pair, isExist := k.GetTokenPair(ctx, id)
+	if !isExist {
+		return sdkerrors.Wrapf(types.ErrInternalTokenPair, "pair is not exist by id  (%s)", id)
+	}
+
+	contract := pair.GetERC20Contract()
+	// Mint Tokens and send to receiver
+	_, err = k.CallEVM(ctx, erc20, types.ModuleAddress, contract, true, "mint", common.HexToAddress(evmSender), transferAmount.BigInt())
+	if err != nil {
+		return err
+	}
 	return nil
 }

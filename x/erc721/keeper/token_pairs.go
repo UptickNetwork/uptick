@@ -199,3 +199,25 @@ func (k Keeper) DeleteNFTUIDPairByNFTUID(ctx sdk.Context, nftUID string) {
 	store := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixNFTUIDPairByNFTUID)
 	store.Delete([]byte(nftUID))
 }
+
+// SetEvmAddressByContractTokenId
+func (k Keeper) SetEvmAddressByContractTokenId(ctx sdk.Context, evmContractAddress string, evmTokenId string, evmAddress string) {
+
+	contractAndTokenId := evmContractAddress + evmTokenId
+	store := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixEvmAddressByContractTokenId)
+	store.Set([]byte(contractAndTokenId), []byte(evmAddress))
+}
+
+func (k Keeper) GetEvmAddressByContractTokenId(ctx sdk.Context, evmContractAddress string, evmTokenId string) []byte {
+
+	contractAndTokenId := evmContractAddress + evmTokenId
+	store := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixEvmAddressByContractTokenId)
+	return store.Get([]byte(contractAndTokenId))
+}
+
+func (k Keeper) DeleteEvmAddressByContractTokenId(ctx sdk.Context, evmContractAddress string, evmTokenId string) {
+
+	contractAndTokenId := evmContractAddress + evmTokenId
+	store := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixEvmAddressByContractTokenId)
+	store.Delete([]byte(contractAndTokenId))
+}
