@@ -1,6 +1,7 @@
 package types
 
 import (
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
 
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
@@ -16,13 +17,17 @@ const (
 
 	// RouterKey to be used for message routing
 	RouterKey = ModuleName
+
+	TransferERC20Memo = ":IBCTransferFromERC20"
 )
 
 // ModuleAddress is the native module address for EVM
 var ModuleAddress common.Address
+var AccModuleAddress sdk.AccAddress
 
 func init() {
 	ModuleAddress = common.BytesToAddress(authtypes.NewModuleAddress(ModuleName).Bytes())
+	AccModuleAddress = authtypes.NewModuleAddress(ModuleName)
 }
 
 // prefix bytes for the EVM persistent store

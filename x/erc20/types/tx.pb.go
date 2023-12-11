@@ -8,6 +8,7 @@ import (
 	fmt "fmt"
 	github_com_cosmos_cosmos_sdk_types "github.com/cosmos/cosmos-sdk/types"
 	types "github.com/cosmos/cosmos-sdk/types"
+	types1 "github.com/cosmos/ibc-go/v5/modules/core/02-client/types"
 	_ "github.com/gogo/protobuf/gogoproto"
 	grpc1 "github.com/gogo/protobuf/grpc"
 	proto "github.com/gogo/protobuf/proto"
@@ -236,46 +237,155 @@ func (m *MsgConvertERC20Response) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_MsgConvertERC20Response proto.InternalMessageInfo
 
+type MsgTransferERC20 struct {
+	EvmContractAddress string `protobuf:"bytes,1,opt,name=evm_contract_address,json=evmContractAddress,proto3" json:"evm_contract_address,omitempty"`
+	// tokenID to convert
+	Amount github_com_cosmos_cosmos_sdk_types.Int `protobuf:"bytes,2,opt,name=amount,proto3,customtype=github.com/cosmos/cosmos-sdk/types.Int" json:"amount"`
+	// the port on which the packet will be sent
+	SourcePort string `protobuf:"bytes,3,opt,name=source_port,json=sourcePort,proto3" json:"source_port,omitempty"`
+	// the channel by which the packet will be sent
+	SourceChannel string `protobuf:"bytes,4,opt,name=source_channel,json=sourceChannel,proto3" json:"source_channel,omitempty"`
+	// the sender address
+	EvmSender string `protobuf:"bytes,5,opt,name=evm_sender,json=evmSender,proto3" json:"evm_sender,omitempty"`
+	// the recipient address on the destination chain
+	CosmosReceiver string `protobuf:"bytes,6,opt,name=cosmos_receiver,json=cosmosReceiver,proto3" json:"cosmos_receiver,omitempty"`
+	// Timeout height relative to the current block height.
+	// The timeout is disabled when set to 0.
+	TimeoutHeight types1.Height `protobuf:"bytes,7,opt,name=timeout_height,json=timeoutHeight,proto3" json:"timeout_height"`
+	// Timeout timestamp in absolute nanoseconds since unix epoch.
+	// The timeout is disabled when set to 0.
+	TimeoutTimestamp uint64 `protobuf:"varint,8,opt,name=timeout_timestamp,json=timeoutTimestamp,proto3" json:"timeout_timestamp,omitempty"`
+	// optional memo
+	Memo string `protobuf:"bytes,9,opt,name=memo,proto3" json:"memo,omitempty"`
+}
+
+func (m *MsgTransferERC20) Reset()         { *m = MsgTransferERC20{} }
+func (m *MsgTransferERC20) String() string { return proto.CompactTextString(m) }
+func (*MsgTransferERC20) ProtoMessage()    {}
+func (*MsgTransferERC20) Descriptor() ([]byte, []int) {
+	return fileDescriptor_e692cfc50219ebc2, []int{4}
+}
+func (m *MsgTransferERC20) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *MsgTransferERC20) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_MsgTransferERC20.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *MsgTransferERC20) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_MsgTransferERC20.Merge(m, src)
+}
+func (m *MsgTransferERC20) XXX_Size() int {
+	return m.Size()
+}
+func (m *MsgTransferERC20) XXX_DiscardUnknown() {
+	xxx_messageInfo_MsgTransferERC20.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_MsgTransferERC20 proto.InternalMessageInfo
+
+type MsgTransferERC20Response struct {
+}
+
+func (m *MsgTransferERC20Response) Reset()         { *m = MsgTransferERC20Response{} }
+func (m *MsgTransferERC20Response) String() string { return proto.CompactTextString(m) }
+func (*MsgTransferERC20Response) ProtoMessage()    {}
+func (*MsgTransferERC20Response) Descriptor() ([]byte, []int) {
+	return fileDescriptor_e692cfc50219ebc2, []int{5}
+}
+func (m *MsgTransferERC20Response) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *MsgTransferERC20Response) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_MsgTransferERC20Response.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *MsgTransferERC20Response) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_MsgTransferERC20Response.Merge(m, src)
+}
+func (m *MsgTransferERC20Response) XXX_Size() int {
+	return m.Size()
+}
+func (m *MsgTransferERC20Response) XXX_DiscardUnknown() {
+	xxx_messageInfo_MsgTransferERC20Response.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_MsgTransferERC20Response proto.InternalMessageInfo
+
 func init() {
 	proto.RegisterType((*MsgConvertCoin)(nil), "uptick.erc20.v1.MsgConvertCoin")
 	proto.RegisterType((*MsgConvertCoinResponse)(nil), "uptick.erc20.v1.MsgConvertCoinResponse")
 	proto.RegisterType((*MsgConvertERC20)(nil), "uptick.erc20.v1.MsgConvertERC20")
 	proto.RegisterType((*MsgConvertERC20Response)(nil), "uptick.erc20.v1.MsgConvertERC20Response")
+	proto.RegisterType((*MsgTransferERC20)(nil), "uptick.erc20.v1.MsgTransferERC20")
+	proto.RegisterType((*MsgTransferERC20Response)(nil), "uptick.erc20.v1.MsgTransferERC20Response")
 }
 
 func init() { proto.RegisterFile("uptick/erc20/v1/tx.proto", fileDescriptor_e692cfc50219ebc2) }
 
 var fileDescriptor_e692cfc50219ebc2 = []byte{
-	// 459 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x84, 0x52, 0xc1, 0x6e, 0x13, 0x31,
-	0x14, 0x8c, 0x93, 0x28, 0xa2, 0x2e, 0x22, 0xc8, 0x42, 0x65, 0xbb, 0x42, 0x9b, 0x10, 0x24, 0x48,
-	0x0f, 0xb5, 0x9b, 0xf4, 0x0b, 0x48, 0x04, 0x88, 0x43, 0x39, 0xac, 0xc4, 0x85, 0x4b, 0xe5, 0x38,
-	0xd6, 0xb2, 0x0a, 0xf1, 0x5b, 0xd9, 0xce, 0xd2, 0x1e, 0x41, 0xe2, 0x0e, 0xe2, 0x67, 0xf8, 0x84,
-	0x1e, 0x2b, 0x71, 0x41, 0x1c, 0x2a, 0x94, 0xf0, 0x21, 0x68, 0xed, 0x4d, 0xe8, 0x16, 0xd1, 0x9e,
-	0x6c, 0xbf, 0x19, 0x8f, 0xe7, 0xcd, 0x33, 0x0e, 0x16, 0x99, 0x4d, 0xc5, 0x8c, 0x49, 0x2d, 0x86,
-	0x07, 0x2c, 0x1f, 0x30, 0x7b, 0x42, 0x33, 0x0d, 0x16, 0x48, 0xdb, 0x23, 0xd4, 0x21, 0x34, 0x1f,
-	0x84, 0x0f, 0x12, 0x80, 0xe4, 0x9d, 0x64, 0x3c, 0x4b, 0x19, 0x57, 0x0a, 0x2c, 0xb7, 0x29, 0x28,
-	0xe3, 0xe9, 0xe1, 0xbd, 0x04, 0x12, 0x70, 0x5b, 0x56, 0xec, 0xca, 0x6a, 0x24, 0xc0, 0xcc, 0xc1,
-	0xb0, 0x09, 0x37, 0x92, 0xe5, 0x83, 0x89, 0xb4, 0x7c, 0xc0, 0x04, 0xa4, 0xca, 0xe3, 0xbd, 0x53,
-	0x7c, 0xe7, 0xc8, 0x24, 0x63, 0x50, 0xb9, 0xd4, 0x76, 0x0c, 0xa9, 0x22, 0x87, 0xb8, 0x59, 0xe0,
-	0x01, 0xea, 0xa2, 0xfe, 0xf6, 0x70, 0x97, 0x7a, 0x01, 0x5a, 0x08, 0xd0, 0x52, 0x80, 0x16, 0xc4,
-	0x51, 0xf3, 0xec, 0xa2, 0x53, 0x8b, 0x1d, 0x99, 0x84, 0xf8, 0x96, 0x96, 0x42, 0xa6, 0xb9, 0xd4,
-	0x41, 0xbd, 0x8b, 0xfa, 0x5b, 0xf1, 0xe6, 0x4c, 0x76, 0x70, 0xcb, 0x48, 0x35, 0x95, 0x3a, 0x68,
-	0x38, 0xa4, 0x3c, 0xf5, 0x02, 0xbc, 0x53, 0x7d, 0x3a, 0x96, 0x26, 0x03, 0x65, 0x64, 0xef, 0x1b,
-	0xc2, 0xed, 0xbf, 0xd0, 0xb3, 0x78, 0x3c, 0x3c, 0x20, 0x7b, 0xf8, 0xae, 0x00, 0x65, 0x35, 0x17,
-	0xf6, 0x98, 0x4f, 0xa7, 0x5a, 0x1a, 0xe3, 0x2c, 0x6e, 0xc5, 0xed, 0x75, 0xfd, 0xa9, 0x2f, 0x93,
-	0xe7, 0xb8, 0xc5, 0xe7, 0xb0, 0x50, 0xd6, 0x5b, 0x19, 0xd1, 0xc2, 0xe8, 0xcf, 0x8b, 0xce, 0xe3,
-	0x24, 0xb5, 0x6f, 0x17, 0x13, 0x2a, 0x60, 0xce, 0xca, 0x58, 0xfc, 0xb2, 0x6f, 0xa6, 0x33, 0x66,
-	0x4f, 0x33, 0x69, 0xe8, 0x4b, 0x65, 0xe3, 0xf2, 0x76, 0xa5, 0xa9, 0xc6, 0x7f, 0x9b, 0x6a, 0x56,
-	0x9a, 0xda, 0xc5, 0xf7, 0xaf, 0x38, 0x5f, 0x77, 0x35, 0xfc, 0x52, 0xc7, 0x8d, 0x23, 0x93, 0x90,
-	0x0f, 0x08, 0x6f, 0x5f, 0x0e, 0xbc, 0x43, 0xaf, 0x0c, 0x9a, 0x56, 0x63, 0x09, 0x9f, 0xdc, 0x40,
-	0xd8, 0xe4, 0xd6, 0xff, 0xf8, 0xfd, 0xf7, 0xd7, 0x7a, 0x8f, 0x74, 0xd9, 0xbf, 0x9f, 0x8a, 0x09,
-	0x7f, 0xe1, 0xd8, 0xcd, 0xeb, 0x13, 0xc2, 0xb7, 0x2b, 0xf1, 0x76, 0xaf, 0x79, 0xc3, 0x31, 0xc2,
-	0xfe, 0x4d, 0x8c, 0x8d, 0x8d, 0x3d, 0x67, 0xe3, 0x11, 0x79, 0x78, 0x9d, 0x0d, 0x57, 0x1b, 0xbd,
-	0x38, 0x5b, 0x46, 0xe8, 0x7c, 0x19, 0xa1, 0x5f, 0xcb, 0x08, 0x7d, 0x5e, 0x45, 0xb5, 0xf3, 0x55,
-	0x54, 0xfb, 0xb1, 0x8a, 0x6a, 0x6f, 0xf6, 0x2f, 0x0d, 0xeb, 0xb5, 0x93, 0x79, 0x25, 0xed, 0x7b,
-	0xd0, 0xb3, 0xb5, 0xe8, 0x49, 0x29, 0xeb, 0xe6, 0x36, 0x69, 0xb9, 0xef, 0x7c, 0xf8, 0x27, 0x00,
-	0x00, 0xff, 0xff, 0x66, 0x74, 0x97, 0x77, 0x4f, 0x03, 0x00, 0x00,
+	// 709 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xb4, 0x54, 0xcd, 0x6e, 0x13, 0x3b,
+	0x14, 0xce, 0x34, 0xb9, 0xb9, 0x8d, 0x7b, 0x9b, 0xf4, 0x5a, 0x55, 0xef, 0x74, 0x74, 0x49, 0xd2,
+	0x20, 0xda, 0x54, 0x28, 0x76, 0x93, 0xee, 0xd8, 0xd1, 0x08, 0x0a, 0x8b, 0x22, 0x34, 0x94, 0x0d,
+	0x9b, 0x68, 0xe2, 0x98, 0xc9, 0xa8, 0x1d, 0x3b, 0xb2, 0x9d, 0xa1, 0x5d, 0x82, 0x84, 0xc4, 0x06,
+	0x09, 0x89, 0x17, 0x28, 0x6f, 0xc0, 0x92, 0x47, 0xe8, 0xb2, 0x12, 0x1b, 0xc4, 0xa2, 0x42, 0x2d,
+	0x0b, 0x1e, 0x03, 0x8d, 0xed, 0x84, 0xa6, 0xf4, 0x67, 0xc5, 0x6a, 0x3c, 0xdf, 0xf9, 0x7c, 0xce,
+	0xf7, 0x9d, 0x39, 0x67, 0x80, 0x3b, 0x1c, 0xa8, 0x88, 0xec, 0x60, 0x2a, 0x48, 0x6b, 0x0d, 0x27,
+	0x4d, 0xac, 0xf6, 0xd0, 0x40, 0x70, 0xc5, 0x61, 0xc9, 0x44, 0x90, 0x8e, 0xa0, 0xa4, 0xe9, 0xfd,
+	0x1f, 0x72, 0x1e, 0xee, 0x52, 0x1c, 0x0c, 0x22, 0x1c, 0x30, 0xc6, 0x55, 0xa0, 0x22, 0xce, 0xa4,
+	0xa1, 0x7b, 0xf3, 0x21, 0x0f, 0xb9, 0x3e, 0xe2, 0xf4, 0x64, 0xd1, 0x32, 0xe1, 0x32, 0xe6, 0x12,
+	0x77, 0x03, 0x49, 0x71, 0xd2, 0xec, 0x52, 0x15, 0x34, 0x31, 0xe1, 0x11, 0xb3, 0xf1, 0x4a, 0xd4,
+	0x25, 0x98, 0x70, 0x41, 0x31, 0xd9, 0x8d, 0x28, 0x53, 0xa9, 0x02, 0x73, 0x32, 0x84, 0xda, 0x3e,
+	0x28, 0x6e, 0xc9, 0xb0, 0xcd, 0x59, 0x42, 0x85, 0x6a, 0xf3, 0x88, 0xc1, 0x75, 0x90, 0x4b, 0x13,
+	0xb8, 0x4e, 0xd5, 0xa9, 0xcf, 0xb4, 0x16, 0x91, 0xa9, 0x80, 0xd2, 0x0a, 0xc8, 0x56, 0x40, 0x29,
+	0x71, 0x23, 0x77, 0x78, 0x5c, 0xc9, 0xf8, 0x9a, 0x0c, 0x3d, 0x30, 0x2d, 0x28, 0xa1, 0x51, 0x42,
+	0x85, 0x3b, 0x55, 0x75, 0xea, 0x05, 0x7f, 0xfc, 0x0e, 0x17, 0x40, 0x5e, 0x52, 0xd6, 0xa3, 0xc2,
+	0xcd, 0xea, 0x88, 0x7d, 0xab, 0xb9, 0x60, 0x61, 0xb2, 0xb4, 0x4f, 0xe5, 0x80, 0x33, 0x49, 0x6b,
+	0x9f, 0x1c, 0x50, 0xfa, 0x15, 0xba, 0xe7, 0xb7, 0x5b, 0x6b, 0x70, 0x15, 0xcc, 0x11, 0xce, 0x94,
+	0x08, 0x88, 0xea, 0x04, 0xbd, 0x9e, 0xa0, 0x52, 0x6a, 0x89, 0x05, 0xbf, 0x34, 0xc2, 0xef, 0x1a,
+	0x18, 0xde, 0x07, 0xf9, 0x20, 0xe6, 0x43, 0xa6, 0x8c, 0x94, 0x0d, 0x94, 0x0a, 0xfd, 0x7a, 0x5c,
+	0x59, 0x0e, 0x23, 0xd5, 0x1f, 0x76, 0x11, 0xe1, 0x31, 0xb6, 0x7d, 0x33, 0x8f, 0x86, 0xec, 0xed,
+	0x60, 0xb5, 0x3f, 0xa0, 0x12, 0x3d, 0x64, 0xca, 0xb7, 0xb7, 0x27, 0x4c, 0x65, 0x2f, 0x35, 0x95,
+	0x9b, 0x30, 0xb5, 0x08, 0xfe, 0x3b, 0xa7, 0x7c, 0xec, 0xea, 0x63, 0x16, 0xcc, 0x6d, 0xc9, 0x70,
+	0x5b, 0x04, 0x4c, 0x3e, 0xa7, 0xc2, 0xd8, 0x5a, 0x03, 0xf3, 0x34, 0x89, 0x3b, 0x97, 0x58, 0x83,
+	0x34, 0x89, 0xdb, 0x7f, 0xc8, 0x5d, 0x05, 0xcc, 0x48, 0x3e, 0x14, 0x84, 0x76, 0x06, 0x5c, 0x28,
+	0x6b, 0x10, 0x18, 0xe8, 0x31, 0x17, 0x0a, 0xde, 0x02, 0x45, 0x4b, 0x20, 0xfd, 0x80, 0x31, 0xba,
+	0x6b, 0xad, 0xce, 0x1a, 0xb4, 0x6d, 0x40, 0x78, 0x03, 0x80, 0xd4, 0x81, 0xed, 0xc6, 0x5f, 0x9a,
+	0x52, 0xa0, 0x49, 0xfc, 0x44, 0x03, 0x70, 0x05, 0x94, 0x8c, 0x8c, 0xce, 0xb8, 0x97, 0x79, 0xcd,
+	0x29, 0x1a, 0xd8, 0x1f, 0x75, 0x74, 0x13, 0x14, 0x55, 0x14, 0x53, 0x3e, 0x54, 0x9d, 0x3e, 0x8d,
+	0xc2, 0xbe, 0x72, 0xff, 0xd6, 0x13, 0xe8, 0xa1, 0xa8, 0x4b, 0x50, 0x3a, 0xc3, 0xc8, 0x4e, 0x6e,
+	0xd2, 0x44, 0x0f, 0x34, 0xc3, 0x8e, 0xe0, 0xac, 0xbd, 0x67, 0x40, 0x78, 0x1b, 0xfc, 0x3b, 0x4a,
+	0x94, 0x3e, 0xa5, 0x0a, 0xe2, 0x81, 0x3b, 0x5d, 0x75, 0xea, 0x39, 0x7f, 0xce, 0x06, 0xb6, 0x47,
+	0x38, 0x84, 0x20, 0x17, 0xd3, 0x98, 0xbb, 0x05, 0xad, 0x49, 0x9f, 0xef, 0x4c, 0xbf, 0x39, 0xa8,
+	0x64, 0x7e, 0x1c, 0x54, 0x32, 0x35, 0x0f, 0xb8, 0xe7, 0xbf, 0xd8, 0xe8, 0x73, 0xb6, 0x3e, 0x64,
+	0x41, 0x76, 0x4b, 0x86, 0xf0, 0xa5, 0x03, 0x66, 0xce, 0xee, 0x4f, 0x05, 0x9d, 0x5b, 0x6c, 0x34,
+	0x39, 0xe5, 0xde, 0xca, 0x35, 0x84, 0xf1, 0xc0, 0xd4, 0x5f, 0x7d, 0xfe, 0xfe, 0x7e, 0xaa, 0x06,
+	0xab, 0xf8, 0xf7, 0x9f, 0x08, 0x26, 0xe6, 0x42, 0x47, 0xaf, 0xdf, 0x6b, 0x07, 0xfc, 0x33, 0xb1,
+	0x2d, 0xd5, 0x2b, 0x6a, 0x68, 0x86, 0x57, 0xbf, 0x8e, 0x31, 0x96, 0xb1, 0xaa, 0x65, 0xdc, 0x84,
+	0x4b, 0x57, 0xc9, 0xd0, 0x18, 0x7c, 0xeb, 0x80, 0xd9, 0xc9, 0xf9, 0x5e, 0xba, 0xa8, 0xcc, 0x04,
+	0xc5, 0x5b, 0xbd, 0x96, 0x32, 0x96, 0x82, 0xb4, 0x94, 0x3a, 0x5c, 0xbe, 0x48, 0x4a, 0xd4, 0x25,
+	0x0d, 0x65, 0xaf, 0x35, 0x74, 0x60, 0x63, 0xf3, 0xf0, 0xa4, 0xec, 0x1c, 0x9d, 0x94, 0x9d, 0x6f,
+	0x27, 0x65, 0xe7, 0xdd, 0x69, 0x39, 0x73, 0x74, 0x5a, 0xce, 0x7c, 0x39, 0x2d, 0x67, 0x9e, 0x35,
+	0xce, 0x6c, 0xcb, 0x53, 0x9d, 0xeb, 0x11, 0x55, 0x2f, 0xb8, 0xd8, 0x19, 0x65, 0xde, 0xb3, 0xb9,
+	0xf5, 0xe2, 0x74, 0xf3, 0xfa, 0x6f, 0xb9, 0xfe, 0x33, 0x00, 0x00, 0xff, 0xff, 0x5d, 0xdc, 0x72,
+	0x11, 0xcf, 0x05, 0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -296,6 +406,7 @@ type MsgClient interface {
 	// ConvertERC20 mints a Cosmos coin representation of the ERC20 token contract
 	// that is registered on the token mapping.
 	ConvertERC20(ctx context.Context, in *MsgConvertERC20, opts ...grpc.CallOption) (*MsgConvertERC20Response, error)
+	TransferERC20(ctx context.Context, in *MsgTransferERC20, opts ...grpc.CallOption) (*MsgTransferERC20Response, error)
 }
 
 type msgClient struct {
@@ -324,6 +435,15 @@ func (c *msgClient) ConvertERC20(ctx context.Context, in *MsgConvertERC20, opts 
 	return out, nil
 }
 
+func (c *msgClient) TransferERC20(ctx context.Context, in *MsgTransferERC20, opts ...grpc.CallOption) (*MsgTransferERC20Response, error) {
+	out := new(MsgTransferERC20Response)
+	err := c.cc.Invoke(ctx, "/uptick.erc20.v1.Msg/TransferERC20", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // MsgServer is the server API for Msg service.
 type MsgServer interface {
 	// ConvertCoin mints a ERC20 representation of the SDK Coin denom that is
@@ -332,6 +452,7 @@ type MsgServer interface {
 	// ConvertERC20 mints a Cosmos coin representation of the ERC20 token contract
 	// that is registered on the token mapping.
 	ConvertERC20(context.Context, *MsgConvertERC20) (*MsgConvertERC20Response, error)
+	TransferERC20(context.Context, *MsgTransferERC20) (*MsgTransferERC20Response, error)
 }
 
 // UnimplementedMsgServer can be embedded to have forward compatible implementations.
@@ -343,6 +464,9 @@ func (*UnimplementedMsgServer) ConvertCoin(ctx context.Context, req *MsgConvertC
 }
 func (*UnimplementedMsgServer) ConvertERC20(ctx context.Context, req *MsgConvertERC20) (*MsgConvertERC20Response, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ConvertERC20 not implemented")
+}
+func (*UnimplementedMsgServer) TransferERC20(ctx context.Context, req *MsgTransferERC20) (*MsgTransferERC20Response, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method TransferERC20 not implemented")
 }
 
 func RegisterMsgServer(s grpc1.Server, srv MsgServer) {
@@ -385,6 +509,24 @@ func _Msg_ConvertERC20_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Msg_TransferERC20_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MsgTransferERC20)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MsgServer).TransferERC20(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/uptick.erc20.v1.Msg/TransferERC20",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MsgServer).TransferERC20(ctx, req.(*MsgTransferERC20))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 var _Msg_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "uptick.erc20.v1.Msg",
 	HandlerType: (*MsgServer)(nil),
@@ -396,6 +538,10 @@ var _Msg_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ConvertERC20",
 			Handler:    _Msg_ConvertERC20_Handler,
+		},
+		{
+			MethodName: "TransferERC20",
+			Handler:    _Msg_TransferERC20_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
@@ -549,6 +695,119 @@ func (m *MsgConvertERC20Response) MarshalToSizedBuffer(dAtA []byte) (int, error)
 	return len(dAtA) - i, nil
 }
 
+func (m *MsgTransferERC20) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *MsgTransferERC20) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *MsgTransferERC20) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.Memo) > 0 {
+		i -= len(m.Memo)
+		copy(dAtA[i:], m.Memo)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.Memo)))
+		i--
+		dAtA[i] = 0x4a
+	}
+	if m.TimeoutTimestamp != 0 {
+		i = encodeVarintTx(dAtA, i, uint64(m.TimeoutTimestamp))
+		i--
+		dAtA[i] = 0x40
+	}
+	{
+		size, err := m.TimeoutHeight.MarshalToSizedBuffer(dAtA[:i])
+		if err != nil {
+			return 0, err
+		}
+		i -= size
+		i = encodeVarintTx(dAtA, i, uint64(size))
+	}
+	i--
+	dAtA[i] = 0x3a
+	if len(m.CosmosReceiver) > 0 {
+		i -= len(m.CosmosReceiver)
+		copy(dAtA[i:], m.CosmosReceiver)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.CosmosReceiver)))
+		i--
+		dAtA[i] = 0x32
+	}
+	if len(m.EvmSender) > 0 {
+		i -= len(m.EvmSender)
+		copy(dAtA[i:], m.EvmSender)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.EvmSender)))
+		i--
+		dAtA[i] = 0x2a
+	}
+	if len(m.SourceChannel) > 0 {
+		i -= len(m.SourceChannel)
+		copy(dAtA[i:], m.SourceChannel)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.SourceChannel)))
+		i--
+		dAtA[i] = 0x22
+	}
+	if len(m.SourcePort) > 0 {
+		i -= len(m.SourcePort)
+		copy(dAtA[i:], m.SourcePort)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.SourcePort)))
+		i--
+		dAtA[i] = 0x1a
+	}
+	{
+		size := m.Amount.Size()
+		i -= size
+		if _, err := m.Amount.MarshalTo(dAtA[i:]); err != nil {
+			return 0, err
+		}
+		i = encodeVarintTx(dAtA, i, uint64(size))
+	}
+	i--
+	dAtA[i] = 0x12
+	if len(m.EvmContractAddress) > 0 {
+		i -= len(m.EvmContractAddress)
+		copy(dAtA[i:], m.EvmContractAddress)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.EvmContractAddress)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *MsgTransferERC20Response) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *MsgTransferERC20Response) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *MsgTransferERC20Response) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	return len(dAtA) - i, nil
+}
+
 func encodeVarintTx(dAtA []byte, offset int, v uint64) int {
 	offset -= sovTx(v)
 	base := offset
@@ -612,6 +871,55 @@ func (m *MsgConvertERC20) Size() (n int) {
 }
 
 func (m *MsgConvertERC20Response) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	return n
+}
+
+func (m *MsgTransferERC20) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.EvmContractAddress)
+	if l > 0 {
+		n += 1 + l + sovTx(uint64(l))
+	}
+	l = m.Amount.Size()
+	n += 1 + l + sovTx(uint64(l))
+	l = len(m.SourcePort)
+	if l > 0 {
+		n += 1 + l + sovTx(uint64(l))
+	}
+	l = len(m.SourceChannel)
+	if l > 0 {
+		n += 1 + l + sovTx(uint64(l))
+	}
+	l = len(m.EvmSender)
+	if l > 0 {
+		n += 1 + l + sovTx(uint64(l))
+	}
+	l = len(m.CosmosReceiver)
+	if l > 0 {
+		n += 1 + l + sovTx(uint64(l))
+	}
+	l = m.TimeoutHeight.Size()
+	n += 1 + l + sovTx(uint64(l))
+	if m.TimeoutTimestamp != 0 {
+		n += 1 + sovTx(uint64(m.TimeoutTimestamp))
+	}
+	l = len(m.Memo)
+	if l > 0 {
+		n += 1 + l + sovTx(uint64(l))
+	}
+	return n
+}
+
+func (m *MsgTransferERC20Response) Size() (n int) {
 	if m == nil {
 		return 0
 	}
@@ -1030,6 +1338,384 @@ func (m *MsgConvertERC20Response) Unmarshal(dAtA []byte) error {
 		}
 		if fieldNum <= 0 {
 			return fmt.Errorf("proto: MsgConvertERC20Response: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		default:
+			iNdEx = preIndex
+			skippy, err := skipTx(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthTx
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *MsgTransferERC20) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowTx
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: MsgTransferERC20: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: MsgTransferERC20: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field EvmContractAddress", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.EvmContractAddress = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Amount", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.Amount.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SourcePort", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.SourcePort = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SourceChannel", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.SourceChannel = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field EvmSender", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.EvmSender = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 6:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field CosmosReceiver", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.CosmosReceiver = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 7:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field TimeoutHeight", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.TimeoutHeight.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 8:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field TimeoutTimestamp", wireType)
+			}
+			m.TimeoutTimestamp = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.TimeoutTimestamp |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 9:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Memo", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Memo = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipTx(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthTx
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *MsgTransferERC20Response) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowTx
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: MsgTransferERC20Response: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: MsgTransferERC20Response: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		default:

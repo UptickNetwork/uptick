@@ -79,14 +79,14 @@ func (k Keeper) OnRecvPacket(
 	return nil
 }
 
-func (k Keeper) OnAcknowledgementPacket(
-	ctx sdk.Context,
-	packet channeltypes.Packet,
-	acknowledgement []byte,
-) error {
-	// nothing to do
-	return nil
-}
+//func (k Keeper) OnAcknowledgementPacket(
+//	ctx sdk.Context,
+//	packet channeltypes.Packet,
+//	acknowledgement []byte,
+//) error {
+//	// nothing to do
+//	return nil
+//}
 
 func (k Keeper) SendPacket(ctx sdk.Context, channelCap *capabilitytypes.Capability, packet exported.PacketI) error {
 	return k.ics4Wrapper.SendPacket(ctx, channelCap, packet)
@@ -99,4 +99,20 @@ func (k Keeper) WriteAcknowledgement(ctx sdk.Context, channelCap *capabilitytype
 // GetAppVersion returns the underlying application version.
 func (k Keeper) GetAppVersion(ctx sdk.Context, portID, channelID string) (string, bool) {
 	return k.ics4Wrapper.GetAppVersion(ctx, portID, channelID)
+}
+
+// OnAcknowledgementPacket responds to the success or failure of a packet
+// acknowledgement written on the receiving chain. If the acknowledgement
+// was a success then nothing occurs. If the acknowledgement failed, then
+// the sender is refunded their tokens using the refundPacketToken function.
+func (k Keeper) OnAcknowledgementPacket(ctx sdk.Context, packet channeltypes.Packet, data transfertypes.FungibleTokenPacketData, ack channeltypes.Acknowledgement) error {
+
+	switch ack.Response.(type) {
+	case *channeltypes.Acknowledgement_Error:
+		k.refundPacketToken(ctx, packet, data)
+	default:
+		// the acknowledgement succeeded on the receiving chain so nothing
+		// needs to be executed and no error needs to be returned
+	}
+	return nil
 }

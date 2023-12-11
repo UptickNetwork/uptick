@@ -3,6 +3,7 @@ package uptick.cw721.v1;
 
 import "google/api/annotations.proto";
 import "gogoproto/gogo.proto";
+import "ibc/core/client/v1/client.proto";
 
 option go_package = "github.com/UptickNetwork/uptick/x/cw721/types";
 
@@ -18,6 +19,11 @@ service Msg {
   rpc ConvertCW721(MsgConvertCW721) returns (MsgConvertCW721Response) {
     option (google.api.http).get = "/uptick/cw721/v1/tx/convert_cw721";
   };
+
+  rpc TransferCW721(MsgTransferCW721) returns (MsgTransferCW721Response) {
+    option (google.api.http).get = "/uptick/cw721/v1/tx/ibc-transfer-cw721";
+  };
+
 }
 
 // MsgConvertNFT defines a Msg to convert a native Cosmos nft to a CW721 token
@@ -58,3 +64,43 @@ message MsgConvertCW721 {
 
 // MsgConvertCW721Response returns no fields
 message MsgConvertCW721Response {}
+
+
+// MsgConvertCW721Response returns no fields
+message MsgConvertC721Response {}
+
+message MsgTransferCW721 {
+
+  option (gogoproto.equal) = false;
+  option (gogoproto.goproto_getters) = false;
+
+  string cw_contract_address = 1;
+  // tokenID to convert
+  repeated string cw_token_ids = 2;
+
+  // the port on which the packet will be sent
+  string source_port = 3;
+  // the channel by which the packet will be sent
+  string source_channel = 4;
+  // the class_id of tokens to be transferred
+  string class_id = 5;
+  // the non fungible tokens to be transferred
+  repeated string cosmos_token_ids = 6;
+  // the sender address
+  string cw_sender = 7;
+  // the recipient address on the destination chain
+  string cosmos_receiver = 8;
+  // Timeout height relative to the current block height.
+  // The timeout is disabled when set to 0.
+  ibc.core.client.v1.Height timeout_height = 9 [
+    (gogoproto.nullable) = false
+  ];
+  // Timeout timestamp in absolute nanoseconds since unix epoch.
+  // The timeout is disabled when set to 0.
+  uint64 timeout_timestamp = 10;
+  // optional memo
+  string memo = 11;
+
+}
+
+message MsgTransferCW721Response {}

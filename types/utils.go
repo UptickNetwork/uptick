@@ -1,6 +1,7 @@
 package types
 
 import (
+	"encoding/hex"
 	"strings"
 
 	"github.com/evmos/ethermint/crypto/ethsecp256k1"
@@ -11,6 +12,8 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 )
+
+const prefix = "uptick"
 
 // IsSupportedKey returns true if the pubkey type is supported by the chain
 // (i.e eth_secp256k1, amino multisig, ed25519).
@@ -61,4 +64,30 @@ func GetUptickAddressFromBech32(address string) (sdk.AccAddress, error) {
 	}
 
 	return sdk.AccAddress(addressBz), nil
+}
+
+func ConvertAddressCosmos2Evm(cosmosAddress string) (string, error) {
+
+	rawBytes, err := sdk.GetFromBech32(cosmosAddress, prefix)
+	if err != nil {
+		return "", err
+	}
+	evmAddress := "0x" + hex.EncodeToString(rawBytes)
+	return evmAddress, nil
+}
+
+func ConvertAddressEvm2Cosmos(evmAddress string) (string, error) {
+
+	rawBytes, err := hex.DecodeString(evmAddress[2:])
+	if err != nil {
+		return "", err
+	}
+
+	cosmosAddress, err := sdk.Bech32ifyAddressBytes(prefix, rawBytes)
+	if err != nil {
+		return "", err
+	}
+
+	return cosmosAddress, nil
+
 }

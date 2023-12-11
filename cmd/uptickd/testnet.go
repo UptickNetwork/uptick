@@ -13,7 +13,6 @@ import (
 	"github.com/spf13/cobra"
 
 	tmconfig "github.com/tendermint/tendermint/config"
-	tmrand "github.com/tendermint/tendermint/libs/rand"
 	"github.com/tendermint/tendermint/types"
 	tmtime "github.com/tendermint/tendermint/types/time"
 
@@ -217,7 +216,7 @@ func initTestnetFiles(
 ) error {
 
 	if args.chainID == "" {
-		args.chainID = fmt.Sprintf("evmos_%d-1", tmrand.Int63n(9999999999999)+1)
+		args.chainID = "uptick_7777-1"
 	}
 
 	nodeIDs := make([]string, args.numValidators)

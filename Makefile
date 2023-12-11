@@ -2,7 +2,7 @@
 
 BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
 COMMIT := $(shell git log -1 --format='%H')
-VERSION := v0.2.12
+VERSION := v0.2.15
 
 
 # don't override user values
@@ -540,14 +540,18 @@ ifeq ($(OS),Windows_NT)
 	mkdir localnet-setup &
 	@$(MAKE) localnet-build
 
-	IF not exist "build/node0/$(UPTICK_BINARY)/config/genesis.json" docker run --rm -v $(CURDIR)/build\uptick\Z uptick/node "./uptickd testnet --v 4 -o /uptick --keyring-backend=test --ip-addresses uptickdnode0,uptickdnode1,uptickdnode2,uptickdnode3"
-	docker-compose up -d
+	IF not exist "build/node0/$(UPTICK_BINARY)/config/genesis.json" docker run --rm -v $(CURDIR)/build\uptick\Z xuxinai2002/node:v0.2 "./uptickd testnet --v 4 -o /uptick --keyring-backend=test --starting-ip-address 192.167.10.2"
+	# docker-compose up -d
 else
-	mkdir -p localnet-setup
-	@$(MAKE) localnet-build
+	# mkdir -p localnet-setup
+	 @$(MAKE) localnet-build
 
-	if ! [ -f localnet-setup/node0/$(UPTICK_BINARY)/config/genesis.json ]; then docker run --rm -v $(CURDIR)/localnet-setup:/uptick:Z uptick/node "./uptickd testnet --v 4 -o /uptick --keyring-backend=test --ip-addresses uptickdnode0,uptickdnode1,uptickdnode2,uptickdnode3"; fi
-	docker-compose up -d
+#	if ! [ -f localnet-setup/node0/$(UPTICK_BINARY)/config/genesis.json ]; \
+#	then \
+#		docker run --rm -v $(CURDIR)/localnet-setup:/uptick:Z xuxinai2002/node:v0.1 "export LD_LIBRARY_PATH=/wasm && ./uptickd testnet init-files --v 4 -o /uptick --keyring-backend=test --starting-ip-address 192.167.10.2"; \
+#	fi
+#
+#	docker-compose up -d
 endif
 
 # Stop testnet
@@ -563,15 +567,15 @@ localnet-clean:
 localnet-unsafe-reset:
 	docker-compose down
 ifeq ($(OS),Windows_NT)
-	@docker run --rm -v $(CURDIR)\localnet-setup\node0\uptickd:uptick\Z uptick/node "./uptickd unsafe-reset-all --home=/uptick"
-	@docker run --rm -v $(CURDIR)\localnet-setup\node1\uptickd:uptick\Z uptick/node "./uptickd unsafe-reset-all --home=/uptick"
-	@docker run --rm -v $(CURDIR)\localnet-setup\node2\uptickd:uptick\Z uptick/node "./uptickd unsafe-reset-all --home=/uptick"
-	@docker run --rm -v $(CURDIR)\localnet-setup\node3\uptickd:uptick\Z uptick/node "./uptickd unsafe-reset-all --home=/uptick"
+	@docker run --rm -v $(CURDIR)\localnet-setup\node0\uptickd:uptick\Z xuxinai2002/node:v0.1 "./uptickd unsafe-reset-all --home=/uptick"
+	@docker run --rm -v $(CURDIR)\localnet-setup\node1\uptickd:uptick\Z xuxinai2002/node:v0.1 "./uptickd unsafe-reset-all --home=/uptick"
+	@docker run --rm -v $(CURDIR)\localnet-setup\node2\uptickd:uptick\Z xuxinai2002/node:v0.1 "./uptickd unsafe-reset-all --home=/uptick"
+	@docker run --rm -v $(CURDIR)\localnet-setup\node3\uptickd:uptick\Z xuxinai2002/node:v0.1 "./uptickd unsafe-reset-all --home=/uptick"
 else
-	@docker run --rm -v $(CURDIR)/localnet-setup/node0/uptickd:/uptick:Z uptick/node "./uptickd unsafe-reset-all --home=/uptick"
-	@docker run --rm -v $(CURDIR)/localnet-setup/node1/uptickd:/uptick:Z uptick/node "./uptickd unsafe-reset-all --home=/uptick"
-	@docker run --rm -v $(CURDIR)/localnet-setup/node2/uptickd:/uptick:Z uptick/node "./uptickd unsafe-reset-all --home=/uptick"
-	@docker run --rm -v $(CURDIR)/localnet-setup/node3/uptickd:/uptick:Z uptick/node "./uptickd unsafe-reset-all --home=/uptick"
+	@docker run --rm -v $(CURDIR)/localnet-setup/node0/uptickd:/uptick:Z xuxinai2002/node:v0.1 "./uptickd unsafe-reset-all --home=/uptick"
+	@docker run --rm -v $(CURDIR)/localnet-setup/node1/uptickd:/uptick:Z xuxinai2002/node:v0.1 "./uptickd unsafe-reset-all --home=/uptick"
+	@docker run --rm -v $(CURDIR)/localnet-setup/node2/uptickd:/uptick:Z xuxinai2002/node:v0.1 "./uptickd unsafe-reset-all --home=/uptick"
+	@docker run --rm -v $(CURDIR)/localnet-setup/node3/uptickd:/uptick:Z xuxinai2002/node:v0.1 "./uptickd unsafe-reset-all --home=/uptick"
 endif
 
 # Clean testnet

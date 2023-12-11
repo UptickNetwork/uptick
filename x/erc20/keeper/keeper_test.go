@@ -95,7 +95,7 @@ func (suite *KeeperTestSuite) DoSetupTest(t require.TestingT) {
 	feemarketGenesis.Params.NoBaseFee = false
 
 	// init app
-	suite.app = app.Setup(checkTx, feemarketGenesis)
+	// suite.app = app.Setup(checkTx, feemarketGenesis)
 
 	if suite.mintFeeCollector {
 		// mint some coin to fee collector
