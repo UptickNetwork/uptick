@@ -1273,16 +1273,14 @@ func (app *Uptick) registerUpgradeHandlers() {
 	//
 	switch upgradeInfo.Name {
 	case upgradeVersion:
-		subSpace := app.GetSubspace(ibcnfttransfertypes.ModuleName)
-		app.Logger().Info("upgrade for v0.2.15 : ", "version :", upgradeVersion, "subSpace is :", subSpace)
-		if len(subSpace.Name()) == 0 {
+		app.Logger().Info("upgrade for v0.2.15 : ", "version :", upgradeVersion, "app is :", app.Version())
+		if app.Version() == "v0.2.11" {
 			storeUpgrades = &storetypes.StoreUpgrades{
 				Added: []string{ibcnfttransfertypes.ModuleName},
 			}
 		} else {
 			storeUpgrades = nil
 		}
-
 	}
 	//
 	if storeUpgrades != nil {
