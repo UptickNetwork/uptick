@@ -1233,6 +1233,7 @@ func initParamsKeeper(
 	paramsKeeper.Subspace(erc721types.ModuleName)
 	paramsKeeper.Subspace(icahosttypes.SubModuleName)
 	paramsKeeper.Subspace(wasm.ModuleName)
+	paramsKeeper.Subspace(ibcnfttransfertypes.ModuleName)
 
 	return paramsKeeper
 }
