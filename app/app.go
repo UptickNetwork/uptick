@@ -1270,22 +1270,16 @@ func (app *Uptick) registerUpgradeHandlers() {
 	if app.UpgradeKeeper.IsSkipHeight(upgradeInfo.Height) {
 		return
 	}
+
 	var storeUpgrades *storetypes.StoreUpgrades
-	//
+
 	switch upgradeInfo.Name {
 	case upgradeVersion:
-		subSpace := app.GetSubspace(ibcnfttransfertypes.ModuleName)
-		app.Logger().Info("upgrade for v0.2.15 : ", "version :", upgradeVersion, "subSpace is :", subSpace)
-		if len(subSpace.Name()) == 0 {
-			storeUpgrades = &storetypes.StoreUpgrades{
-				Added: []string{ibcnfttransfertypes.ModuleName},
-			}
-		} else {
-			storeUpgrades = nil
+		storeUpgrades = &storetypes.StoreUpgrades{
+			Added: []string{ibcnfttransfertypes.ModuleName},
 		}
-
 	}
-	//
+
 	if storeUpgrades != nil {
 		// configure store loader that checks if version == upgradeHeight and applies store upgrades
 		app.SetStoreLoader(upgradetypes.UpgradeStoreLoader(upgradeInfo.Height, storeUpgrades))
