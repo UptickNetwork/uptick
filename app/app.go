@@ -1248,13 +1248,13 @@ func (app *Uptick) registerUpgradeHandlers() {
 			// Refs:
 			// - https://docs.cosmos.network/master/building-modules/upgrade.html#registering-migrations
 			// - https://docs.cosmos.network/master/migrations/chain-upgrade-guide-044.html#chain-upgrade
-			//gs := ibcnfttransfertypes.DefaultGenesisState()
-			//bz, err := ibcnfttransfertypes.ModuleCdc.MarshalJSON(gs)
-			//if err != nil {
-			//	panic(fmt.Errorf("failed to ModuleCdc %s: %w", ibcnfttransfertypes.ModuleName, err))
-			//}
-			//_ = app.mm.Modules[ibcnfttransfertypes.ModuleName].InitGenesis(
-			//	ctx, ibcnfttransfertypes.ModuleCdc, bz)
+			gs := ibcnfttransfertypes.DefaultGenesisState()
+			bz, err := ibcnfttransfertypes.ModuleCdc.MarshalJSON(gs)
+			if err != nil {
+				panic(fmt.Errorf("failed to ModuleCdc %s: %w", ibcnfttransfertypes.ModuleName, err))
+			}
+			_ = app.mm.Modules[ibcnfttransfertypes.ModuleName].InitGenesis(
+				ctx, ibcnfttransfertypes.ModuleCdc, bz)
 
 			return app.mm.RunMigrations(ctx, app.configurator, vm)
 		})
