@@ -12,9 +12,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	tmconfig "github.com/tendermint/tendermint/config"
-	"github.com/tendermint/tendermint/types"
-	tmtime "github.com/tendermint/tendermint/types/time"
+	tmconfig "github.com/cometbft/cometbft/config"
+	"github.com/cometbft/cometbft/types"
+	tmtime "github.com/cometbft/cometbft/types/time"
 
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/flags"
@@ -92,7 +92,7 @@ func addTestnetFlagsToCmd(cmd *cobra.Command) {
 	cmd.Flags().StringP(flagOutputDir, "o", "./.testnets", "Directory to store initialization data for the testnet")
 	cmd.Flags().String(flags.FlagChainID, "", "genesis file chain-id, if left blank will be randomly created")
 	cmd.Flags().String(sdkserver.FlagMinGasPrices, fmt.Sprintf("0.000006%s", cmdcfg.BaseDenom), "Minimum gas prices to accept for transactions; All fees in a tx must meet this minimum (e.g. 0.01uptick,0.001stake)")
-	cmd.Flags().String(flags.FlagKeyAlgorithm, string(hd.EthSecp256k1Type), "Key signing algorithm to generate keys for")
+	cmd.Flags().String(flags.FlagKeyType, string(hd.EthSecp256k1Type), "Key signing algorithm to generate keys for")
 
 }
 
@@ -147,7 +147,7 @@ Example:
 			args.nodeDaemonHome, _ = cmd.Flags().GetString(flagNodeDaemonHome)
 			args.startingIPAddress, _ = cmd.Flags().GetString(flagStartingIPAddress)
 			args.numValidators, _ = cmd.Flags().GetInt(flagNumValidators)
-			args.algo, _ = cmd.Flags().GetString(flags.FlagKeyAlgorithm)
+			args.algo, _ = cmd.Flags().GetString(flags.FlagKeyType)
 
 			return initTestnetFiles(clientCtx, cmd, serverCtx.Config, mbm, genBalIterator, args)
 		},
@@ -181,7 +181,7 @@ Example:
 			args.chainID, _ = cmd.Flags().GetString(flags.FlagChainID)
 			args.minGasPrices, _ = cmd.Flags().GetString(sdkserver.FlagMinGasPrices)
 			args.numValidators, _ = cmd.Flags().GetInt(flagNumValidators)
-			args.algo, _ = cmd.Flags().GetString(flags.FlagKeyAlgorithm)
+			args.algo, _ = cmd.Flags().GetString(flags.FlagKeyType)
 			args.enableLogging, _ = cmd.Flags().GetBool(flagEnableLogging)
 			args.rpcAddress, _ = cmd.Flags().GetString(flagRPCAddress)
 			args.apiAddress, _ = cmd.Flags().GetString(flagAPIAddress)
@@ -473,7 +473,12 @@ func collectGenFiles(
 			return err
 		}
 
-		nodeAppState, err := genutil.GenAppStateFromConfig(clientCtx.Codec, clientCtx.TxConfig, nodeConfig, initCfg, *genDoc, genBalIterator)
+		nodeAppState, err := genutil.GenAppStateFromConfig(
+			clientCtx.Codec,
+			clientCtx.TxConfig,
+			nodeConfig,
+			initCfg, *genDoc,
+			genBalIterator, nil)
 		if err != nil {
 			return err
 		}

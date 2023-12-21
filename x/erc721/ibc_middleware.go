@@ -1,17 +1,20 @@
 package erc721
 
 import (
+	"strings"
+
 	"github.com/bianjieai/nft-transfer/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	capabilitytypes "github.com/cosmos/cosmos-sdk/x/capability/types"
-	channeltypes "github.com/cosmos/ibc-go/v5/modules/core/04-channel/types"
-	porttypes "github.com/cosmos/ibc-go/v5/modules/core/05-port/types"
-	"github.com/cosmos/ibc-go/v5/modules/core/exported"
-	"strings"
+	channeltypes "github.com/cosmos/ibc-go/v7/modules/core/04-channel/types"
+	porttypes "github.com/cosmos/ibc-go/v7/modules/core/05-port/types"
+	"github.com/cosmos/ibc-go/v7/modules/core/exported"
 
 	"github.com/UptickNetwork/uptick/ibc"
 	"github.com/UptickNetwork/uptick/x/erc721/keeper"
+
+	clienttypes "github.com/cosmos/ibc-go/v7/modules/core/02-client/types"
 )
 
 var _ porttypes.Middleware = &IBCMiddleware{}
@@ -83,12 +86,22 @@ func (im IBCMiddleware) OnAcknowledgementPacket(
 }
 
 // SendPacket implements the ICS4 Wrapper interface
+// func (im IBCMiddleware) SendPacket(
+// 	ctx sdk.Context,
+// 	chanCap *capabilitytypes.Capability,
+// 	packet exported.PacketI,
+// ) error {
+// 	return nil
+// }
+
 func (im IBCMiddleware) SendPacket(
 	ctx sdk.Context,
 	chanCap *capabilitytypes.Capability,
-	packet exported.PacketI,
-) error {
-	return nil
+	sourcePort string,
+	sourceChannel string,
+	timeoutHeight clienttypes.Height,
+	timeoutTimestamp uint64, data []byte) (sequence uint64, err error) {
+	return 0, nil
 }
 
 // WriteAcknowledgement implements the ICS4 Wrapper interface

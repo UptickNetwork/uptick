@@ -7,7 +7,7 @@ import (
 	fmt "fmt"
 	types "github.com/cosmos/cosmos-sdk/x/bank/types"
 	_ "github.com/gogo/protobuf/gogoproto"
-	proto "github.com/gogo/protobuf/proto"
+	proto "github.com/cosmos/gogoproto/proto"
 	io "io"
 	math "math"
 	math_bits "math/bits"
@@ -399,6 +399,7 @@ func (m *UpdateTokenPairERC20Proposal) GetNewErc20Address() string {
 }
 
 func init() {
+
 	proto.RegisterEnum("uptick.erc20.v1.Owner", Owner_name, Owner_value)
 	proto.RegisterType((*TokenPair)(nil), "uptick.erc20.v1.TokenPair")
 	proto.RegisterType((*RegisterCoinProposal)(nil), "uptick.erc20.v1.RegisterCoinProposal")

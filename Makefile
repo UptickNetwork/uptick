@@ -2,7 +2,7 @@
 
 BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
 COMMIT := $(shell git log -1 --format='%H')
-VERSION := v0.2.15-origin
+VERSION := v0.2.16-origin
 
 
 # don't override user values
@@ -17,7 +17,7 @@ endif
 PACKAGES_NOSIMULATION=$(shell go list ./... | grep -v '/simulation')
 PACKAGES_SIMTEST=$(shell go list ./... | grep '/simulation')
 
-TMVERSION := $(shell go list -m github.com/tendermint/tendermint | sed 's:.* ::')
+TMVERSION := $(shell go list -m github.com/cometbft/cometbft | sed 's:.* ::')
 COMMIT := $(shell git log -1 --format='%H')
 LEDGER_ENABLED ?= true
 BINDIR ?= $(GOPATH)/bin
@@ -85,7 +85,7 @@ ldflags = -X github.com/cosmos/cosmos-sdk/version.Name=uptick \
           -X github.com/cosmos/cosmos-sdk/version.Version=$(VERSION) \
           -X github.com/cosmos/cosmos-sdk/version.Commit=$(COMMIT) \
           -X "github.com/cosmos/cosmos-sdk/version.BuildTags=$(build_tags_comma_sep)" \
-          -X github.com/tendermint/tendermint/version.TMCoreSemVer=$(TMVERSION)
+          -X github.com/cometbft/cometbft/version.TMCoreSemVer=$(TMVERSION)
 
 # DB backend selection
 ifeq (cleveldb,$(findstring cleveldb,$(COSMOS_BUILD_OPTIONS)))
@@ -280,8 +280,8 @@ docs-tools-stamp: docs-tools
 
 go.sum: go.mod
 	echo "Ensure dependencies have not been modified ..." >&2
-	go mod verify
-	go mod tidy
+#	go mod verify
+#	go mod tidy
 
 ###############################################################################
 ###                              Documentation                              ###
@@ -511,7 +511,7 @@ proto-update-deps:
 ## Importing of tendermint protobuf definitions currently requires the
 ## use of `sed` in order to build properly with cosmos-sdk's proto file layout
 ## (which is the standard Buf.build FILE_LAYOUT)
-## Issue link: https://github.com/tendermint/tendermint/issues/5021
+## Issue link: https://github.com/cometbft/cometbft/issues/5021
 	@mkdir -p $(TM_ABCI_TYPES)
 	@curl -sSL $(TM_URL)/abci/types.proto > $(TM_ABCI_TYPES)/types.proto
 

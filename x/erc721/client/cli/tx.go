@@ -15,8 +15,8 @@ import (
 
 	"github.com/UptickNetwork/uptick/x/erc721/types"
 	ibcnfttransfertypes "github.com/bianjieai/nft-transfer/types"
-	clienttypes "github.com/cosmos/ibc-go/v5/modules/core/02-client/types"
-	channelutils "github.com/cosmos/ibc-go/v5/modules/core/04-channel/client/utils"
+	clienttypes "github.com/cosmos/ibc-go/v7/modules/core/02-client/types"
+	channelutils "github.com/cosmos/ibc-go/v7/modules/core/04-channel/client/utils"
 	"time"
 )
 
