@@ -3,9 +3,10 @@ package keeper
 import (
 	"context"
 	"fmt"
-	ibcnfttransfertypes "github.com/bianjieai/nft-transfer/types"
 	"math/big"
 	"strings"
+
+	ibcnfttransfertypes "github.com/bianjieai/nft-transfer/types"
 
 	"github.com/UptickNetwork/uptick/x/collection/exported"
 

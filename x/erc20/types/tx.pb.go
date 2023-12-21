@@ -8,10 +8,11 @@ import (
 	fmt "fmt"
 	github_com_cosmos_cosmos_sdk_types "github.com/cosmos/cosmos-sdk/types"
 	types "github.com/cosmos/cosmos-sdk/types"
-	types1 "github.com/cosmos/ibc-go/v5/modules/core/02-client/types"
+	types1 "github.com/cosmos/ibc-go/v7/modules/core/02-client/types"
 	_ "github.com/gogo/protobuf/gogoproto"
-	grpc1 "github.com/gogo/protobuf/grpc"
-	proto "github.com/gogo/protobuf/proto"
+	grpc1 "github.com/cosmos/gogoproto/grpc"
+
+	proto "github.com/cosmos/gogoproto/proto"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
@@ -329,6 +330,7 @@ func (m *MsgTransferERC20Response) XXX_DiscardUnknown() {
 var xxx_messageInfo_MsgTransferERC20Response proto.InternalMessageInfo
 
 func init() {
+
 	proto.RegisterType((*MsgConvertCoin)(nil), "uptick.erc20.v1.MsgConvertCoin")
 	proto.RegisterType((*MsgConvertCoinResponse)(nil), "uptick.erc20.v1.MsgConvertCoinResponse")
 	proto.RegisterType((*MsgConvertERC20)(nil), "uptick.erc20.v1.MsgConvertERC20")

@@ -3,9 +3,9 @@ package keeper
 import (
 	"fmt"
 	nftkeeper "github.com/UptickNetwork/uptick/x/collection/keeper"
-	porttypes "github.com/cosmos/ibc-go/v5/modules/core/05-port/types"
+	porttypes "github.com/cosmos/ibc-go/v7/modules/core/05-port/types"
 
-	"github.com/tendermint/tendermint/libs/log"
+	"github.com/cometbft/cometbft/libs/log"
 
 	"github.com/cosmos/cosmos-sdk/codec"
 	storetypes "github.com/cosmos/cosmos-sdk/store/types"

@@ -9,10 +9,10 @@ import (
 	"testing"
 
 	"github.com/UptickNetwork/uptick/x/erc721/client/cli"
+	tmcli "github.com/cometbft/cometbft/libs/cli"
 	clitestutil "github.com/cosmos/cosmos-sdk/testutil/cli"
 	"github.com/evmos/ethermint/testutil/network"
 	"github.com/stretchr/testify/suite"
-	tmcli "github.com/tendermint/tendermint/libs/cli"
 )
 
 type IntegrationTestSuite struct {
