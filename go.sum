@@ -428,8 +428,6 @@ github.com/cosmos/gogoproto v1.4.10 h1:QH/yT8X+c0F4ZDacDv3z+xE3WU1P1Z3wQoLMBRJoK
 github.com/cosmos/gogoproto v1.4.10/go.mod h1:3aAZzeRWpAwr+SS/LLkICX2/kDFyaYVzckBDzygIxek=
 github.com/cosmos/iavl v0.21.0-alpha.1.0.20230904092046-df3db2d96583 h1:3Matt7/LjZiZkIBPalYazOZcw2B05Ch14dU5TJyqJEc=
 github.com/cosmos/iavl v0.21.0-alpha.1.0.20230904092046-df3db2d96583/go.mod h1:WO7FyvaZJoH65+HFOsDir7xU9FWk2w9cHXNW1XHcl7A=
-github.com/cosmos/ibc-go/v7 v7.3.0 h1:QtGeVMi/3JeLWuvEuC60sBHpAF40Oenx/y+bP8+wRRw=
-github.com/cosmos/ibc-go/v7 v7.3.0/go.mod h1:mUmaHFXpXrEdcxfdXyau+utZf14pGKVUiXwYftRZZfQ=
 github.com/cosmos/ics23/go v0.10.0 h1:iXqLLgp2Lp+EdpIuwXTYIQU+AiHj9mOC2X9ab++bZDM=
 github.com/cosmos/ics23/go v0.10.0/go.mod h1:ZfJSmng/TBNTBkFemHHHj5YY7VAU/MBU980F4VU1NG0=
 github.com/cosmos/keyring v1.2.0 h1:8C1lBP9xhImmIabyXW4c3vFjjLiBdGCmfLUfeZlV1Yo=
@@ -1262,6 +1260,8 @@ github.com/ugorji/go/codec v1.2.11/go.mod h1:UNopzCgEMSXjBc6AOMqYvWC1ktqTAfzJZUZ
 github.com/ulikunitz/xz v0.5.10/go.mod h1:nbz6k7qbPmH4IRqmfOplQw/tblSgqTqBwxkY0oWt/14=
 github.com/ulikunitz/xz v0.5.11 h1:kpFauv27b6ynzBNT/Xy+1k+fK4WswhN/6PN5WhFAGw8=
 github.com/ulikunitz/xz v0.5.11/go.mod h1:nbz6k7qbPmH4IRqmfOplQw/tblSgqTqBwxkY0oWt/14=
+github.com/uptSmart/ibc-go/v7 v7.3.0-erc20 h1:16Wr4BjTH0tDo/j+W8p3jTvt6KB07C8qaOV6av+HvG0=
+github.com/uptSmart/ibc-go/v7 v7.3.0-erc20/go.mod h1:mUmaHFXpXrEdcxfdXyau+utZf14pGKVUiXwYftRZZfQ=
 github.com/urfave/cli v1.20.0/go.mod h1:70zkFmudgCuE/ngEzBv17Jvp/497gISqfk5gWijbERA=
 github.com/urfave/cli v1.22.1 h1:+mkCCcOFKPnCmVYVcURKps1Xe+3zP90gSYGNfRkjoIY=
 github.com/urfave/cli v1.22.1/go.mod h1:Gos4lmkARVdJ6EkW0WaNv/tZAAMe9V7XWyB60NtXRu0=
