@@ -472,7 +472,7 @@ func NewUptick(
 		appCodec,
 		keys[banktypes.StoreKey],
 		app.AccountKeeper,
-		app.BlockedAddrs(),
+		app.BlockedModuleAccountAddrs(),
 		authAddr,
 	)
 
@@ -1242,7 +1242,7 @@ func initParamsKeeper(
 	paramsKeeper.Subspace(erc20types.ModuleName)
 	paramsKeeper.Subspace(erc721types.ModuleName)
 	paramsKeeper.Subspace(icahosttypes.SubModuleName)
-	paramsKeeper.Subspace(wasm.ModuleName)
+	paramsKeeper.Subspace(wasmtypes.ModuleName)
 	paramsKeeper.Subspace(ibcnfttransfertypes.ModuleName)
 
 	// paramsKeeper.Subspace(feemarkettypes.ModuleName).WithKeyTable(feemarkettypes.ParamKeyTable())
@@ -1288,9 +1288,37 @@ func (app *Uptick) registerUpgradeHandlers() {
 		return
 	}
 
+	var storeUpgrades *storetypes.StoreUpgrades
+	switch upgradeInfo.Name {
+	case upgradeVersion:
+		// add revenue module for testnet (v7 -> v8)
+		storeUpgrades = &storetypes.StoreUpgrades{
+			Added: []string{crisistypes.ModuleName},
+		}
+	}
+
+	if storeUpgrades != nil {
+
+		// configure store loader that checks if version == upgradeHeight and applies store upgrades
+		app.SetStoreLoader(upgradetypes.UpgradeStoreLoader(upgradeInfo.Height, storeUpgrades))
+	}
 }
 
 func generateFeemarketParams(enableHeight int64) feemarkettypes.Params {
 	feemarketParams.EnableHeight = enableHeight
 	return feemarketParams
+}
+
+// BlockedModuleAccountAddrs returns all the app's blocked module account
+// addresses.
+func (app *Uptick) BlockedModuleAccountAddrs() map[string]bool {
+	modAccAddrs := app.ModuleAccountAddrs()
+
+	// remove module accounts that are ALLOWED to received funds
+	//
+	// TODO: Blocked on updating to v0.46.x
+	// delete(modAccAddrs, authtypes.NewModuleAddress(grouptypes.ModuleName).String())
+	delete(modAccAddrs, authtypes.NewModuleAddress(govtypes.ModuleName).String())
+
+	return modAccAddrs
 }
