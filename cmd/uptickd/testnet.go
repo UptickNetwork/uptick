@@ -414,7 +414,7 @@ func initGenFiles(
 	var govGenState govv1.GenesisState
 	clientCtx.Codec.MustUnmarshalJSON(appGenState[govtypes.ModuleName], &govGenState)
 
-	govGenState.DepositParams.MinDeposit[0].Denom = coinDenom
+	govGenState.Params.MinDeposit[0].Denom = coinDenom
 	appGenState[govtypes.ModuleName] = clientCtx.Codec.MustMarshalJSON(&govGenState)
 
 	var crisisGenState crisistypes.GenesisState
@@ -478,7 +478,7 @@ func collectGenFiles(
 			clientCtx.TxConfig,
 			nodeConfig,
 			initCfg, *genDoc,
-			genBalIterator, nil)
+			genBalIterator, genutiltypes.DefaultMessageValidator)
 		if err != nil {
 			return err
 		}
