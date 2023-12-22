@@ -33,7 +33,7 @@ require (
 	github.com/rs/cors v1.10.1 // indirect
 	github.com/spf13/cast v1.6.0
 	github.com/spf13/cobra v1.8.0
-	github.com/spf13/viper v1.16.0 // indirect
+	github.com/spf13/viper v1.16.0
 	github.com/stretchr/testify v1.8.4
 	github.com/tidwall/gjson v1.17.0
 	github.com/tidwall/sjson v1.2.5 // indirect
@@ -237,6 +237,8 @@ require (
 replace (
 	// use cosmos fork of keyring
 	github.com/99designs/keyring => github.com/cosmos/keyring v1.2.0
+
+	github.com/cosmos/ibc-go/v7 => github.com/uptSmart/ibc-go/v7 v7.3.0-erc20
 	// use Cosmos-SDK fork to enable Ledger functionality
 	// github.com/cosmos/cosmos-sdk => github.com/evmos/cosmos-sdk v0.47.5-evmos.2
 	// use Evmos geth fork
@@ -246,7 +248,4 @@ replace (
 	github.com/gin-gonic/gin => github.com/gin-gonic/gin v1.9.1
 	// replace broken goleveldb
 	github.com/syndtr/goleveldb => github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
-
-// TODO
-// github.com/cosmos/ibc-go/v7 => github.com/uptSmart/ibc-go/v5 v5.3.2-erc20
 )

@@ -656,7 +656,7 @@ func NewUptick(
 	app.IBCNFTTransferKeeper = ibcnfttransferkeeper.NewKeeper(
 		appCodec,
 		keys[ibcnfttransfertypes.StoreKey],
-		ibctransfertypes.ModuleName,
+		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
 		app.IBCKeeper.ChannelKeeper,
 		app.IBCKeeper.ChannelKeeper,
 		&app.IBCKeeper.PortKeeper,
@@ -1293,7 +1293,7 @@ func (app *Uptick) registerUpgradeHandlers() {
 	case upgradeVersion:
 		// add revenue module for testnet (v7 -> v8)
 		storeUpgrades = &storetypes.StoreUpgrades{
-			Added: []string{crisistypes.ModuleName},
+			Added: []string{crisistypes.ModuleName, consensusparamtypes.ModuleName},
 		}
 	}
 
