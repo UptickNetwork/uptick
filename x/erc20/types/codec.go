@@ -33,6 +33,11 @@ func init() {
 func RegisterLegacyAminoCodec(cdc *codec.LegacyAmino) {
 	cdc.RegisterConcrete(&MsgConvertCoin{}, "uptick/erc20/v1/MsgConvertCoin", nil)
 	cdc.RegisterConcrete(&MsgConvertERC20{}, "uptick/erc20/v1/MsgConvertERC20", nil)
+
+	//cdc.RegisterConcrete(&RegisterCoinProposal{}, "uptick/erc20/RegisterCoinProposal", nil)
+	//cdc.RegisterConcrete(&RegisterERC20Proposal{}, "uptick/erc20/RegisterERC20Proposal", nil)
+	//cdc.RegisterConcrete(&ToggleTokenRelayProposal{}, "uptick/erc20/ToggleTokenRelayProposal", nil)
+	//cdc.RegisterConcrete(&UpdateTokenPairERC20Proposal{}, "uptick/erc20/UpdateTokenPairERC20Proposal", nil)
 }
 
 // RegisterInterfaces register implementations
