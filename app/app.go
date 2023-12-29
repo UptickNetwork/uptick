@@ -1301,6 +1301,12 @@ func (app *Uptick) registerUpgradeHandlers() {
 				panic(fmt.Errorf("failed to FeeMarketKeeper SetParams "))
 			}
 
+			// add consensus params
+			consensusParams, err := app.ConsensusParamsKeeper.Get(ctx)
+			if err != nil {
+				app.ConsensusParamsKeeper.Set(ctx, consensusParams)
+			}
+
 			// Refs:
 			// - https://docs.cosmos.network/master/building-modules/upgrade.html#registering-migrations
 			// - https://docs.cosmos.network/master/migrations/chain-upgrade-guide-044.html#chain-upgrade
