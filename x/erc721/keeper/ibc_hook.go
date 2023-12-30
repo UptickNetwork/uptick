@@ -3,7 +3,7 @@ package keeper
 import (
 	"github.com/bianjieai/nft-transfer/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	channeltypes "github.com/cosmos/ibc-go/v5/modules/core/04-channel/types"
+	channeltypes "github.com/cosmos/ibc-go/v7/modules/core/04-channel/types"
 	"strings"
 
 	ercTypes "github.com/UptickNetwork/uptick/x/erc721/types"

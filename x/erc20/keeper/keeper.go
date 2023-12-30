@@ -2,17 +2,17 @@ package keeper
 
 import (
 	"fmt"
-	porttypes "github.com/cosmos/ibc-go/v5/modules/core/05-port/types"
+	porttypes "github.com/cosmos/ibc-go/v7/modules/core/05-port/types"
 
+	"github.com/cometbft/cometbft/libs/log"
 	storetypes "github.com/cosmos/cosmos-sdk/store/types"
-	"github.com/tendermint/tendermint/libs/log"
 
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	paramtypes "github.com/cosmos/cosmos-sdk/x/params/types"
 
 	"github.com/UptickNetwork/uptick/x/erc20/types"
-	ibctransferkeeper "github.com/cosmos/ibc-go/v5/modules/apps/transfer/keeper"
+	ibctransferkeeper "github.com/cosmos/ibc-go/v7/modules/apps/transfer/keeper"
 )
 
 // Keeper of this module maintains collections of erc20.

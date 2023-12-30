@@ -4,13 +4,14 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	capabilitytypes "github.com/cosmos/cosmos-sdk/x/capability/types"
-	channeltypes "github.com/cosmos/ibc-go/v5/modules/core/04-channel/types"
-	porttypes "github.com/cosmos/ibc-go/v5/modules/core/05-port/types"
-	"github.com/cosmos/ibc-go/v5/modules/core/exported"
+	clienttypes "github.com/cosmos/ibc-go/v7/modules/core/02-client/types"
+	channeltypes "github.com/cosmos/ibc-go/v7/modules/core/04-channel/types"
+	porttypes "github.com/cosmos/ibc-go/v7/modules/core/05-port/types"
+	"github.com/cosmos/ibc-go/v7/modules/core/exported"
 
 	"github.com/UptickNetwork/uptick/ibc"
 	"github.com/UptickNetwork/uptick/x/erc20/keeper"
-	transfertypes "github.com/cosmos/ibc-go/v5/modules/apps/transfer/types"
+	transfertypes "github.com/cosmos/ibc-go/v7/modules/apps/transfer/types"
 )
 
 var _ porttypes.Middleware = &IBCMiddleware{}
@@ -48,13 +49,18 @@ func (im IBCMiddleware) OnRecvPacket(
 	return im.keeper.OnRecvPacket(ctx, packet, ack)
 }
 
-// SendPacket implements the ICS4 Wrapper interface
 func (im IBCMiddleware) SendPacket(
 	ctx sdk.Context,
 	chanCap *capabilitytypes.Capability,
-	packet exported.PacketI,
-) error {
-	return im.keeper.SendPacket(ctx, chanCap, packet)
+	sourcePort string,
+	sourceChannel string,
+	timeoutHeight clienttypes.Height,
+	timeoutTimestamp uint64, data []byte) (sequence uint64, err error) {
+	return im.keeper.SendPacket(
+		ctx, chanCap,
+		sourcePort, sourceChannel,
+		timeoutHeight, timeoutTimestamp, data,
+	)
 }
 
 // WriteAcknowledgement implements the ICS4 Wrapper interface

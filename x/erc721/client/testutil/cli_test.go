@@ -10,7 +10,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	tmcli "github.com/tendermint/tendermint/libs/cli"
+	tmcli "github.com/cometbft/cometbft/libs/cli"
 
 	clitestutil "github.com/cosmos/cosmos-sdk/testutil/cli"
 

@@ -9,7 +9,7 @@ import (
 	"github.com/UptickNetwork/uptick/x/collection/exported"
 
 	cryptocodec "github.com/cosmos/cosmos-sdk/crypto/codec"
-	proto "github.com/gogo/protobuf/proto"
+	proto "github.com/cosmos/gogoproto/proto"
 )
 
 var (
