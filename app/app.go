@@ -1258,8 +1258,10 @@ func initParamsKeeper(
 	paramsKeeper.Subspace(erc20types.ModuleName).WithKeyTable(erc20types.ParamKeyTable())
 	paramsKeeper.Subspace(erc721types.ModuleName).WithKeyTable(erc721types.ParamKeyTable())
 	paramsKeeper.Subspace(icahosttypes.SubModuleName).WithKeyTable(icahosttypes.ParamKeyTable())
-	paramsKeeper.Subspace(wasmtypes.ModuleName).WithKeyTable(wasmtypes.ParamKeyTable())
 
+	// paramsKeeper.Subspace(wasmtypes.ModuleName).WithKeyTable(wasmtypes.ParamKeyTable())
+	// paramsKeeper.Subspace(wasmtypes.ModuleName).WithKeyTable(wasmParamsKeyTable())
+	paramsKeeper.Subspace(wasmtypes.ModuleName).WithKeyTable(wasmParamsKeyTable())
 	paramsKeeper.Subspace(ibcnfttransfertypes.ModuleName)
 
 	return paramsKeeper
@@ -1267,13 +1269,27 @@ func initParamsKeeper(
 
 func (app *Uptick) registerUpgradeHandlers() {
 
+	// Set param key table for params module migration
+	baseAppLegacySS := app.ParamsKeeper.Subspace(baseapp.Paramspace).WithKeyTable(paramstypes.ConsensusParamsKeyTable())
 	upgradeVersion := "v0.2.16"
 	app.UpgradeKeeper.SetUpgradeHandler(
 		upgradeVersion,
 		func(ctx sdk.Context, _ upgradetypes.Plan, vm module.VersionMap) (module.VersionMap, error) {
 
+			// Migrate Tendermint consensus parameters from x/params module to a dedicated x/consensus module.
+			baseapp.MigrateParams(ctx, baseAppLegacySS, &app.ConsensusParamsKeeper)
+
 			if err := app.FeeMarketKeeper.SetParams(ctx, generateFeemarketParams(ctx.BlockHeight())); err != nil {
 				panic(fmt.Errorf("failed to FeeMarketKeeper SetParams "))
+			}
+
+			wasmParams := app.wasmKeeper.GetParams(ctx)
+			// fmt.Printf("xxl init wasmParam is : %v \n", wasmParams)
+			// app.ParamsKeeper.Subspace(wasmtypes.ModuleName).SetParamSet(ctx, nil)
+			wasmParams.CodeUploadAccess.Permission = wasmtypes.AccessTypeEverybody
+			wasmParams.InstantiateDefaultPermission = wasmtypes.AccessTypeEverybody
+			if err := app.wasmKeeper.SetParams(ctx, wasmParams); err != nil {
+				panic(fmt.Errorf("failed to wasmKeeper SetParams "))
 			}
 
 			// Refs:
@@ -1289,6 +1305,15 @@ func (app *Uptick) registerUpgradeHandlers() {
 			//	ctx, ibcnfttransfertypes.ModuleCdc, bz)
 			//
 			//_ = app.mm.InitGenesis(ctx, ibcnfttransfertypes.ModuleCdc, app.mm.Modules[ibcnfttransfertypes.ModuleName])
+
+			// gs := wasmtypes.DefaultGasRegisterConfig()
+			//bz, err := ibcnfttransfertypes.ModuleCdc.MarshalJSON(gs)
+			//if err != nil {
+			//	panic(fmt.Errorf("failed to ModuleCdc %s: %w", ibcnfttransfertypes.ModuleName, err))
+			//}
+
+			//wasmtypes.GenesisState{}
+			//_ = app.mm.InitGenesis(ctx, wasmtypes.ModuleCdc, app.mm.Modules[wasmtypes.ModuleName])
 
 			return app.mm.RunMigrations(ctx, app.configurator, vm)
 		})
@@ -1310,7 +1335,7 @@ func (app *Uptick) registerUpgradeHandlers() {
 	case upgradeVersion:
 		// add revenue module for testnet (v7 -> v8)
 		storeUpgrades = &storetypes.StoreUpgrades{
-			Added: []string{crisistypes.ModuleName, consensusparamtypes.ModuleName},
+			Added: []string{crisistypes.ModuleName, consensusparamtypes.ModuleName, ibcnfttransfertypes.ModuleName},
 		}
 	}
 
@@ -1332,10 +1357,58 @@ func (app *Uptick) BlockedModuleAccountAddrs() map[string]bool {
 	modAccAddrs := app.ModuleAccountAddrs()
 
 	// remove module accounts that are ALLOWED to received funds
-	//
-	// TODO: Blocked on updating to v0.46.x
 	// delete(modAccAddrs, authtypes.NewModuleAddress(grouptypes.ModuleName).String())
 	delete(modAccAddrs, authtypes.NewModuleAddress(govtypes.ModuleName).String())
 
 	return modAccAddrs
 }
+
+// Deprecated.
+func wasmParamsKeyTable() paramstypes.KeyTable {
+
+	var addrees []string
+	return paramstypes.NewKeyTable(
+		paramstypes.NewParamSetPair(
+			wasmtypes.ParamStoreKeyUploadAccess, wasmtypes.AccessConfig{
+				Permission: wasmtypes.AccessTypeEverybody,
+				Addresses:  addrees,
+			}, validateAccessConfig,
+		),
+		paramstypes.NewParamSetPair(
+			wasmtypes.ParamStoreKeyInstantiateAccess, wasmtypes.AccessTypeEverybody, validateAccessType,
+		),
+	)
+}
+
+func validateAccessConfig(i interface{}) error {
+	v, ok := i.(wasmtypes.AccessConfig)
+	if !ok {
+		return fmt.Errorf("invalid parameter type: %T", i)
+	}
+	return v.ValidateBasic()
+}
+
+func validateAccessType(i interface{}) error {
+	a, ok := i.(wasmtypes.AccessType)
+	if !ok {
+		return fmt.Errorf("invalid parameter type: %T", i)
+	}
+	if a == wasmtypes.AccessTypeUnspecified {
+		return fmt.Errorf("ErrEmpty: %T", i)
+		// errorsmod.Wrap(ErrEmpty, "type")
+	}
+	for _, v := range wasmtypes.AllAccessTypes {
+		if v == a {
+			return nil
+		}
+	}
+	return fmt.Errorf("unknown type: %q", a)
+}
+
+//// ParamSetPairs returns the parameter set pairs.
+//func (p *Params) ParamSetPairs() paramtypes.ParamSetPairs {
+//	return paramtypes.ParamSetPairs{
+//		paramtypes.NewParamSetPair(ParamStoreKeyUploadAccess, &p.CodeUploadAccess, validateAccessConfig),
+//		paramtypes.NewParamSetPair(ParamStoreKeyInstantiateAccess, &p.InstantiateDefaultPermission, validateAccessType),
+//	}
+//}
