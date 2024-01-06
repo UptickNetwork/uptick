@@ -123,6 +123,7 @@
     - [Params](#uptick.erc721.v1.Params)
   
 - [uptick/erc721/v1/query.proto](#uptick/erc721/v1/query.proto)
+    - [QueryEvmAddressRequest](#uptick.erc721.v1.QueryEvmAddressRequest)
     - [QueryParamsRequest](#uptick.erc721.v1.QueryParamsRequest)
     - [QueryParamsResponse](#uptick.erc721.v1.QueryParamsResponse)
     - [QueryTokenPairRequest](#uptick.erc721.v1.QueryTokenPairRequest)
@@ -1675,6 +1676,23 @@ Params defines the erc721 module params
 
 
 
+<a name="uptick.erc721.v1.QueryEvmAddressRequest"></a>
+
+### QueryEvmAddressRequest
+QueryTokenPairRequest is the request type for the Query/TokenPair RPC method.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| `port` | [string](#string) |  | token identifier can be either the hex contract address of the ERC721 or the Cosmos nft classID |
+| `channel` | [string](#string) |  |  |
+| `classId` | [string](#string) |  |  |
+
+
+
+
+
+
 <a name="uptick.erc721.v1.QueryParamsRequest"></a>
 
 ### QueryParamsRequest
@@ -1774,13 +1792,14 @@ method.
 <a name="uptick.erc721.v1.Query"></a>
 
 ### Query
-Query defines the gRPC querier service.
+Query defines the gRPC queried service.
 
 | Method Name | Request Type | Response Type | Description | HTTP Verb | Endpoint |
 | ----------- | ------------ | ------------- | ------------| ------- | -------- |
-| `TokenPairs` | [QueryTokenPairsRequest](#uptick.erc721.v1.QueryTokenPairsRequest) | [QueryTokenPairsResponse](#uptick.erc721.v1.QueryTokenPairsResponse) | TokenPairs retrieves registered token pairs | GET|/evmos/erc721/v1/token_pairs|
-| `TokenPair` | [QueryTokenPairRequest](#uptick.erc721.v1.QueryTokenPairRequest) | [QueryTokenPairResponse](#uptick.erc721.v1.QueryTokenPairResponse) | TokenPair retrieves a registered token pair | GET|/evmos/erc721/v1/token_pairs/{token}|
-| `Params` | [QueryParamsRequest](#uptick.erc721.v1.QueryParamsRequest) | [QueryParamsResponse](#uptick.erc721.v1.QueryParamsResponse) | Params retrieves the erc721 module params | GET|/evmos/erc721/v1/params|
+| `TokenPairs` | [QueryTokenPairsRequest](#uptick.erc721.v1.QueryTokenPairsRequest) | [QueryTokenPairsResponse](#uptick.erc721.v1.QueryTokenPairsResponse) | TokenPairs retrieves registered token pairs | GET|/uptick/erc721/v1/token_pairs|
+| `TokenPair` | [QueryTokenPairRequest](#uptick.erc721.v1.QueryTokenPairRequest) | [QueryTokenPairResponse](#uptick.erc721.v1.QueryTokenPairResponse) | TokenPair retrieves a registered token pair | GET|/uptick/erc721/v1/token_pairs/{token}|
+| `EvmContract` | [QueryEvmAddressRequest](#uptick.erc721.v1.QueryEvmAddressRequest) | [QueryTokenPairResponse](#uptick.erc721.v1.QueryTokenPairResponse) | EvmContract retrieves a registered evm contract | GET|/uptick/erc721/v1/evm_contract/{port}/{channel}/{classId}|
+| `Params` | [QueryParamsRequest](#uptick.erc721.v1.QueryParamsRequest) | [QueryParamsResponse](#uptick.erc721.v1.QueryParamsResponse) | Params retrieves the erc721 module params | GET|/uptick/erc721/v1/params|
 
  <!-- end services -->
 
