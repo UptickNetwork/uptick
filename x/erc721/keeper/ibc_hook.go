@@ -39,7 +39,7 @@ func (k Keeper) OnRecvPacket(
 		return nil
 	}
 
-	fmt.Printf("xxl -- 0001 OnRecvPacket %v \n", data)
+	fmt.Printf("xxl -- 0001 OnRecvPacket %v-%v-%v \n", packet.GetDestPort(), packet.GetDestChannel(), data.ClassId)
 	voucherClassID := k.GetVoucherClassID(packet.GetDestPort(), packet.GetDestChannel(), data.ClassId)
 	fmt.Printf("xxl -- 0001.5 voucherClassID %s \n", voucherClassID)
 
