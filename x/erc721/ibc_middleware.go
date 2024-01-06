@@ -1,6 +1,7 @@
 package erc721
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/bianjieai/nft-transfer/types"
@@ -14,10 +15,13 @@ import (
 	"github.com/UptickNetwork/uptick/ibc"
 	"github.com/UptickNetwork/uptick/x/erc721/keeper"
 
+	erc721Types "github.com/UptickNetwork/uptick/x/erc721/types"
 	clienttypes "github.com/cosmos/ibc-go/v7/modules/core/02-client/types"
 )
 
 var _ porttypes.Middleware = &IBCMiddleware{}
+
+const convertFlag = "convertToEvm"
 
 // IBCMiddleware implements the ICS26 callbacks for the transfer middleware given
 // the claim keeper and the underlying application.
@@ -42,14 +46,44 @@ func (im IBCMiddleware) OnRecvPacket(
 	relayer sdk.AccAddress,
 ) exported.Acknowledgement {
 
-	ack := im.Module.OnRecvPacket(ctx, packet, relayer)
+	fmt.Printf("xxl 0000 erc721 OnRecvPacket \n")
+	var data types.NonFungibleTokenPacketData
+	if err := types.ModuleCdc.UnmarshalJSON(packet.GetData(), &data); err != nil {
+		return nil
+	}
+	if strings.Contains(data.Memo, convertFlag) {
 
-	// return if the acknowledgement is an error ACK
-	if !ack.Success() {
-		return ack
+		newPackage, dstReceiver := PackageToModuleAccount(packet)
+		fmt.Printf("xxl new package account is dstRecerver %s\n", dstReceiver)
+
+		ack := im.Module.OnRecvPacket(ctx, newPackage, relayer)
+		// return if the acknowledgement is an error ACK
+		if !ack.Success() {
+			fmt.Printf("xxl 0001 ack %v \n", ack)
+			return ack
+		}
+		return im.keeper.OnRecvPacket(ctx, newPackage, dstReceiver)
+
+	} else {
+		return im.Module.OnRecvPacket(ctx, packet, relayer)
 	}
 
-	return nil
+}
+
+func PackageToModuleAccount(packet channeltypes.Packet) (channeltypes.Packet, string) {
+
+	//
+	var data types.NonFungibleTokenPacketData
+	if err := types.ModuleCdc.UnmarshalJSON(packet.GetData(), &data); err != nil {
+		return channeltypes.Packet{}, ""
+	}
+	dstReceiver := data.Receiver
+	data.Receiver = erc721Types.AccModuleAddress.String()
+
+	fmt.Printf("xxl data.Receiver %s \n", data)
+	packet.Data = types.ModuleCdc.MustMarshalJSON(&data)
+
+	return packet, dstReceiver
 }
 
 // OnAcknowledgementPacket implements the IBCModule interface
@@ -84,15 +118,6 @@ func (im IBCMiddleware) OnAcknowledgementPacket(
 
 	return nil
 }
-
-// SendPacket implements the ICS4 Wrapper interface
-// func (im IBCMiddleware) SendPacket(
-// 	ctx sdk.Context,
-// 	chanCap *capabilitytypes.Capability,
-// 	packet exported.PacketI,
-// ) error {
-// 	return nil
-// }
 
 func (im IBCMiddleware) SendPacket(
 	ctx sdk.Context,

@@ -1284,36 +1284,11 @@ func (app *Uptick) registerUpgradeHandlers() {
 			}
 
 			wasmParams := app.wasmKeeper.GetParams(ctx)
-			// fmt.Printf("xxl init wasmParam is : %v \n", wasmParams)
-			// app.ParamsKeeper.Subspace(wasmtypes.ModuleName).SetParamSet(ctx, nil)
 			wasmParams.CodeUploadAccess.Permission = wasmtypes.AccessTypeEverybody
 			wasmParams.InstantiateDefaultPermission = wasmtypes.AccessTypeEverybody
 			if err := app.wasmKeeper.SetParams(ctx, wasmParams); err != nil {
 				panic(fmt.Errorf("failed to wasmKeeper SetParams "))
 			}
-
-			// Refs:
-			// - https://docs.cosmos.network/master/building-modules/upgrade.html#registering-migrations
-			// - https://docs.cosmos.network/master/migrations/chain-upgrade-guide-044.html#chain-upgrade
-
-			//gs := ibcnfttransfertypes.DefaultGenesisState()
-			//bz, err := ibcnfttransfertypes.ModuleCdc.MarshalJSON(gs)
-			//if err != nil {
-			//	panic(fmt.Errorf("failed to ModuleCdc %s: %w", ibcnfttransfertypes.ModuleName, err))
-			//}
-			//_ = app.mm.Modules[ibcnfttransfertypes.ModuleName].InitGenesis(
-			//	ctx, ibcnfttransfertypes.ModuleCdc, bz)
-			//
-			//_ = app.mm.InitGenesis(ctx, ibcnfttransfertypes.ModuleCdc, app.mm.Modules[ibcnfttransfertypes.ModuleName])
-
-			// gs := wasmtypes.DefaultGasRegisterConfig()
-			//bz, err := ibcnfttransfertypes.ModuleCdc.MarshalJSON(gs)
-			//if err != nil {
-			//	panic(fmt.Errorf("failed to ModuleCdc %s: %w", ibcnfttransfertypes.ModuleName, err))
-			//}
-
-			//wasmtypes.GenesisState{}
-			//_ = app.mm.InitGenesis(ctx, wasmtypes.ModuleCdc, app.mm.Modules[wasmtypes.ModuleName])
 
 			return app.mm.RunMigrations(ctx, app.configurator, vm)
 		})

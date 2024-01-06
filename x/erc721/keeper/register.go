@@ -1,6 +1,7 @@
 package keeper
 
 import (
+	"fmt"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/ethereum/go-ethereum/common"
@@ -29,6 +30,7 @@ func (k Keeper) RegisterNFT(ctx sdk.Context, msg *types.MsgConvertNFT) (*types.T
 // RegisterERC721 creates a Cosmos coin and registers the token pair between the nft and the ERC721
 func (k Keeper) RegisterERC721(ctx sdk.Context, msg *types.MsgConvertERC721) (*types.TokenPair, error) {
 
+	fmt.Printf("xxl RegisterERC721 0001 \n")
 	// Check if ERC721 is already registered
 	contract := common.HexToAddress(msg.EvmContractAddress)
 	if k.IsERC721Registered(ctx, contract) {
@@ -36,12 +38,17 @@ func (k Keeper) RegisterERC721(ctx sdk.Context, msg *types.MsgConvertERC721) (*t
 			"token ERC721 contract already registered: %s", contract.String())
 	}
 
+	fmt.Printf("xxl RegisterERC721 0002 \n")
 	err := k.CreateNFTClass(ctx, msg)
 	if err != nil {
+
+		fmt.Printf("xxl RegisterERC721 0025 %v - %v \n", err, msg)
+
 		return nil, sdkerrors.Wrap(err,
 			"failed to create wrapped coin denom metadata for ERC721")
 	}
 
+	fmt.Printf("xxl RegisterERC721 0003 \n")
 	pair := types.NewTokenPair(contract, msg.ClassId)
 	k.SetTokenPair(ctx, pair)
 	k.SetClassMap(ctx, pair.ClassId, pair.GetID())
