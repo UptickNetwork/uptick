@@ -78,6 +78,7 @@ func (k Keeper) ConvertERC721(
 	*types.MsgConvertERC721Response, error,
 ) {
 
+	fmt.Printf("xxl 0000 ConvertERC721 \n")
 	ctx := sdk.UnwrapSDKContext(goCtx)
 	//classId, nftId
 	classId, nftIds, err := k.GetClassIDAndNFTID(ctx, msg)
@@ -90,14 +91,18 @@ func (k Keeper) ConvertERC721(
 	// Error checked during msg validation
 	sender := common.HexToAddress(msg.EvmSender)
 
+	fmt.Printf("xxl 0001 ConvertERC721 \n")
 	id := k.GetTokenPairID(ctx, msg.EvmContractAddress)
 	if len(id) == 0 {
+
+		fmt.Printf("xxl 0015 ConvertERC721 \n")
 		_, err := k.RegisterERC721(ctx, msg)
 		if err != nil {
 			return nil, err
 		}
 	}
 
+	fmt.Printf("xxl 0002 ConvertERC721 \n")
 	pair, err := k.GetPair(ctx, msg.EvmContractAddress)
 	if err != nil {
 		return nil, err
@@ -114,15 +119,23 @@ func (k Keeper) ConvertERC721(
 		return nil, err
 	}
 
+	fmt.Printf("xxl 0003 ConvertERC721 \n")
 	owner, err := k.QueryERC721TokenOwner(ctx, erc721, bigTokenId)
 	if err != nil {
+
+		fmt.Printf("xxl 0003.1 ConvertERC721 err %v \n", err)
 		return nil, err
 	}
 	if owner != sender {
+
+		fmt.Printf("xxl 0003.2 ConvertERC721 err %v \n", sdkerrors.ErrUnauthorized)
 		return nil, sdkerrors.Wrapf(sdkerrors.ErrUnauthorized, "%s is not the owner of erc721 token %s", sender, strings.Join(msg.EvmTokenIds, ","))
 	}
 
 	if acc == nil || !acc.IsContract() {
+
+		fmt.Printf("xxl 0003.3 ConvertERC721 err %v \n", pair)
+
 		k.DeleteTokenPair(ctx, pair)
 		k.Logger(ctx).Debug(
 			"deleting selfdestructed token pair from state",
@@ -132,6 +145,7 @@ func (k Keeper) ConvertERC721(
 		return nil, nil
 	}
 
+	fmt.Printf("xxl 0004 ConvertERC721 \n")
 	return k.convertEvm2Cosmos(ctx, pair, msg, sender) //
 
 }
@@ -149,6 +163,7 @@ func (k Keeper) ConvertNFT(
 
 	//classId, nftIDs
 	contractAddress, tokenIds, err := k.GetContractAddressAndTokenIds(ctx, msg)
+	fmt.Printf("xxl 0000 ConvertNFT %s - %v \n", contractAddress, tokenIds)
 	if err != nil {
 		return nil, err
 	}
@@ -157,7 +172,6 @@ func (k Keeper) ConvertNFT(
 
 	// Error checked during msg validation
 	receiver := common.HexToAddress(msg.EvmReceiver)
-
 	id := k.GetTokenPairID(ctx, msg.EvmContractAddress)
 	if len(id) == 0 {
 		_, err := k.RegisterNFT(ctx, msg)
@@ -201,6 +215,7 @@ func (k Keeper) convertCosmos2Evm(
 	*types.MsgConvertNFTResponse, error,
 ) {
 
+	fmt.Printf("xxl 0001 convertCosmos2Evm \n")
 	var (
 		bigTokenIds []*big.Int
 		reqInfo     exported.NFT
@@ -234,15 +249,18 @@ func (k Keeper) convertCosmos2Evm(
 			Sender:    msg.CosmosSender,
 			Recipient: types.AccModuleAddress.String(),
 		}
+
+		fmt.Printf("xxl 0002 before k.nftKeeper.TransferNFT %v \n", transferNft)
 		if _, err = k.nftKeeper.TransferNFT(ctx, &transferNft); err != nil {
 			return nil, err
 		}
+		fmt.Printf("xxl 0003 after k.nftKeeper.TransferNFT \n")
 
 		//	does token id exist
 		owner, err := k.QueryERC721TokenOwner(ctx, common.HexToAddress(msg.EvmContractAddress), bigTokenIds[i])
 		if err != nil {
-			// mint
-			// mint enhance )
+
+			fmt.Printf("xxl 0004 mintEnhance %s-%s \n", contract, receiver)
 			_, err = k.CallEVM(
 				ctx, erc721, types.ModuleAddress, contract, true,
 				"mintEnhance", receiver, bigTokenIds[i], reqInfo.GetName(), reqInfo.GetURI(), reqInfo.GetData(), reqInfo.GetURIHash())
@@ -252,6 +270,8 @@ func (k Keeper) convertCosmos2Evm(
 					ctx, erc721, receiver, contract, true,
 					"mint", receiver, bigTokenIds[i], reqInfo.GetURI())
 				if err != nil {
+
+					fmt.Printf("xxl 0005 mint error %v \n", err)
 					return nil, err
 				}
 			}
@@ -312,6 +332,7 @@ func (k Keeper) convertEvm2Cosmos(
 	erc721 := contracts.ERC721UpticksContract.ABI
 	contract := pair.GetERC721Contract()
 
+	fmt.Printf("xxl 0000 convertEvm2Cosmos ...")
 	for i, tokenId := range msg.EvmTokenIds {
 
 		bigTokenId := new(big.Int)
@@ -339,6 +360,7 @@ func (k Keeper) convertEvm2Cosmos(
 		nftId := string(k.GetNFTPairByContractTokenID(ctx, msg.EvmContractAddress, tokenId))
 		if nftId == "" {
 
+			//
 			mintNFT := nftTypes.MsgMintNFT{
 				DenomId:   msg.ClassId,
 				Id:        msg.CosmosTokenIds[i],
@@ -354,6 +376,7 @@ func (k Keeper) convertEvm2Cosmos(
 			if _, err = k.nftKeeper.MintNFT(ctx, &mintNFT); err != nil {
 				return nil, err
 			}
+
 		} else {
 			transferNft := nftTypes.MsgTransferNFT{
 				DenomId:   msg.ClassId,
