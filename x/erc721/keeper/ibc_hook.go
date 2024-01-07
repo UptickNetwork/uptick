@@ -1,7 +1,6 @@
 package keeper
 
 import (
-	"fmt"
 	erc20Types "github.com/UptickNetwork/uptick/x/erc20/types"
 	erc721Types "github.com/UptickNetwork/uptick/x/erc721/types"
 	"github.com/bianjieai/nft-transfer/types"
@@ -21,7 +20,6 @@ func (k Keeper) OnRecvPacket(
 	packet channeltypes.Packet,
 	receiver string) exported.Acknowledgement {
 
-	fmt.Printf("xxl -- 0000 OnRecvPacket \n")
 	event := &erc20Types.EventIBCERC20{
 		Status:             erc20Types.STATUS_UNKNOWN,
 		Message:            "",
@@ -39,9 +37,7 @@ func (k Keeper) OnRecvPacket(
 		return nil
 	}
 
-	fmt.Printf("xxl -- 0001 OnRecvPacket %v-%v-%v \n", packet.GetDestPort(), packet.GetDestChannel(), data.ClassId)
 	voucherClassID := k.GetVoucherClassID(packet.GetDestPort(), packet.GetDestChannel(), data.ClassId)
-	fmt.Printf("xxl -- 0001.5 voucherClassID %s \n", voucherClassID)
 
 	msg := erc721Types.MsgConvertNFT{
 		EvmContractAddress: "",
@@ -52,7 +48,6 @@ func (k Keeper) OnRecvPacket(
 		EvmReceiver:        receiver,
 	}
 
-	fmt.Printf("xxl -- 0002 msg %v \n", msg)
 	// use cctx to ConvertCoin
 	context := sdk.WrapSDKContext(cctx)
 	_, err := k.ConvertNFT(context, &msg)
@@ -60,8 +55,6 @@ func (k Keeper) OnRecvPacket(
 		event.Status = erc20Types.STATUS_FAILED
 		event.Message = err.Error()
 		_ = ctx.EventManager().EmitTypedEvent(event)
-
-		fmt.Printf("xxl 0003 err %v \n", err)
 		return nil
 	}
 

@@ -2,7 +2,6 @@ package keeper
 
 import (
 	"context"
-	"fmt"
 	ibctransfertypes "github.com/cosmos/ibc-go/v7/modules/apps/transfer/types"
 	channeltypes "github.com/cosmos/ibc-go/v7/modules/core/04-channel/types"
 	"math/big"
@@ -33,12 +32,9 @@ func (k Keeper) TransferERC20(
 	*types.MsgTransferERC20Response, error,
 ) {
 
-	fmt.Printf("xxl: 01---- %v \n", msg)
 	cosmosSender, err := appType.ConvertAddressEvm2Cosmos(msg.EvmSender)
 	if err != nil {
-
-		fmt.Printf("xxl: 02---- %v \n", err)
-		return nil, err
+		return nil, sdkerrors.Wrapf(err, "failed to ConvertAddressEvm2Cosmos %v", err)
 	}
 	ctx := sdk.UnwrapSDKContext(goCtx)
 
@@ -49,17 +45,14 @@ func (k Keeper) TransferERC20(
 		Sender:          msg.EvmSender,
 	}
 	k.ConvertERC20(ctx, &convertMsg)
-
 	receiver, err := sdk.AccAddressFromBech32(cosmosSender)
 	if err != nil {
-
-		fmt.Printf("xxl: 03---- %v \n", err)
-		return nil, err
+		return nil, sdkerrors.Wrapf(err, "failed to AccAddressFromBech32 %v-%v", receiver, err)
 	}
 	sender := common.HexToAddress(msg.EvmSender)
 	pair, err := k.MintingEnabled(ctx, sender.Bytes(), receiver, msg.EvmContractAddress)
 	if err != nil {
-		return nil, err
+		return nil, sdkerrors.Wrapf(err, "failed to MintingEnabled %v", err)
 	}
 
 	coins := sdk.Coins{sdk.Coin{Denom: pair.Denom, Amount: msg.Amount}}
@@ -75,8 +68,7 @@ func (k Keeper) TransferERC20(
 	}
 	_, err = k.ibcKeeper.Transfer(goCtx, &ibcMsg)
 	if err != nil {
-		fmt.Printf("xxl:---- 04 %v\n", err)
-		return nil, err
+		return nil, sdkerrors.Wrapf(err, "failed to ibc Transfer%v", err)
 	}
 
 	return &types.MsgTransferERC20Response{}, nil

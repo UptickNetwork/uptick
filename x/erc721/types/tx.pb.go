@@ -505,7 +505,7 @@ type MsgServer interface {
 	ConvertNFT(context.Context, *MsgConvertNFT) (*MsgConvertNFTResponse, error)
 	// ConvertERC721 mints a native Cosmos coin representation of the ERC721 token
 	// contract that is registered on the token mapping.
-	ConvertERC721(context.Context, *MsgConvertERC721) (*MsgConvertERC721Response, error)
+	ConvertERC721(context.Context, *MsgConvertERC721) (*MsgConvertERC721, error)
 	TransferERC721(context.Context, *MsgTransferERC721) (*MsgTransferERC721Response, error)
 }
 

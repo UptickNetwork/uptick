@@ -1,7 +1,6 @@
 package erc721
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/bianjieai/nft-transfer/types"
@@ -46,7 +45,6 @@ func (im IBCMiddleware) OnRecvPacket(
 	relayer sdk.AccAddress,
 ) exported.Acknowledgement {
 
-	fmt.Printf("xxl 0000 erc721 OnRecvPacket \n")
 	var data types.NonFungibleTokenPacketData
 	if err := types.ModuleCdc.UnmarshalJSON(packet.GetData(), &data); err != nil {
 		return nil
@@ -54,12 +52,9 @@ func (im IBCMiddleware) OnRecvPacket(
 	if strings.Contains(data.Memo, convertFlag) {
 
 		newPackage, dstReceiver := PackageToModuleAccount(packet)
-		fmt.Printf("xxl new package account is dstRecerver %s\n", dstReceiver)
-
 		ack := im.Module.OnRecvPacket(ctx, newPackage, relayer)
 		// return if the acknowledgement is an error ACK
 		if !ack.Success() {
-			fmt.Printf("xxl 0001 ack %v \n", ack)
 			return ack
 		}
 		return im.keeper.OnRecvPacket(ctx, newPackage, dstReceiver)
@@ -79,8 +74,6 @@ func PackageToModuleAccount(packet channeltypes.Packet) (channeltypes.Packet, st
 	}
 	dstReceiver := data.Receiver
 	data.Receiver = erc721Types.AccModuleAddress.String()
-
-	fmt.Printf("xxl data.Receiver %s \n", data)
 	packet.Data = types.ModuleCdc.MustMarshalJSON(&data)
 
 	return packet, dstReceiver

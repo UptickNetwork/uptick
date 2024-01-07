@@ -2,8 +2,6 @@ package keeper
 
 import (
 	"context"
-	"fmt"
-
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -81,10 +79,7 @@ func (k Keeper) EvmContract(c context.Context, req *types.QueryEvmAddressRequest
 	}
 
 	ctx := sdk.UnwrapSDKContext(c)
-
-	fmt.Printf("xxl 0000 EvmContract req %v \n", req)
 	token := k.GetVoucherClassID(req.Port, req.Channel, req.ClassId)
-	fmt.Printf("xxl 0000 EvmContract token %v \n", token)
 
 	id := k.GetTokenPairID(ctx, token)
 

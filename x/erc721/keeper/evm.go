@@ -140,24 +140,36 @@ func (k Keeper) QueryNFTEnhance(
 	tokenID *big.Int,
 ) (types.NFTEnhance, error) {
 
+	retEnhance, err := k.QueryERC721DataByTokenID("getNFTEnhanceInfo", ctx, contract, tokenID)
+	if err != nil {
+		retTokenUri, err := k.QueryERC721DataByTokenID("tokenURI", ctx, contract, tokenID)
+		if err != nil {
+			return types.NFTEnhance{}, nil
+		} else {
+			return types.NewNFTEnhance("", retTokenUri[0].(string), "", ""), nil
+		}
+	} else {
+		return types.NewNFTEnhance(retEnhance[0].(string), retEnhance[1].(string), retEnhance[2].(string), retEnhance[3].(string)), nil
+	}
+}
+
+func (k Keeper) QueryERC721DataByTokenID(
+	queryFuncName string,
+	ctx sdk.Context,
+	contract common.Address,
+	tokenID *big.Int) ([]interface{}, error) {
+
+	//uptick bug fix: 11/07 get from tokenUri
 	erc721 := contracts.ERC721UpticksContract.ABI
-
-	// Name
-	res, err := k.CallEVM(ctx, erc721, types.ModuleAddress, contract, true, "getNFTEnhanceInfo", tokenID)
+	res, err := k.CallEVM(ctx, erc721, types.ModuleAddress, contract, true, queryFuncName, tokenID)
 	if err != nil {
-		return types.NFTEnhance{}, err
+		return nil, err
 	}
-
-	ret, err := erc721.Unpack("getNFTEnhanceInfo", res.Ret)
+	ret, err := erc721.Unpack(queryFuncName, res.Ret)
 	if err != nil {
-		fmt.Printf("QueryNFTEnhance resRet %v \n", err)
+		return nil, err
 	}
-
-	if len(ret) != 4 {
-		return types.NFTEnhance{}, nil
-	}
-
-	return types.NewNFTEnhance(ret[0].(string), ret[1].(string), ret[2].(string), ret[3].(string)), nil
+	return ret, nil
 }
 
 // QueryERC721Token returns the data of a ERC721 token

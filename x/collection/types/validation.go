@@ -34,7 +34,7 @@ var (
 
 // ValidateDenomID verifies whether the  parameters are legal
 func ValidateDenomID(denomID string) error {
-	boolPrifix := strings.HasPrefix(denomID, "tibc-")
+	boolPrifix := strings.HasPrefix(denomID, "uptick-")
 	if !regexpID(denomID) && !boolPrifix {
 		return sdkerrors.Wrapf(ErrInvalidDenom, "denomID can only accept characters that match the regular expression: (%s),but got (%s)", idString, denomID)
 	}
