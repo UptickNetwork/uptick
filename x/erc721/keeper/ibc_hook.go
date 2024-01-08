@@ -37,7 +37,13 @@ func (k Keeper) OnRecvPacket(
 		return nil
 	}
 
-	voucherClassID := k.GetVoucherClassID(packet.GetDestPort(), packet.GetDestChannel(), data.ClassId)
+	// add the prefix class check for the case of class id
+	var voucherClassID string
+	if types.IsAwayFromOrigin(packet.GetSourcePort(), packet.GetSourceChannel(), data.ClassId) {
+		voucherClassID = k.GetVoucherClassID(packet.GetDestPort(), packet.GetDestChannel(), data.ClassId)
+	} else {
+		voucherClassID, _ = types.RemoveClassPrefix(packet.GetSourcePort(), packet.GetSourceChannel(), data.ClassId)
+	}
 
 	msg := erc721Types.MsgConvertNFT{
 		EvmContractAddress: "",
