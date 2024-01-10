@@ -5,7 +5,6 @@ go 1.19
 require (
 	cosmossdk.io/simapp v0.0.0-20230608160436-666c345ad23d
 	cosmossdk.io/tools/rosetta v0.2.1
-	github.com/CosmWasm/wasmd v0.45.0
 	github.com/armon/go-metrics v0.4.1 // indirect
 	github.com/bianjieai/nft-transfer v1.1.3-ibc-v7.3.0
 	github.com/btcsuite/btcd v0.23.4 // indirect
