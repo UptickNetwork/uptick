@@ -21,36 +21,36 @@ func (k Keeper) SetParams(ctx sdk.Context, params types.Params) {
 func (k Keeper) GetClassIDAndNFTID(ctx sdk.Context, msg *types.MsgConvertERC721) (string, []string, error) {
 
 	var (
-		nftIds  []string
-		nftId   string
-		classId string
-		err     error
-		nftOrg  string
+		CosmosTokenIds []string
+		nftId          string
+		classId        string
+		err            error
+		nftOrg         string
 	)
 
-	for i, tokenId := range msg.TokenIds {
+	for i, tokenId := range msg.EvmTokenIds {
 
-		uTokenId := types.CreateTokenUID(msg.ContractAddress, tokenId)
+		uTokenId := types.CreateTokenUID(msg.EvmContractAddress, tokenId)
 		savedNftId, savedClassId := types.GetNFTFromUID(string(k.GetNFTUIDPairByTokenUID(ctx, uTokenId)))
 
 		nftOrg = ""
-		if len(msg.NftIds) > i {
-			nftOrg = msg.NftIds[i]
+		if len(msg.CosmosTokenIds) > i {
+			nftOrg = msg.CosmosTokenIds[i]
 		}
 		nftId, err = getNftData(nftOrg, tokenId, savedNftId, 0)
 
-		nftIds = append(nftIds, nftId)
+		CosmosTokenIds = append(CosmosTokenIds, nftId)
 		if err != nil {
 			return "", nil, err
 		}
 
-		classId, err = getNftData(msg.ClassId, msg.ContractAddress, savedClassId, 1)
+		classId, err = getNftData(msg.ClassId, msg.EvmContractAddress, savedClassId, 1)
 		if err != nil {
 			return "", nil, err
 		}
 	}
 
-	return classId, nftIds, nil
+	return classId, CosmosTokenIds, nil
 
 }
 
@@ -58,24 +58,24 @@ func (k Keeper) GetClassIDAndNFTID(ctx sdk.Context, msg *types.MsgConvertERC721)
 func (k Keeper) GetContractAddressAndTokenIds(ctx sdk.Context, msg *types.MsgConvertNFT) (string, []string, error) {
 
 	var (
-		contractAddress string
-		tokenIds        []string
-		err             error
+		EvmContractAddress string
+		EvmTokenIds        []string
+		err                error
 	)
 
 	pair, err := k.GetPair(ctx, msg.ClassId)
 	if err != nil {
+		msg.EvmTokenIds, _ = getNftDatas(msg.EvmTokenIds, msg.CosmosTokenIds, nil, 2)
 
-		msg.TokenIds, _ = getNftDatas(msg.TokenIds, msg.NftIds, nil, 2)
-		//Stop here ... ...
 		erc721ContractAddress, err := k.DeployERC721Contract(ctx, msg)
 		if err == nil {
-			contractAddress = erc721ContractAddress.String()
+			EvmContractAddress = erc721ContractAddress.String()
 		}
 
-		return contractAddress, msg.TokenIds, nil
+		return EvmContractAddress, msg.EvmTokenIds, nil
 
 	} else {
+
 		var (
 			savedTokenIds        []string
 			savedContractAddress string
@@ -83,7 +83,7 @@ func (k Keeper) GetContractAddressAndTokenIds(ctx sdk.Context, msg *types.MsgCon
 			tempContractAddress  string
 		)
 
-		for _, nftId := range msg.NftIds {
+		for _, nftId := range msg.CosmosTokenIds {
 
 			uNftID := types.CreateNFTUID(msg.ClassId, nftId)
 
@@ -94,21 +94,22 @@ func (k Keeper) GetContractAddressAndTokenIds(ctx sdk.Context, msg *types.MsgCon
 			savedTokenIds = append(savedTokenIds, savedTokenId)
 		}
 
-		tokenIds, err = getNftDatas(msg.TokenIds, msg.NftIds, savedTokenIds, 2)
+		EvmTokenIds, err = getNftDatas(msg.EvmTokenIds, msg.CosmosTokenIds, savedTokenIds, 2)
 		if err != nil {
 			return "", nil, err
 		}
 
-		contractAddress, err = getNftData(msg.ContractAddress, msg.ClassId, savedContractAddress, 3)
+		EvmContractAddress, err = getNftData(msg.EvmContractAddress, msg.ClassId, savedContractAddress, 3)
 
-		if contractAddress == "" {
-			contractAddress = pair.Erc721Address
+		if EvmContractAddress == "" {
+			EvmContractAddress = pair.Erc721Address
 		}
 
 		if err != nil {
 			return "", nil, err
 		}
-		return contractAddress, tokenIds, nil
+
+		return EvmContractAddress, EvmTokenIds, nil
 
 	}
 

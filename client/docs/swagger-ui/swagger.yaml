@@ -2,7 +2,7 @@ swagger: '2.0'
 info:
   title: Uptick Chain - Legacy REST and gRPC Gateway docs
   description: A REST interface for state queries, legacy transactions
-  version: 0.2.7
+  version: 0.2.9
 paths:
   /ethermint/evm/v1/account/{address}:
     get:
@@ -1113,7 +1113,7 @@ paths:
 
                   Tendermint sha256 hash of the transaction bytes. See
 
-                  https://github.com/tendermint/tendermint/issues/6539 for
+                  https://github.com/cometbft/cometbft/issues/6539 for
                   reference
               logs:
                 type: array
@@ -15833,7 +15833,7 @@ definitions:
         title: |-
           ethereum transaction hash in hex format. This hash differs from the
           Tendermint sha256 hash of the transaction bytes. See
-          https://github.com/tendermint/tendermint/issues/6539 for reference
+          https://github.com/cometbft/cometbft/issues/6539 for reference
       logs:
         type: array
         items:

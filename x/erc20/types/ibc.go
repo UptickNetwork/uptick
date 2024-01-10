@@ -1,7 +1,7 @@
 package types
 
 import (
-	transfertypes "github.com/cosmos/ibc-go/v5/modules/apps/transfer/types"
+	transfertypes "github.com/cosmos/ibc-go/v7/modules/apps/transfer/types"
 )
 
 func IBCDenom(port, channel, denom string) (string, error) {
