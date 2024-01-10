@@ -6,9 +6,10 @@ package types
 import (
 	context "context"
 	fmt "fmt"
+	types "github.com/cosmos/ibc-go/v7/modules/core/02-client/types"
 	_ "github.com/gogo/protobuf/gogoproto"
-	grpc1 "github.com/gogo/protobuf/grpc"
-	proto "github.com/gogo/protobuf/proto"
+	grpc1 "github.com/cosmos/gogoproto/grpc"
+	proto "github.com/cosmos/gogoproto/proto"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
@@ -34,15 +35,15 @@ type MsgConvertNFT struct {
 	// nft classID to cnvert to ERC721
 	ClassId string `protobuf:"bytes,1,opt,name=class_id,json=classId,proto3" json:"class_id,omitempty"`
 	// nftID to cnvert to ERC721
-	NftIds []string `protobuf:"bytes,2,rep,name=nft_ids,json=nftIds,proto3" json:"nft_ids,omitempty"`
+	CosmosTokenIds []string `protobuf:"bytes,2,rep,name=cosmos_token_ids,json=cosmosTokenIds,proto3" json:"cosmos_token_ids,omitempty"`
 	// recipient hex address to receive ERC721 token
-	Receiver string `protobuf:"bytes,3,opt,name=receiver,proto3" json:"receiver,omitempty"`
+	EvmReceiver string `protobuf:"bytes,3,opt,name=evm_receiver,json=evmReceiver,proto3" json:"evm_receiver,omitempty"`
 	// cosmos bech32 address from the owner of the given Cosmos coins
-	Sender string `protobuf:"bytes,4,opt,name=sender,proto3" json:"sender,omitempty"`
+	CosmosSender string `protobuf:"bytes,4,opt,name=cosmos_sender,json=cosmosSender,proto3" json:"cosmos_sender,omitempty"`
 	// ERC721 token contract address registered in a token pair
-	ContractAddress string `protobuf:"bytes,5,opt,name=contract_address,json=contractAddress,proto3" json:"contract_address,omitempty"`
+	EvmContractAddress string `protobuf:"bytes,5,opt,name=evm_contract_address,json=evmContractAddress,proto3" json:"evm_contract_address,omitempty"`
 	// ERC721 token id registered in a token pair
-	TokenIds []string `protobuf:"bytes,6,rep,name=token_ids,json=tokenIds,proto3" json:"token_ids,omitempty"`
+	EvmTokenIds []string `protobuf:"bytes,6,rep,name=evm_token_ids,json=evmTokenIds,proto3" json:"evm_token_ids,omitempty"`
 }
 
 func (m *MsgConvertNFT) Reset()         { *m = MsgConvertNFT{} }
@@ -85,37 +86,37 @@ func (m *MsgConvertNFT) GetClassId() string {
 	return ""
 }
 
-func (m *MsgConvertNFT) GetNftIds() []string {
+func (m *MsgConvertNFT) GetCosmosTokenIds() []string {
 	if m != nil {
-		return m.NftIds
+		return m.CosmosTokenIds
 	}
 	return nil
 }
 
-func (m *MsgConvertNFT) GetReceiver() string {
+func (m *MsgConvertNFT) GetEvmReceiver() string {
 	if m != nil {
-		return m.Receiver
+		return m.EvmReceiver
 	}
 	return ""
 }
 
-func (m *MsgConvertNFT) GetSender() string {
+func (m *MsgConvertNFT) GetCosmosSender() string {
 	if m != nil {
-		return m.Sender
+		return m.CosmosSender
 	}
 	return ""
 }
 
-func (m *MsgConvertNFT) GetContractAddress() string {
+func (m *MsgConvertNFT) GetEvmContractAddress() string {
 	if m != nil {
-		return m.ContractAddress
+		return m.EvmContractAddress
 	}
 	return ""
 }
 
-func (m *MsgConvertNFT) GetTokenIds() []string {
+func (m *MsgConvertNFT) GetEvmTokenIds() []string {
 	if m != nil {
-		return m.TokenIds
+		return m.EvmTokenIds
 	}
 	return nil
 }
@@ -161,17 +162,17 @@ var xxx_messageInfo_MsgConvertNFTResponse proto.InternalMessageInfo
 // nft.
 type MsgConvertERC721 struct {
 	// ERC721 token contract address registered in a token pair
-	ContractAddress string `protobuf:"bytes,1,opt,name=contract_address,json=contractAddress,proto3" json:"contract_address,omitempty"`
+	EvmContractAddress string `protobuf:"bytes,1,opt,name=evm_contract_address,json=evmContractAddress,proto3" json:"evm_contract_address,omitempty"`
 	// tokenID to convert
-	TokenIds []string `protobuf:"bytes,2,rep,name=token_ids,json=tokenIds,proto3" json:"token_ids,omitempty"`
+	EvmTokenIds []string `protobuf:"bytes,2,rep,name=evm_token_ids,json=evmTokenIds,proto3" json:"evm_token_ids,omitempty"`
 	// bech32 address to receive native Cosmos coins
-	Receiver string `protobuf:"bytes,3,opt,name=receiver,proto3" json:"receiver,omitempty"`
+	CosmosReceiver string `protobuf:"bytes,3,opt,name=cosmos_receiver,json=cosmosReceiver,proto3" json:"cosmos_receiver,omitempty"`
 	// sender hex address from the owner of the given ERC721 tokens
-	Sender string `protobuf:"bytes,4,opt,name=sender,proto3" json:"sender,omitempty"`
+	EvmSender string `protobuf:"bytes,4,opt,name=evm_sender,json=evmSender,proto3" json:"evm_sender,omitempty"`
 	// nft classID to cnvert to ERC721
 	ClassId string `protobuf:"bytes,5,opt,name=class_id,json=classId,proto3" json:"class_id,omitempty"`
 	// nftID to cnvert to ERC721
-	NftIds []string `protobuf:"bytes,6,rep,name=nft_ids,json=nftIds,proto3" json:"nft_ids,omitempty"`
+	CosmosTokenIds []string `protobuf:"bytes,6,rep,name=cosmos_token_ids,json=cosmosTokenIds,proto3" json:"cosmos_token_ids,omitempty"`
 }
 
 func (m *MsgConvertERC721) Reset()         { *m = MsgConvertERC721{} }
@@ -207,30 +208,30 @@ func (m *MsgConvertERC721) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_MsgConvertERC721 proto.InternalMessageInfo
 
-func (m *MsgConvertERC721) GetContractAddress() string {
+func (m *MsgConvertERC721) GetEvmContractAddress() string {
 	if m != nil {
-		return m.ContractAddress
+		return m.EvmContractAddress
 	}
 	return ""
 }
 
-func (m *MsgConvertERC721) GetTokenIds() []string {
+func (m *MsgConvertERC721) GetEvmTokenIds() []string {
 	if m != nil {
-		return m.TokenIds
+		return m.EvmTokenIds
 	}
 	return nil
 }
 
-func (m *MsgConvertERC721) GetReceiver() string {
+func (m *MsgConvertERC721) GetCosmosReceiver() string {
 	if m != nil {
-		return m.Receiver
+		return m.CosmosReceiver
 	}
 	return ""
 }
 
-func (m *MsgConvertERC721) GetSender() string {
+func (m *MsgConvertERC721) GetEvmSender() string {
 	if m != nil {
-		return m.Sender
+		return m.EvmSender
 	}
 	return ""
 }
@@ -242,9 +243,9 @@ func (m *MsgConvertERC721) GetClassId() string {
 	return ""
 }
 
-func (m *MsgConvertERC721) GetNftIds() []string {
+func (m *MsgConvertERC721) GetCosmosTokenIds() []string {
 	if m != nil {
-		return m.NftIds
+		return m.CosmosTokenIds
 	}
 	return nil
 }
@@ -286,45 +287,159 @@ func (m *MsgConvertERC721Response) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_MsgConvertERC721Response proto.InternalMessageInfo
 
+type MsgTransferERC721 struct {
+	EvmContractAddress string `protobuf:"bytes,1,opt,name=evm_contract_address,json=evmContractAddress,proto3" json:"evm_contract_address,omitempty"`
+	// tokenID to convert
+	EvmTokenIds []string `protobuf:"bytes,2,rep,name=evm_token_ids,json=evmTokenIds,proto3" json:"evm_token_ids,omitempty"`
+	// the port on which the packet will be sent
+	SourcePort string `protobuf:"bytes,3,opt,name=source_port,json=sourcePort,proto3" json:"source_port,omitempty"`
+	// the channel by which the packet will be sent
+	SourceChannel string `protobuf:"bytes,4,opt,name=source_channel,json=sourceChannel,proto3" json:"source_channel,omitempty"`
+	// the class_id of tokens to be transferred
+	ClassId string `protobuf:"bytes,5,opt,name=class_id,json=classId,proto3" json:"class_id,omitempty"`
+	// the non fungible tokens to be transferred
+	CosmosTokenIds []string `protobuf:"bytes,6,rep,name=cosmos_token_ids,json=cosmosTokenIds,proto3" json:"cosmos_token_ids,omitempty"`
+	// the sender address
+	EvmSender string `protobuf:"bytes,7,opt,name=evm_sender,json=evmSender,proto3" json:"evm_sender,omitempty"`
+	// the recipient address on the destination chain
+	CosmosReceiver string `protobuf:"bytes,8,opt,name=cosmos_receiver,json=cosmosReceiver,proto3" json:"cosmos_receiver,omitempty"`
+	// Timeout height relative to the current block height.
+	// The timeout is disabled when set to 0.
+	TimeoutHeight types.Height `protobuf:"bytes,9,opt,name=timeout_height,json=timeoutHeight,proto3" json:"timeout_height"`
+	// Timeout timestamp in absolute nanoseconds since unix epoch.
+	// The timeout is disabled when set to 0.
+	TimeoutTimestamp uint64 `protobuf:"varint,10,opt,name=timeout_timestamp,json=timeoutTimestamp,proto3" json:"timeout_timestamp,omitempty"`
+	// optional memo
+	Memo string `protobuf:"bytes,11,opt,name=memo,proto3" json:"memo,omitempty"`
+}
+
+func (m *MsgTransferERC721) Reset()         { *m = MsgTransferERC721{} }
+func (m *MsgTransferERC721) String() string { return proto.CompactTextString(m) }
+func (*MsgTransferERC721) ProtoMessage()    {}
+func (*MsgTransferERC721) Descriptor() ([]byte, []int) {
+	return fileDescriptor_331f042db48d170e, []int{4}
+}
+func (m *MsgTransferERC721) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *MsgTransferERC721) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_MsgTransferERC721.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *MsgTransferERC721) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_MsgTransferERC721.Merge(m, src)
+}
+func (m *MsgTransferERC721) XXX_Size() int {
+	return m.Size()
+}
+func (m *MsgTransferERC721) XXX_DiscardUnknown() {
+	xxx_messageInfo_MsgTransferERC721.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_MsgTransferERC721 proto.InternalMessageInfo
+
+type MsgTransferERC721Response struct {
+}
+
+func (m *MsgTransferERC721Response) Reset()         { *m = MsgTransferERC721Response{} }
+func (m *MsgTransferERC721Response) String() string { return proto.CompactTextString(m) }
+func (*MsgTransferERC721Response) ProtoMessage()    {}
+func (*MsgTransferERC721Response) Descriptor() ([]byte, []int) {
+	return fileDescriptor_331f042db48d170e, []int{5}
+}
+func (m *MsgTransferERC721Response) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *MsgTransferERC721Response) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_MsgTransferERC721Response.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *MsgTransferERC721Response) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_MsgTransferERC721Response.Merge(m, src)
+}
+func (m *MsgTransferERC721Response) XXX_Size() int {
+	return m.Size()
+}
+func (m *MsgTransferERC721Response) XXX_DiscardUnknown() {
+	xxx_messageInfo_MsgTransferERC721Response.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_MsgTransferERC721Response proto.InternalMessageInfo
+
 func init() {
 	proto.RegisterType((*MsgConvertNFT)(nil), "uptick.erc721.v1.MsgConvertNFT")
 	proto.RegisterType((*MsgConvertNFTResponse)(nil), "uptick.erc721.v1.MsgConvertNFTResponse")
 	proto.RegisterType((*MsgConvertERC721)(nil), "uptick.erc721.v1.MsgConvertERC721")
 	proto.RegisterType((*MsgConvertERC721Response)(nil), "uptick.erc721.v1.MsgConvertERC721Response")
+	proto.RegisterType((*MsgTransferERC721)(nil), "uptick.erc721.v1.MsgTransferERC721")
+	proto.RegisterType((*MsgTransferERC721Response)(nil), "uptick.erc721.v1.MsgTransferERC721Response")
 }
 
 func init() { proto.RegisterFile("uptick/erc721/v1/tx.proto", fileDescriptor_331f042db48d170e) }
 
 var fileDescriptor_331f042db48d170e = []byte{
-	// 447 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x9c, 0x53, 0x31, 0x8f, 0xd3, 0x30,
-	0x18, 0xad, 0x53, 0x2e, 0xd7, 0x5a, 0x3a, 0x51, 0x59, 0xc0, 0xe5, 0x02, 0x0a, 0x55, 0x10, 0xa2,
-	0x80, 0x14, 0x2b, 0x65, 0xb8, 0x19, 0x4e, 0x20, 0x3a, 0xdc, 0x0d, 0x11, 0x2c, 0x2c, 0x51, 0xce,
-	0x76, 0x43, 0xd4, 0xc3, 0x8e, 0x6c, 0x5f, 0x38, 0x36, 0xc4, 0xcc, 0x80, 0xc4, 0xc0, 0xcf, 0x41,
-	0x62, 0x62, 0x3c, 0x89, 0x85, 0x11, 0xb5, 0xfc, 0x10, 0x84, 0x4d, 0x4a, 0x53, 0x95, 0x16, 0xdd,
-	0xe6, 0xef, 0x7d, 0xcf, 0xdf, 0xfb, 0xde, 0x8b, 0x03, 0xf7, 0x4e, 0x4b, 0x5d, 0x90, 0x09, 0x66,
-	0x92, 0xec, 0x0f, 0x63, 0x5c, 0xc5, 0x58, 0x9f, 0x45, 0xa5, 0x14, 0x5a, 0xa0, 0x9e, 0x6d, 0x45,
-	0xb6, 0x15, 0x55, 0xb1, 0x7f, 0x23, 0x17, 0x22, 0x3f, 0x61, 0x38, 0x2b, 0x0b, 0x9c, 0x71, 0x2e,
-	0x74, 0xa6, 0x0b, 0xc1, 0x95, 0xe5, 0xfb, 0x57, 0x72, 0x91, 0x0b, 0x73, 0xc4, 0xbf, 0x4f, 0x16,
-	0x0d, 0x3f, 0x03, 0xb8, 0x73, 0xa8, 0xf2, 0x03, 0xc1, 0x2b, 0x26, 0xf5, 0xd1, 0x93, 0x67, 0x68,
-	0x0f, 0x76, 0xc8, 0x49, 0xa6, 0x54, 0x5a, 0x50, 0x0f, 0xf4, 0xc1, 0xa0, 0x9b, 0x6c, 0x9b, 0x7a,
-	0x44, 0xd1, 0x2e, 0xdc, 0xe6, 0x63, 0x9d, 0x16, 0x54, 0x79, 0x4e, 0xbf, 0x3d, 0xe8, 0x26, 0x2e,
-	0x1f, 0xeb, 0x11, 0x55, 0xc8, 0x87, 0x1d, 0xc9, 0x08, 0x2b, 0x2a, 0x26, 0xbd, 0xb6, 0xb9, 0x33,
-	0xaf, 0xd1, 0x35, 0xe8, 0x2a, 0xc6, 0x29, 0x93, 0xde, 0x25, 0xd3, 0xf9, 0x53, 0xa1, 0xbb, 0xb0,
-	0x47, 0x04, 0xd7, 0x32, 0x23, 0x3a, 0xcd, 0x28, 0x95, 0x4c, 0x29, 0x6f, 0xcb, 0x30, 0x2e, 0xd7,
-	0xf8, 0x43, 0x0b, 0xa3, 0xeb, 0xb0, 0xab, 0xc5, 0x84, 0x71, 0xa3, 0xec, 0x1a, 0xe5, 0x8e, 0x01,
-	0x46, 0x54, 0x85, 0xbb, 0xf0, 0x6a, 0xc3, 0x40, 0xc2, 0x54, 0x29, 0xb8, 0x62, 0xe1, 0x17, 0x00,
-	0x7b, 0x7f, 0x3b, 0x8f, 0x93, 0x83, 0xfd, 0x61, 0xbc, 0x52, 0x15, 0xfc, 0x87, 0xaa, 0xd3, 0x54,
-	0xbd, 0x90, 0xe3, 0xc5, 0x64, 0xb7, 0xfe, 0x99, 0xac, 0xbb, 0x98, 0x6c, 0xe8, 0x43, 0x6f, 0xd9,
-	0x43, 0x6d, 0x70, 0xf8, 0xc9, 0x81, 0xed, 0x43, 0x95, 0xa3, 0xb7, 0x00, 0xc2, 0x85, 0x0f, 0x78,
-	0x33, 0x5a, 0x7e, 0x19, 0x51, 0x23, 0x20, 0xff, 0xce, 0x06, 0xc2, 0x3c, 0xc1, 0xc1, 0xbb, 0x6f,
-	0x3f, 0x3f, 0x3a, 0x21, 0xea, 0xe3, 0x15, 0xcf, 0x10, 0x13, 0x7b, 0x21, 0xe5, 0x63, 0x8d, 0xde,
-	0x03, 0xb8, 0xd3, 0x0c, 0x3a, 0x5c, 0x27, 0x62, 0x39, 0xfe, 0xbd, 0xcd, 0x9c, 0xf9, 0x2e, 0xf7,
-	0xcd, 0x2e, 0xb7, 0xd1, 0xad, 0xb5, 0xbb, 0x58, 0xf0, 0xd1, 0xd3, 0xaf, 0xd3, 0x00, 0x9c, 0x4f,
-	0x03, 0xf0, 0x63, 0x1a, 0x80, 0x0f, 0xb3, 0xa0, 0x75, 0x3e, 0x0b, 0x5a, 0xdf, 0x67, 0x41, 0xeb,
-	0x45, 0x94, 0x17, 0xfa, 0xe5, 0xe9, 0x71, 0x44, 0xc4, 0x2b, 0xfc, 0xdc, 0x0c, 0x3a, 0x62, 0xfa,
-	0xb5, 0x90, 0x93, 0x7a, 0xec, 0x59, 0x3d, 0x58, 0xbf, 0x29, 0x99, 0x3a, 0x76, 0xcd, 0x6f, 0xf2,
-	0xe0, 0x57, 0x00, 0x00, 0x00, 0xff, 0xff, 0xf6, 0x24, 0x54, 0x91, 0x89, 0x03, 0x00, 0x00,
+	// 715 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xb4, 0x55, 0xcf, 0x4f, 0x13, 0x41,
+	0x18, 0xed, 0xd2, 0xf2, 0xa3, 0x5f, 0x69, 0x2d, 0x13, 0x8c, 0x4b, 0xd5, 0xb6, 0x2e, 0x21, 0x34,
+	0x10, 0x76, 0x69, 0x3d, 0x90, 0x78, 0x93, 0x46, 0x85, 0x03, 0xc4, 0xd4, 0x7a, 0xf1, 0xb2, 0xd9,
+	0x4e, 0x87, 0xed, 0x86, 0xee, 0xce, 0x66, 0x66, 0xba, 0xe2, 0xcd, 0x78, 0xf2, 0xe0, 0xc1, 0x44,
+	0xff, 0x00, 0xfe, 0x02, 0xff, 0x0e, 0x8e, 0x44, 0x2f, 0x9e, 0x8c, 0x01, 0x0f, 0x9e, 0x4d, 0xbc,
+	0x9b, 0xdd, 0xd9, 0x16, 0x5a, 0x2a, 0x70, 0xd0, 0x53, 0xa7, 0xef, 0x7b, 0xf3, 0xe6, 0xcd, 0xfb,
+	0xfa, 0x4d, 0x61, 0xa1, 0xe7, 0x0b, 0x07, 0xef, 0x1b, 0x84, 0xe1, 0x8d, 0x5a, 0xd5, 0x08, 0xaa,
+	0x86, 0x38, 0xd0, 0x7d, 0x46, 0x05, 0x45, 0x79, 0x59, 0xd2, 0x65, 0x49, 0x0f, 0xaa, 0x85, 0x3b,
+	0x36, 0xa5, 0x76, 0x97, 0x18, 0x96, 0xef, 0x18, 0x96, 0xe7, 0x51, 0x61, 0x09, 0x87, 0x7a, 0x5c,
+	0xf2, 0x0b, 0xf3, 0x36, 0xb5, 0x69, 0xb4, 0x34, 0xc2, 0x55, 0x8c, 0x96, 0x9c, 0x16, 0x36, 0x30,
+	0x65, 0xc4, 0xc0, 0x5d, 0x87, 0x78, 0x22, 0x3c, 0x42, 0xae, 0x24, 0x41, 0xfb, 0xa5, 0x40, 0x76,
+	0x87, 0xdb, 0x75, 0xea, 0x05, 0x84, 0x89, 0xdd, 0xc7, 0x4d, 0xb4, 0x00, 0x33, 0xb8, 0x6b, 0x71,
+	0x6e, 0x3a, 0x6d, 0x55, 0x29, 0x2b, 0x95, 0x74, 0x63, 0x3a, 0xfa, 0xbe, 0xdd, 0x46, 0x15, 0xc8,
+	0x63, 0xca, 0x5d, 0xca, 0x4d, 0x41, 0xf7, 0x89, 0x67, 0x3a, 0x6d, 0xae, 0x4e, 0x94, 0x93, 0x95,
+	0x74, 0x23, 0x27, 0xf1, 0x66, 0x08, 0x6f, 0xb7, 0x39, 0xba, 0x07, 0xb3, 0x24, 0x70, 0x4d, 0x46,
+	0x30, 0x71, 0x02, 0xc2, 0xd4, 0x64, 0x24, 0x94, 0x21, 0x81, 0xdb, 0x88, 0x21, 0xb4, 0x08, 0xd9,
+	0x58, 0x8c, 0x13, 0xaf, 0x4d, 0x98, 0x9a, 0x8a, 0x38, 0xb3, 0x12, 0x7c, 0x16, 0x61, 0x68, 0x1d,
+	0xe6, 0x43, 0x1d, 0x4c, 0x3d, 0xc1, 0x2c, 0x2c, 0x4c, 0xab, 0xdd, 0x66, 0x84, 0x73, 0x75, 0x32,
+	0xe2, 0x22, 0x12, 0xb8, 0xf5, 0xb8, 0xf4, 0x50, 0x56, 0x90, 0x06, 0xd9, 0x70, 0xc7, 0x99, 0xc1,
+	0xa9, 0xc8, 0x60, 0x78, 0x74, 0xdf, 0x9d, 0x76, 0x0b, 0x6e, 0x0e, 0xdd, 0xb9, 0x41, 0xb8, 0x4f,
+	0x3d, 0x4e, 0xb4, 0xdf, 0x0a, 0xe4, 0xcf, 0x2a, 0x8f, 0x1a, 0xf5, 0x8d, 0x5a, 0xf5, 0xaf, 0x1e,
+	0x94, 0xeb, 0x7b, 0x98, 0xb8, 0xe0, 0x01, 0x2d, 0xc3, 0x8d, 0xf8, 0xfa, 0x23, 0x21, 0xc5, 0x51,
+	0x0e, 0x72, 0xba, 0x0b, 0x10, 0x8a, 0x0d, 0x85, 0x94, 0x26, 0x81, 0x1b, 0x27, 0x74, 0xbe, 0x5d,
+	0x93, 0x57, 0xb7, 0x6b, 0x6a, 0x5c, 0xbb, 0xb4, 0x02, 0xa8, 0xa3, 0xd7, 0x1e, 0x64, 0xf2, 0x39,
+	0x09, 0x73, 0x3b, 0xdc, 0x6e, 0x32, 0xcb, 0xe3, 0x7b, 0x84, 0xfd, 0xd7, 0x50, 0x4a, 0x90, 0xe1,
+	0xb4, 0xc7, 0x30, 0x31, 0x7d, 0xca, 0x44, 0x1c, 0x08, 0x48, 0xe8, 0x29, 0x65, 0x02, 0x2d, 0x41,
+	0x2e, 0x26, 0xe0, 0x8e, 0xe5, 0x79, 0xa4, 0x1b, 0x07, 0x92, 0x95, 0x68, 0x5d, 0x82, 0xff, 0x24,
+	0x94, 0x91, 0xe0, 0xa7, 0x47, 0x83, 0x1f, 0xd3, 0xc0, 0x99, 0xb1, 0x0d, 0x7c, 0x02, 0x39, 0xe1,
+	0xb8, 0x84, 0xf6, 0x84, 0xd9, 0x21, 0x8e, 0xdd, 0x11, 0x6a, 0xba, 0xac, 0x54, 0x32, 0xb5, 0x82,
+	0xee, 0xb4, 0xb0, 0x1e, 0x0e, 0xa7, 0x1e, 0x8f, 0x64, 0x50, 0xd5, 0xb7, 0x22, 0xc6, 0x66, 0xea,
+	0xe8, 0x5b, 0x29, 0xd1, 0xc8, 0xc6, 0xfb, 0x24, 0x88, 0x56, 0x61, 0xae, 0x2f, 0x14, 0x7e, 0x72,
+	0x61, 0xb9, 0xbe, 0x0a, 0x65, 0xa5, 0x92, 0x6a, 0xe4, 0xe3, 0x42, 0xb3, 0x8f, 0x23, 0x04, 0x29,
+	0x97, 0xb8, 0x54, 0xcd, 0x44, 0x9e, 0xa2, 0xf5, 0x83, 0x99, 0xb7, 0x87, 0xa5, 0xc4, 0xcf, 0xc3,
+	0x52, 0x42, 0xbb, 0x0d, 0x0b, 0x17, 0x7a, 0xda, 0xef, 0x78, 0xed, 0x53, 0x12, 0x92, 0x3b, 0xdc,
+	0x46, 0xaf, 0x15, 0x80, 0x73, 0x0f, 0x43, 0x49, 0x1f, 0x7d, 0x92, 0xf4, 0xa1, 0x29, 0x2a, 0x2c,
+	0x5f, 0x41, 0x18, 0xfc, 0xa4, 0x2a, 0x6f, 0xbe, 0xfc, 0xf8, 0x30, 0xa1, 0xa1, 0xb2, 0x31, 0xe6,
+	0xfd, 0x33, 0xb0, 0xdc, 0x60, 0x7a, 0x7b, 0x02, 0xbd, 0x53, 0x20, 0x3b, 0x3c, 0x8d, 0xda, 0x65,
+	0x87, 0x48, 0x4e, 0x61, 0xe5, 0x6a, 0xce, 0xc0, 0xcb, 0x6a, 0xe4, 0x65, 0x09, 0x2d, 0x5e, 0xea,
+	0x45, 0x82, 0xe8, 0xa3, 0x02, 0xb9, 0x91, 0x41, 0x58, 0x1c, 0x7b, 0xd6, 0x30, 0xa9, 0xb0, 0x7a,
+	0x0d, 0xd2, 0xc0, 0xd1, 0x7a, 0xe4, 0x68, 0x05, 0x55, 0xc6, 0x3a, 0x72, 0x5a, 0x78, 0x4d, 0xc4,
+	0x1b, 0xd7, 0x64, 0x65, 0x73, 0xeb, 0xe8, 0xa4, 0xa8, 0x1c, 0x9f, 0x14, 0x95, 0xef, 0x27, 0x45,
+	0xe5, 0xfd, 0x69, 0x31, 0x71, 0x7c, 0x5a, 0x4c, 0x7c, 0x3d, 0x2d, 0x26, 0x5e, 0xe8, 0xb6, 0x23,
+	0x3a, 0xbd, 0x96, 0x8e, 0xa9, 0x6b, 0x3c, 0x8f, 0xd4, 0x76, 0x89, 0x78, 0x49, 0xd9, 0x7e, 0x5f,
+	0xfb, 0xa0, 0xaf, 0x2e, 0x5e, 0xf9, 0x84, 0xb7, 0xa6, 0xa2, 0x7f, 0x85, 0xfb, 0x7f, 0x02, 0x00,
+	0x00, 0xff, 0xff, 0x72, 0x09, 0x4e, 0x17, 0x99, 0x06, 0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -345,6 +460,7 @@ type MsgClient interface {
 	// ConvertERC721 mints a native Cosmos coin representation of the ERC721 token
 	// contract that is registered on the token mapping.
 	ConvertERC721(ctx context.Context, in *MsgConvertERC721, opts ...grpc.CallOption) (*MsgConvertERC721Response, error)
+	TransferERC721(ctx context.Context, in *MsgTransferERC721, opts ...grpc.CallOption) (*MsgTransferERC721Response, error)
 }
 
 type msgClient struct {
@@ -373,6 +489,15 @@ func (c *msgClient) ConvertERC721(ctx context.Context, in *MsgConvertERC721, opt
 	return out, nil
 }
 
+func (c *msgClient) TransferERC721(ctx context.Context, in *MsgTransferERC721, opts ...grpc.CallOption) (*MsgTransferERC721Response, error) {
+	out := new(MsgTransferERC721Response)
+	err := c.cc.Invoke(ctx, "/uptick.erc721.v1.Msg/TransferERC721", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // MsgServer is the server API for Msg service.
 type MsgServer interface {
 	// ConvertNFT mints a ERC721 representation of the native Cosmos nft
@@ -380,7 +505,8 @@ type MsgServer interface {
 	ConvertNFT(context.Context, *MsgConvertNFT) (*MsgConvertNFTResponse, error)
 	// ConvertERC721 mints a native Cosmos coin representation of the ERC721 token
 	// contract that is registered on the token mapping.
-	ConvertERC721(context.Context, *MsgConvertERC721) (*MsgConvertERC721Response, error)
+	ConvertERC721(context.Context, *MsgConvertERC721) (*MsgConvertERC721, error)
+	TransferERC721(context.Context, *MsgTransferERC721) (*MsgTransferERC721Response, error)
 }
 
 // UnimplementedMsgServer can be embedded to have forward compatible implementations.
@@ -392,6 +518,9 @@ func (*UnimplementedMsgServer) ConvertNFT(ctx context.Context, req *MsgConvertNF
 }
 func (*UnimplementedMsgServer) ConvertERC721(ctx context.Context, req *MsgConvertERC721) (*MsgConvertERC721Response, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ConvertERC721 not implemented")
+}
+func (*UnimplementedMsgServer) TransferERC721(ctx context.Context, req *MsgTransferERC721) (*MsgTransferERC721Response, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method TransferERC721 not implemented")
 }
 
 func RegisterMsgServer(s grpc1.Server, srv MsgServer) {
@@ -434,6 +563,24 @@ func _Msg_ConvertERC721_Handler(srv interface{}, ctx context.Context, dec func(i
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Msg_TransferERC721_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MsgTransferERC721)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MsgServer).TransferERC721(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/uptick.erc721.v1.Msg/TransferERC721",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MsgServer).TransferERC721(ctx, req.(*MsgTransferERC721))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 var _Msg_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "uptick.erc721.v1.Msg",
 	HandlerType: (*MsgServer)(nil),
@@ -445,6 +592,10 @@ var _Msg_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ConvertERC721",
 			Handler:    _Msg_ConvertERC721_Handler,
+		},
+		{
+			MethodName: "TransferERC721",
+			Handler:    _Msg_TransferERC721_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
@@ -471,41 +622,41 @@ func (m *MsgConvertNFT) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if len(m.TokenIds) > 0 {
-		for iNdEx := len(m.TokenIds) - 1; iNdEx >= 0; iNdEx-- {
-			i -= len(m.TokenIds[iNdEx])
-			copy(dAtA[i:], m.TokenIds[iNdEx])
-			i = encodeVarintTx(dAtA, i, uint64(len(m.TokenIds[iNdEx])))
+	if len(m.EvmTokenIds) > 0 {
+		for iNdEx := len(m.EvmTokenIds) - 1; iNdEx >= 0; iNdEx-- {
+			i -= len(m.EvmTokenIds[iNdEx])
+			copy(dAtA[i:], m.EvmTokenIds[iNdEx])
+			i = encodeVarintTx(dAtA, i, uint64(len(m.EvmTokenIds[iNdEx])))
 			i--
 			dAtA[i] = 0x32
 		}
 	}
-	if len(m.ContractAddress) > 0 {
-		i -= len(m.ContractAddress)
-		copy(dAtA[i:], m.ContractAddress)
-		i = encodeVarintTx(dAtA, i, uint64(len(m.ContractAddress)))
+	if len(m.EvmContractAddress) > 0 {
+		i -= len(m.EvmContractAddress)
+		copy(dAtA[i:], m.EvmContractAddress)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.EvmContractAddress)))
 		i--
 		dAtA[i] = 0x2a
 	}
-	if len(m.Sender) > 0 {
-		i -= len(m.Sender)
-		copy(dAtA[i:], m.Sender)
-		i = encodeVarintTx(dAtA, i, uint64(len(m.Sender)))
+	if len(m.CosmosSender) > 0 {
+		i -= len(m.CosmosSender)
+		copy(dAtA[i:], m.CosmosSender)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.CosmosSender)))
 		i--
 		dAtA[i] = 0x22
 	}
-	if len(m.Receiver) > 0 {
-		i -= len(m.Receiver)
-		copy(dAtA[i:], m.Receiver)
-		i = encodeVarintTx(dAtA, i, uint64(len(m.Receiver)))
+	if len(m.EvmReceiver) > 0 {
+		i -= len(m.EvmReceiver)
+		copy(dAtA[i:], m.EvmReceiver)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.EvmReceiver)))
 		i--
 		dAtA[i] = 0x1a
 	}
-	if len(m.NftIds) > 0 {
-		for iNdEx := len(m.NftIds) - 1; iNdEx >= 0; iNdEx-- {
-			i -= len(m.NftIds[iNdEx])
-			copy(dAtA[i:], m.NftIds[iNdEx])
-			i = encodeVarintTx(dAtA, i, uint64(len(m.NftIds[iNdEx])))
+	if len(m.CosmosTokenIds) > 0 {
+		for iNdEx := len(m.CosmosTokenIds) - 1; iNdEx >= 0; iNdEx-- {
+			i -= len(m.CosmosTokenIds[iNdEx])
+			copy(dAtA[i:], m.CosmosTokenIds[iNdEx])
+			i = encodeVarintTx(dAtA, i, uint64(len(m.CosmosTokenIds[iNdEx])))
 			i--
 			dAtA[i] = 0x12
 		}
@@ -563,11 +714,11 @@ func (m *MsgConvertERC721) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if len(m.NftIds) > 0 {
-		for iNdEx := len(m.NftIds) - 1; iNdEx >= 0; iNdEx-- {
-			i -= len(m.NftIds[iNdEx])
-			copy(dAtA[i:], m.NftIds[iNdEx])
-			i = encodeVarintTx(dAtA, i, uint64(len(m.NftIds[iNdEx])))
+	if len(m.CosmosTokenIds) > 0 {
+		for iNdEx := len(m.CosmosTokenIds) - 1; iNdEx >= 0; iNdEx-- {
+			i -= len(m.CosmosTokenIds[iNdEx])
+			copy(dAtA[i:], m.CosmosTokenIds[iNdEx])
+			i = encodeVarintTx(dAtA, i, uint64(len(m.CosmosTokenIds[iNdEx])))
 			i--
 			dAtA[i] = 0x32
 		}
@@ -579,33 +730,33 @@ func (m *MsgConvertERC721) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		i--
 		dAtA[i] = 0x2a
 	}
-	if len(m.Sender) > 0 {
-		i -= len(m.Sender)
-		copy(dAtA[i:], m.Sender)
-		i = encodeVarintTx(dAtA, i, uint64(len(m.Sender)))
+	if len(m.EvmSender) > 0 {
+		i -= len(m.EvmSender)
+		copy(dAtA[i:], m.EvmSender)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.EvmSender)))
 		i--
 		dAtA[i] = 0x22
 	}
-	if len(m.Receiver) > 0 {
-		i -= len(m.Receiver)
-		copy(dAtA[i:], m.Receiver)
-		i = encodeVarintTx(dAtA, i, uint64(len(m.Receiver)))
+	if len(m.CosmosReceiver) > 0 {
+		i -= len(m.CosmosReceiver)
+		copy(dAtA[i:], m.CosmosReceiver)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.CosmosReceiver)))
 		i--
 		dAtA[i] = 0x1a
 	}
-	if len(m.TokenIds) > 0 {
-		for iNdEx := len(m.TokenIds) - 1; iNdEx >= 0; iNdEx-- {
-			i -= len(m.TokenIds[iNdEx])
-			copy(dAtA[i:], m.TokenIds[iNdEx])
-			i = encodeVarintTx(dAtA, i, uint64(len(m.TokenIds[iNdEx])))
+	if len(m.EvmTokenIds) > 0 {
+		for iNdEx := len(m.EvmTokenIds) - 1; iNdEx >= 0; iNdEx-- {
+			i -= len(m.EvmTokenIds[iNdEx])
+			copy(dAtA[i:], m.EvmTokenIds[iNdEx])
+			i = encodeVarintTx(dAtA, i, uint64(len(m.EvmTokenIds[iNdEx])))
 			i--
 			dAtA[i] = 0x12
 		}
 	}
-	if len(m.ContractAddress) > 0 {
-		i -= len(m.ContractAddress)
-		copy(dAtA[i:], m.ContractAddress)
-		i = encodeVarintTx(dAtA, i, uint64(len(m.ContractAddress)))
+	if len(m.EvmContractAddress) > 0 {
+		i -= len(m.EvmContractAddress)
+		copy(dAtA[i:], m.EvmContractAddress)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.EvmContractAddress)))
 		i--
 		dAtA[i] = 0xa
 	}
@@ -635,6 +786,134 @@ func (m *MsgConvertERC721Response) MarshalToSizedBuffer(dAtA []byte) (int, error
 	return len(dAtA) - i, nil
 }
 
+func (m *MsgTransferERC721) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *MsgTransferERC721) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *MsgTransferERC721) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.Memo) > 0 {
+		i -= len(m.Memo)
+		copy(dAtA[i:], m.Memo)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.Memo)))
+		i--
+		dAtA[i] = 0x5a
+	}
+	if m.TimeoutTimestamp != 0 {
+		i = encodeVarintTx(dAtA, i, uint64(m.TimeoutTimestamp))
+		i--
+		dAtA[i] = 0x50
+	}
+	{
+		size, err := m.TimeoutHeight.MarshalToSizedBuffer(dAtA[:i])
+		if err != nil {
+			return 0, err
+		}
+		i -= size
+		i = encodeVarintTx(dAtA, i, uint64(size))
+	}
+	i--
+	dAtA[i] = 0x4a
+	if len(m.CosmosReceiver) > 0 {
+		i -= len(m.CosmosReceiver)
+		copy(dAtA[i:], m.CosmosReceiver)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.CosmosReceiver)))
+		i--
+		dAtA[i] = 0x42
+	}
+	if len(m.EvmSender) > 0 {
+		i -= len(m.EvmSender)
+		copy(dAtA[i:], m.EvmSender)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.EvmSender)))
+		i--
+		dAtA[i] = 0x3a
+	}
+	if len(m.CosmosTokenIds) > 0 {
+		for iNdEx := len(m.CosmosTokenIds) - 1; iNdEx >= 0; iNdEx-- {
+			i -= len(m.CosmosTokenIds[iNdEx])
+			copy(dAtA[i:], m.CosmosTokenIds[iNdEx])
+			i = encodeVarintTx(dAtA, i, uint64(len(m.CosmosTokenIds[iNdEx])))
+			i--
+			dAtA[i] = 0x32
+		}
+	}
+	if len(m.ClassId) > 0 {
+		i -= len(m.ClassId)
+		copy(dAtA[i:], m.ClassId)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.ClassId)))
+		i--
+		dAtA[i] = 0x2a
+	}
+	if len(m.SourceChannel) > 0 {
+		i -= len(m.SourceChannel)
+		copy(dAtA[i:], m.SourceChannel)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.SourceChannel)))
+		i--
+		dAtA[i] = 0x22
+	}
+	if len(m.SourcePort) > 0 {
+		i -= len(m.SourcePort)
+		copy(dAtA[i:], m.SourcePort)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.SourcePort)))
+		i--
+		dAtA[i] = 0x1a
+	}
+	if len(m.EvmTokenIds) > 0 {
+		for iNdEx := len(m.EvmTokenIds) - 1; iNdEx >= 0; iNdEx-- {
+			i -= len(m.EvmTokenIds[iNdEx])
+			copy(dAtA[i:], m.EvmTokenIds[iNdEx])
+			i = encodeVarintTx(dAtA, i, uint64(len(m.EvmTokenIds[iNdEx])))
+			i--
+			dAtA[i] = 0x12
+		}
+	}
+	if len(m.EvmContractAddress) > 0 {
+		i -= len(m.EvmContractAddress)
+		copy(dAtA[i:], m.EvmContractAddress)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.EvmContractAddress)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *MsgTransferERC721Response) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *MsgTransferERC721Response) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *MsgTransferERC721Response) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	return len(dAtA) - i, nil
+}
+
 func encodeVarintTx(dAtA []byte, offset int, v uint64) int {
 	offset -= sovTx(v)
 	base := offset
@@ -656,26 +935,26 @@ func (m *MsgConvertNFT) Size() (n int) {
 	if l > 0 {
 		n += 1 + l + sovTx(uint64(l))
 	}
-	if len(m.NftIds) > 0 {
-		for _, s := range m.NftIds {
+	if len(m.CosmosTokenIds) > 0 {
+		for _, s := range m.CosmosTokenIds {
 			l = len(s)
 			n += 1 + l + sovTx(uint64(l))
 		}
 	}
-	l = len(m.Receiver)
+	l = len(m.EvmReceiver)
 	if l > 0 {
 		n += 1 + l + sovTx(uint64(l))
 	}
-	l = len(m.Sender)
+	l = len(m.CosmosSender)
 	if l > 0 {
 		n += 1 + l + sovTx(uint64(l))
 	}
-	l = len(m.ContractAddress)
+	l = len(m.EvmContractAddress)
 	if l > 0 {
 		n += 1 + l + sovTx(uint64(l))
 	}
-	if len(m.TokenIds) > 0 {
-		for _, s := range m.TokenIds {
+	if len(m.EvmTokenIds) > 0 {
+		for _, s := range m.EvmTokenIds {
 			l = len(s)
 			n += 1 + l + sovTx(uint64(l))
 		}
@@ -698,21 +977,21 @@ func (m *MsgConvertERC721) Size() (n int) {
 	}
 	var l int
 	_ = l
-	l = len(m.ContractAddress)
+	l = len(m.EvmContractAddress)
 	if l > 0 {
 		n += 1 + l + sovTx(uint64(l))
 	}
-	if len(m.TokenIds) > 0 {
-		for _, s := range m.TokenIds {
+	if len(m.EvmTokenIds) > 0 {
+		for _, s := range m.EvmTokenIds {
 			l = len(s)
 			n += 1 + l + sovTx(uint64(l))
 		}
 	}
-	l = len(m.Receiver)
+	l = len(m.CosmosReceiver)
 	if l > 0 {
 		n += 1 + l + sovTx(uint64(l))
 	}
-	l = len(m.Sender)
+	l = len(m.EvmSender)
 	if l > 0 {
 		n += 1 + l + sovTx(uint64(l))
 	}
@@ -720,8 +999,8 @@ func (m *MsgConvertERC721) Size() (n int) {
 	if l > 0 {
 		n += 1 + l + sovTx(uint64(l))
 	}
-	if len(m.NftIds) > 0 {
-		for _, s := range m.NftIds {
+	if len(m.CosmosTokenIds) > 0 {
+		for _, s := range m.CosmosTokenIds {
 			l = len(s)
 			n += 1 + l + sovTx(uint64(l))
 		}
@@ -730,6 +1009,69 @@ func (m *MsgConvertERC721) Size() (n int) {
 }
 
 func (m *MsgConvertERC721Response) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	return n
+}
+
+func (m *MsgTransferERC721) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.EvmContractAddress)
+	if l > 0 {
+		n += 1 + l + sovTx(uint64(l))
+	}
+	if len(m.EvmTokenIds) > 0 {
+		for _, s := range m.EvmTokenIds {
+			l = len(s)
+			n += 1 + l + sovTx(uint64(l))
+		}
+	}
+	l = len(m.SourcePort)
+	if l > 0 {
+		n += 1 + l + sovTx(uint64(l))
+	}
+	l = len(m.SourceChannel)
+	if l > 0 {
+		n += 1 + l + sovTx(uint64(l))
+	}
+	l = len(m.ClassId)
+	if l > 0 {
+		n += 1 + l + sovTx(uint64(l))
+	}
+	if len(m.CosmosTokenIds) > 0 {
+		for _, s := range m.CosmosTokenIds {
+			l = len(s)
+			n += 1 + l + sovTx(uint64(l))
+		}
+	}
+	l = len(m.EvmSender)
+	if l > 0 {
+		n += 1 + l + sovTx(uint64(l))
+	}
+	l = len(m.CosmosReceiver)
+	if l > 0 {
+		n += 1 + l + sovTx(uint64(l))
+	}
+	l = m.TimeoutHeight.Size()
+	n += 1 + l + sovTx(uint64(l))
+	if m.TimeoutTimestamp != 0 {
+		n += 1 + sovTx(uint64(m.TimeoutTimestamp))
+	}
+	l = len(m.Memo)
+	if l > 0 {
+		n += 1 + l + sovTx(uint64(l))
+	}
+	return n
+}
+
+func (m *MsgTransferERC721Response) Size() (n int) {
 	if m == nil {
 		return 0
 	}
@@ -807,7 +1149,7 @@ func (m *MsgConvertNFT) Unmarshal(dAtA []byte) error {
 			iNdEx = postIndex
 		case 2:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field NftIds", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field CosmosTokenIds", wireType)
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
@@ -835,11 +1177,11 @@ func (m *MsgConvertNFT) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.NftIds = append(m.NftIds, string(dAtA[iNdEx:postIndex]))
+			m.CosmosTokenIds = append(m.CosmosTokenIds, string(dAtA[iNdEx:postIndex]))
 			iNdEx = postIndex
 		case 3:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Receiver", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field EvmReceiver", wireType)
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
@@ -867,11 +1209,11 @@ func (m *MsgConvertNFT) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Receiver = string(dAtA[iNdEx:postIndex])
+			m.EvmReceiver = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 4:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Sender", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field CosmosSender", wireType)
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
@@ -899,11 +1241,11 @@ func (m *MsgConvertNFT) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Sender = string(dAtA[iNdEx:postIndex])
+			m.CosmosSender = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 5:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field ContractAddress", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field EvmContractAddress", wireType)
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
@@ -931,11 +1273,11 @@ func (m *MsgConvertNFT) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.ContractAddress = string(dAtA[iNdEx:postIndex])
+			m.EvmContractAddress = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 6:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field TokenIds", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field EvmTokenIds", wireType)
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
@@ -963,7 +1305,7 @@ func (m *MsgConvertNFT) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.TokenIds = append(m.TokenIds, string(dAtA[iNdEx:postIndex]))
+			m.EvmTokenIds = append(m.EvmTokenIds, string(dAtA[iNdEx:postIndex]))
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
@@ -1067,7 +1409,7 @@ func (m *MsgConvertERC721) Unmarshal(dAtA []byte) error {
 		switch fieldNum {
 		case 1:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field ContractAddress", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field EvmContractAddress", wireType)
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
@@ -1095,11 +1437,11 @@ func (m *MsgConvertERC721) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.ContractAddress = string(dAtA[iNdEx:postIndex])
+			m.EvmContractAddress = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 2:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field TokenIds", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field EvmTokenIds", wireType)
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
@@ -1127,11 +1469,11 @@ func (m *MsgConvertERC721) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.TokenIds = append(m.TokenIds, string(dAtA[iNdEx:postIndex]))
+			m.EvmTokenIds = append(m.EvmTokenIds, string(dAtA[iNdEx:postIndex]))
 			iNdEx = postIndex
 		case 3:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Receiver", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field CosmosReceiver", wireType)
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
@@ -1159,11 +1501,11 @@ func (m *MsgConvertERC721) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Receiver = string(dAtA[iNdEx:postIndex])
+			m.CosmosReceiver = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 4:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Sender", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field EvmSender", wireType)
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
@@ -1191,7 +1533,7 @@ func (m *MsgConvertERC721) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Sender = string(dAtA[iNdEx:postIndex])
+			m.EvmSender = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 5:
 			if wireType != 2 {
@@ -1227,7 +1569,7 @@ func (m *MsgConvertERC721) Unmarshal(dAtA []byte) error {
 			iNdEx = postIndex
 		case 6:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field NftIds", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field CosmosTokenIds", wireType)
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
@@ -1255,7 +1597,7 @@ func (m *MsgConvertERC721) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.NftIds = append(m.NftIds, string(dAtA[iNdEx:postIndex]))
+			m.CosmosTokenIds = append(m.CosmosTokenIds, string(dAtA[iNdEx:postIndex]))
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
@@ -1305,6 +1647,446 @@ func (m *MsgConvertERC721Response) Unmarshal(dAtA []byte) error {
 		}
 		if fieldNum <= 0 {
 			return fmt.Errorf("proto: MsgConvertERC721Response: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		default:
+			iNdEx = preIndex
+			skippy, err := skipTx(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthTx
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *MsgTransferERC721) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowTx
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: MsgTransferERC721: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: MsgTransferERC721: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field EvmContractAddress", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.EvmContractAddress = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field EvmTokenIds", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.EvmTokenIds = append(m.EvmTokenIds, string(dAtA[iNdEx:postIndex]))
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SourcePort", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.SourcePort = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SourceChannel", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.SourceChannel = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ClassId", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ClassId = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 6:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field CosmosTokenIds", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.CosmosTokenIds = append(m.CosmosTokenIds, string(dAtA[iNdEx:postIndex]))
+			iNdEx = postIndex
+		case 7:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field EvmSender", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.EvmSender = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 8:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field CosmosReceiver", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.CosmosReceiver = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 9:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field TimeoutHeight", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.TimeoutHeight.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 10:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field TimeoutTimestamp", wireType)
+			}
+			m.TimeoutTimestamp = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.TimeoutTimestamp |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 11:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Memo", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Memo = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipTx(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthTx
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *MsgTransferERC721Response) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowTx
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: MsgTransferERC721Response: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: MsgTransferERC721Response: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		default:

@@ -8,13 +8,13 @@ Build and install the Uptick binaries from source or using Docker. {synopsis}
 
 ## Pre-requisites
 
-- [Install Go 1.18+](https://golang.org/dl/) {prereq}
+- [Install Go 1.17.5+](https://golang.org/dl/) {prereq}
 - [Install jq](https://stedolan.github.io/jq/download/) {prereq}
 
 ## Install Go
 
 ::: warning
-Uptick is built using [Go](https://golang.org/dl/) version `1.18+`
+Uptick is built using [Go](https://golang.org/dl/) version `1.17.5+`
 :::
 
 ```bash
@@ -49,7 +49,6 @@ Clone and build {{ $themeConfig.project.name }} using `git`:
 ```bash
 git clone https://github.com/UptickNetwork/uptick.git
 cd uptick
-git checkout <version>
 make install
 ```
 
@@ -57,4 +56,32 @@ Check that the `{{ $themeConfig.project.binary }}` binaries have been successful
 
 ```bash
 uptickd version
+```
+
+### Docker
+
+You can build {{ $themeConfig.project.name }} using Docker by running:
+
+```bash
+make build-docker
+```
+
+The command above will create a docker container: `uptickhq/uptick:latest`. Now you can run `uptickd` in the container.
+
+```bash
+docker run -it -p 26657:26657 -p 26656:26656 -v ~/.uptickd/:/root/.uptickd uptickhq/uptick:latest uptickd version
+
+# To initialize
+# docker run -it -p 26657:26657 -p 26656:26656 -v ~/.uptickd/:/root/.uptickd uptickhq/uptick:latest uptickd init test-chain --chain-id test_7000-2
+
+# To run
+# docker run -it -p 26657:26657 -p 26656:26656 -v ~/.uptickd/:/root/.uptickd uptickhq/uptick:latest uptickd start
+```
+
+### Releases
+
+You can also download a specific release available on the {{ $themeConfig.project.name }} [repository](https://github.com/UptickNetwork/uptick/releases) or via command line:
+
+```bash
+go install github.com/UptickNetwork/uptick@latest
 ```

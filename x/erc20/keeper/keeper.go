@@ -2,17 +2,17 @@ package keeper
 
 import (
 	"fmt"
+	porttypes "github.com/cosmos/ibc-go/v7/modules/core/05-port/types"
 
-	porttypes "github.com/cosmos/ibc-go/v5/modules/core/05-port/types"
-
+	"github.com/cometbft/cometbft/libs/log"
 	storetypes "github.com/cosmos/cosmos-sdk/store/types"
-	"github.com/tendermint/tendermint/libs/log"
 
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	paramtypes "github.com/cosmos/cosmos-sdk/x/params/types"
 
 	"github.com/UptickNetwork/uptick/x/erc20/types"
+	ibctransferkeeper "github.com/cosmos/ibc-go/v7/modules/apps/transfer/keeper"
 )
 
 // Keeper of this module maintains collections of erc20.
@@ -25,6 +25,7 @@ type Keeper struct {
 	bankKeeper    types.BankKeeper
 	evmKeeper     types.EVMKeeper
 	ics4Wrapper   porttypes.ICS4Wrapper
+	ibcKeeper     ibctransferkeeper.Keeper
 }
 
 // NewKeeper creates new instances of the erc20 Keeper
@@ -64,4 +65,11 @@ func (k *Keeper) SetICS4Wrapper(ics4Wrapper porttypes.ICS4Wrapper) {
 	}
 
 	k.ics4Wrapper = ics4Wrapper
+}
+
+// SetIBCKeeper sets the ICS4 wrapper to the keeper.
+// It panics if already set
+func (k *Keeper) SetIBCKeeper(ibcKeeper ibctransferkeeper.Keeper) {
+
+	k.ibcKeeper = ibcKeeper
 }

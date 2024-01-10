@@ -4,7 +4,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 
-	ibctransfertypes "github.com/cosmos/ibc-go/v5/modules/apps/transfer/types"
+	ibctransfertypes "github.com/cosmos/ibc-go/v7/modules/apps/transfer/types"
 
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -12,11 +12,13 @@ import (
 var (
 	_ sdk.Msg = &MsgConvertCoin{}
 	_ sdk.Msg = &MsgConvertERC20{}
+	_ sdk.Msg = &MsgTransferERC20{}
 )
 
 const (
-	TypeMsgConvertCoin  = "convert_coin"
-	TypeMsgConvertERC20 = "convert_ERC20"
+	TypeMsgConvertCoin   = "convert_coin"
+	TypeMsgConvertERC20  = "convert_ERC20"
+	TypeMsgTransferERC20 = "transfer_ERC20"
 )
 
 // NewMsgConvertCoin creates a new instance of MsgConvertCoin
@@ -112,5 +114,35 @@ func (msg *MsgConvertERC20) GetSignBytes() []byte {
 // GetSigners defines whose signature is required
 func (msg MsgConvertERC20) GetSigners() []sdk.AccAddress {
 	addr := common.HexToAddress(msg.Sender)
+	return []sdk.AccAddress{addr.Bytes()}
+}
+
+// ----------- MsgTransferERC20 --------------------
+
+// Route should return the name of the module
+func (msg MsgTransferERC20) Route() string { return RouterKey }
+
+// Type should return the action
+func (msg MsgTransferERC20) Type() string { return TypeMsgTransferERC20 }
+
+// ValidateBasic runs stateless checks on the message
+func (msg MsgTransferERC20) ValidateBasic() error {
+	if !common.IsHexAddress(msg.EvmContractAddress) {
+		return sdkerrors.Wrapf(sdkerrors.ErrInvalidAddress, "invalid contract hex address '%s'", msg.EvmContractAddress)
+	}
+	if !common.IsHexAddress(msg.EvmSender) {
+		return sdkerrors.Wrapf(sdkerrors.ErrInvalidAddress, "invalid sender hex address %s", msg.EvmSender)
+	}
+	return nil
+}
+
+// GetSignBytes encodes the message for signing
+func (msg *MsgTransferERC20) GetSignBytes() []byte {
+	return sdk.MustSortJSON(ModuleCdc.MustMarshalJSON(msg))
+}
+
+// GetSigners defines whose signature is required
+func (msg MsgTransferERC20) GetSigners() []sdk.AccAddress {
+	addr := common.HexToAddress(msg.EvmSender)
 	return []sdk.AccAddress{addr.Bytes()}
 }

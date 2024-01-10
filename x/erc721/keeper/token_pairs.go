@@ -122,12 +122,15 @@ func (k Keeper) SetNFTPairs(ctx sdk.Context, contractAddress string, tokenID str
 
 	// save nft pair
 	if len(k.GetNFTPairByContractTokenID(ctx, contractAddress, tokenID)) == 0 {
+
 		k.SetNFTPairByContractTokenID(ctx, contractAddress, tokenID, classID, nftID)
 	}
 
 	if len(k.GetNFTPairByClassNFTID(ctx, classID, nftID)) == 0 {
+
 		k.SetNFTPairByClassNFTID(ctx, classID, nftID, contractAddress, tokenID)
 	}
+
 }
 
 func (k Keeper) SetNFTPairByContractTokenID(ctx sdk.Context, contractAddress string, tokenID string, classID string, nftID string) {
@@ -172,6 +175,7 @@ func (k Keeper) SetNFTPairByClassNFTID(ctx sdk.Context, classID string, nftID st
 }
 
 func (k Keeper) SetNFTUIDPairByNFTUID(ctx sdk.Context, nftUID string, tokenUID string) {
+
 	store := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixNFTUIDPairByNFTUID)
 	store.Set([]byte(nftUID), []byte(tokenUID))
 }
@@ -194,4 +198,26 @@ func (k Keeper) DeleteNFTPairByNFTID(ctx sdk.Context, classID string, nftID stri
 func (k Keeper) DeleteNFTUIDPairByNFTUID(ctx sdk.Context, nftUID string) {
 	store := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixNFTUIDPairByNFTUID)
 	store.Delete([]byte(nftUID))
+}
+
+// SetEvmAddressByContractTokenId
+func (k Keeper) SetEvmAddressByContractTokenId(ctx sdk.Context, evmContractAddress string, evmTokenId string, evmAddress string) {
+
+	contractAndTokenId := evmContractAddress + evmTokenId
+	store := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixEvmAddressByContractTokenId)
+	store.Set([]byte(contractAndTokenId), []byte(evmAddress))
+}
+
+func (k Keeper) GetEvmAddressByContractTokenId(ctx sdk.Context, evmContractAddress string, evmTokenId string) []byte {
+
+	contractAndTokenId := evmContractAddress + evmTokenId
+	store := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixEvmAddressByContractTokenId)
+	return store.Get([]byte(contractAndTokenId))
+}
+
+func (k Keeper) DeleteEvmAddressByContractTokenId(ctx sdk.Context, evmContractAddress string, evmTokenId string) {
+
+	contractAndTokenId := evmContractAddress + evmTokenId
+	store := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixEvmAddressByContractTokenId)
+	store.Delete([]byte(contractAndTokenId))
 }

@@ -1,0 +1,102 @@
+package keeper
+
+import (
+	erc20Types "github.com/UptickNetwork/uptick/x/erc20/types"
+	erc721Types "github.com/UptickNetwork/uptick/x/erc721/types"
+	"github.com/bianjieai/nft-transfer/types"
+	sdk "github.com/cosmos/cosmos-sdk/types"
+	channeltypes "github.com/cosmos/ibc-go/v7/modules/core/04-channel/types"
+	"github.com/cosmos/ibc-go/v7/modules/core/exported"
+	"strings"
+)
+
+// OnRecvPacket processes a cross chain fungible token transfer. If the
+// sender chain is the source of minted tokens then vouchers will be minted
+// and sent to the receiving address. Otherwise if the sender chain is sending
+// back tokens this chain originally transferred to it, the tokens are
+// unescrowed and sent to the receiving address.
+func (k Keeper) OnRecvPacket(
+	ctx sdk.Context,
+	packet channeltypes.Packet,
+	receiver string) exported.Acknowledgement {
+
+	event := &erc20Types.EventIBCERC20{
+		Status:             erc20Types.STATUS_UNKNOWN,
+		Message:            "",
+		Sequence:           packet.Sequence,
+		SourceChannel:      packet.SourceChannel,
+		DestinationChannel: packet.DestinationChannel,
+	}
+	cctx, write := ctx.CacheContext()
+
+	var data types.NonFungibleTokenPacketData
+	if err := types.ModuleCdc.UnmarshalJSON(packet.GetData(), &data); err != nil {
+		event.Status = erc20Types.STATUS_FAILED
+		event.Message = err.Error()
+		_ = ctx.EventManager().EmitTypedEvent(event)
+		return nil
+	}
+
+	// add the prefix class check for the case of class id
+	var voucherClassID string
+	if types.IsAwayFromOrigin(packet.GetSourcePort(), packet.GetSourceChannel(), data.ClassId) {
+		voucherClassID = k.GetVoucherClassID(packet.GetDestPort(), packet.GetDestChannel(), data.ClassId)
+	} else {
+		voucherClassID, _ = types.RemoveClassPrefix(packet.GetSourcePort(), packet.GetSourceChannel(), data.ClassId)
+	}
+
+	msg := erc721Types.MsgConvertNFT{
+		EvmContractAddress: "",
+		EvmTokenIds:        nil,
+		ClassId:            voucherClassID,
+		CosmosTokenIds:     data.TokenIds,
+		CosmosSender:       erc721Types.AccModuleAddress.String(),
+		EvmReceiver:        receiver,
+	}
+
+	// use cctx to ConvertCoin
+	context := sdk.WrapSDKContext(cctx)
+	_, err := k.ConvertNFT(context, &msg)
+	if err != nil {
+		event.Status = erc20Types.STATUS_FAILED
+		event.Message = err.Error()
+		_ = ctx.EventManager().EmitTypedEvent(event)
+		return nil
+	}
+
+	write()
+	ctx.EventManager().EmitEvents(cctx.EventManager().Events())
+	event.Status = erc20Types.STATUS_SUCCESS
+	_ = ctx.EventManager().EmitTypedEvent(event)
+
+	return nil
+
+}
+
+// OnAcknowledgementPacket responds to the success or failure of a packet
+// acknowledgement written on the receiving chain. If the acknowledgement
+// was a success then nothing occurs. If the acknowledgement failed, then
+// the sender is refunded their tokens using the refundPacketToken function.
+func (k Keeper) OnAcknowledgementPacket(ctx sdk.Context, packet channeltypes.Packet, data types.NonFungibleTokenPacketData, ack channeltypes.Acknowledgement) error {
+
+	switch ack.Response.(type) {
+	case *channeltypes.Acknowledgement_Error:
+		if strings.Contains(data.Memo, erc721Types.TransferERC721Memo) {
+			k.RefundPacketToken(ctx, data)
+		}
+	default:
+		// the acknowledgement succeeded on the receiving chain so nothing
+		// needs to be executed and no error needs to be returned
+	}
+	return nil
+}
+
+// OnTimeoutPacket refunds the sender since the original packet sent was
+// never received and has been timed out.
+func (k Keeper) OnTimeoutPacket(ctx sdk.Context, packet channeltypes.Packet, data types.NonFungibleTokenPacketData) error {
+
+	if strings.Contains(data.Memo, erc721Types.TransferERC721Memo) {
+		k.RefundPacketToken(ctx, data)
+	}
+	return nil
+}

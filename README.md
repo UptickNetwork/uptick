@@ -35,9 +35,9 @@ parent:
   </a>
 </div>
 
-Uptick is an NFT infrastructure network that is a scalable, high-throughput Proof-of-Stake blockchain that is fully compatible and interoperable with Ethereum. It's built using the [Cosmos SDK](https://github.com/cosmos/cosmos-sdk/) which runs on top of [Tendermint Core](https://github.com/tendermint/tendermint) consensus engine.
+Uptick is an NFT infrastructure network that is a scalable, high-throughput Proof-of-Stake blockchain that is fully compatible and interoperable with Ethereum. It's built using the [Cosmos SDK](https://github.com/cosmos/cosmos-sdk/) which runs on top of [Tendermint Core](https://github.com/cometbft/cometbft) consensus engine.
 
-**Note**: Requires [Go 1.18+](https://golang.org/dl/)
+**Note**: Requires [Go 1.17.5+](https://golang.org/dl/)
 
 ## Installation
 

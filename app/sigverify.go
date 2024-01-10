@@ -11,6 +11,7 @@ import (
 	authante "github.com/cosmos/cosmos-sdk/x/auth/ante"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 
+	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	"github.com/evmos/ethermint/crypto/ethsecp256k1"
 )
 
@@ -35,8 +36,8 @@ func SigVerificationGasConsumer(
 ) error {
 	pubkey := sig.PubKey
 	switch pubkey := pubkey.(type) {
-
-	case *ethsecp256k1.PubKey:
+	
+	case *ethsecp256k1.PubKey, *secp256k1.PubKey:
 		// Ethereum keys
 		meter.ConsumeGas(secp256k1VerifyCost, "ante verify: eth_secp256k1")
 		return nil
