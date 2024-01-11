@@ -332,13 +332,6 @@ type Uptick struct {
 	Erc721Keeper erc721keeper.Keeper
 
 	NFTKeeper nftkeeper.Keeper
-
-	//Add ICS721 for nft ibc transfer
-	// ICS721Keeper ibcnfttransferkeeper.Keeper
-
-	// this line is used by starport scaffolding # stargate/app/keeperDeclaration
-	scopedWasmKeeper capabilitykeeper.ScopedKeeper
-
 	// simulation manager
 	sm         *module.SimulationManager
 	tpsCounter *tpsCounter
