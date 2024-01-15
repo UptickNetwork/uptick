@@ -23,6 +23,7 @@ import (
 var _ porttypes.Middleware = &IBCMiddleware{}
 
 const convertERC721 = "erc721"
+const convertCW721 = "cw721"
 
 // IBCMiddleware implements the ICS26 callbacks for the transfer middleware given
 // the claim keeper and the underlying application.
@@ -67,6 +68,7 @@ func (im IBCMiddleware) OnRecvPacket(
 	}
 
 	if strings.ToLower(packageMemo.ConvertTo) == convertERC721 {
+
 		newPackage, dstReceiver := PackageToModuleAccount(packet)
 		if !common.IsHexAddress(dstReceiver) {
 			ackResult = channeltypes.NewErrorAcknowledgement(
@@ -79,8 +81,18 @@ func (im IBCMiddleware) OnRecvPacket(
 		if !ack.Success() {
 			return ack
 		}
-		return im.keeper.OnRecvPacket(ctx, newPackage, dstReceiver)
+		return im.keeper.OnRecvPacket(ctx, newPackage, dstReceiver, 0)
 
+	} else if strings.ToLower(packageMemo.ConvertTo) == convertCW721 {
+
+		newPackage, dstReceiver := PackageToModuleAccount(packet)
+		ack := im.Module.OnRecvPacket(ctx, newPackage, relayer)
+		// return if the acknowledgement is an error ACK
+		if !ack.Success() {
+			return ack
+		}
+		// im.keeper.
+		return im.keeper.OnRecvPacket(ctx, newPackage, dstReceiver, 1)
 	} else {
 		return im.Module.OnRecvPacket(ctx, packet, relayer)
 	}

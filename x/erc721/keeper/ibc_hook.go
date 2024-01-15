@@ -1,8 +1,11 @@
 package keeper
 
 import (
+	"context"
+	cw721Types "github.com/UptickNetwork/uptick/x/cw721/types"
 	erc20Types "github.com/UptickNetwork/uptick/x/erc20/types"
 	erc721Types "github.com/UptickNetwork/uptick/x/erc721/types"
+
 	"github.com/bianjieai/nft-transfer/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	channeltypes "github.com/cosmos/ibc-go/v7/modules/core/04-channel/types"
@@ -11,15 +14,14 @@ import (
 )
 
 // OnRecvPacket processes a cross chain fungible token transfer. If the
-// sender chain is the source of minted tokens then vouchers will be minted
-// and sent to the receiving address. Otherwise if the sender chain is sending
-// back tokens this chain originally transferred to it, the tokens are
-// unescrowed and sent to the receiving address.
+// convertType 0:erc721 1:cw721
 func (k Keeper) OnRecvPacket(
 	ctx sdk.Context,
 	packet channeltypes.Packet,
-	receiver string) exported.Acknowledgement {
+	receiver string,
+	convertType uint) exported.Acknowledgement {
 
+	k.Logger(ctx).Info("xxl OnRecvPacket ", "convertType", convertType)
 	event := &erc20Types.EventIBCERC20{
 		Status:             erc20Types.STATUS_UNKNOWN,
 		Message:            "",
@@ -45,21 +47,19 @@ func (k Keeper) OnRecvPacket(
 		voucherClassID, _ = types.RemoveClassPrefix(packet.GetSourcePort(), packet.GetSourceChannel(), data.ClassId)
 	}
 
-	msg := erc721Types.MsgConvertNFT{
-		EvmContractAddress: "",
-		EvmTokenIds:        nil,
-		ClassId:            voucherClassID,
-		CosmosTokenIds:     data.TokenIds,
-		CosmosSender:       erc721Types.AccModuleAddress.String(),
-		EvmReceiver:        receiver,
-	}
-
+	k.Logger(ctx).Info("xxl OnRecvPacket ", "voucherClassID", voucherClassID)
 	// use cctx to ConvertCoin
 	context := sdk.WrapSDKContext(cctx)
-	_, err := k.ConvertNFT(context, &msg)
+	var err error
+	if convertType == 0 {
+		err = k.ConvertNFTFromErc721(context, voucherClassID, data.TokenIds, receiver)
+	} else if convertType == 1 {
+		err = k.ConvertNFTFromCw721(context, voucherClassID, data.TokenIds, receiver)
+	}
 	if err != nil {
 		event.Status = erc20Types.STATUS_FAILED
 		event.Message = err.Error()
+		k.Logger(ctx).Error("xxl OnRecvPacket ", "err ", err.Error())
 		_ = ctx.EventManager().EmitTypedEvent(event)
 		return nil
 	}
@@ -69,6 +69,42 @@ func (k Keeper) OnRecvPacket(
 	event.Status = erc20Types.STATUS_SUCCESS
 	_ = ctx.EventManager().EmitTypedEvent(event)
 
+	k.Logger(ctx).Info("xxl OnRecvPacket ", "finish OK")
+
+	return nil
+
+}
+
+func (k Keeper) ConvertNFTFromErc721(context context.Context, voucherClassID string, tokenIds []string, receiver string) error {
+
+	msg := erc721Types.MsgConvertNFT{
+		EvmContractAddress: "",
+		EvmTokenIds:        nil,
+		ClassId:            voucherClassID,
+		CosmosTokenIds:     tokenIds,
+		CosmosSender:       erc721Types.AccModuleAddress.String(),
+		EvmReceiver:        receiver,
+	}
+	_, err := k.ConvertNFT(context, &msg)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (k Keeper) ConvertNFTFromCw721(context context.Context, voucherClassID string, tokenIds []string, receiver string) error {
+	msg := cw721Types.MsgConvertNFT{
+		ClassId:         voucherClassID,
+		NftIds:          tokenIds,
+		Receiver:        receiver,
+		Sender:          erc721Types.AccModuleAddress.String(),
+		ContractAddress: "",
+		TokenIds:        nil,
+	}
+	_, err := k.cw721Keep.ConvertNFT(context, &msg)
+	if err != nil {
+		return err
+	}
 	return nil
 
 }
