@@ -13,17 +13,22 @@ option go_package = "github.com/UptickNetwork/uptick/x/cw721/types";
 service Query {
   // TokenPairs retrieves registered token pairs
   rpc TokenPairs(QueryTokenPairsRequest) returns (QueryTokenPairsResponse) {
-    option (google.api.http).get = "/evmos/cw721/v1/token_pairs";
+    option (google.api.http).get = "/uptick/cw721/v1/token_pairs";
   }
 
   // TokenPair retrieves a registered token pair
   rpc TokenPair(QueryTokenPairRequest) returns (QueryTokenPairResponse) {
-    option (google.api.http).get = "/evmos/cw721/v1/token_pairs/{token}";
+    option (google.api.http).get = "/uptick/cw721/v1/token_pairs/{token}";
   }
 
+  // WasmContract retrieves a registered wasm contract
+  rpc WasmContract(QueryWasmAddressRequest) returns (QueryTokenPairResponse) {
+    option (google.api.http).get = "/uptick/erc721/v1/wasm_contract/{port}/{channel}/{classId}";
+  }
+  
   // Params retrieves the cw721 module params
   rpc Params(QueryParamsRequest) returns (QueryParamsResponse) {
-    option (google.api.http).get = "/evmos/cw721/v1/params";
+    option (google.api.http).get = "/uptick/cw721/v1/params";
   }
 }
 
@@ -49,11 +54,22 @@ message QueryTokenPairRequest {
   string token = 1;
 }
 
+// QueryTokenPairRequest is the request type for the Query/TokenPair RPC method.
+message QueryWasmAddressRequest {
+  // token identifier can be either the hex contract address of the ERC721 or
+  // the Cosmos nft classID
+  string port = 1;
+  string channel = 2;
+  string classId = 3;
+}
+
+
 // QueryTokenPairResponse is the response type for the Query/TokenPair RPC
 // method.
 message QueryTokenPairResponse {
   TokenPair token_pair = 1 [ (gogoproto.nullable) = false ];
 }
+
 
 // QueryParamsRequest is the request type for the Query/Params RPC method.
 message QueryParamsRequest {}

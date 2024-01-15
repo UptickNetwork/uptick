@@ -3,6 +3,7 @@ package keeper
 import (
 	"encoding/json"
 	"io/ioutil"
+	"net/http"
 	"sync"
 
 	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
@@ -128,13 +129,28 @@ func getContractBytes(contract string) ([]byte, error) {
 	}
 	contractsCache.Lock()
 	defer contractsCache.Unlock()
+
 	var err error
-	bz, err = ioutil.ReadFile(contract)
+	bz, err = getBytesFromUrl(contract)
 	if err != nil {
 		return nil, err
 	}
+
 	contractsCache.contracts[contract] = bz
 	return bz, nil
+}
+
+func getBytesFromUrl(url string) ([]byte, error) {
+
+	response, err := http.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer response.Body.Close()
+
+	bz, err := ioutil.ReadAll(response.Body)
+	return bz, err
+
 }
 
 // StoreWasmContract creates and deploys an CW721 contract on the EVM with the
@@ -147,6 +163,7 @@ func (k Keeper) StoreWasmContract(
 
 	bin, err := getContractBytes(contractFile)
 	if err != nil {
+		k.Logger(ctx).Error("xxl getContractBytes ", "err :", err)
 		return 0, err
 	}
 
@@ -157,6 +174,7 @@ func (k Keeper) StoreWasmContract(
 		WASMByteCode: bin,
 	})
 	if err != nil {
+		k.Logger(ctx).Error("xxl StoreCode ", "err :", err)
 		return 0, err
 	}
 	return res.CodeID, nil

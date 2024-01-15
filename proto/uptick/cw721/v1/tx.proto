@@ -16,7 +16,7 @@ service Msg {
   };
   // ConvertCW721 mints a native Cosmos coin representation of the CW721 token
   // contract that is registered on the token mapping.
-  rpc ConvertCW721(MsgConvertCW721) returns (MsgConvertCW721Response) {
+  rpc ConvertCW721(MsgConvertCW721) returns (MsgConvertCW721) {
     option (google.api.http).get = "/uptick/cw721/v1/tx/convert_cw721";
   };
 

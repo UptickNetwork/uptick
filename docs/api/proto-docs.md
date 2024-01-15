@@ -65,6 +65,7 @@
     - [QueryTokenPairResponse](#uptick.cw721.v1.QueryTokenPairResponse)
     - [QueryTokenPairsRequest](#uptick.cw721.v1.QueryTokenPairsRequest)
     - [QueryTokenPairsResponse](#uptick.cw721.v1.QueryTokenPairsResponse)
+    - [QueryWasmAddressRequest](#uptick.cw721.v1.QueryWasmAddressRequest)
   
     - [Query](#uptick.cw721.v1.Query)
   
@@ -123,6 +124,7 @@
     - [Params](#uptick.erc721.v1.Params)
   
 - [uptick/erc721/v1/query.proto](#uptick/erc721/v1/query.proto)
+    - [QueryEvmAddressRequest](#uptick.erc721.v1.QueryEvmAddressRequest)
     - [QueryParamsRequest](#uptick.erc721.v1.QueryParamsRequest)
     - [QueryParamsResponse](#uptick.erc721.v1.QueryParamsResponse)
     - [QueryTokenPairRequest](#uptick.erc721.v1.QueryTokenPairRequest)
@@ -1001,6 +1003,23 @@ method.
 
 
 
+
+<a name="uptick.cw721.v1.QueryWasmAddressRequest"></a>
+
+### QueryWasmAddressRequest
+QueryTokenPairRequest is the request type for the Query/TokenPair RPC method.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| `port` | [string](#string) |  | token identifier can be either the hex contract address of the ERC721 or the Cosmos nft classID |
+| `channel` | [string](#string) |  |  |
+| `classId` | [string](#string) |  |  |
+
+
+
+
+
  <!-- end messages -->
 
  <!-- end enums -->
@@ -1015,9 +1034,10 @@ Query defines the gRPC querier service.
 
 | Method Name | Request Type | Response Type | Description | HTTP Verb | Endpoint |
 | ----------- | ------------ | ------------- | ------------| ------- | -------- |
-| `TokenPairs` | [QueryTokenPairsRequest](#uptick.cw721.v1.QueryTokenPairsRequest) | [QueryTokenPairsResponse](#uptick.cw721.v1.QueryTokenPairsResponse) | TokenPairs retrieves registered token pairs | GET|/evmos/cw721/v1/token_pairs|
-| `TokenPair` | [QueryTokenPairRequest](#uptick.cw721.v1.QueryTokenPairRequest) | [QueryTokenPairResponse](#uptick.cw721.v1.QueryTokenPairResponse) | TokenPair retrieves a registered token pair | GET|/evmos/cw721/v1/token_pairs/{token}|
-| `Params` | [QueryParamsRequest](#uptick.cw721.v1.QueryParamsRequest) | [QueryParamsResponse](#uptick.cw721.v1.QueryParamsResponse) | Params retrieves the cw721 module params | GET|/evmos/cw721/v1/params|
+| `TokenPairs` | [QueryTokenPairsRequest](#uptick.cw721.v1.QueryTokenPairsRequest) | [QueryTokenPairsResponse](#uptick.cw721.v1.QueryTokenPairsResponse) | TokenPairs retrieves registered token pairs | GET|/uptick/cw721/v1/token_pairs|
+| `TokenPair` | [QueryTokenPairRequest](#uptick.cw721.v1.QueryTokenPairRequest) | [QueryTokenPairResponse](#uptick.cw721.v1.QueryTokenPairResponse) | TokenPair retrieves a registered token pair | GET|/uptick/cw721/v1/token_pairs/{token}|
+| `WasmContract` | [QueryWasmAddressRequest](#uptick.cw721.v1.QueryWasmAddressRequest) | [QueryTokenPairResponse](#uptick.cw721.v1.QueryTokenPairResponse) | WasmContract retrieves a registered wasm contract | GET|/uptick/erc721/v1/wasm_contract/{port}/{channel}/{classId}|
+| `Params` | [QueryParamsRequest](#uptick.cw721.v1.QueryParamsRequest) | [QueryParamsResponse](#uptick.cw721.v1.QueryParamsResponse) | Params retrieves the cw721 module params | GET|/uptick/cw721/v1/params|
 
  <!-- end services -->
 
@@ -1150,7 +1170,7 @@ Msg defines the cw721 Msg service.
 | Method Name | Request Type | Response Type | Description | HTTP Verb | Endpoint |
 | ----------- | ------------ | ------------- | ------------| ------- | -------- |
 | `ConvertNFT` | [MsgConvertNFT](#uptick.cw721.v1.MsgConvertNFT) | [MsgConvertNFTResponse](#uptick.cw721.v1.MsgConvertNFTResponse) | ConvertNFT mints a CW721 representation of the native Cosmos nft that is registered on the token mapping. | GET|/uptick/cw721/v1/tx/convert_nft|
-| `ConvertCW721` | [MsgConvertCW721](#uptick.cw721.v1.MsgConvertCW721) | [MsgConvertCW721Response](#uptick.cw721.v1.MsgConvertCW721Response) | ConvertCW721 mints a native Cosmos coin representation of the CW721 token contract that is registered on the token mapping. | GET|/uptick/cw721/v1/tx/convert_cw721|
+| `ConvertCW721` | [MsgConvertCW721](#uptick.cw721.v1.MsgConvertCW721) | [MsgConvertCW721](#uptick.cw721.v1.MsgConvertCW721) | ConvertCW721 mints a native Cosmos coin representation of the CW721 token contract that is registered on the token mapping. | GET|/uptick/cw721/v1/tx/convert_cw721|
 | `TransferCW721` | [MsgTransferCW721](#uptick.cw721.v1.MsgTransferCW721) | [MsgTransferCW721Response](#uptick.cw721.v1.MsgTransferCW721Response) |  | GET|/uptick/cw721/v1/tx/ibc-transfer-cw721|
 
  <!-- end services -->
@@ -1675,6 +1695,23 @@ Params defines the erc721 module params
 
 
 
+<a name="uptick.erc721.v1.QueryEvmAddressRequest"></a>
+
+### QueryEvmAddressRequest
+QueryTokenPairRequest is the request type for the Query/TokenPair RPC method.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| `port` | [string](#string) |  | token identifier can be either the hex contract address of the ERC721 or the Cosmos nft classID |
+| `channel` | [string](#string) |  |  |
+| `classId` | [string](#string) |  |  |
+
+
+
+
+
+
 <a name="uptick.erc721.v1.QueryParamsRequest"></a>
 
 ### QueryParamsRequest
@@ -1774,13 +1811,14 @@ method.
 <a name="uptick.erc721.v1.Query"></a>
 
 ### Query
-Query defines the gRPC querier service.
+Query defines the gRPC queried service.
 
 | Method Name | Request Type | Response Type | Description | HTTP Verb | Endpoint |
 | ----------- | ------------ | ------------- | ------------| ------- | -------- |
-| `TokenPairs` | [QueryTokenPairsRequest](#uptick.erc721.v1.QueryTokenPairsRequest) | [QueryTokenPairsResponse](#uptick.erc721.v1.QueryTokenPairsResponse) | TokenPairs retrieves registered token pairs | GET|/evmos/erc721/v1/token_pairs|
-| `TokenPair` | [QueryTokenPairRequest](#uptick.erc721.v1.QueryTokenPairRequest) | [QueryTokenPairResponse](#uptick.erc721.v1.QueryTokenPairResponse) | TokenPair retrieves a registered token pair | GET|/evmos/erc721/v1/token_pairs/{token}|
-| `Params` | [QueryParamsRequest](#uptick.erc721.v1.QueryParamsRequest) | [QueryParamsResponse](#uptick.erc721.v1.QueryParamsResponse) | Params retrieves the erc721 module params | GET|/evmos/erc721/v1/params|
+| `TokenPairs` | [QueryTokenPairsRequest](#uptick.erc721.v1.QueryTokenPairsRequest) | [QueryTokenPairsResponse](#uptick.erc721.v1.QueryTokenPairsResponse) | TokenPairs retrieves registered token pairs | GET|/uptick/erc721/v1/token_pairs|
+| `TokenPair` | [QueryTokenPairRequest](#uptick.erc721.v1.QueryTokenPairRequest) | [QueryTokenPairResponse](#uptick.erc721.v1.QueryTokenPairResponse) | TokenPair retrieves a registered token pair | GET|/uptick/erc721/v1/token_pairs/{token}|
+| `EvmContract` | [QueryEvmAddressRequest](#uptick.erc721.v1.QueryEvmAddressRequest) | [QueryTokenPairResponse](#uptick.erc721.v1.QueryTokenPairResponse) | EvmContract retrieves a registered evm contract | GET|/uptick/erc721/v1/evm_contract/{port}/{channel}/{classId}|
+| `Params` | [QueryParamsRequest](#uptick.erc721.v1.QueryParamsRequest) | [QueryParamsResponse](#uptick.erc721.v1.QueryParamsResponse) | Params retrieves the erc721 module params | GET|/uptick/erc721/v1/params|
 
  <!-- end services -->
 
@@ -1903,7 +1941,7 @@ Msg defines the erc721 Msg service.
 | Method Name | Request Type | Response Type | Description | HTTP Verb | Endpoint |
 | ----------- | ------------ | ------------- | ------------| ------- | -------- |
 | `ConvertNFT` | [MsgConvertNFT](#uptick.erc721.v1.MsgConvertNFT) | [MsgConvertNFTResponse](#uptick.erc721.v1.MsgConvertNFTResponse) | ConvertNFT mints a ERC721 representation of the native Cosmos nft that is registered on the token mapping. | GET|/uptick/erc721/v1/tx/convert_nft|
-| `ConvertERC721` | [MsgConvertERC721](#uptick.erc721.v1.MsgConvertERC721) | [MsgConvertERC721Response](#uptick.erc721.v1.MsgConvertERC721Response) | ConvertERC721 mints a native Cosmos coin representation of the ERC721 token contract that is registered on the token mapping. | GET|/uptick/erc721/v1/tx/convert_erc721|
+| `ConvertERC721` | [MsgConvertERC721](#uptick.erc721.v1.MsgConvertERC721) | [MsgConvertERC721](#uptick.erc721.v1.MsgConvertERC721) | ConvertERC721 mints a native Cosmos coin representation of the ERC721 token contract that is registered on the token mapping. | GET|/uptick/erc721/v1/tx/convert_erc721|
 | `TransferERC721` | [MsgTransferERC721](#uptick.erc721.v1.MsgTransferERC721) | [MsgTransferERC721Response](#uptick.erc721.v1.MsgTransferERC721Response) |  | GET|/uptick/erc721/v1/tx/ibc-transfer-erc721|
 
  <!-- end services -->

@@ -544,7 +544,7 @@ type MsgServer interface {
 	ConvertNFT(context.Context, *MsgConvertNFT) (*MsgConvertNFTResponse, error)
 	// ConvertCW721 mints a native Cosmos coin representation of the CW721 token
 	// contract that is registered on the token mapping.
-	ConvertCW721(context.Context, *MsgConvertCW721) (*MsgConvertCW721Response, error)
+	ConvertCW721(context.Context, *MsgConvertCW721) (*MsgConvertCW721, error)
 	TransferCW721(context.Context, *MsgTransferCW721) (*MsgTransferCW721Response, error)
 }
 

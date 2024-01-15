@@ -72,3 +72,29 @@ func (k Keeper) Params(c context.Context, _ *types.QueryParamsRequest) (*types.Q
 	params := k.GetParams(ctx)
 	return &types.QueryParamsResponse{Params: params}, nil
 }
+
+// WasmContract returns a given registered token pair
+func (k Keeper) WasmContract(c context.Context, req *types.QueryWasmAddressRequest) (*types.QueryTokenPairResponse, error) {
+
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "empty request")
+	}
+
+	ctx := sdk.UnwrapSDKContext(c)
+	token := k.GetVoucherClassID(req.Port, req.Channel, req.ClassId)
+
+	// keeper.Keeper.GetVoucherClassID(req.Port, req.Channel, req.ClassId)
+	id := k.GetTokenPairID(ctx, token)
+
+	if len(id) == 0 {
+		return nil, status.Errorf(codes.NotFound, "token pair with token '%s'", token)
+	}
+
+	pair, found := k.GetTokenPair(ctx, id)
+	if !found {
+		return nil, status.Errorf(codes.NotFound, "token pair with token '%s'", token)
+	}
+
+	return &types.QueryTokenPairResponse{TokenPair: pair}, nil
+
+}

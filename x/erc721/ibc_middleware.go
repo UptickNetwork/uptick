@@ -1,6 +1,8 @@
 package erc721
 
 import (
+	"encoding/json"
+	"github.com/ethereum/go-ethereum/common"
 	"strings"
 
 	"github.com/bianjieai/nft-transfer/types"
@@ -14,10 +16,14 @@ import (
 	"github.com/UptickNetwork/uptick/ibc"
 	"github.com/UptickNetwork/uptick/x/erc721/keeper"
 
+	erc721Types "github.com/UptickNetwork/uptick/x/erc721/types"
 	clienttypes "github.com/cosmos/ibc-go/v7/modules/core/02-client/types"
 )
 
 var _ porttypes.Middleware = &IBCMiddleware{}
+
+const convertERC721 = "erc721"
+const convertCW721 = "cw721"
 
 // IBCMiddleware implements the ICS26 callbacks for the transfer middleware given
 // the claim keeper and the underlying application.
@@ -34,6 +40,10 @@ func NewIBCMiddleware(k keeper.Keeper, app porttypes.IBCModule) IBCMiddleware {
 	}
 }
 
+type PackageMemo struct {
+	ConvertTo string `protobuf:"bytes,1,opt,name=convert_to,proto3" json:"convert_to,omitempty"`
+}
+
 // OnRecvPacket implements the IBCModule interface.
 // If fees are not enabled, this callback will default to the ibc-core packet callback.
 func (im IBCMiddleware) OnRecvPacket(
@@ -42,14 +52,65 @@ func (im IBCMiddleware) OnRecvPacket(
 	relayer sdk.AccAddress,
 ) exported.Acknowledgement {
 
-	ack := im.Module.OnRecvPacket(ctx, packet, relayer)
-
-	// return if the acknowledgement is an error ACK
-	if !ack.Success() {
-		return ack
+	ackResult := channeltypes.NewResultAcknowledgement([]byte{byte(1)})
+	var data types.NonFungibleTokenPacketData
+	if err := types.ModuleCdc.UnmarshalJSON(packet.GetData(), &data); err != nil {
+		ackResult = channeltypes.NewErrorAcknowledgement(
+			sdkerrors.Wrapf(sdkerrors.ErrInvalidType, "cannot unmarshal ICS-721 nft-transfer packet data"),
+		)
+		return ackResult
 	}
 
-	return nil
+	var packageMemo PackageMemo
+	err := json.Unmarshal([]byte(data.Memo), &packageMemo)
+	if err != nil {
+		return im.Module.OnRecvPacket(ctx, packet, relayer)
+	}
+
+	if strings.ToLower(packageMemo.ConvertTo) == convertERC721 {
+
+		newPackage, dstReceiver := PackageToModuleAccount(packet)
+		if !common.IsHexAddress(dstReceiver) {
+			ackResult = channeltypes.NewErrorAcknowledgement(
+				sdkerrors.Wrapf(sdkerrors.ErrInvalidType, "receiver address format error"),
+			)
+			return ackResult
+		}
+		ack := im.Module.OnRecvPacket(ctx, newPackage, relayer)
+		// return if the acknowledgement is an error ACK
+		if !ack.Success() {
+			return ack
+		}
+		return im.keeper.OnRecvPacket(ctx, newPackage, dstReceiver, 0)
+
+	} else if strings.ToLower(packageMemo.ConvertTo) == convertCW721 {
+
+		newPackage, dstReceiver := PackageToModuleAccount(packet)
+		ack := im.Module.OnRecvPacket(ctx, newPackage, relayer)
+		// return if the acknowledgement is an error ACK
+		if !ack.Success() {
+			return ack
+		}
+		// im.keeper.
+		return im.keeper.OnRecvPacket(ctx, newPackage, dstReceiver, 1)
+	} else {
+		return im.Module.OnRecvPacket(ctx, packet, relayer)
+	}
+
+}
+
+func PackageToModuleAccount(packet channeltypes.Packet) (channeltypes.Packet, string) {
+
+	//
+	var data types.NonFungibleTokenPacketData
+	if err := types.ModuleCdc.UnmarshalJSON(packet.GetData(), &data); err != nil {
+		return channeltypes.Packet{}, ""
+	}
+	dstReceiver := data.Receiver
+	data.Receiver = erc721Types.AccModuleAddress.String()
+	packet.Data = types.ModuleCdc.MustMarshalJSON(&data)
+
+	return packet, dstReceiver
 }
 
 // OnAcknowledgementPacket implements the IBCModule interface
@@ -84,15 +145,6 @@ func (im IBCMiddleware) OnAcknowledgementPacket(
 
 	return nil
 }
-
-// SendPacket implements the ICS4 Wrapper interface
-// func (im IBCMiddleware) SendPacket(
-// 	ctx sdk.Context,
-// 	chanCap *capabilitytypes.Capability,
-// 	packet exported.PacketI,
-// ) error {
-// 	return nil
-// }
 
 func (im IBCMiddleware) SendPacket(
 	ctx sdk.Context,
