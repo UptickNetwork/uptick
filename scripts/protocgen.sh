@@ -15,8 +15,8 @@ protoc_gen_doc() {
     go get -u github.com/pseudomuto/protoc-gen-doc/cmd/protoc-gen-doc 2>/dev/null
 }
 
-protoc_gen_gocosmos
-protoc_gen_doc
+#protoc_gen_gocosmos
+#protoc_gen_doc
 
 proto_dirs=$(find ./proto -path -prune -o -name '*.proto' -print0 | xargs -0 -n1 dirname | sort | uniq)
 for dir in $proto_dirs; do
@@ -37,5 +37,6 @@ buf protoc \
     $(find "$(pwd)/proto" -maxdepth 5 -name '*.proto')
 
 # move proto files to the right places
-cp -r github.com/UptickNetwork/uptick/* ./
-rm -rf github.com
+
+# cp -r github.com/UptickNetwork/uptick/* ./
+# rm -rf github.com

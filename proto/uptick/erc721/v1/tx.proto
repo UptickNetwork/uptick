@@ -16,7 +16,7 @@ service Msg {
   };
   // ConvertERC721 mints a native Cosmos coin representation of the ERC721 token
   // contract that is registered on the token mapping.
-  rpc ConvertERC721(MsgConvertERC721) returns (MsgConvertERC721Response) {
+  rpc ConvertERC721(MsgConvertERC721) returns (MsgConvertERC721) {
     option (google.api.http).get = "/uptick/erc721/v1/tx/convert_erc721";
   };
 

@@ -3,6 +3,8 @@ package keeper
 import (
 	"fmt"
 	nftkeeper "github.com/UptickNetwork/uptick/x/collection/keeper"
+	ibcnfttransferkeeper "github.com/bianjieai/nft-transfer/keeper"
+	ibcnfttransfertypes "github.com/bianjieai/nft-transfer/types"
 	porttypes "github.com/cosmos/ibc-go/v7/modules/core/05-port/types"
 
 	"github.com/cometbft/cometbft/libs/log"
@@ -12,49 +14,48 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	paramtypes "github.com/cosmos/cosmos-sdk/x/params/types"
 
-	"github.com/UptickNetwork/uptick/x/erc721/types"
-	ibcnfttransferkeeper "github.com/bianjieai/nft-transfer/keeper"
+	"github.com/UptickNetwork/uptick/x/cw721/types"
 
-	cw721keep "github.com/UptickNetwork/uptick/x/cw721/keeper"
-	ibcnfttransfertypes "github.com/bianjieai/nft-transfer/types"
+	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
 )
 
-// Keeper of this module maintains collections of erc721.
+// Keeper of this module maintains collections of cw721.
 type Keeper struct {
 	storeKey   storetypes.StoreKey
 	cdc        codec.BinaryCodec
 	paramstore paramtypes.Subspace
 
-	accountKeeper types.AccountKeeper
-	nftKeeper     nftkeeper.Keeper
-	evmKeeper     types.EVMKeeper
-	ics4Wrapper   porttypes.ICS4Wrapper
-	ibcKeeper     ibcnfttransferkeeper.Keeper
-	cw721Keep     cw721keep.Keeper
+	accountKeeper        types.AccountKeeper
+	nftKeeper            nftkeeper.Keeper
+	cwKeeper             wasmkeeper.Keeper
+	cwPermissionedKeeper *wasmkeeper.PermissionedKeeper
+	ics4Wrapper          porttypes.ICS4Wrapper
+	ibcKeeper            ibcnfttransferkeeper.Keeper
 }
 
-// NewKeeper creates new instances of the erc721 Keeper
+// NewKeeper creates new instances of the cw721 Keeper
 func NewKeeper(storeKey storetypes.StoreKey,
 	cdc codec.BinaryCodec,
 	ps paramtypes.Subspace,
 	ak types.AccountKeeper,
 	nk nftkeeper.Keeper,
-	ek types.EVMKeeper,
-	ik ibcnfttransferkeeper.Keeper,
-) Keeper {
+	ek wasmkeeper.Keeper,
+	pk *wasmkeeper.PermissionedKeeper,
+	ik ibcnfttransferkeeper.Keeper) Keeper {
 	// set KeyTable if it has not already been set
 	if !ps.HasKeyTable() {
 		ps = ps.WithKeyTable(types.ParamKeyTable())
 	}
 
 	return Keeper{
-		storeKey:      storeKey,
-		cdc:           cdc,
-		paramstore:    ps,
-		accountKeeper: ak,
-		nftKeeper:     nk,
-		evmKeeper:     ek,
-		ibcKeeper:     ik,
+		storeKey:             storeKey,
+		cdc:                  cdc,
+		paramstore:           ps,
+		accountKeeper:        ak,
+		nftKeeper:            nk,
+		cwKeeper:             ek,
+		cwPermissionedKeeper: pk,
+		ibcKeeper:            ik,
 	}
 }
 
@@ -71,14 +72,6 @@ func (k *Keeper) SetICS4Wrapper(ics4Wrapper porttypes.ICS4Wrapper) {
 	}
 
 	k.ics4Wrapper = ics4Wrapper
-}
-
-
-// SetCw721Keeper sets the ICS4 wrapper to the keeper.
-// It panics if already set
-func (k *Keeper) SetCw721Keeper(cw721keeper cw721keep.Keeper) {
-
-	k.cw721Keep = cw721keeper
 }
 
 func (k *Keeper) GetVoucherClassID(port string, channel string, classId string) string {

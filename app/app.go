@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-
+	"github.com/UptickNetwork/uptick/x/cw721"
 	"github.com/cosmos/cosmos-sdk/x/consensus"
 	"github.com/cosmos/cosmos-sdk/x/nft"
 
@@ -155,6 +155,9 @@ import (
 	_ "github.com/UptickNetwork/uptick/client/docs/statik"
 	consensusparamkeeper "github.com/cosmos/cosmos-sdk/x/consensus/keeper"
 	consensusparamtypes "github.com/cosmos/cosmos-sdk/x/consensus/types"
+
+	cw721keeper "github.com/UptickNetwork/uptick/x/cw721/keeper"
+	cw721types "github.com/UptickNetwork/uptick/x/cw721/types"
 )
 
 func init() {
@@ -229,6 +232,7 @@ var (
 		feemarket.AppModuleBasic{},
 		erc20.AppModuleBasic{},
 		erc721.AppModuleBasic{},
+		cw721.AppModuleBasic{},
 
 		nftmodule.AppModuleBasic{},
 		nfttransfer.AppModuleBasic{},
@@ -251,6 +255,8 @@ var (
 		evmtypes.ModuleName:    {authtypes.Minter, authtypes.Burner}, // used for secure addition and subtraction of balance using module account
 		erc20types.ModuleName:  {authtypes.Minter, authtypes.Burner},
 		erc721types.ModuleName: nil,
+
+		cw721types.ModuleName: nil,
 
 		nfttypes.ModuleName: nil,
 		// nft.ModuleName:      nil,
@@ -330,6 +336,7 @@ type Uptick struct {
 	// Uptick keepers
 	Erc20Keeper  *erc20keeper.Keeper
 	Erc721Keeper erc721keeper.Keeper
+	Cw721Keeper  cw721keeper.Keeper
 
 	NFTKeeper nftkeeper.Keeper
 	// simulation manager
@@ -391,6 +398,7 @@ func NewUptick(
 		// uptick keys
 		erc20types.StoreKey,
 		erc721types.StoreKey,
+		cw721types.StoreKey,
 		nfttypes.StoreKey,
 
 		// nfttypes.StoreKey,
@@ -670,6 +678,51 @@ func NewUptick(
 	icaModule := ica.NewAppModule(nil, &app.ICAHostKeeper)
 	icaHostIBCModule := icahost.NewIBCModule(app.ICAHostKeeper)
 
+	// this line is used by starport scaffolding # stargate/app/keeperDefinition
+	wasmDir := filepath.Join(homePath, "data")
+
+	wasmConfig, err := wasm.ReadWasmConfig(appOpts)
+	if err != nil {
+		panic("error while reading wasm config: " + err.Error())
+	}
+
+	// The last arguments can contain custom message handlers, and custom query handlers,
+	// if we want to allow any custom callbacks
+	supportedFeatures := "iterator,staking,stargate"
+	app.wasmKeeper = wasmkeeper.NewKeeper(
+		appCodec,
+		keys[wasmtypes.StoreKey],
+		app.AccountKeeper,
+		app.BankKeeper,
+		app.StakingKeeper,
+		distrkeeper.NewQuerier(app.DistrKeeper),
+		nil,
+		app.IBCKeeper.ChannelKeeper,
+		&app.IBCKeeper.PortKeeper,
+		scopedWasmKeeper,
+		app.TransferKeeper,
+		app.MsgServiceRouter(),
+		app.GRPCQueryRouter(),
+		wasmDir,
+		wasmConfig,
+		supportedFeatures,
+		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
+		wasmOpts...,
+	)
+
+	app.Cw721Keeper = cw721keeper.NewKeeper(
+		keys[cw721types.StoreKey],
+		appCodec,
+		app.GetSubspace(cw721types.ModuleName),
+		app.AccountKeeper,
+		app.NFTKeeper,
+		app.wasmKeeper,
+		&app.wasmPermissionedKeeper,
+		app.IBCNFTTransferKeeper,
+	)
+
+	app.Erc721Keeper.SetCw721Keeper(app.Cw721Keeper)
+
 	ibcnfttransferModule := nfttransfer.NewAppModule(app.IBCNFTTransferKeeper)
 	nftTransferIBCModule := nfttransfer.NewIBCModule(app.IBCNFTTransferKeeper)
 	ercTransferStack := erc721.NewIBCMiddleware(app.Erc721Keeper, nftTransferIBCModule)
@@ -720,7 +773,7 @@ func NewUptick(
 		feegrantmodule.NewAppModule(appCodec, app.AccountKeeper, app.BankKeeper, app.FeeGrantKeeper, app.interfaceRegistry),
 		authzmodule.NewAppModule(appCodec, app.AuthzKeeper, app.AccountKeeper, app.BankKeeper, app.interfaceRegistry),
 		consensus.NewAppModule(appCodec, app.ConsensusParamsKeeper),
-		// nftmodule.NewAppModule(appCodec, app.NFTKeeper, app.AccountKeeper, app.BankKeeper),
+		// nftmodule.NewAppModule(appCodec, app.NF	app.mm.SetOrderBeginBlockers(TKeeper, app.AccountKeeper, app.BankKeeper),
 		// ibc modules
 		ibc.NewAppModule(app.IBCKeeper),
 		transferModule,
@@ -730,6 +783,7 @@ func NewUptick(
 		// Uptick app modules
 		erc20.NewAppModule(*app.Erc20Keeper, app.AccountKeeper),
 		erc721.NewAppModule(app.Erc721Keeper, app.AccountKeeper),
+		cw721.NewAppModule(app.Cw721Keeper, app.AccountKeeper),
 		nftmodule.NewAppModule(app.appCodec, app.NFTKeeper, app.AccountKeeper, app.BankKeeper),
 
 		ibcnfttransferModule,
@@ -767,6 +821,7 @@ func NewUptick(
 		vestingtypes.ModuleName,
 		erc20types.ModuleName,
 		erc721types.ModuleName,
+		cw721types.ModuleName,
 		nfttypes.ModuleName,
 
 		ibcnfttransfertypes.ModuleName,
@@ -799,6 +854,7 @@ func NewUptick(
 		vestingtypes.ModuleName,
 		erc20types.ModuleName,
 		erc721types.ModuleName,
+		cw721types.ModuleName,
 		nfttypes.ModuleName,
 		ibcnfttransfertypes.ModuleName,
 		icatypes.ModuleName,
@@ -844,6 +900,7 @@ func NewUptick(
 		ibcnfttransfertypes.ModuleName,
 		icatypes.ModuleName,
 		consensusparamtypes.ModuleName,
+		cw721types.ModuleName,
 	)
 
 	app.mm.RegisterInvariants(&app.CrisisKeeper)
@@ -1085,6 +1142,7 @@ func (app *Uptick) RegisterAPIRoutes(apiSvr *api.Server, apiConfig config.APICon
 	if apiConfig.Swagger {
 		RegisterSwaggerAPI(clientCtx, apiSvr.Router)
 	}
+
 }
 
 func (app *Uptick) RegisterTxService(clientCtx client.Context) {
@@ -1183,6 +1241,7 @@ func initParamsKeeper(
 	paramsKeeper.Subspace(icahosttypes.SubModuleName).WithKeyTable(icahosttypes.ParamKeyTable())
 
 	paramsKeeper.Subspace(ibcnfttransfertypes.ModuleName)
+	paramsKeeper.Subspace(cw721types.ModuleName).WithKeyTable(cw721types.ParamKeyTable())
 
 	return paramsKeeper
 }
@@ -1191,7 +1250,8 @@ func (app *Uptick) registerUpgradeHandlers() {
 
 	// Set param key table for params module migration
 	baseAppLegacySS := app.ParamsKeeper.Subspace(baseapp.Paramspace).WithKeyTable(paramstypes.ConsensusParamsKeyTable())
-	upgradeVersion := "v0.2.16"
+	upgradeVersion := "v0.2.17"
+
 	app.UpgradeKeeper.SetUpgradeHandler(
 		upgradeVersion,
 		func(ctx sdk.Context, _ upgradetypes.Plan, vm module.VersionMap) (module.VersionMap, error) {
@@ -1203,7 +1263,16 @@ func (app *Uptick) registerUpgradeHandlers() {
 				panic(fmt.Errorf("failed to FeeMarketKeeper SetParams "))
 			}
 
-			return app.mm.RunMigrations(ctx, app.configurator, vm)
+			wasmParams := app.wasmKeeper.GetParams(ctx)
+			wasmParams.CodeUploadAccess.Permission = wasmtypes.AccessTypeEverybody
+			wasmParams.InstantiateDefaultPermission = wasmtypes.AccessTypeEverybody
+			if err := app.wasmKeeper.SetParams(ctx, wasmParams); err != nil {
+				panic(fmt.Errorf("failed to wasmKeeper SetParams "))
+			}
+
+			//add wasm load
+			app.Cw721Keeper.LoadCw721Base(ctx)
+
 		})
 
 	// When a planned update height is reached, the old binary will panic
@@ -1223,8 +1292,10 @@ func (app *Uptick) registerUpgradeHandlers() {
 	case upgradeVersion:
 		// add revenue module for testnet (v7 -> v8)
 		storeUpgrades = &storetypes.StoreUpgrades{
-			Added:   []string{crisistypes.ModuleName, consensusparamtypes.ModuleName, ibcnfttransfertypes.ModuleName},
-			Deleted: []string{"wasm"},
+
+			// Added: []string{crisistypes.ModuleName, consensusparamtypes.ModuleName},
+			Added: []string{cw721types.ModuleName, wasmtypes.ModuleName},
+
 		}
 	}
 
@@ -1251,3 +1322,47 @@ func (app *Uptick) BlockedModuleAccountAddrs() map[string]bool {
 
 	return modAccAddrs
 }
+
+
+// Deprecated.
+func wasmParamsKeyTable() paramstypes.KeyTable {
+
+	var addrees []string
+	return paramstypes.NewKeyTable(
+		paramstypes.NewParamSetPair(
+			wasmtypes.ParamStoreKeyUploadAccess, wasmtypes.AccessConfig{
+				Permission: wasmtypes.AccessTypeEverybody,
+				Addresses:  addrees,
+			}, validateAccessConfig,
+		),
+		paramstypes.NewParamSetPair(
+			wasmtypes.ParamStoreKeyInstantiateAccess, wasmtypes.AccessTypeEverybody, validateAccessType,
+		),
+	)
+}
+
+func validateAccessConfig(i interface{}) error {
+	v, ok := i.(wasmtypes.AccessConfig)
+	if !ok {
+		return fmt.Errorf("invalid parameter type: %T", i)
+	}
+	return v.ValidateBasic()
+}
+
+func validateAccessType(i interface{}) error {
+	a, ok := i.(wasmtypes.AccessType)
+	if !ok {
+		return fmt.Errorf("invalid parameter type: %T", i)
+	}
+	if a == wasmtypes.AccessTypeUnspecified {
+		return fmt.Errorf("ErrEmpty: %T", i)
+		// errorsmod.Wrap(ErrEmpty, "type")
+	}
+	for _, v := range wasmtypes.AllAccessTypes {
+		if v == a {
+			return nil
+		}
+	}
+	return fmt.Errorf("unknown type: %q", a)
+}
+
