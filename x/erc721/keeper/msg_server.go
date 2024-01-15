@@ -31,7 +31,6 @@ func (k Keeper) TransferERC721(
 	*types.MsgTransferERC721Response, error,
 ) {
 
-	fmt.Printf("xxl: ---- 1 %v \n", msg)
 	ctx := sdk.UnwrapSDKContext(goCtx)
 	convertMsg := types.MsgConvertERC721{
 		EvmContractAddress: msg.EvmContractAddress,
@@ -41,24 +40,26 @@ func (k Keeper) TransferERC721(
 		ClassId:            msg.ClassId,
 		CosmosTokenIds:     msg.CosmosTokenIds,
 	}
-	k.ConvertERC721(ctx, &convertMsg)
+	resMsg, err := k.ConvertERC721(ctx, &convertMsg)
+	if err != nil {
+		return nil, sdkerrors.Wrapf(err, "failed to ConvertERC721 %v", err)
+	}
 
 	ibcMsg := ibcnfttransfertypes.MsgTransfer{
 		SourcePort:       msg.SourcePort,
 		SourceChannel:    msg.SourceChannel,
-		ClassId:          msg.ClassId,
-		TokenIds:         msg.CosmosTokenIds,
+		ClassId:          resMsg.ClassId,
+		TokenIds:         resMsg.CosmosTokenIds,
 		Sender:           types.AccModuleAddress.String(),
 		Receiver:         msg.CosmosReceiver,
 		TimeoutHeight:    msg.TimeoutHeight,
 		TimeoutTimestamp: msg.TimeoutTimestamp,
 		Memo:             msg.Memo + types.TransferERC721Memo,
 	}
-	fmt.Printf("xxl: ---- 2 %v \n", ibcMsg)
 
-	_, err := k.ibcKeeper.Transfer(goCtx, &ibcMsg)
+	_, err = k.ibcKeeper.Transfer(goCtx, &ibcMsg)
 	if err != nil {
-		fmt.Printf("xxl: ---- 3 %v \n", err)
+		return nil, sdkerrors.Wrapf(err, "failed to ibc Transfer %v", err)
 	}
 
 	for _, evmTokenId := range msg.CosmosTokenIds {
@@ -75,9 +76,8 @@ func (k Keeper) ConvertERC721(
 	goCtx context.Context,
 	msg *types.MsgConvertERC721,
 ) (
-	*types.MsgConvertERC721Response, error,
+	*types.MsgConvertERC721, error,
 ) {
-
 	ctx := sdk.UnwrapSDKContext(goCtx)
 	//classId, nftId
 	classId, nftIds, err := k.GetClassIDAndNFTID(ctx, msg)
@@ -89,18 +89,18 @@ func (k Keeper) ConvertERC721(
 
 	// Error checked during msg validation
 	sender := common.HexToAddress(msg.EvmSender)
-
 	id := k.GetTokenPairID(ctx, msg.EvmContractAddress)
 	if len(id) == 0 {
+
 		_, err := k.RegisterERC721(ctx, msg)
 		if err != nil {
-			return nil, err
+			return nil, sdkerrors.Wrapf(err, "failed to RegisterERC721 %v", err)
 		}
 	}
 
 	pair, err := k.GetPair(ctx, msg.EvmContractAddress)
 	if err != nil {
-		return nil, err
+		return nil, sdkerrors.Wrapf(err, "failed to GetPair %v", err)
 	}
 
 	// Remove token pair if contract is suicided
@@ -110,26 +110,26 @@ func (k Keeper) ConvertERC721(
 	bigTokenId := new(big.Int)
 	_, err = fmt.Sscan(msg.EvmTokenIds[0], bigTokenId)
 	if err != nil {
-		sdkerrors.Wrapf(sdkerrors.ErrUnauthorized, "%s error scanning value", err)
-		return nil, err
+		return nil, sdkerrors.Wrapf(sdkerrors.ErrUnauthorized, "%s error scanning value", err)
 	}
 
 	owner, err := k.QueryERC721TokenOwner(ctx, erc721, bigTokenId)
 	if err != nil {
-		return nil, err
+		return nil, sdkerrors.Wrapf(err, "failed to QueryERC721TokenOwner %v", err)
 	}
 	if owner != sender {
 		return nil, sdkerrors.Wrapf(sdkerrors.ErrUnauthorized, "%s is not the owner of erc721 token %s", sender, strings.Join(msg.EvmTokenIds, ","))
 	}
 
 	if acc == nil || !acc.IsContract() {
+
 		k.DeleteTokenPair(ctx, pair)
 		k.Logger(ctx).Debug(
-			"deleting selfdestructed token pair from state",
+			"deleting self destructed token pair from state",
 			"contract", pair.Erc721Address,
 		)
 		// NOTE: return nil error to persist the changes from the deletion
-		return nil, nil
+		return nil, sdkerrors.Wrapf(err, "failed to self destructed %v", err)
 	}
 
 	return k.convertEvm2Cosmos(ctx, pair, msg, sender) //
@@ -157,7 +157,6 @@ func (k Keeper) ConvertNFT(
 
 	// Error checked during msg validation
 	receiver := common.HexToAddress(msg.EvmReceiver)
-
 	id := k.GetTokenPairID(ctx, msg.EvmContractAddress)
 	if len(id) == 0 {
 		_, err := k.RegisterNFT(ctx, msg)
@@ -234,6 +233,7 @@ func (k Keeper) convertCosmos2Evm(
 			Sender:    msg.CosmosSender,
 			Recipient: types.AccModuleAddress.String(),
 		}
+
 		if _, err = k.nftKeeper.TransferNFT(ctx, &transferNft); err != nil {
 			return nil, err
 		}
@@ -241,8 +241,7 @@ func (k Keeper) convertCosmos2Evm(
 		//	does token id exist
 		owner, err := k.QueryERC721TokenOwner(ctx, common.HexToAddress(msg.EvmContractAddress), bigTokenIds[i])
 		if err != nil {
-			// mint
-			// mint enhance )
+
 			_, err = k.CallEVM(
 				ctx, erc721, types.ModuleAddress, contract, true,
 				"mintEnhance", receiver, bigTokenIds[i], reqInfo.GetName(), reqInfo.GetURI(), reqInfo.GetData(), reqInfo.GetURIHash())
@@ -306,7 +305,7 @@ func (k Keeper) convertEvm2Cosmos(
 	msg *types.MsgConvertERC721,
 	sender common.Address,
 ) (
-	*types.MsgConvertERC721Response, error,
+	*types.MsgConvertERC721, error,
 ) {
 
 	erc721 := contracts.ERC721UpticksContract.ABI
@@ -317,8 +316,7 @@ func (k Keeper) convertEvm2Cosmos(
 		bigTokenId := new(big.Int)
 		_, err := fmt.Sscan(tokenId, bigTokenId)
 		if err != nil {
-			sdkerrors.Wrapf(sdkerrors.ErrUnauthorized, "%s error scanning value", err)
-			return nil, err
+			return nil, sdkerrors.Wrapf(sdkerrors.ErrUnauthorized, "%s error scanning", err)
 		}
 
 		reqInfo, err := k.QueryNFTEnhance(ctx, contract, bigTokenId)
@@ -327,18 +325,19 @@ func (k Keeper) convertEvm2Cosmos(
 			"safeTransferFrom", sender, types.ModuleAddress, bigTokenId,
 		)
 		if err != nil {
-			return nil, err
+			return nil, sdkerrors.Wrapf(sdkerrors.ErrUnauthorized, "%s error safeTransferFrom ", err)
 		}
 
 		// query erc721 token
 		_, err = k.QueryERC721Token(ctx, contract)
 		if err != nil {
-			return nil, err
+			return nil, sdkerrors.Wrapf(err, "%s error QueryERC721Token ", err)
 		}
 
 		nftId := string(k.GetNFTPairByContractTokenID(ctx, msg.EvmContractAddress, tokenId))
 		if nftId == "" {
 
+			//
 			mintNFT := nftTypes.MsgMintNFT{
 				DenomId:   msg.ClassId,
 				Id:        msg.CosmosTokenIds[i],
@@ -352,8 +351,9 @@ func (k Keeper) convertEvm2Cosmos(
 
 			// mint nft
 			if _, err = k.nftKeeper.MintNFT(ctx, &mintNFT); err != nil {
-				return nil, err
+				return nil, sdkerrors.Wrapf(sdkerrors.ErrUnauthorized, "%s error MsgMintNFT ", err)
 			}
+
 		} else {
 			transferNft := nftTypes.MsgTransferNFT{
 				DenomId:   msg.ClassId,
@@ -366,7 +366,7 @@ func (k Keeper) convertEvm2Cosmos(
 				Recipient: msg.CosmosReceiver,
 			}
 			if _, err = k.nftKeeper.TransferNFT(ctx, &transferNft); err != nil {
-				return nil, err
+				return nil, sdkerrors.Wrapf(sdkerrors.ErrUnauthorized, "%s error MsgTransferNFT ", err)
 			}
 		}
 	}
@@ -390,7 +390,7 @@ func (k Keeper) convertEvm2Cosmos(
 		},
 	)
 
-	return &types.MsgConvertERC721Response{}, nil
+	return msg, nil
 }
 
 // RefundPacketToken handles the erc721 conversion for a native erc721 token

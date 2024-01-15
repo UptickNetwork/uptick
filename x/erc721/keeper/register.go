@@ -38,6 +38,7 @@ func (k Keeper) RegisterERC721(ctx sdk.Context, msg *types.MsgConvertERC721) (*t
 
 	err := k.CreateNFTClass(ctx, msg)
 	if err != nil {
+
 		return nil, sdkerrors.Wrap(err,
 			"failed to create wrapped coin denom metadata for ERC721")
 	}

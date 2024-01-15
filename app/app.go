@@ -1188,6 +1188,7 @@ func (app *Uptick) RegisterAPIRoutes(apiSvr *api.Server, apiConfig config.APICon
 	if apiConfig.Swagger {
 		RegisterSwaggerAPI(clientCtx, apiSvr.Router)
 	}
+
 }
 
 func (app *Uptick) RegisterTxService(clientCtx client.Context) {
@@ -1306,6 +1307,20 @@ func (app *Uptick) registerUpgradeHandlers() {
 
 			// Migrate Tendermint consensus parameters from x/params module to a dedicated x/consensus module.
 			baseapp.MigrateParams(ctx, baseAppLegacySS, &app.ConsensusParamsKeeper)
+
+			if err := app.FeeMarketKeeper.SetParams(ctx, generateFeemarketParams(ctx.BlockHeight())); err != nil {
+				panic(fmt.Errorf("failed to FeeMarketKeeper SetParams "))
+			}
+
+			wasmParams := app.wasmKeeper.GetParams(ctx)
+			wasmParams.CodeUploadAccess.Permission = wasmtypes.AccessTypeEverybody
+			wasmParams.InstantiateDefaultPermission = wasmtypes.AccessTypeEverybody
+			if err := app.wasmKeeper.SetParams(ctx, wasmParams); err != nil {
+				panic(fmt.Errorf("failed to wasmKeeper SetParams "))
+			}
+
+			//add wasm load
+			app.Cw721Keeper.LoadCw721Base(ctx)
 			return app.mm.RunMigrations(ctx, app.configurator, vm)
 		})
 
@@ -1328,7 +1343,7 @@ func (app *Uptick) registerUpgradeHandlers() {
 		storeUpgrades = &storetypes.StoreUpgrades{
 
 			// Added: []string{crisistypes.ModuleName, consensusparamtypes.ModuleName},
-			Added: []string{cw721types.ModuleName},
+			Added: []string{cw721types.ModuleName, wasmtypes.ModuleName},
 		}
 	}
 

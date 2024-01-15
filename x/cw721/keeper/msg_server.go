@@ -2,6 +2,7 @@ package keeper
 
 import (
 	"context"
+	"fmt"
 	nftTypes "github.com/UptickNetwork/uptick/x/collection/types"
 	ibcnfttransfertypes "github.com/bianjieai/nft-transfer/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
@@ -31,13 +32,16 @@ func (k Keeper) TransferCW721(
 		ClassId:         msg.ClassId,
 		NftIds:          msg.CosmosTokenIds,
 	}
-	k.ConvertCW721(ctx, &convertMsg)
+	resMsg, err := k.ConvertCW721(ctx, &convertMsg)
+	if err != nil {
+		return nil, sdkerrors.Wrapf(err, "failed to ConvertERC721 %v", err)
+	}
 
 	ibcMsg := ibcnfttransfertypes.MsgTransfer{
 		SourcePort:       msg.SourcePort,
 		SourceChannel:    msg.SourceChannel,
-		ClassId:          msg.ClassId,
-		TokenIds:         msg.CosmosTokenIds,
+		ClassId:          resMsg.ClassId,
+		TokenIds:         resMsg.TokenIds,
 		Sender:           types.AccModuleAddress.String(),
 		Receiver:         msg.CosmosReceiver,
 		TimeoutHeight:    msg.TimeoutHeight,
@@ -45,7 +49,11 @@ func (k Keeper) TransferCW721(
 		Memo:             msg.Memo + types.TransferCW721Memo,
 	}
 
-	k.ibcKeeper.Transfer(goCtx, &ibcMsg)
+	_, err = k.ibcKeeper.Transfer(goCtx, &ibcMsg)
+	if err != nil {
+		return nil, sdkerrors.Wrapf(err, "failed to ibc Transfer %v", err)
+	}
+
 	for _, cwTokenId := range msg.CosmosTokenIds {
 		k.SetCwAddressByContractTokenId(ctx, msg.CwContractAddress, cwTokenId, msg.CwSender)
 	}
@@ -60,7 +68,7 @@ func (k Keeper) ConvertCW721(
 	goCtx context.Context,
 	msg *types.MsgConvertCW721,
 ) (
-	*types.MsgConvertCW721Response, error,
+	*types.MsgConvertCW721, error,
 ) {
 
 	ctx := sdk.UnwrapSDKContext(goCtx)
@@ -97,7 +105,7 @@ func (k Keeper) convertWasm2Cosmos(
 	ctx sdk.Context,
 	msg *types.MsgConvertCW721,
 ) (
-	*types.MsgConvertCW721Response, error,
+	*types.MsgConvertCW721, error,
 ) {
 
 	for i, tokenId := range msg.TokenIds {
@@ -137,14 +145,17 @@ func (k Keeper) convertWasm2Cosmos(
 				return nil, err
 			}
 		} else {
-
+			nftInfo, err := k.nftKeeper.GetNFT(ctx, msg.ClassId, msg.NftIds[i])
+			if err != nil {
+				return nil, sdkerrors.Wrapf(sdkerrors.ErrConflict, "fail to get nftInfo ", "classId", msg.ClassId, "nftId", msg.NftIds[i])
+			}
 			transferNft := nftTypes.MsgTransferNFT{
 				DenomId:   msg.ClassId,
 				Id:        msg.NftIds[i],
-				Name:      "",
+				Name:      nftInfo.GetName(),
 				URI:       allNftInfo.Info.TokenUri,
-				Data:      "",
-				UriHash:   "",
+				Data:      nftInfo.GetData(),
+				UriHash:   nftInfo.GetURIHash(),
 				Sender:    types.AccModuleAddress.String(),
 				Recipient: msg.Receiver,
 			}
@@ -159,7 +170,7 @@ func (k Keeper) convertWasm2Cosmos(
 		k.SetNFTPairs(ctx, msg.ContractAddress, tokenId, msg.ClassId, msg.NftIds[i])
 	}
 
-	return &types.MsgConvertCW721Response{}, nil
+	return msg, nil
 }
 
 // ConvertNFT ConvertCoin converts native Cosmos nft into CW721 tokens for both
@@ -181,7 +192,8 @@ func (k Keeper) ConvertNFT(
 	msg.ContractAddress = contractAddress
 	msg.TokenIds = tokenIds
 
-	id := k.GetClassMap(ctx, msg.ContractAddress)
+	id := k.GetClassMap(ctx, msg.ClassId)
+	k.Logger(ctx).Info("xxl ConvertNFT ", "id", id, "msg", msg)
 	if len(id) == 0 {
 		_, err := k.RegisterNFT(ctx, msg)
 		if err != nil {
@@ -250,8 +262,10 @@ func (k Keeper) convertCosmos2Wasm(
 
 		if err != nil {
 
+			fmt.Printf("xxl start convertCosmos2Wasm %v-%v-%v-%v \n", msg, tokenId, msg.Sender, reqInfo.GetURI())
 			// mint
-			_, err := k.MintCw721(ctx, msg.ContractAddress, tokenId, types.AccModuleAddress.String(), reqInfo.GetURI())
+			_, err := k.MintCw721(ctx, msg.ContractAddress, tokenId, msg.Sender, reqInfo.GetURI())
+			fmt.Printf("xxl end convertCosmos2Wasm %v \n", err)
 			if err != nil {
 				return nil, err
 			}

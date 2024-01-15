@@ -59,6 +59,7 @@ require (
 require (
 	github.com/cosmos/gogoproto v1.4.10
 	github.com/gogo/protobuf v1.3.2
+	github.com/tendermint/tendermint v0.35.9
 )
 
 require (

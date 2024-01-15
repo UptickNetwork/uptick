@@ -4,6 +4,7 @@ import (
 	"fmt"
 	nftkeeper "github.com/UptickNetwork/uptick/x/collection/keeper"
 	ibcnfttransferkeeper "github.com/bianjieai/nft-transfer/keeper"
+	ibcnfttransfertypes "github.com/bianjieai/nft-transfer/types"
 	porttypes "github.com/cosmos/ibc-go/v7/modules/core/05-port/types"
 
 	"github.com/cometbft/cometbft/libs/log"
@@ -71,4 +72,17 @@ func (k *Keeper) SetICS4Wrapper(ics4Wrapper porttypes.ICS4Wrapper) {
 	}
 
 	k.ics4Wrapper = ics4Wrapper
+}
+
+func (k *Keeper) GetVoucherClassID(port string, channel string, classId string) string {
+	// since SendPacket did not prefix the classID, we must prefix classID here
+	classPrefix := ibcnfttransfertypes.GetClassPrefix(port, channel)
+	// NOTE: sourcePrefix contains the trailing "/"
+	prefixedClassID := classPrefix + classId
+
+	// construct the class trace from the full raw classID
+	classTrace := ibcnfttransfertypes.ParseClassTrace(prefixedClassID)
+	voucherClassID := classTrace.IBCClassID()
+
+	return voucherClassID
 }
