@@ -546,11 +546,6 @@ else
 	# mkdir -p localnet-setup
 	 @$(MAKE) localnet-build
 
-#	if ! [ -f localnet-setup/node0/$(UPTICK_BINARY)/config/genesis.json ]; \
-#	then \
-#		docker run --rm -v $(CURDIR)/localnet-setup:/uptick:Z xuxinai2002/node:v0.1 "export LD_LIBRARY_PATH=/wasm && ./uptickd testnet init-files --v 4 -o /uptick --keyring-backend=test --starting-ip-address 192.167.10.2"; \
-#	fi
-#
 #	docker-compose up -d
 endif
 

@@ -14,8 +14,6 @@ import (
 
 	ethante "github.com/evmos/ethermint/app/ante"
 	evmtypes "github.com/evmos/ethermint/x/evm/types"
-
-	wasmTypes "github.com/CosmWasm/wasmd/x/wasm/types"
 )
 
 // HandlerOptions defines the list of module keepers required to run the Evmos
@@ -31,7 +29,6 @@ type HandlerOptions struct {
 	SignModeHandler   authsigning.SignModeHandler
 	SigGasConsumer    func(meter sdk.GasMeter, sig signing.SignatureV2, params authtypes.Params) error
 	TxCounterStoreKey storetypes.StoreKey
-	WasmConfig        wasmTypes.WasmConfig
 	Cdc               codec.BinaryCodec
 	MaxTxGasWanted    uint64
 	TxFeeChecker      ante.TxFeeChecker

@@ -8,10 +8,6 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/consensus"
 	"github.com/cosmos/cosmos-sdk/x/nft"
 
-	"github.com/CosmWasm/wasmd/x/wasm"
-	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
-	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
-
 	"io"
 	"net/http"
 	"os"
@@ -179,14 +175,6 @@ func init() {
 const (
 	// Name defines the application binary name
 	Name = "uptickd"
-
-	// ProposalsEnabled If EnabledSpecificProposals is "", and this is "true", then enable all x/wasm proposals.
-	// If EnabledSpecificProposals is "", and this is not "true", then disable all x/wasm proposals.
-	ProposalsEnabled = "true"
-	// EnableSpecificProposals If set to non-empty string it must be comma-separated list of values that are all a subset
-	// of "EnableAllProposals" (takes precedence over ProposalsEnabled)
-	// https://github.com/CosmWasm/wasmd/blob/02a54d33ff2c064f3539ae12d75d027d9c665f05/x/wasm/internal/types/proposal.go#L28-L34
-	EnableSpecificProposals = ""
 )
 
 var (
@@ -249,7 +237,6 @@ var (
 		nftmodule.AppModuleBasic{},
 		nfttransfer.AppModuleBasic{},
 
-		wasm.AppModuleBasic{},
 		ica.AppModuleBasic{},
 
 		consensus.AppModuleBasic{},
@@ -273,9 +260,8 @@ var (
 
 		nfttypes.ModuleName: nil,
 		// nft.ModuleName:      nil,
-		wasmtypes.ModuleName: {authtypes.Burner},
-		icatypes.ModuleName:  nil,
-		nft.ModuleName:       nil,
+		icatypes.ModuleName: nil,
+		nft.ModuleName:      nil,
 	}
 
 	// module accounts that are allowed to receive tokens
@@ -353,15 +339,6 @@ type Uptick struct {
 	Cw721Keeper  cw721keeper.Keeper
 
 	NFTKeeper nftkeeper.Keeper
-
-	//Add ICS721 for nft ibc transfer
-	// ICS721Keeper ibcnfttransferkeeper.Keeper
-
-	// this line is used by starport scaffolding # stargate/app/keeperDeclaration
-	wasmKeeper             wasm.Keeper
-	wasmPermissionedKeeper wasmkeeper.PermissionedKeeper
-	scopedWasmKeeper       capabilitykeeper.ScopedKeeper
-
 	// simulation manager
 	sm         *module.SimulationManager
 	tpsCounter *tpsCounter
@@ -378,7 +355,6 @@ func NewUptick(
 	invCheckPeriod uint,
 	encodingConfig simappparams.EncodingConfig,
 	appOpts servertypes.AppOptions,
-	wasmOpts []wasm.Option,
 	baseAppOptions ...func(*baseapp.BaseApp),
 ) *Uptick {
 
@@ -428,7 +404,6 @@ func NewUptick(
 		// nfttypes.StoreKey,
 		ibcnfttransfertypes.StoreKey,
 		icahosttypes.StoreKey,
-		wasmtypes.StoreKey,
 		consensusparamtypes.StoreKey,
 		crisistypes.StoreKey,
 	)
@@ -465,7 +440,6 @@ func NewUptick(
 	scopedTransferKeeper := app.CapabilityKeeper.ScopeToModule(ibctransfertypes.ModuleName)
 
 	scopedNFTTransferKeeper := app.CapabilityKeeper.ScopeToModule(ibcnfttransfertypes.ModuleName)
-	scopedWasmKeeper := app.CapabilityKeeper.ScopeToModule(wasmtypes.ModuleName)
 	// Applications that wish to enforce statically created ScopedKeepers should call `Seal` after creating
 	// their scoped modules in `NewApp` with `ScopeToModule`
 	app.CapabilityKeeper.Seal()
@@ -758,7 +732,6 @@ func NewUptick(
 	ibcRouter := porttypes.NewRouter()
 
 	ibcRouter.AddRoute(ibctransfertypes.ModuleName, transferStack).
-		AddRoute(wasmtypes.ModuleName, wasm.NewIBCHandler(app.wasmKeeper, app.IBCKeeper.ChannelKeeper, app.IBCKeeper.ChannelKeeper)).
 		AddRoute(ibcnfttransfertypes.ModuleName, ercTransferStack).
 		AddRoute(icahosttypes.SubModuleName, icaHostIBCModule)
 
@@ -815,9 +788,6 @@ func NewUptick(
 
 		ibcnfttransferModule,
 		icaModule,
-		// this line is used by starport scaffolding # stargate/app/appModule
-		// wasm.NewAppModule(appCodec, &app.wasmKeeper, app.StakingKeeper, app.AccountKeeper, app.BankKeeper),
-		wasm.NewAppModule(appCodec, &app.wasmKeeper, app.StakingKeeper, app.AccountKeeper, app.BankKeeper, app.MsgServiceRouter(), app.GetSubspace(wasmtypes.ModuleName)),
 	)
 
 	// During begin block slashing happens after distr.BeginBlocker so that
@@ -856,7 +826,6 @@ func NewUptick(
 
 		ibcnfttransfertypes.ModuleName,
 		icatypes.ModuleName,
-		wasmtypes.ModuleName,
 		consensusparamtypes.ModuleName,
 	)
 
@@ -889,7 +858,6 @@ func NewUptick(
 		nfttypes.ModuleName,
 		ibcnfttransfertypes.ModuleName,
 		icatypes.ModuleName,
-		wasmtypes.ModuleName,
 		consensusparamtypes.ModuleName,
 	)
 
@@ -931,7 +899,6 @@ func NewUptick(
 		nfttypes.ModuleName,
 		ibcnfttransfertypes.ModuleName,
 		icatypes.ModuleName,
-		wasmtypes.ModuleName,
 		consensusparamtypes.ModuleName,
 		cw721types.ModuleName,
 	)
@@ -967,7 +934,6 @@ func NewUptick(
 		feemarket.NewAppModule(app.FeeMarketKeeper, app.GetSubspace(feemarkettypes.ModuleName)),
 
 		//nftmodule.NewAppModule(app.appCodec, app.CollectionKeeper, app.AccountKeeper, app.BankKeeper),
-		wasm.NewAppModule(appCodec, &app.wasmKeeper, app.StakingKeeper, app.AccountKeeper, app.BankKeeper, app.MsgServiceRouter(), app.GetSubspace(wasmtypes.ModuleName)),
 		nftmodule.NewAppModule(appCodec, app.NFTKeeper, app.AccountKeeper, app.BankKeeper),
 		ibcnfttransferModule,
 	)
@@ -985,17 +951,15 @@ func NewUptick(
 
 	maxGasWanted := cast.ToUint64(appOpts.Get(srvflags.EVMMaxTxGasWanted))
 	options := ante.HandlerOptions{
-		AccountKeeper:     app.AccountKeeper,
-		BankKeeper:        app.BankKeeper,
-		IBCKeeper:         app.IBCKeeper,
-		TxCounterStoreKey: keys[wasm.StoreKey],
-		WasmConfig:        wasmConfig,
-		FeeMarketKeeper:   app.FeeMarketKeeper,
-		EvmKeeper:         app.EvmKeeper,
-		FeegrantKeeper:    app.FeeGrantKeeper,
-		SignModeHandler:   encodingConfig.TxConfig.SignModeHandler(),
-		SigGasConsumer:    SigVerificationGasConsumer,
-		MaxTxGasWanted:    maxGasWanted,
+		AccountKeeper:   app.AccountKeeper,
+		BankKeeper:      app.BankKeeper,
+		IBCKeeper:       app.IBCKeeper,
+		FeeMarketKeeper: app.FeeMarketKeeper,
+		EvmKeeper:       app.EvmKeeper,
+		FeegrantKeeper:  app.FeeGrantKeeper,
+		SignModeHandler: encodingConfig.TxConfig.SignModeHandler(),
+		SigGasConsumer:  SigVerificationGasConsumer,
+		MaxTxGasWanted:  maxGasWanted,
 	}
 
 	if err := options.Validate(); err != nil {
@@ -1005,15 +969,6 @@ func NewUptick(
 	app.SetAnteHandler(ante.NewAnteHandler(options))
 	app.SetEndBlocker(app.EndBlocker)
 	app.registerUpgradeHandlers()
-
-	if manager := app.SnapshotManager(); manager != nil {
-		err = manager.RegisterExtensions(
-			wasmkeeper.NewWasmSnapshotter(app.CommitMultiStore(), &app.wasmKeeper),
-		)
-		if err != nil {
-			panic("failed to register snapshot extension: " + err.Error())
-		}
-	}
 
 	upgradeInfo, err := app.UpgradeKeeper.ReadUpgradeInfoFromDisk()
 	if err != nil {
@@ -1036,7 +991,6 @@ func NewUptick(
 
 	app.ScopedIBCKeeper = scopedIBCKeeper
 	app.ScopedTransferKeeper = scopedTransferKeeper
-	app.scopedWasmKeeper = scopedWasmKeeper
 	app.ScopedICAHostKeeper = scopedICAHostKeeper
 
 	// Finally start the tpsCounter.
@@ -1286,9 +1240,6 @@ func initParamsKeeper(
 	paramsKeeper.Subspace(erc721types.ModuleName).WithKeyTable(erc721types.ParamKeyTable())
 	paramsKeeper.Subspace(icahosttypes.SubModuleName).WithKeyTable(icahosttypes.ParamKeyTable())
 
-	// paramsKeeper.Subspace(wasmtypes.ModuleName).WithKeyTable(wasmtypes.ParamKeyTable())
-	// paramsKeeper.Subspace(wasmtypes.ModuleName).WithKeyTable(wasmParamsKeyTable())
-	paramsKeeper.Subspace(wasmtypes.ModuleName).WithKeyTable(wasmParamsKeyTable())
 	paramsKeeper.Subspace(ibcnfttransfertypes.ModuleName)
 	paramsKeeper.Subspace(cw721types.ModuleName).WithKeyTable(cw721types.ParamKeyTable())
 
@@ -1321,7 +1272,7 @@ func (app *Uptick) registerUpgradeHandlers() {
 
 			//add wasm load
 			app.Cw721Keeper.LoadCw721Base(ctx)
-			return app.mm.RunMigrations(ctx, app.configurator, vm)
+
 		})
 
 	// When a planned update height is reached, the old binary will panic
@@ -1344,6 +1295,7 @@ func (app *Uptick) registerUpgradeHandlers() {
 
 			// Added: []string{crisistypes.ModuleName, consensusparamtypes.ModuleName},
 			Added: []string{cw721types.ModuleName, wasmtypes.ModuleName},
+
 		}
 	}
 
@@ -1370,6 +1322,7 @@ func (app *Uptick) BlockedModuleAccountAddrs() map[string]bool {
 
 	return modAccAddrs
 }
+
 
 // Deprecated.
 func wasmParamsKeyTable() paramstypes.KeyTable {
@@ -1412,3 +1365,4 @@ func validateAccessType(i interface{}) error {
 	}
 	return fmt.Errorf("unknown type: %q", a)
 }
+
