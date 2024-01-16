@@ -2,7 +2,6 @@ package keeper
 
 import (
 	"encoding/json"
-	"fmt"
 	"math/big"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -120,7 +119,7 @@ func (k Keeper) QueryClassEnhance(
 
 	ret, err := erc721.Unpack("getClassEnhanceInfo", res.Ret)
 	if err != nil {
-		fmt.Printf("QueryClassEnhance resRet %v \n", err)
+		k.Logger(ctx).Error("QueryClassEnhance resRet", "error", err.Error())
 	}
 
 	if len(ret) != 7 {

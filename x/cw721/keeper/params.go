@@ -1,7 +1,6 @@
 package keeper
 
 import (
-	"fmt"
 	"github.com/UptickNetwork/uptick/x/cw721/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
@@ -12,8 +11,7 @@ const UPTICK_CW721_LABLE = "Uptick CW721"
 const UPTICK_CW721_NAME = "Uptick CW721"
 const UPTICK_CW721_SYMBOL = "UCW721"
 
-// xxl TODO Just for test ...
-const BASE_WASM_URL = "http://192.168.20.177:8081"
+const BASE_WASM_URL = "https://github.com/UptickNetwork/uptick/blob/main/release/wasm"
 
 // GetParams returns the total set of erc20 parameters.
 func (k Keeper) GetParams(ctx sdk.Context) (params types.Params) {
@@ -58,6 +56,13 @@ func (k Keeper) GetClassIDAndNFTID(ctx sdk.Context, msg *types.MsgConvertCW721) 
 		if err != nil {
 			return "", nil, err
 		}
+
+		if msg.ContractAddress != "" && msg.ContractAddress != classId {
+
+			return "", nil, sdkerrors.Wrapf(types.ErrContractAddressNotCorrect,
+				"nft id is not correct expect %s - get %s",
+				msg.ContractAddress, classId)
+		}
 	}
 
 	return classId, nftIds, nil
@@ -66,22 +71,19 @@ func (k Keeper) GetClassIDAndNFTID(ctx sdk.Context, msg *types.MsgConvertCW721) 
 
 func (k Keeper) LoadCw721Base(ctx sdk.Context) (error, uint64) {
 
-	// xxl come to load cw721 base ...
+	// come to load cw721 base ...
 	var codeId uint64
 	var err error
 	resultBytes := k.GetWasmCode(ctx, types.AccModuleAddress.String())
-	fmt.Printf("xxl GetWasmCode %v - %v \n", types.AccModuleAddress.String(), resultBytes)
 	codeId, _ = strconv.ParseUint(string(resultBytes), 10, 64)
 
 	if codeId <= 0 {
 		codeId, err = k.StoreWasmContract(ctx, BASE_WASM_URL+"/cw721_base.wasm", types.AccModuleAddress.String())
 		if err != nil {
-			k.Logger(ctx).Error("xxl LoadCw721Base ", "err:", err.Error())
+			k.Logger(ctx).Error("LoadCw721Base ", "err:", err.Error())
 			return err, 0
 		} else {
-			k.Logger(ctx).Info("xxl LoadCw721Base codeId ", "codeId is : ", codeId)
-
-			fmt.Printf("xxl SetWasmCode %v - %v \n", types.AccModuleAddress.String(), codeId)
+			k.Logger(ctx).Info("LoadCw721Base codeId ", "codeId is : ", codeId)
 			k.SetWasmCode(ctx, types.AccModuleAddress.String(), codeId)
 		}
 	}
@@ -99,7 +101,6 @@ func (k Keeper) GetContractAddressAndTokenIds(ctx sdk.Context, msg *types.MsgCon
 	)
 
 	pair, err := k.GetPair(ctx, msg.ClassId)
-	fmt.Printf("xxl GetContractAddressAndTokenIds pair %v\n ", pair)
 	if err != nil {
 
 		var codeId uint64
@@ -111,7 +112,7 @@ func (k Keeper) GetContractAddressAndTokenIds(ctx sdk.Context, msg *types.MsgCon
 			return "", nil, err
 		}
 
-		k.Logger(ctx).Info("xxl GetContractAddressAndTokenIds", "codeId is ", codeId)
+		k.Logger(ctx).Info("GetContractAddressAndTokenIds", "codeId is ", codeId)
 		contractAddress, err = k.InstantiateWasmContract(
 			ctx,
 			types.AccModuleAddress.String(),
@@ -122,12 +123,12 @@ func (k Keeper) GetContractAddressAndTokenIds(ctx sdk.Context, msg *types.MsgCon
 			types.AccModuleAddress.String(),
 		)
 
-		k.Logger(ctx).Info("xxl GetContractAddressAndTokenIds", "contractAddress", contractAddress)
+		k.Logger(ctx).Info("GetContractAddressAndTokenIds", "contractAddress", contractAddress)
 		if err == nil {
-			k.Logger(ctx).Info("xxl  GetContractAddressAndTokenIds", "contractAddress", contractAddress, "NftIds", msg.NftIds)
+			k.Logger(ctx).Info(" GetContractAddressAndTokenIds", "contractAddress", contractAddress, "NftIds", msg.NftIds)
 			return contractAddress, msg.NftIds, err
 		} else {
-			k.Logger(ctx).Error("xxl  GetContractAddressAndTokenIds", "NftIds", msg.NftIds, "error", err.Error())
+			k.Logger(ctx).Error(" GetContractAddressAndTokenIds", "NftIds", msg.NftIds, "error", err.Error())
 			return "", msg.NftIds, err
 		}
 
@@ -149,15 +150,15 @@ func (k Keeper) GetContractAddressAndTokenIds(ctx sdk.Context, msg *types.MsgCon
 		if err != nil {
 			return "", nil, err
 		}
-		k.Logger(ctx).Info("xxl  GetContractAddressAndTokenIds", "tokenIds", tokenIds)
+		k.Logger(ctx).Info(" GetContractAddressAndTokenIds", "tokenIds", tokenIds)
 		//
 		//contractAddress, err = getNftData(msg.ContractAddress, msg.ClassId, savedContractAddress, 3)
-		//k.Logger(ctx).Info("xxl  GetContractAddressAndTokenIds", "contractAddress", contractAddress)
+		//k.Logger(ctx).Info(" GetContractAddressAndTokenIds", "contractAddress", contractAddress)
 		//
 		//if contractAddress == "" {
 		//	contractAddress = pair.Cw721Address
 		//}
-		//k.Logger(ctx).Info("xxl  GetContractAddressAndTokenIds", "pair.Cw721Address", pair.Cw721Address)
+		//k.Logger(ctx).Info(" GetContractAddressAndTokenIds", "pair.Cw721Address", pair.Cw721Address)
 		//
 		//if err != nil {
 		//	return "", nil, err
