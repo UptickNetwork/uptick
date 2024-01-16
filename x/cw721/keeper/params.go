@@ -11,7 +11,7 @@ const UPTICK_CW721_LABLE = "Uptick CW721"
 const UPTICK_CW721_NAME = "Uptick CW721"
 const UPTICK_CW721_SYMBOL = "UCW721"
 
-const BASE_WASM_URL = "https://github.com/UptickNetwork/uptick/blob/main/release/wasm"
+const BASE_WASM_URL = "https://raw.githubusercontent.com/UptickNetwork/uptick/main/release/wasm/"
 
 // GetParams returns the total set of erc20 parameters.
 func (k Keeper) GetParams(ctx sdk.Context) (params types.Params) {
@@ -57,11 +57,11 @@ func (k Keeper) GetClassIDAndNFTID(ctx sdk.Context, msg *types.MsgConvertCW721) 
 			return "", nil, err
 		}
 
-		if msg.ContractAddress != "" && msg.ContractAddress != classId {
+		if msg.ClassId != "" && msg.ClassId != classId {
 
 			return "", nil, sdkerrors.Wrapf(types.ErrContractAddressNotCorrect,
 				"nft id is not correct expect %s - get %s",
-				msg.ContractAddress, classId)
+				msg.ClassId, classId)
 		}
 	}
 
@@ -158,7 +158,7 @@ func (k Keeper) GetContractAddressAndTokenIds(ctx sdk.Context, msg *types.MsgCon
 		//if contractAddress == "" {
 		//	contractAddress = pair.Cw721Address
 		//}
-		//k.Logger(ctx).Info(" GetContractAddressAndTokenIds", "pair.Cw721Address", pair.Cw721Address)
+		//k.Logger(ctx).Info("	 GetContractAddressAndTokenIds", "pair.Cw721Address", pair.Cw721Address)
 		//
 		//if err != nil {
 		//	return "", nil, err

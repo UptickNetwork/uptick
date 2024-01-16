@@ -148,9 +148,8 @@ func getBytesFromUrl(url string) ([]byte, error) {
 	}
 	defer response.Body.Close()
 
-	// bz, err := ioutil.ReadAll(response.Body)
-
-	bz, err := ioutil.ReadFile("/Users/xuxinlai/my/mul/gon/v2/ics721-setup/cw721_base.wasm")
+	bz, err := ioutil.ReadAll(response.Body)
+	// bz, err := ioutil.ReadFile("/Users/xuxinlai/my/mul/gon/v2/ics721-setup/cw721_base.wasm")
 	return bz, err
 
 }
