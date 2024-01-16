@@ -2,6 +2,7 @@ package keeper
 
 import (
 	"context"
+	"fmt"
 	cw721Types "github.com/UptickNetwork/uptick/x/cw721/types"
 	erc20Types "github.com/UptickNetwork/uptick/x/erc20/types"
 	erc721Types "github.com/UptickNetwork/uptick/x/erc721/types"
@@ -115,10 +116,15 @@ func (k Keeper) ConvertNFTFromCw721(context context.Context, voucherClassID stri
 // the sender is refunded their tokens using the refundPacketToken function.
 func (k Keeper) OnAcknowledgementPacket(ctx sdk.Context, packet channeltypes.Packet, data types.NonFungibleTokenPacketData, ack channeltypes.Acknowledgement) error {
 
+	fmt.Printf("xxl OnAcknowledgementPacket %s \n", data.Receiver)
 	switch ack.Response.(type) {
 	case *channeltypes.Acknowledgement_Error:
 		if strings.Contains(data.Memo, erc721Types.TransferERC721Memo) {
+			data.ClassId = k.getRefundClassId(packet, data)
 			k.RefundPacketToken(ctx, data)
+		} else if strings.Contains(data.Memo, cw721Types.TransferCW721Memo) {
+			data.ClassId = k.getRefundClassId(packet, data)
+			k.cw721Keep.RefundPacketToken(ctx, data)
 		}
 	default:
 		// the acknowledgement succeeded on the receiving chain so nothing
@@ -132,7 +138,29 @@ func (k Keeper) OnAcknowledgementPacket(ctx sdk.Context, packet channeltypes.Pac
 func (k Keeper) OnTimeoutPacket(ctx sdk.Context, packet channeltypes.Packet, data types.NonFungibleTokenPacketData) error {
 
 	if strings.Contains(data.Memo, erc721Types.TransferERC721Memo) {
+		data.ClassId = k.getRefundClassId(packet, data)
 		k.RefundPacketToken(ctx, data)
+	} else if strings.Contains(data.Memo, cw721Types.TransferCW721Memo) {
+		data.ClassId = k.getRefundClassId(packet, data)
+		k.cw721Keep.RefundPacketToken(ctx, data)
 	}
 	return nil
+}
+
+func (k Keeper) getRefundClassId(packet channeltypes.Packet, data types.NonFungibleTokenPacketData) string {
+	var voucherClassID string
+
+	if strings.Contains(data.ClassId, "nft-transfer/") {
+		// if types.IsAwayFromOrigin(packet.GetSourcePort(), packet.GetSourceChannel(), data.ClassId) {
+		orgClass, _ := types.RemoveClassPrefix(packet.GetSourcePort(), packet.GetSourceChannel(), data.ClassId)
+		voucherClassID = k.GetVoucherClassID(packet.GetSourcePort(), packet.GetSourceChannel(), orgClass)
+
+	} else {
+		fmt.Printf("xxl 0005 voucherClassID %s \n", voucherClassID)
+		voucherClassID = data.ClassId
+	}
+
+	fmt.Printf("xxl voucherClassID 0006 is %s \n", voucherClassID)
+
+	return voucherClassID
 }

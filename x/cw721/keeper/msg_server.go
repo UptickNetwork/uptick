@@ -2,6 +2,7 @@ package keeper
 
 import (
 	"context"
+	"fmt"
 	nftTypes "github.com/UptickNetwork/uptick/x/collection/types"
 	ibcnfttransfertypes "github.com/bianjieai/nft-transfer/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
@@ -31,9 +32,11 @@ func (k Keeper) TransferCW721(
 		ClassId:         msg.ClassId,
 		NftIds:          msg.CosmosTokenIds,
 	}
+
+	fmt.Printf("xxl convertMsg %v - %v -%v\n", convertMsg.ClassId, convertMsg.NftIds, msg)
 	resMsg, err := k.ConvertCW721(ctx, &convertMsg)
 	if err != nil {
-		return nil, sdkerrors.Wrapf(err, "failed to ConvertERC721 %v", err)
+		return nil, sdkerrors.Wrapf(err, "failed to ConvertCW721 %v", err)
 	}
 
 	ibcMsg := ibcnfttransfertypes.MsgTransfer{
@@ -53,7 +56,9 @@ func (k Keeper) TransferCW721(
 		return nil, sdkerrors.Wrapf(err, "failed to ibc Transfer %v", err)
 	}
 
-	for _, cwTokenId := range msg.CosmosTokenIds {
+	fmt.Printf("xxl 0000 TransferCW721 msg:%v- CosmosTokenIds:%v \n", msg, msg.CosmosTokenIds)
+	for _, cwTokenId := range msg.CwTokenIds {
+		fmt.Printf("xxl 0001 TransferCW721 CwSender: %v-cwTokenId :%v \n", msg.CwSender, cwTokenId)
 		k.SetCwAddressByContractTokenId(ctx, msg.CwContractAddress, cwTokenId, msg.CwSender)
 	}
 
@@ -73,6 +78,7 @@ func (k Keeper) ConvertCW721(
 	ctx := sdk.UnwrapSDKContext(goCtx)
 
 	//classId, nftId
+	fmt.Printf("xxl msg %v\n", msg)
 	classId, nftIds, err := k.GetClassIDAndNFTID(ctx, msg)
 	if err != nil {
 		return nil, err
@@ -306,14 +312,19 @@ func (k Keeper) RefundPacketToken(
 	data ibcnfttransfertypes.NonFungibleTokenPacketData,
 ) error {
 
+	fmt.Printf("xxl RefundPacketToken data %v\n", data)
 	for _, tokenId := range data.TokenIds {
 
 		uNftID := types.CreateNFTUID(data.ClassId, tokenId)
+		fmt.Printf("xxl RefundPacketToken uNftID %v\n", uNftID)
+
 		cwTokenId, cwContractAddress := types.GetNFTFromUID(string(k.GetTokenUIDPairByNFTUID(ctx, uNftID)))
 		cwReceiver := k.GetCwAddressByContractTokenId(ctx, cwContractAddress, tokenId)
 
+		fmt.Printf("xxl RefundPacketToken %s - %s - %s - %s\n", cwContractAddress, cwTokenId, string(cwReceiver), data.Sender)
 		_, err := k.TransferCw721(ctx, cwContractAddress, cwTokenId, string(cwReceiver), data.Sender)
 		if err != nil {
+			fmt.Printf("xxl RefundPacketToken %v \n", err)
 			return err
 		}
 
