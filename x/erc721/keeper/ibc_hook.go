@@ -2,7 +2,6 @@ package keeper
 
 import (
 	"context"
-	"fmt"
 	cw721Types "github.com/UptickNetwork/uptick/x/cw721/types"
 	erc20Types "github.com/UptickNetwork/uptick/x/erc20/types"
 	erc721Types "github.com/UptickNetwork/uptick/x/erc721/types"
@@ -116,7 +115,6 @@ func (k Keeper) ConvertNFTFromCw721(context context.Context, voucherClassID stri
 // the sender is refunded their tokens using the refundPacketToken function.
 func (k Keeper) OnAcknowledgementPacket(ctx sdk.Context, packet channeltypes.Packet, data types.NonFungibleTokenPacketData, ack channeltypes.Acknowledgement) error {
 
-	fmt.Printf("xxl OnAcknowledgementPacket %s \n", data.Receiver)
 	switch ack.Response.(type) {
 	case *channeltypes.Acknowledgement_Error:
 		if strings.Contains(data.Memo, erc721Types.TransferERC721Memo) {
@@ -156,11 +154,8 @@ func (k Keeper) getRefundClassId(packet channeltypes.Packet, data types.NonFungi
 		voucherClassID = k.GetVoucherClassID(packet.GetSourcePort(), packet.GetSourceChannel(), orgClass)
 
 	} else {
-		fmt.Printf("xxl 0005 voucherClassID %s \n", voucherClassID)
 		voucherClassID = data.ClassId
 	}
-
-	fmt.Printf("xxl voucherClassID 0006 is %s \n", voucherClassID)
 
 	return voucherClassID
 }
