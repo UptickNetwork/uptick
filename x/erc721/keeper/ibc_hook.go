@@ -21,7 +21,7 @@ func (k Keeper) OnRecvPacket(
 	receiver string,
 	convertType uint) exported.Acknowledgement {
 
-	k.Logger(ctx).Info("xxl OnRecvPacket ", "convertType", convertType)
+	k.Logger(ctx).Info("OnRecvPacket ", "convertType", convertType)
 	event := &erc20Types.EventIBCERC20{
 		Status:             erc20Types.STATUS_UNKNOWN,
 		Message:            "",
@@ -47,7 +47,7 @@ func (k Keeper) OnRecvPacket(
 		voucherClassID, _ = types.RemoveClassPrefix(packet.GetSourcePort(), packet.GetSourceChannel(), data.ClassId)
 	}
 
-	k.Logger(ctx).Info("xxl OnRecvPacket ", "voucherClassID", voucherClassID)
+	k.Logger(ctx).Info("OnRecvPacket ", "voucherClassID", voucherClassID)
 	// use cctx to ConvertCoin
 	context := sdk.WrapSDKContext(cctx)
 	var err error
@@ -59,7 +59,7 @@ func (k Keeper) OnRecvPacket(
 	if err != nil {
 		event.Status = erc20Types.STATUS_FAILED
 		event.Message = err.Error()
-		k.Logger(ctx).Error("xxl OnRecvPacket ", "err ", err.Error())
+		k.Logger(ctx).Error("OnRecvPacket ", "err ", err.Error())
 		_ = ctx.EventManager().EmitTypedEvent(event)
 		return nil
 	}
@@ -69,7 +69,7 @@ func (k Keeper) OnRecvPacket(
 	event.Status = erc20Types.STATUS_SUCCESS
 	_ = ctx.EventManager().EmitTypedEvent(event)
 
-	k.Logger(ctx).Info("xxl OnRecvPacket ", "finish OK")
+	k.Logger(ctx).Info("OnRecvPacket ", "finish OK")
 
 	return nil
 

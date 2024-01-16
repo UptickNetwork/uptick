@@ -77,8 +77,6 @@ func (wl *writerLogger) Info(msg string, keyVals ...interface{}) {
 
 func TestTAddress(t *testing.T) {
 
-	fmt.Printf("test address ..\n")
-
 	//// cosmos -> evm
 	//rawBytes, err := sdk.GetFromBech32("uptick1n3t0zuwq4u47ke48qm3pfhj96f4ujhs70f52sg", "uptick")
 	//if err != nil {
