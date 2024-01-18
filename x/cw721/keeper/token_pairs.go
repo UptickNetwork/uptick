@@ -139,11 +139,14 @@ func (k Keeper) SetNFTPairs(ctx sdk.Context, contractAddress string, tokenID str
 // GetTokenPairID returns the pair id from either of the registered tokens.
 func (k Keeper) GetTokenPairID(ctx sdk.Context, token string) []byte {
 
-	if common.IsHexAddress(token) {
+	//if common.IsHexAddress(token) {
+	//	return k.GetCW721Map(ctx, token)
+	//}
+	if len(k.GetCW721Map(ctx, token)) == 0 {
+		return k.GetClassMap(ctx, token)
+	} else {
 		return k.GetCW721Map(ctx, token)
 	}
-
-	return k.GetClassMap(ctx, token)
 }
 
 func (k Keeper) SetNFTPairByContractTokenID(ctx sdk.Context, contractAddress string, tokenID string, classID string, nftID string) {

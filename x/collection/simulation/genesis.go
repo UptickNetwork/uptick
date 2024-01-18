@@ -2,8 +2,6 @@ package simulation
 
 import (
 	"encoding/json"
-	"fmt"
-
 	"github.com/cosmos/cosmos-sdk/types/module"
 	simtypes "github.com/cosmos/cosmos-sdk/types/simulation"
 
@@ -63,11 +61,10 @@ func RandomizedGenState(simState *module.SimulationState) {
 
 	nftGenesis := types.NewGenesisState(collections)
 
-	bz, err := json.MarshalIndent(nftGenesis, "", " ")
+	_, err := json.MarshalIndent(nftGenesis, "", " ")
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("Selected randomly generated %s parameters:\n%s\n", types.ModuleName, bz)
 
 	simState.GenState[types.ModuleName] = simState.Cdc.MustMarshalJSON(nftGenesis)
 }

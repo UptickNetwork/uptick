@@ -3,9 +3,11 @@ package main
 import (
 	"errors"
 	"fmt"
-
+	"github.com/CosmWasm/wasmd/x/wasm"
+	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
 	tmcfg "github.com/cometbft/cometbft/config"
 	genutiltypes "github.com/cosmos/cosmos-sdk/x/genutil/types"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/viper"
 
 	"io"
@@ -253,6 +255,11 @@ func (a appCreator) newApp(logger log.Logger, db dbm.DB, traceStore io.Writer, a
 		panic(err)
 	}
 
+	var wasmOpts []wasm.Option
+	if cast.ToBool(appOpts.Get("telemetry.enabled")) {
+		wasmOpts = append(wasmOpts, wasmkeeper.WithVMCacheMetrics(prometheus.DefaultRegisterer))
+	}
+
 	// Setup chainId
 	chainID := cast.ToString(appOpts.Get(flags.FlagChainID))
 	if len(chainID) == 0 {
@@ -276,6 +283,7 @@ func (a appCreator) newApp(logger log.Logger, db dbm.DB, traceStore io.Writer, a
 		cast.ToUint(appOpts.Get(sdkserver.FlagInvCheckPeriod)),
 		a.encCfg,
 		appOpts,
+		wasmOpts,
 		baseapp.SetPruning(pruningOpts),
 		baseapp.SetMinGasPrices(cast.ToString(appOpts.Get(sdkserver.FlagMinGasPrices))),
 		baseapp.SetHaltHeight(cast.ToUint64(appOpts.Get(sdkserver.FlagHaltHeight))),
@@ -311,18 +319,19 @@ func (a appCreator) appExport(
 ) (servertypes.ExportedApp, error) {
 	var uptickApp *app.Uptick
 	homePath, ok := appOpts.Get(flags.FlagHome).(string)
+	var emptyWasmOpts []wasm.Option
 	if !ok || homePath == "" {
 		return servertypes.ExportedApp{}, errors.New("application home is not set")
 	}
 
 	if height == -1 {
-		uptickApp = app.NewUptick(logger, db, traceStore, false, map[int64]bool{}, "", uint(1), a.encCfg, appOpts)
+		uptickApp = app.NewUptick(logger, db, traceStore, false, map[int64]bool{}, "", uint(1), a.encCfg, appOpts, emptyWasmOpts)
 
 		if err := uptickApp.LoadHeight(height); err != nil {
 			return servertypes.ExportedApp{}, err
 		}
 	} else {
-		uptickApp = app.NewUptick(logger, db, traceStore, true, map[int64]bool{}, "", uint(1), a.encCfg, appOpts)
+		uptickApp = app.NewUptick(logger, db, traceStore, true, map[int64]bool{}, "", uint(1), a.encCfg, appOpts, emptyWasmOpts)
 
 	}
 

@@ -149,6 +149,7 @@ func getBytesFromUrl(url string) ([]byte, error) {
 	defer response.Body.Close()
 
 	bz, err := ioutil.ReadAll(response.Body)
+	// bz, err := ioutil.ReadFile("/Users/xuxinlai/my/mul/gon/v2/ics721-setup/cw721_base.wasm")
 	return bz, err
 
 }
@@ -163,7 +164,7 @@ func (k Keeper) StoreWasmContract(
 
 	bin, err := getContractBytes(contractFile)
 	if err != nil {
-		k.Logger(ctx).Error("xxl getContractBytes ", "err :", err)
+		k.Logger(ctx).Error("getContractBytes ", "err :", err)
 		return 0, err
 	}
 
@@ -174,7 +175,7 @@ func (k Keeper) StoreWasmContract(
 		WASMByteCode: bin,
 	})
 	if err != nil {
-		k.Logger(ctx).Error("xxl StoreCode ", "err :", err)
+		k.Logger(ctx).Error("StoreCode ", "err :", err)
 		return 0, err
 	}
 	return res.CodeID, nil
