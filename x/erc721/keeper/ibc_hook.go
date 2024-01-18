@@ -21,7 +21,7 @@ func (k Keeper) OnRecvPacket(
 	receiver string,
 	convertType uint) exported.Acknowledgement {
 
-	k.Logger(ctx).Info("xxl OnRecvPacket ", "convertType", convertType)
+	k.Logger(ctx).Info("OnRecvPacket ", "convertType", convertType)
 	event := &erc20Types.EventIBCERC20{
 		Status:             erc20Types.STATUS_UNKNOWN,
 		Message:            "",
@@ -47,7 +47,7 @@ func (k Keeper) OnRecvPacket(
 		voucherClassID, _ = types.RemoveClassPrefix(packet.GetSourcePort(), packet.GetSourceChannel(), data.ClassId)
 	}
 
-	k.Logger(ctx).Info("xxl OnRecvPacket ", "voucherClassID", voucherClassID)
+	k.Logger(ctx).Info("OnRecvPacket ", "voucherClassID", voucherClassID)
 	// use cctx to ConvertCoin
 	context := sdk.WrapSDKContext(cctx)
 	var err error
@@ -59,7 +59,7 @@ func (k Keeper) OnRecvPacket(
 	if err != nil {
 		event.Status = erc20Types.STATUS_FAILED
 		event.Message = err.Error()
-		k.Logger(ctx).Error("xxl OnRecvPacket ", "err ", err.Error())
+		k.Logger(ctx).Error("OnRecvPacket ", "err ", err.Error())
 		_ = ctx.EventManager().EmitTypedEvent(event)
 		return nil
 	}
@@ -69,7 +69,7 @@ func (k Keeper) OnRecvPacket(
 	event.Status = erc20Types.STATUS_SUCCESS
 	_ = ctx.EventManager().EmitTypedEvent(event)
 
-	k.Logger(ctx).Info("xxl OnRecvPacket ", "finish OK")
+	k.Logger(ctx).Info("OnRecvPacket ", "finish OK")
 
 	return nil
 
@@ -118,7 +118,11 @@ func (k Keeper) OnAcknowledgementPacket(ctx sdk.Context, packet channeltypes.Pac
 	switch ack.Response.(type) {
 	case *channeltypes.Acknowledgement_Error:
 		if strings.Contains(data.Memo, erc721Types.TransferERC721Memo) {
+			data.ClassId = k.getRefundClassId(packet, data)
 			k.RefundPacketToken(ctx, data)
+		} else if strings.Contains(data.Memo, cw721Types.TransferCW721Memo) {
+			data.ClassId = k.getRefundClassId(packet, data)
+			k.cw721Keep.RefundPacketToken(ctx, data)
 		}
 	default:
 		// the acknowledgement succeeded on the receiving chain so nothing
@@ -132,7 +136,26 @@ func (k Keeper) OnAcknowledgementPacket(ctx sdk.Context, packet channeltypes.Pac
 func (k Keeper) OnTimeoutPacket(ctx sdk.Context, packet channeltypes.Packet, data types.NonFungibleTokenPacketData) error {
 
 	if strings.Contains(data.Memo, erc721Types.TransferERC721Memo) {
+		data.ClassId = k.getRefundClassId(packet, data)
 		k.RefundPacketToken(ctx, data)
+	} else if strings.Contains(data.Memo, cw721Types.TransferCW721Memo) {
+		data.ClassId = k.getRefundClassId(packet, data)
+		k.cw721Keep.RefundPacketToken(ctx, data)
 	}
 	return nil
+}
+
+func (k Keeper) getRefundClassId(packet channeltypes.Packet, data types.NonFungibleTokenPacketData) string {
+	var voucherClassID string
+
+	if strings.Contains(data.ClassId, "nft-transfer/") {
+		// if types.IsAwayFromOrigin(packet.GetSourcePort(), packet.GetSourceChannel(), data.ClassId) {
+		orgClass, _ := types.RemoveClassPrefix(packet.GetSourcePort(), packet.GetSourceChannel(), data.ClassId)
+		voucherClassID = k.GetVoucherClassID(packet.GetSourcePort(), packet.GetSourceChannel(), orgClass)
+
+	} else {
+		voucherClassID = data.ClassId
+	}
+
+	return voucherClassID
 }

@@ -19,7 +19,7 @@ func (k Keeper) RegisterNFT(ctx sdk.Context, msg *types.MsgConvertNFT) (*types.T
 	}
 
 	pair := types.NewTokenPair(msg.ContractAddress, msg.ClassId)
-	k.Logger(ctx).Info("xxl RegisterNFT ", "ClassId", pair.ClassId, "Cw721Address", pair.Cw721Address)
+	k.Logger(ctx).Info("RegisterNFT ", "ClassId", pair.ClassId, "Cw721Address", pair.Cw721Address)
 	k.SetTokenPair(ctx, pair)
 	k.SetClassMap(ctx, pair.ClassId, pair.GetID())
 	k.SetCW721Map(ctx, pair.Cw721Address, pair.GetID())

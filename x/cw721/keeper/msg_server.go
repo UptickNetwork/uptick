@@ -2,7 +2,6 @@ package keeper
 
 import (
 	"context"
-	"fmt"
 	nftTypes "github.com/UptickNetwork/uptick/x/collection/types"
 	ibcnfttransfertypes "github.com/bianjieai/nft-transfer/types"
 	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
@@ -32,9 +31,10 @@ func (k Keeper) TransferCW721(
 		ClassId:         msg.ClassId,
 		NftIds:          msg.CosmosTokenIds,
 	}
+
 	resMsg, err := k.ConvertCW721(ctx, &convertMsg)
 	if err != nil {
-		return nil, sdkerrors.Wrapf(err, "failed to ConvertERC721 %v", err)
+		return nil, sdkerrors.Wrapf(err, "failed to ConvertCW721 %v", err)
 	}
 
 	ibcMsg := ibcnfttransfertypes.MsgTransfer{
@@ -54,7 +54,7 @@ func (k Keeper) TransferCW721(
 		return nil, sdkerrors.Wrapf(err, "failed to ibc Transfer %v", err)
 	}
 
-	for _, cwTokenId := range msg.CosmosTokenIds {
+	for _, cwTokenId := range msg.CwTokenIds {
 		k.SetCwAddressByContractTokenId(ctx, msg.CwContractAddress, cwTokenId, msg.CwSender)
 	}
 
@@ -75,7 +75,6 @@ func (k Keeper) ConvertCW721(
 
 	//classId, nftId
 	classId, nftIds, err := k.GetClassIDAndNFTID(ctx, msg)
-
 	if err != nil {
 		return nil, err
 	}
@@ -193,7 +192,7 @@ func (k Keeper) ConvertNFT(
 	msg.TokenIds = tokenIds
 
 	id := k.GetClassMap(ctx, msg.ClassId)
-	k.Logger(ctx).Info("xxl ConvertNFT ", "id", id, "msg", msg)
+	k.Logger(ctx).Info("ConvertNFT ", "id", id, "msg", msg)
 	if len(id) == 0 {
 		_, err := k.RegisterNFT(ctx, msg)
 		if err != nil {
@@ -262,10 +261,8 @@ func (k Keeper) convertCosmos2Wasm(
 
 		if err != nil {
 
-			fmt.Printf("xxl start convertCosmos2Wasm %v-%v-%v-%v \n", msg, tokenId, msg.Sender, reqInfo.GetURI())
 			// mint
-			_, err := k.MintCw721(ctx, msg.ContractAddress, tokenId, msg.Sender, reqInfo.GetURI())
-			fmt.Printf("xxl end convertCosmos2Wasm %v \n", err)
+			_, err := k.MintCw721(ctx, msg.ContractAddress, tokenId, msg.Receiver, reqInfo.GetURI())
 			if err != nil {
 				return nil, err
 			}
@@ -313,6 +310,7 @@ func (k Keeper) RefundPacketToken(
 	for _, tokenId := range data.TokenIds {
 
 		uNftID := types.CreateNFTUID(data.ClassId, tokenId)
+
 		cwTokenId, cwContractAddress := types.GetNFTFromUID(string(k.GetTokenUIDPairByNFTUID(ctx, uNftID)))
 		cwReceiver := k.GetCwAddressByContractTokenId(ctx, cwContractAddress, tokenId)
 
