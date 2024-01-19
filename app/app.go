@@ -1341,9 +1341,7 @@ func (app *Uptick) registerUpgradeHandlers() {
 	case upgradeVersion:
 		// add revenue module for testnet (v7 -> v8)
 		storeUpgrades = &storetypes.StoreUpgrades{
-
-			// Added: []string{crisistypes.ModuleName, consensusparamtypes.ModuleName},
-			Added: []string{cw721types.ModuleName, wasmtypes.ModuleName},
+			Added: []string{cw721types.ModuleName, crisistypes.ModuleName, consensusparamtypes.ModuleName, ibcnfttransfertypes.ModuleName},
 		}
 	}
 
