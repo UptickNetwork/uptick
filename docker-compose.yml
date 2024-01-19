@@ -3,7 +3,7 @@ version: '3'
 services:
   node0:
     container_name: upticknode0
-    image: "xuxinai2002/node:v0.1"
+    image: "uptick/node:v0.1"
     ports:
       - "26656-26657:26656-26657"
     volumes:
@@ -16,7 +16,7 @@ services:
 
   node1:
     container_name: upticknode1
-    image: "xuxinai2002/node:v0.1"
+    image: "uptick/node:v0.1"
     ports:
       - "26659-26660:26656-26657"
     volumes:
@@ -29,7 +29,7 @@ services:
 
   node2:
     container_name: upticknode2
-    image: "xuxinai2002/node:v0.1"
+    image: "uptick/node:v0.1"
     ports:
       - "26661-26662:26656-26657"
     volumes:
@@ -42,7 +42,7 @@ services:
 
   node3:
     container_name: upticknode3
-    image: "xuxinai2002/node:v0.1"
+    image: "uptick/node:v0.1"
     ports:
       - "26663-26664:26656-26657"
     volumes:
