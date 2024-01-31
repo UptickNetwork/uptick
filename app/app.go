@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
 	"github.com/UptickNetwork/uptick/x/cw721"
 	"github.com/cosmos/cosmos-sdk/x/consensus"
 	"github.com/cosmos/cosmos-sdk/x/nft"
@@ -985,6 +986,7 @@ func NewUptick(
 
 	maxGasWanted := cast.ToUint64(appOpts.Get(srvflags.EVMMaxTxGasWanted))
 	options := ante.HandlerOptions{
+		Cdc:               app.appCodec,
 		AccountKeeper:     app.AccountKeeper,
 		BankKeeper:        app.BankKeeper,
 		IBCKeeper:         app.IBCKeeper,
