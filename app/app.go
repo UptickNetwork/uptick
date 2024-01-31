@@ -1324,10 +1324,9 @@ func (app *Uptick) registerUpgradeHandlers() {
 			if err != nil {
 				panic(fmt.Errorf("failed to ModuleCdc %s: %w", ibcnfttransfertypes.ModuleName, err))
 			}
-
-			var genesisData map[string]json.RawMessage
-			genesisData[ibcnfttransfertypes.ModuleName] = bz
-			app.mm.InitGenesis(ctx, ibcnfttransfertypes.ModuleCdc, genesisData)
+			if module, ok := app.mm.Modules[ibcnfttransfertypes.ModuleName].(module.HasGenesis); ok {
+				module.InitGenesis(ctx, ibcnfttransfertypes.ModuleCdc, bz)
+			}
 
 			return app.mm.RunMigrations(ctx, app.configurator, vm)
 		})
