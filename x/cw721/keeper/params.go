@@ -78,7 +78,7 @@ func (k Keeper) LoadCw721Base(ctx sdk.Context) (error, uint64) {
 	codeId, _ = strconv.ParseUint(string(resultBytes), 10, 64)
 
 	if codeId <= 0 {
-		codeId, err = k.StoreWasmContract(ctx, BASE_WASM_URL+"/cw721_base.wasm", types.AccModuleAddress.String())
+		codeId, err = k.StoreWasmContract(ctx, BASE_WASM_URL+"cw721_base.wasm", types.AccModuleAddress.String())
 		if err != nil {
 			k.Logger(ctx).Error("LoadCw721Base ", "err:", err.Error())
 			return err, 0
