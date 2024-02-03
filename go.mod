@@ -238,15 +238,8 @@ require (
 replace (
 	// use cosmos fork of keyring
 	github.com/99designs/keyring => github.com/cosmos/keyring v1.2.0
-
 	github.com/cosmos/ibc-go/v7 => github.com/uptSmart/ibc-go/v7 v7.3.0-erc20
-	// use Cosmos-SDK fork to enable Ledger functionality
-	// github.com/cosmos/cosmos-sdk => github.com/evmos/cosmos-sdk v0.47.5-evmos.2
-	// use Evmos geth fork
-	// github.com/ethereum/go-ethereum => github.com/evmos/go-ethereum v1.10.26-evmos-rc2
 	github.com/evmos/ethermint => github.com/bianjieai/ethermint v0.22.0-irishub-20231207
-	// Security Advisory https://github.com/advisories/GHSA-h395-qcrw-5vmq
 	github.com/gin-gonic/gin => github.com/gin-gonic/gin v1.9.1
-	// replace broken goleveldb
 	github.com/syndtr/goleveldb => github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
 )

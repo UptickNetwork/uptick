@@ -1299,7 +1299,7 @@ func (app *Uptick) registerUpgradeHandlers() {
 
 	// Set param key table for params module migration
 	baseAppLegacySS := app.ParamsKeeper.Subspace(baseapp.Paramspace).WithKeyTable(paramstypes.ConsensusParamsKeyTable())
-	upgradeVersion := "v0.2.17"
+	upgradeVersion := "v0.2.18"
 
 	app.UpgradeKeeper.SetUpgradeHandler(
 		upgradeVersion,
@@ -1319,8 +1319,15 @@ func (app *Uptick) registerUpgradeHandlers() {
 				panic(fmt.Errorf("failed to wasmKeeper SetParams "))
 			}
 
-			//add wasm load
-			app.Cw721Keeper.LoadCw721Base(ctx)
+			gs := ibcnfttransfertypes.DefaultGenesisState()
+			bz, err := ibcnfttransfertypes.ModuleCdc.MarshalJSON(gs)
+			if err != nil {
+				panic(fmt.Errorf("failed to ModuleCdc %s: %w", ibcnfttransfertypes.ModuleName, err))
+			}
+			if module, ok := app.mm.Modules[ibcnfttransfertypes.ModuleName].(module.HasGenesis); ok {
+				module.InitGenesis(ctx, ibcnfttransfertypes.ModuleCdc, bz)
+			}
+
 			return app.mm.RunMigrations(ctx, app.configurator, vm)
 		})
 
@@ -1336,22 +1343,6 @@ func (app *Uptick) registerUpgradeHandlers() {
 		return
 	}
 
-	var storeUpgrades *storetypes.StoreUpgrades
-	switch upgradeInfo.Name {
-	case upgradeVersion:
-		// add revenue module for testnet (v7 -> v8)
-		storeUpgrades = &storetypes.StoreUpgrades{
-
-			// Added: []string{crisistypes.ModuleName, consensusparamtypes.ModuleName},
-			Added: []string{cw721types.ModuleName, wasmtypes.ModuleName},
-		}
-	}
-
-	if storeUpgrades != nil {
-
-		// configure store loader that checks if version == upgradeHeight and applies store upgrades
-		app.SetStoreLoader(upgradetypes.UpgradeStoreLoader(upgradeInfo.Height, storeUpgrades))
-	}
 }
 
 func generateFeemarketParams(enableHeight int64) feemarkettypes.Params {
