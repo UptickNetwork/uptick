@@ -7,7 +7,7 @@ import "uptick/cw721/v1/cw721.proto";
 import "google/api/annotations.proto";
 import "gogoproto/gogo.proto";
 
-option go_package = "github.com/UptickNetwork/uptick/x/cw721/types";
+option go_package = "github.com/UptickNetwork/wasm-nft-convert/cw721/types";
 
 // Query defines the gRPC querier service.
 service Query {

@@ -6,6 +6,8 @@ require (
 	cosmossdk.io/simapp v0.0.0-20230608160436-666c345ad23d
 	cosmossdk.io/tools/rosetta v0.2.1
 	github.com/CosmWasm/wasmd v0.45.0
+	github.com/UptickNetwork/evm-nft-convert v1.0.6
+	github.com/UptickNetwork/wasm-nft-convert v1.0.4
 	github.com/armon/go-metrics v0.4.1 // indirect
 	github.com/bianjieai/nft-transfer v1.1.3-ibc-v7.3.0
 	github.com/btcsuite/btcd v0.23.4 // indirect
@@ -47,7 +49,6 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20231030173426-d783a09b4405
 	google.golang.org/grpc v1.60.0
 	sigs.k8s.io/yaml v1.4.0 // indirect
-
 )
 
 require (
@@ -59,7 +60,6 @@ require (
 require (
 	github.com/cosmos/gogoproto v1.4.10
 	github.com/gogo/protobuf v1.3.2
-	github.com/tendermint/tendermint v0.35.9
 )
 
 require (
