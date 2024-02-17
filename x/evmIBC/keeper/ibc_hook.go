@@ -2,9 +2,12 @@ package keeper
 
 import (
 	"context"
-	cw721Types "github.com/UptickNetwork/uptick/x/cw721/types"
+	"fmt"
+	erc721types "github.com/UptickNetwork/evm-nft-convert/types"
 	erc20Types "github.com/UptickNetwork/uptick/x/erc20/types"
-	erc721Types "github.com/UptickNetwork/uptick/x/erc721/types"
+	cw721Types "github.com/UptickNetwork/wasm-nft-convert/types"
+	// erc721Types "github.com/UptickNetwork/uptick/x/evmIBC/types"
+	erc721Types "github.com/UptickNetwork/evm-nft-convert/types"
 
 	"github.com/bianjieai/nft-transfer/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -21,6 +24,7 @@ func (k Keeper) OnRecvPacket(
 	receiver string,
 	convertType uint) exported.Acknowledgement {
 
+	fmt.Printf("xxl OnRecvPacket 0001 \n")
 	k.Logger(ctx).Info("OnRecvPacket ", "convertType", convertType)
 	event := &erc20Types.EventIBCERC20{
 		Status:             erc20Types.STATUS_UNKNOWN,
@@ -77,7 +81,8 @@ func (k Keeper) OnRecvPacket(
 
 func (k Keeper) ConvertNFTFromErc721(context context.Context, voucherClassID string, tokenIds []string, receiver string) error {
 
-	msg := erc721Types.MsgConvertNFT{
+	fmt.Printf("xxl 001 ConvertNFTFromErc721 \n")
+	msg := erc721types.MsgConvertNFT{
 		EvmContractAddress: "",
 		EvmTokenIds:        nil,
 		ClassId:            voucherClassID,
@@ -85,7 +90,9 @@ func (k Keeper) ConvertNFTFromErc721(context context.Context, voucherClassID str
 		CosmosSender:       erc721Types.AccModuleAddress.String(),
 		EvmReceiver:        receiver,
 	}
-	_, err := k.ConvertNFT(context, &msg)
+
+	fmt.Printf("xxl 002 ConvertNFTFromErc721 msg %v:\n", msg)
+	_, err := k.erc721keeper.ConvertNFT(context, &msg)
 	if err != nil {
 		return err
 	}
@@ -101,7 +108,7 @@ func (k Keeper) ConvertNFTFromCw721(context context.Context, voucherClassID stri
 		ContractAddress: "",
 		TokenIds:        nil,
 	}
-	_, err := k.cw721Keep.ConvertNFT(context, &msg)
+	_, err := k.cw721Keeper.ConvertNFT(context, &msg)
 	if err != nil {
 		return err
 	}
@@ -122,7 +129,7 @@ func (k Keeper) OnAcknowledgementPacket(ctx sdk.Context, packet channeltypes.Pac
 			k.RefundPacketToken(ctx, data)
 		} else if strings.Contains(data.Memo, cw721Types.TransferCW721Memo) {
 			data.ClassId = k.getRefundClassId(packet, data)
-			k.cw721Keep.RefundPacketToken(ctx, data)
+			k.cw721Keeper.RefundPacketToken(ctx, data)
 		}
 	default:
 		// the acknowledgement succeeded on the receiving chain so nothing
@@ -140,7 +147,7 @@ func (k Keeper) OnTimeoutPacket(ctx sdk.Context, packet channeltypes.Packet, dat
 		k.RefundPacketToken(ctx, data)
 	} else if strings.Contains(data.Memo, cw721Types.TransferCW721Memo) {
 		data.ClassId = k.getRefundClassId(packet, data)
-		k.cw721Keep.RefundPacketToken(ctx, data)
+		k.cw721Keeper.RefundPacketToken(ctx, data)
 	}
 	return nil
 }

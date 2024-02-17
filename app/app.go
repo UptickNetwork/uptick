@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/UptickNetwork/uptick/x/cw721"
+
 	"github.com/cosmos/cosmos-sdk/x/consensus"
 	"github.com/cosmos/cosmos-sdk/x/nft"
 
@@ -141,13 +141,15 @@ import (
 
 	"github.com/UptickNetwork/uptick/x/internft"
 
-	"github.com/UptickNetwork/uptick/x/erc721"
-	erc721keeper "github.com/UptickNetwork/uptick/x/erc721/keeper"
-	erc721types "github.com/UptickNetwork/uptick/x/erc721/types"
+	erc721 "github.com/UptickNetwork/evm-nft-convert"
+	erc721keeper "github.com/UptickNetwork/evm-nft-convert/keeper"
+	erc721types "github.com/UptickNetwork/evm-nft-convert/types"
 
 	nftkeeper "github.com/UptickNetwork/uptick/x/collection/keeper"
 	nftmodule "github.com/UptickNetwork/uptick/x/collection/module"
 	nfttypes "github.com/UptickNetwork/uptick/x/collection/types"
+	"github.com/UptickNetwork/uptick/x/evmIBC"
+	evmIBCKeepr "github.com/UptickNetwork/uptick/x/evmIBC/keeper"
 
 	store "github.com/cosmos/cosmos-sdk/store/types"
 	ica "github.com/cosmos/ibc-go/v7/modules/apps/27-interchain-accounts"
@@ -160,8 +162,9 @@ import (
 	consensusparamkeeper "github.com/cosmos/cosmos-sdk/x/consensus/keeper"
 	consensusparamtypes "github.com/cosmos/cosmos-sdk/x/consensus/types"
 
-	cw721keeper "github.com/UptickNetwork/uptick/x/cw721/keeper"
-	cw721types "github.com/UptickNetwork/uptick/x/cw721/types"
+	"github.com/UptickNetwork/wasm-nft-convert"
+	cw721keeper "github.com/UptickNetwork/wasm-nft-convert/keeper"
+	cw721types "github.com/UptickNetwork/wasm-nft-convert/types"
 )
 
 func init() {
@@ -351,6 +354,7 @@ type Uptick struct {
 	Erc20Keeper  *erc20keeper.Keeper
 	Erc721Keeper erc721keeper.Keeper
 	Cw721Keeper  cw721keeper.Keeper
+	EVMIBCKeeper evmIBCKeepr.Keeper
 
 	NFTKeeper nftkeeper.Keeper
 
@@ -747,11 +751,12 @@ func NewUptick(
 		app.IBCNFTTransferKeeper,
 	)
 
-	app.Erc721Keeper.SetCw721Keeper(app.Cw721Keeper)
+	app.EVMIBCKeeper.SetCw721Keeper(app.Cw721Keeper)
+	app.EVMIBCKeeper.SetErc721Keeper(app.Erc721Keeper)
 
 	ibcnfttransferModule := nfttransfer.NewAppModule(app.IBCNFTTransferKeeper)
 	nftTransferIBCModule := nfttransfer.NewIBCModule(app.IBCNFTTransferKeeper)
-	ercTransferStack := erc721.NewIBCMiddleware(app.Erc721Keeper, nftTransferIBCModule)
+	ercTransferStack := evmIBC.NewIBCMiddleware(app.EVMIBCKeeper, nftTransferIBCModule)
 	// cwTransferStack := cw721.NewIBCMiddleware(app.Cw721Keeper, ercTransferStack)
 
 	// Create static IBC router, add transfer route, then set and seal it
@@ -1299,7 +1304,7 @@ func (app *Uptick) registerUpgradeHandlers() {
 
 	// Set param key table for params module migration
 	baseAppLegacySS := app.ParamsKeeper.Subspace(baseapp.Paramspace).WithKeyTable(paramstypes.ConsensusParamsKeyTable())
-	upgradeVersion := "v0.2.18"
+	upgradeVersion := "v0.2.19"
 
 	app.UpgradeKeeper.SetUpgradeHandler(
 		upgradeVersion,
