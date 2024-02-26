@@ -240,10 +240,10 @@ github.com/Shopify/toxiproxy v2.1.4+incompatible/go.mod h1:OXgGpZ6Cli1/URJOF1DMx
 github.com/StackExchange/wmi v0.0.0-20180116203802-5d049714c4a6/go.mod h1:3eOhrUMpNV+6aFIbp5/iudMxNCF27Vw2OZgy4xEx0Fg=
 github.com/StackExchange/wmi v1.2.1 h1:VIkavFPXSjcnS+O8yTq7NI32k0R5Aj+v39y29VYDOSA=
 github.com/StackExchange/wmi v1.2.1/go.mod h1:rcmrprowKIVzvc+NUiLncP2uuArMWLCbu9SBzvHz7e8=
-github.com/UptickNetwork/evm-nft-convert v1.0.6 h1:NIvibAtkTCacmh+PepbnRh37V88/dm9SAzCAeNt51RU=
-github.com/UptickNetwork/evm-nft-convert v1.0.6/go.mod h1:/mQVnjQ32E2Ij0haUKFiYzp9ClyKnkslcBJRhPAajsw=
-github.com/UptickNetwork/wasm-nft-convert v1.0.4 h1:xMwghHphFqcdotf+/3S0U1JHNAfTzV1ouP8Pej69lLM=
-github.com/UptickNetwork/wasm-nft-convert v1.0.4/go.mod h1:OJFVLNE5R4c05surmlUJnsvxYPPL/4u7J1ghIDy2WQU=
+github.com/UptickNetwork/evm-nft-convert v1.0.8 h1:4nx2fsLT5q4V5MkgpHlk53HZinIU8QMBQ4vwFQ42nZg=
+github.com/UptickNetwork/evm-nft-convert v1.0.8/go.mod h1:/mQVnjQ32E2Ij0haUKFiYzp9ClyKnkslcBJRhPAajsw=
+github.com/UptickNetwork/wasm-nft-convert v1.0.5 h1:1aW8McJUn6dE8hZOs59OolGmU66OVJ3WMln8qVKhPgM=
+github.com/UptickNetwork/wasm-nft-convert v1.0.5/go.mod h1:OJFVLNE5R4c05surmlUJnsvxYPPL/4u7J1ghIDy2WQU=
 github.com/VictoriaMetrics/fastcache v1.6.0 h1:C/3Oi3EiBCqufydp1neRZkqcwmEiuRT9c3fqvvgKm5o=
 github.com/VictoriaMetrics/fastcache v1.6.0/go.mod h1:0qHz5QP0GMX4pfmMA/zt5RgfNuXJrTP0zS7DqpHGGTw=
 github.com/VividCortex/gohistogram v1.0.0 h1:6+hBz+qvs0JOrrNhhmR7lFxo5sINxBCGXrdtl/UvroE=
