@@ -1304,7 +1304,7 @@ func (app *Uptick) registerUpgradeHandlers() {
 
 	// Set param key table for params module migration
 	baseAppLegacySS := app.ParamsKeeper.Subspace(baseapp.Paramspace).WithKeyTable(paramstypes.ConsensusParamsKeyTable())
-	upgradeVersion := "v0.2.19"
+	upgradeVersion := "v0.2.20"
 
 	app.UpgradeKeeper.SetUpgradeHandler(
 		upgradeVersion,
