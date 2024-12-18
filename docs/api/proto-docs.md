@@ -113,36 +113,20 @@
   
     - [Msg](#uptick.erc20.v1.Msg)
   
-- [uptick/erc721/v1/erc721.proto](#uptick/erc721/v1/erc721.proto)
-    - [TokenPair](#uptick.erc721.v1.TokenPair)
-    - [UIDPair](#uptick.erc721.v1.UIDPair)
+- [uptick/evmIBC/v1/evmIBC.proto](#uptick/evmIBC/v1/evmIBC.proto)
+    - [TokenPair](#uptick.evmIBC.v1.TokenPair)
   
-    - [Owner](#uptick.erc721.v1.Owner)
+- [uptick/evmIBC/v1/query.proto](#uptick/evmIBC/v1/query.proto)
+    - [QueryEvmAddressRequest](#uptick.evmIBC.v1.QueryEvmAddressRequest)
+    - [QueryTokenPairResponse](#uptick.evmIBC.v1.QueryTokenPairResponse)
   
-- [uptick/erc721/v1/genesis.proto](#uptick/erc721/v1/genesis.proto)
-    - [GenesisState](#uptick.erc721.v1.GenesisState)
-    - [Params](#uptick.erc721.v1.Params)
+    - [Query](#uptick.evmIBC.v1.Query)
   
-- [uptick/erc721/v1/query.proto](#uptick/erc721/v1/query.proto)
-    - [QueryEvmAddressRequest](#uptick.erc721.v1.QueryEvmAddressRequest)
-    - [QueryParamsRequest](#uptick.erc721.v1.QueryParamsRequest)
-    - [QueryParamsResponse](#uptick.erc721.v1.QueryParamsResponse)
-    - [QueryTokenPairRequest](#uptick.erc721.v1.QueryTokenPairRequest)
-    - [QueryTokenPairResponse](#uptick.erc721.v1.QueryTokenPairResponse)
-    - [QueryTokenPairsRequest](#uptick.erc721.v1.QueryTokenPairsRequest)
-    - [QueryTokenPairsResponse](#uptick.erc721.v1.QueryTokenPairsResponse)
+- [uptick/evmIBC/v1/tx.proto](#uptick/evmIBC/v1/tx.proto)
+    - [MsgTransferERC721](#uptick.evmIBC.v1.MsgTransferERC721)
+    - [MsgTransferERC721Response](#uptick.evmIBC.v1.MsgTransferERC721Response)
   
-    - [Query](#uptick.erc721.v1.Query)
-  
-- [uptick/erc721/v1/tx.proto](#uptick/erc721/v1/tx.proto)
-    - [MsgConvertERC721](#uptick.erc721.v1.MsgConvertERC721)
-    - [MsgConvertERC721Response](#uptick.erc721.v1.MsgConvertERC721Response)
-    - [MsgConvertNFT](#uptick.erc721.v1.MsgConvertNFT)
-    - [MsgConvertNFTResponse](#uptick.erc721.v1.MsgConvertNFTResponse)
-    - [MsgTransferERC721](#uptick.erc721.v1.MsgTransferERC721)
-    - [MsgTransferERC721Response](#uptick.erc721.v1.MsgTransferERC721Response)
-  
-    - [Msg](#uptick.erc721.v1.Msg)
+    - [Msg](#uptick.evmIBC.v1.Msg)
   
 - [uptick/nft/v1beta1/event.proto](#uptick/nft/v1beta1/event.proto)
     - [EventBurn](#cosmos.nft.v1beta1.EventBurn)
@@ -1578,14 +1562,14 @@ Msg defines the erc20 Msg service.
 
 
 
-<a name="uptick/erc721/v1/erc721.proto"></a>
+<a name="uptick/evmIBC/v1/evmIBC.proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
-## uptick/erc721/v1/erc721.proto
+## uptick/evmIBC/v1/evmIBC.proto
 
 
 
-<a name="uptick.erc721.v1.TokenPair"></a>
+<a name="uptick.evmIBC.v1.TokenPair"></a>
 
 ### TokenPair
 TokenPair defines an instance that records a pairing consisting of a native
@@ -1601,83 +1585,6 @@ Cosmos Coin and an ERC721 token address.
 
 
 
-
-<a name="uptick.erc721.v1.UIDPair"></a>
-
-### UIDPair
-defines the unique id of nft asset
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| `erc721_did` | [string](#string) |  | address of ERC721 contract token + tokenId |
-| `class_did` | [string](#string) |  | cosmos nft class ID to be mapped to + nftId |
-
-
-
-
-
- <!-- end messages -->
-
-
-<a name="uptick.erc721.v1.Owner"></a>
-
-### Owner
-Owner enumerates the ownership of a ERC721 contract.
-
-| Name | Number | Description |
-| ---- | ------ | ----------- |
-| OWNER_UNSPECIFIED | 0 | OWNER_UNSPECIFIED defines an invalid/undefined owner. |
-| OWNER_MODULE | 1 | OWNER_MODULE erc721 is owned by the erc721 module account. |
-| OWNER_EXTERNAL | 2 | EXTERNAL erc721 is owned by an external account. |
-
-
- <!-- end enums -->
-
- <!-- end HasExtensions -->
-
- <!-- end services -->
-
-
-
-<a name="uptick/erc721/v1/genesis.proto"></a>
-<p align="right"><a href="#top">Top</a></p>
-
-## uptick/erc721/v1/genesis.proto
-
-
-
-<a name="uptick.erc721.v1.GenesisState"></a>
-
-### GenesisState
-GenesisState defines the module's genesis state.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| `params` | [Params](#uptick.erc721.v1.Params) |  | module parameters |
-| `token_pairs` | [TokenPair](#uptick.erc721.v1.TokenPair) | repeated | registered token pairs |
-
-
-
-
-
-
-<a name="uptick.erc721.v1.Params"></a>
-
-### Params
-Params defines the erc721 module params
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| `enable_erc721` | [bool](#bool) |  | parameter to enable the conversion of Cosmos nft <--> ERC721 tokens. |
-| `enable_evm_hook` | [bool](#bool) |  | parameter to enable the EVM hook that converts an ERC721 token to a Cosmos NFT by transferring the Tokens through a MsgEthereumTx to the ModuleAddress Ethereum address. |
-
-
-
-
-
  <!-- end messages -->
 
  <!-- end enums -->
@@ -1688,17 +1595,17 @@ Params defines the erc721 module params
 
 
 
-<a name="uptick/erc721/v1/query.proto"></a>
+<a name="uptick/evmIBC/v1/query.proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
-## uptick/erc721/v1/query.proto
+## uptick/evmIBC/v1/query.proto
 
 
 
-<a name="uptick.erc721.v1.QueryEvmAddressRequest"></a>
+<a name="uptick.evmIBC.v1.QueryEvmAddressRequest"></a>
 
 ### QueryEvmAddressRequest
-QueryTokenPairRequest is the request type for the Query/TokenPair RPC method.
+QueryEvmAddressRequest is the request type for the Query/TokenPair RPC method.
 
 
 | Field | Type | Label | Description |
@@ -1712,48 +1619,7 @@ QueryTokenPairRequest is the request type for the Query/TokenPair RPC method.
 
 
 
-<a name="uptick.erc721.v1.QueryParamsRequest"></a>
-
-### QueryParamsRequest
-QueryParamsRequest is the request type for the Query/Params RPC method.
-
-
-
-
-
-
-<a name="uptick.erc721.v1.QueryParamsResponse"></a>
-
-### QueryParamsResponse
-QueryParamsResponse is the response type for the Query/Params RPC
-method.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| `params` | [Params](#uptick.erc721.v1.Params) |  |  |
-
-
-
-
-
-
-<a name="uptick.erc721.v1.QueryTokenPairRequest"></a>
-
-### QueryTokenPairRequest
-QueryTokenPairRequest is the request type for the Query/TokenPair RPC method.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| `token` | [string](#string) |  | token identifier can be either the hex contract address of the ERC721 or the Cosmos nft classID |
-
-
-
-
-
-
-<a name="uptick.erc721.v1.QueryTokenPairResponse"></a>
+<a name="uptick.evmIBC.v1.QueryTokenPairResponse"></a>
 
 ### QueryTokenPairResponse
 QueryTokenPairResponse is the response type for the Query/TokenPair RPC
@@ -1762,40 +1628,7 @@ method.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| `token_pair` | [TokenPair](#uptick.erc721.v1.TokenPair) |  |  |
-
-
-
-
-
-
-<a name="uptick.erc721.v1.QueryTokenPairsRequest"></a>
-
-### QueryTokenPairsRequest
-QueryTokenPairsRequest is the request type for the Query/TokenPairs RPC
-method.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| `pagination` | [cosmos.base.query.v1beta1.PageRequest](#cosmos.base.query.v1beta1.PageRequest) |  | pagination defines an optional pagination for the request. |
-
-
-
-
-
-
-<a name="uptick.erc721.v1.QueryTokenPairsResponse"></a>
-
-### QueryTokenPairsResponse
-QueryTokenPairsResponse is the response type for the Query/TokenPairs RPC
-method.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| `token_pairs` | [TokenPair](#uptick.erc721.v1.TokenPair) | repeated |  |
-| `pagination` | [cosmos.base.query.v1beta1.PageResponse](#cosmos.base.query.v1beta1.PageResponse) |  | pagination defines the pagination in the response. |
+| `token_pair` | [TokenPair](#uptick.evmIBC.v1.TokenPair) |  |  |
 
 
 
@@ -1808,91 +1641,27 @@ method.
  <!-- end HasExtensions -->
 
 
-<a name="uptick.erc721.v1.Query"></a>
+<a name="uptick.evmIBC.v1.Query"></a>
 
 ### Query
 Query defines the gRPC queried service.
 
 | Method Name | Request Type | Response Type | Description | HTTP Verb | Endpoint |
 | ----------- | ------------ | ------------- | ------------| ------- | -------- |
-| `TokenPairs` | [QueryTokenPairsRequest](#uptick.erc721.v1.QueryTokenPairsRequest) | [QueryTokenPairsResponse](#uptick.erc721.v1.QueryTokenPairsResponse) | TokenPairs retrieves registered token pairs | GET|/uptick/erc721/v1/token_pairs|
-| `TokenPair` | [QueryTokenPairRequest](#uptick.erc721.v1.QueryTokenPairRequest) | [QueryTokenPairResponse](#uptick.erc721.v1.QueryTokenPairResponse) | TokenPair retrieves a registered token pair | GET|/uptick/erc721/v1/token_pairs/{token}|
-| `EvmContract` | [QueryEvmAddressRequest](#uptick.erc721.v1.QueryEvmAddressRequest) | [QueryTokenPairResponse](#uptick.erc721.v1.QueryTokenPairResponse) | EvmContract retrieves a registered evm contract | GET|/uptick/erc721/v1/evm_contract/{port}/{channel}/{classId}|
-| `Params` | [QueryParamsRequest](#uptick.erc721.v1.QueryParamsRequest) | [QueryParamsResponse](#uptick.erc721.v1.QueryParamsResponse) | Params retrieves the erc721 module params | GET|/uptick/erc721/v1/params|
+| `EvmContract` | [QueryEvmAddressRequest](#uptick.evmIBC.v1.QueryEvmAddressRequest) | [QueryTokenPairResponse](#uptick.evmIBC.v1.QueryTokenPairResponse) | EvmContract retrieves a registered evm contract | GET|/uptick/evmIBC/v1/evm_contract/{port}/{channel}/{classId}|
 
  <!-- end services -->
 
 
 
-<a name="uptick/erc721/v1/tx.proto"></a>
+<a name="uptick/evmIBC/v1/tx.proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
-## uptick/erc721/v1/tx.proto
+## uptick/evmIBC/v1/tx.proto
 
 
 
-<a name="uptick.erc721.v1.MsgConvertERC721"></a>
-
-### MsgConvertERC721
-MsgConvertERC721 defines a Msg to convert a ERC721 token to a native Cosmos
-nft.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| `evm_contract_address` | [string](#string) |  | ERC721 token contract address registered in a token pair |
-| `evm_token_ids` | [string](#string) | repeated | tokenID to convert |
-| `cosmos_receiver` | [string](#string) |  | bech32 address to receive native Cosmos coins |
-| `evm_sender` | [string](#string) |  | sender hex address from the owner of the given ERC721 tokens |
-| `class_id` | [string](#string) |  | nft classID to cnvert to ERC721 |
-| `cosmos_token_ids` | [string](#string) | repeated | nftID to cnvert to ERC721 |
-
-
-
-
-
-
-<a name="uptick.erc721.v1.MsgConvertERC721Response"></a>
-
-### MsgConvertERC721Response
-MsgConvertERC721Response returns no fields
-
-
-
-
-
-
-<a name="uptick.erc721.v1.MsgConvertNFT"></a>
-
-### MsgConvertNFT
-MsgConvertNFT defines a Msg to convert a native Cosmos nft to a ERC721 token
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| `class_id` | [string](#string) |  | nft classID to cnvert to ERC721 |
-| `cosmos_token_ids` | [string](#string) | repeated | nftID to cnvert to ERC721 |
-| `evm_receiver` | [string](#string) |  | recipient hex address to receive ERC721 token |
-| `cosmos_sender` | [string](#string) |  | cosmos bech32 address from the owner of the given Cosmos coins |
-| `evm_contract_address` | [string](#string) |  | ERC721 token contract address registered in a token pair |
-| `evm_token_ids` | [string](#string) | repeated | ERC721 token id registered in a token pair |
-
-
-
-
-
-
-<a name="uptick.erc721.v1.MsgConvertNFTResponse"></a>
-
-### MsgConvertNFTResponse
-MsgConvertNFTResponse returns no fields
-
-
-
-
-
-
-<a name="uptick.erc721.v1.MsgTransferERC721"></a>
+<a name="uptick.evmIBC.v1.MsgTransferERC721"></a>
 
 ### MsgTransferERC721
 
@@ -1917,7 +1686,7 @@ MsgConvertNFTResponse returns no fields
 
 
 
-<a name="uptick.erc721.v1.MsgTransferERC721Response"></a>
+<a name="uptick.evmIBC.v1.MsgTransferERC721Response"></a>
 
 ### MsgTransferERC721Response
 
@@ -1933,16 +1702,14 @@ MsgConvertNFTResponse returns no fields
  <!-- end HasExtensions -->
 
 
-<a name="uptick.erc721.v1.Msg"></a>
+<a name="uptick.evmIBC.v1.Msg"></a>
 
 ### Msg
 Msg defines the erc721 Msg service.
 
 | Method Name | Request Type | Response Type | Description | HTTP Verb | Endpoint |
 | ----------- | ------------ | ------------- | ------------| ------- | -------- |
-| `ConvertNFT` | [MsgConvertNFT](#uptick.erc721.v1.MsgConvertNFT) | [MsgConvertNFTResponse](#uptick.erc721.v1.MsgConvertNFTResponse) | ConvertNFT mints a ERC721 representation of the native Cosmos nft that is registered on the token mapping. | GET|/uptick/erc721/v1/tx/convert_nft|
-| `ConvertERC721` | [MsgConvertERC721](#uptick.erc721.v1.MsgConvertERC721) | [MsgConvertERC721](#uptick.erc721.v1.MsgConvertERC721) | ConvertERC721 mints a native Cosmos coin representation of the ERC721 token contract that is registered on the token mapping. | GET|/uptick/erc721/v1/tx/convert_erc721|
-| `TransferERC721` | [MsgTransferERC721](#uptick.erc721.v1.MsgTransferERC721) | [MsgTransferERC721Response](#uptick.erc721.v1.MsgTransferERC721Response) |  | GET|/uptick/erc721/v1/tx/ibc-transfer-erc721|
+| `TransferERC721` | [MsgTransferERC721](#uptick.evmIBC.v1.MsgTransferERC721) | [MsgTransferERC721Response](#uptick.evmIBC.v1.MsgTransferERC721Response) |  | GET|/uptick/erc721/v1/tx/ibc-transfer-erc721|
 
  <!-- end services -->
 

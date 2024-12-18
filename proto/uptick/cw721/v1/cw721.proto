@@ -4,7 +4,7 @@ package uptick.cw721.v1;
 import "gogoproto/gogo.proto";
 import "cosmos/nft/v1beta1/nft.proto";
 
-option go_package = "github.com/UptickNetwork/uptick/x/cw721/types";
+option go_package = "github.com/UptickNetwork/wasm-nft-convert/cw721/types";
 
 // Owner enumerates the ownership of a CW721 contract.
 enum Owner {

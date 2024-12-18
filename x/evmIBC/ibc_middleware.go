@@ -1,4 +1,4 @@
-package erc721
+package evmIBC
 
 import (
 	"encoding/json"
@@ -14,9 +14,9 @@ import (
 	"github.com/cosmos/ibc-go/v7/modules/core/exported"
 
 	"github.com/UptickNetwork/uptick/ibc"
-	"github.com/UptickNetwork/uptick/x/erc721/keeper"
+	"github.com/UptickNetwork/uptick/x/evmIBC/keeper"
 
-	erc721Types "github.com/UptickNetwork/uptick/x/erc721/types"
+	erc721Types "github.com/UptickNetwork/evm-nft-convert/types"
 	clienttypes "github.com/cosmos/ibc-go/v7/modules/core/02-client/types"
 )
 
