@@ -16,7 +16,6 @@ require (
 	github.com/cometbft/cometbft-db v0.8.0
 	github.com/cosmos/cosmos-sdk v0.47.5
 	github.com/cosmos/go-bip39 v1.0.0
-	// github.com/cosmos/gogoproto v1.4.10
 	github.com/cosmos/ibc-go/v7 v7.3.0
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/ethereum/go-ethereum v1.10.26
@@ -53,14 +52,11 @@ require (
 
 require (
 	cosmossdk.io/math v1.4.0
-	// github.com/gogo/protobuf v1.3.2
 	github.com/spf13/pflag v1.0.5
+	github.com/cosmos/gogoproto v1.4.10
+    github.com/gogo/protobuf v1.3.2
 )
 
-require (
-	github.com/cosmos/gogoproto v1.4.10
-	github.com/gogo/protobuf v1.3.2
-)
 
 require (
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
@@ -232,12 +228,13 @@ require (
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	nhooyr.io/websocket v1.8.7 // indirect
+	nhooyr.io/websocket v1.8.17 // indirect
 )
 
 replace (
 	// use cosmos fork of keyring
 	github.com/99designs/keyring => github.com/cosmos/keyring v1.2.0
+	github.com/bianjieai/nft-transfer => github.com/bianjieai/nft-transfer v1.1.3-ibc-v7.3.0
 	github.com/cosmos/ibc-go/v7 => github.com/uptSmart/ibc-go/v7 v7.3.0-erc20
 	github.com/evmos/ethermint => github.com/bianjieai/ethermint v0.22.0-irishub-20231207
 	github.com/gin-gonic/gin => github.com/gin-gonic/gin v1.9.1
