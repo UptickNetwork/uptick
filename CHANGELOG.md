@@ -45,8 +45,10 @@ Ref: https://keepachangelog.com/en/1.0.0/
 
 ### Improvements
 
-- [\#20](https://github.com/UptickNetwork/uptick/issues/20) Bump Cosmos SDK to [`v0.45.3`](https://github.com/cosmos/cosmos-sdk/releases/tag/v0.45.3).
-- [\#20](https://github.com/UptickNetwork/uptick/issues/20) Bump Ethermint to [`v0.14.0`](https://github.com/evmos/ethermint/releases/tag/v0.14.0).
+- [\#20](https://github.com/UptickNetwork/uptick/issues/20) Bump Cosmos SDK
+  to [`v0.45.3`](https://github.com/cosmos/cosmos-sdk/releases/tag/v0.45.3).
+- [\#20](https://github.com/UptickNetwork/uptick/issues/20) Bump Ethermint
+  to [`v0.14.0`](https://github.com/evmos/ethermint/releases/tag/v0.14.0).
 - [\#40](https://github.com/UptickNetwork/uptick/pull/40) Improve ERC20 module.
 
 ## [v0.1.0] - 2022-03-18

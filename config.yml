@@ -1,14 +1,14 @@
 accounts:
   - name: alice
-    coins: ["100000000uatom", "100000000000000000000auptick"]
+    coins: [ "100000000uatom", "100000000000000000000auptick" ]
   - name: bob
-    coins: ["5000000000000auptick"]
+    coins: [ "5000000000000auptick" ]
 validator:
   name: alice
   staked: "100000000000000000000auptick"
 faucet:
-  name: bob 
-  coins: ["10auptick"]
+  name: bob
+  coins: [ "10auptick" ]
 build:
   binary: "uptickd"
 init:

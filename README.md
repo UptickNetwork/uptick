@@ -35,13 +35,17 @@ parent:
   </a>
 </div>
 
-Uptick is an NFT infrastructure network that is a scalable, high-throughput Proof-of-Stake blockchain that is fully compatible and interoperable with Ethereum. It's built using the [Cosmos SDK](https://github.com/cosmos/cosmos-sdk/) which runs on top of [Tendermint Core](https://github.com/cometbft/cometbft) consensus engine.
+Uptick is an NFT infrastructure network that is a scalable, high-throughput Proof-of-Stake blockchain that is fully
+compatible and interoperable with Ethereum. It's built using the [Cosmos SDK](https://github.com/cosmos/cosmos-sdk/)
+which runs on top of [Tendermint Core](https://github.com/cometbft/cometbft) consensus engine.
 
-**Note**: Requires [Go 1.17.5+](https://golang.org/dl/)
+**Note**: Requires [Go 1.19+](https://golang.org/dl/)
 
 ## Installation
 
-For prerequisites and detailed build instructions please read the [Installation](https://docs.uptick.network/quickstart/installation.html) instructions. Once the dependencies are installed, run:
+For prerequisites and detailed build instructions please read
+the [Installation](https://docs.uptick.network/quickstart/installation.html) instructions. Once the dependencies are
+installed, run:
 
 ```bash
 make install
@@ -51,7 +55,9 @@ Or check out the latest [release](https://github.com/UptickNetwork/uptick/releas
 
 ## Quick Start
 
-To learn how the Uptick works from a high-level perspective, go to the [Introduction](https://docs.uptick.network/intro/overview.html) section from the documentation. You can also check the instructions to [Run a Node](https://docs.uptick.network/quickstart/run_node.html).
+To learn how the Uptick works from a high-level perspective, go to
+the [Introduction](https://docs.uptick.network/intro/overview.html) section from the documentation. You can also check
+the instructions to [Run a Node](https://docs.uptick.network/quickstart/run_node.html).
 
 ## Community
 
@@ -59,6 +65,8 @@ The following chat channels and forums are a great spot to ask questions about U
 
 ## Contributing
 
-Looking for a good place to start contributing? Check out some [`good first issues`](https://github.com/UptickNetwork/uptick/issues?q=is%3Aopen+is%3Aissue+label%3A%22good+first+issue%22).
+Looking for a good place to start contributing? Check out
+some [`good first issues`](https://github.com/UptickNetwork/uptick/issues?q=is%3Aopen+is%3Aissue+label%3A%22good+first+issue%22)
+.
 
 For additional instructions, standards and style guides, please refer to the [Contributing](./CONTRIBUTING.md) document.
