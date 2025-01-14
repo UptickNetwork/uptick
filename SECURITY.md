@@ -1,18 +1,20 @@
 # Security
 
-As part of our vulnerability disclosure policy, we operate a bug
-bounty.
+As part of our vulnerability disclosure policy, we operate a bug bounty.
 
-See the policy for more details on submissions and rewards, and see "Example Vulnerabilities" (below) for examples of the kinds of bugs the team is most interested in.
-
+See the policy for more details on submissions and rewards, and see "Example Vulnerabilities" (below) for examples of
+the kinds of bugs the team is most interested in.
 
 ## Guidelines
 
 We require that all researchers:
 
-* Use the bug bounty to disclose all vulnerabilities, and avoid posting vulnerability information in public places, including Github Issues, Discord channels, and Telegram groups
-* Make every effort to avoid privacy violations, degradation of user experience, disruption to production systems (including but not limited to the Uptick mainnet and/or testnets), and destruction of data
-* Keep any information about vulnerabilities that you’ve discovered confidential between yourself and the engineering team until the issue has been resolved and disclosed
+* Use the bug bounty to disclose all vulnerabilities, and avoid posting vulnerability information in public places,
+  including Github Issues, Discord channels, and Telegram groups
+* Make every effort to avoid privacy violations, degradation of user experience, disruption to production systems (
+  including but not limited to the Uptick mainnet and/or testnets), and destruction of data
+* Keep any information about vulnerabilities that you’ve discovered confidential between yourself and the engineering
+  team until the issue has been resolved and disclosed
 * Avoid posting personally identifiable information, privately or publicly
 
 If you follow these guidelines when reporting an issue to us, we commit to:
@@ -24,23 +26,36 @@ If you follow these guidelines when reporting an issue to us, we commit to:
 
 Tharsis uses the following disclosure process:
 
-1. Once a security report is received, the team works to verify the issue and confirm its severity level using [CVSS](https://nvd.nist.gov/vuln-metrics/cvss).
+1. Once a security report is received, the team works to verify the issue and confirm its severity level
+   using [CVSS](https://nvd.nist.gov/vuln-metrics/cvss).
 2. The team determines the vulnerability’s potential impact on Uptick.
-3. Patches are prepared for eligible releases of Uptick in private repositories. See “Supported Releases” below for more information on which releases are considered eligible.
-4. We notify the community that a security release is coming, to give users time to prepare their systems for the update. Notifications can include forum posts, tweets, and emails to partners and validators.
+3. Patches are prepared for eligible releases of Uptick in private repositories. See “Supported Releases” below for more
+   information on which releases are considered eligible.
+4. We notify the community that a security release is coming, to give users time to prepare their systems for the
+   update. Notifications can include forum posts, tweets, and emails to partners and validators.
 5. 24 hours following this notification, the fixes are applied publicly and new releases are issued.
-6. The team updates their Uptick and Ethermint dependencies to use these releases, and then themselves issue new releases.
-7. Once releases are available for Uptick and Ethermint we notify the community, again, through the same channels as above. We also publish a Security Advisory on Github and publish a CVE (if applicable), as long as neither the Security Advisory nor the CVE include any information on how to exploit these vulnerabilities beyond what information is already available in the patch itself.
+6. The team updates their Uptick and Ethermint dependencies to use these releases, and then themselves issue new
+   releases.
+7. Once releases are available for Uptick and Ethermint we notify the community, again, through the same channels as
+   above. We also publish a Security Advisory on Github and publish a CVE (if applicable), as long as neither the
+   Security Advisory nor the CVE include any information on how to exploit these vulnerabilities beyond what information
+   is already available in the patch itself.
 8. Once the community is notified, we will pay out any relevant bug bounties to submitters.
-9. One week after the releases go out, we will publish a post with further details on the vulnerability as well as our response to it.
+9. One week after the releases go out, we will publish a post with further details on the vulnerability as well as our
+   response to it.
 
-This process can take some time. Every effort will be made to handle the bug in as timely a manner as possible, however it's important that we follow the process described above to ensure that disclosures are handled consistently and to keep Ethermint and its downstream dependent projects--including but not limited to Uptick--as secure as possible.
+This process can take some time. Every effort will be made to handle the bug in as timely a manner as possible, however
+it's important that we follow the process described above to ensure that disclosures are handled consistently and to
+keep Ethermint and its downstream dependent projects--including but not limited to Uptick--as secure as possible.
 
 ## Supported Releases
 
-The team commits to releasing security patch releases for both the latest minor release as well for the major/minor release that Uptick is running.
+The team commits to releasing security patch releases for both the latest minor release as well for the major/minor
+release that Uptick is running.
 
-If you are running older versions of Uptick, we encourage you to upgrade at your earliest opportunity so that you can receive security patches directly from the repo. While you are welcome to backport security patches to older versions for your own use, we will not publish or promote these backports.
+If you are running older versions of Uptick, we encourage you to upgrade at your earliest opportunity so that you can
+receive security patches directly from the repo. While you are welcome to backport security patches to older versions
+for your own use, we will not publish or promote these backports.
 
 ## Scope
 
@@ -52,7 +67,8 @@ Please note that, in the interest of the safety of our users and staff, a few th
 
 ## Example Vulnerabilities
 
-The following is a list of examples of the kinds of vulnerabilities that we’re most interested in. It is not exhaustive: there are other kinds of issues we may also be interested in!
+The following is a list of examples of the kinds of vulnerabilities that we’re most interested in. It is not exhaustive:
+there are other kinds of issues we may also be interested in!
 
 ### Specification
 
