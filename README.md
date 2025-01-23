@@ -62,3 +62,4 @@ The following chat channels and forums are a great spot to ask questions about U
 Looking for a good place to start contributing? Check out some [`good first issues`](https://github.com/UptickNetwork/uptick/issues?q=is%3Aopen+is%3Aissue+label%3A%22good+first+issue%22).
 
 For additional instructions, standards and style guides, please refer to the [Contributing](./CONTRIBUTING.md) document.
+
