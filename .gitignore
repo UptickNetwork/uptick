@@ -80,3 +80,7 @@ node_modules/*
 
 # OpenZeppelin contracts
 contracts/@openzeppelin/*
+
+
+#vscode
+.vscode
