@@ -161,12 +161,12 @@ package keeper_test
 //			sender := sdk.AccAddress(suite.address.Bytes())
 //			contractAddr := common.HexToAddress(pair.Erc20Address)
 //
-//			coins := sdk.NewCoins(sdk.NewCoin(cosmosTokenBase, sdk.NewInt(tc.mint)))
+//			coins := sdk.NewCoins(sdk.NewCoin(cosmosTokenBase, math.NewInt(tc.mint)))
 //			suite.app.BankKeeper.MintCoins(suite.ctx, types.ModuleName, coins)
 //			suite.app.BankKeeper.SendCoinsFromModuleToAccount(suite.ctx, types.ModuleName, sender, coins)
 //
 //			convertCoin := types.NewMsgConvertCoin(
-//				sdk.NewCoin(cosmosTokenBase, sdk.NewInt(tc.burn)),
+//				sdk.NewCoin(cosmosTokenBase, math.NewInt(tc.burn)),
 //				suite.address,
 //				sender,
 //			)
@@ -178,7 +178,7 @@ package keeper_test
 //
 //			balance := suite.BalanceOf(common.HexToAddress(pair.Erc20Address), suite.address)
 //			cosmosBalance := suite.app.BankKeeper.GetBalance(suite.ctx, sender, metadata.Base)
-//			suite.Require().Equal(cosmosBalance.Amount.Int64(), sdk.NewInt(tc.mint-tc.burn).Int64())
+//			suite.Require().Equal(cosmosBalance.Amount.Int64(), math.NewInt(tc.mint-tc.burn).Int64())
 //			suite.Require().Equal(balance, big.NewInt(tc.burn))
 //
 //			// Burn the 10 tokens of suite.address (owner)
@@ -190,11 +190,11 @@ package keeper_test
 //			if tc.result {
 //				// Check if the execution was successful
 //				suite.Require().NoError(err)
-//				suite.Require().Equal(cosmosBalance.Amount, sdk.NewInt(tc.mint-tc.burn+tc.reconvert))
+//				suite.Require().Equal(cosmosBalance.Amount, math.NewInt(tc.mint-tc.burn+tc.reconvert))
 //			} else {
 //				// Check that no changes were made to the account
 //				suite.Require().Error(err)
-//				suite.Require().Equal(cosmosBalance.Amount, sdk.NewInt(tc.mint-tc.burn))
+//				suite.Require().Equal(cosmosBalance.Amount, math.NewInt(tc.mint-tc.burn))
 //			}
 //		})
 //	}

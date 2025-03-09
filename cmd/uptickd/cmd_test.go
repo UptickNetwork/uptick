@@ -15,7 +15,7 @@ import (
 )
 
 func TestInitCmd(t *testing.T) {
-	rootCmd, _ := uptickd.NewRootCmd()
+	rootCmd := uptickd.NewRootCmd()
 	rootCmd.SetArgs([]string{
 		"init",        // Test the init cmd
 		"uptick-test", // Moniker
@@ -23,6 +23,6 @@ func TestInitCmd(t *testing.T) {
 		fmt.Sprintf("--%s=%s", flags.FlagChainID, "uptick_7777-1"),
 	})
 
-	err := svrcmd.Execute(rootCmd, "uptick",app.DefaultNodeHome)
+	err := svrcmd.Execute(rootCmd, "uptick", app.DefaultNodeHome)
 	require.NoError(t, err)
 }

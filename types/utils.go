@@ -2,15 +2,15 @@ package types
 
 import (
 	"encoding/hex"
+	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
+	"github.com/evmos/ethermint/crypto/ethsecp256k1"
 	"strings"
 
-	"github.com/evmos/ethermint/crypto/ethsecp256k1"
-
+	sdkerrors "cosmossdk.io/errors"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/cosmos/cosmos-sdk/crypto/types/multisig"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 )
 
 const prefix = "uptick"
@@ -50,12 +50,12 @@ func IsSupportedKey(pubkey cryptotypes.PubKey) bool {
 func GetUptickAddressFromBech32(address string) (sdk.AccAddress, error) {
 	bech32Prefix := strings.SplitN(address, "1", 2)[0]
 	if bech32Prefix == address {
-		return nil, sdkerrors.Wrapf(sdkerrors.ErrInvalidAddress, "invalid bech32 address: %s", address)
+		return nil, sdkerrors.Wrapf(errortypes.ErrInvalidAddress, "invalid bech32 address: %s", address)
 	}
 
 	addressBz, err := sdk.GetFromBech32(address, bech32Prefix)
 	if err != nil {
-		return nil, sdkerrors.Wrapf(sdkerrors.ErrInvalidAddress, "invalid address %s, %s", address, err.Error())
+		return nil, sdkerrors.Wrapf(errortypes.ErrInvalidAddress, "invalid address %s, %s", address, err.Error())
 	}
 
 	// safety check: shouldn't happen
