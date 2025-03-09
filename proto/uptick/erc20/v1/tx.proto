@@ -5,6 +5,7 @@ import "google/api/annotations.proto";
 import "gogoproto/gogo.proto";
 import "cosmos/base/v1beta1/coin.proto";
 import "ibc/core/client/v1/client.proto";
+import "amino/amino.proto";
 
 option go_package = "github.com/UptickNetwork/uptick/x/erc20/types";
 
@@ -45,10 +46,8 @@ message MsgConvertERC20 {
   // ERC20 token contract address registered on erc20 bridge
   string contract_address = 1;
   // amount of ERC20 tokens to mint
-  string amount = 2 [
-    (gogoproto.customtype) = "github.com/cosmos/cosmos-sdk/types.Int",
-    (gogoproto.nullable) = false
-  ];
+  string amount = 2
+  [(gogoproto.customtype) = "cosmossdk.io/math.Int", (gogoproto.nullable) = false, (amino.dont_omitempty) = true];
   // bech32 address to receive SDK coins.
   string receiver = 3;
   // sender hex address from the owner of the given ERC20 tokens

@@ -1,11 +1,21 @@
 package main
 
 import (
+	storetypes "cosmossdk.io/store/types"
 	"errors"
 	"fmt"
 	"github.com/CosmWasm/wasmd/x/wasm"
 	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
+	"github.com/cosmos/cosmos-sdk/client/pruning"
+	"github.com/cosmos/cosmos-sdk/client/snapshot"
+	"github.com/cosmos/cosmos-sdk/server"
+	"github.com/cosmos/cosmos-sdk/types/tx/signing"
+	authcodec "github.com/cosmos/cosmos-sdk/x/auth/codec"
+	"github.com/cosmos/cosmos-sdk/x/auth/tx"
+	txmodule "github.com/cosmos/cosmos-sdk/x/auth/tx/config"
+	//wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
 	tmcfg "github.com/cometbft/cometbft/config"
+	//simtestutil "github.com/cosmos/cosmos-sdk/testutil/sims"
 	genutiltypes "github.com/cosmos/cosmos-sdk/x/genutil/types"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/viper"
@@ -17,11 +27,13 @@ import (
 	"github.com/spf13/cast"
 	"github.com/spf13/cobra"
 
-	dbm "github.com/cometbft/cometbft-db"
+	"cosmossdk.io/log"
 	tmcli "github.com/cometbft/cometbft/libs/cli"
-	"github.com/cometbft/cometbft/libs/log"
+	dbm "github.com/cosmos/cosmos-db"
 
-	"cosmossdk.io/simapp/params"
+	"cosmossdk.io/store"
+	"github.com/UptickNetwork/uptick/app"
+	cmdcfg "github.com/UptickNetwork/uptick/cmd/config"
 	"github.com/cosmos/cosmos-sdk/baseapp"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/config"
@@ -29,8 +41,6 @@ import (
 	"github.com/cosmos/cosmos-sdk/client/rpc"
 	sdkserver "github.com/cosmos/cosmos-sdk/server"
 	servertypes "github.com/cosmos/cosmos-sdk/server/types"
-	"github.com/cosmos/cosmos-sdk/snapshots"
-	"github.com/cosmos/cosmos-sdk/store"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authcmd "github.com/cosmos/cosmos-sdk/x/auth/client/cli"
 	"github.com/cosmos/cosmos-sdk/x/auth/types"
@@ -39,17 +49,14 @@ import (
 	genutilcli "github.com/cosmos/cosmos-sdk/x/genutil/client/cli"
 	ethermintclient "github.com/evmos/ethermint/client"
 	"github.com/evmos/ethermint/client/debug"
+	ethermintdebug "github.com/evmos/ethermint/client/debug"
 	"github.com/evmos/ethermint/crypto/hd"
 	"github.com/evmos/ethermint/encoding"
 	ethermintserver "github.com/evmos/ethermint/server"
 	servercfg "github.com/evmos/ethermint/server/config"
 	srvflags "github.com/evmos/ethermint/server/flags"
 
-	"github.com/UptickNetwork/uptick/app"
-	cmdcfg "github.com/UptickNetwork/uptick/cmd/config"
-
 	rosettaCmd "cosmossdk.io/tools/rosetta/cmd"
-	snapshottypes "github.com/cosmos/cosmos-sdk/snapshots/types"
 )
 
 const (
@@ -58,9 +65,8 @@ const (
 
 // NewRootCmd creates a new root command for uptickd. It is called once in the
 // main function.
-func NewRootCmd() (*cobra.Command, params.EncodingConfig) {
-
-	encodingConfig := encoding.MakeConfig(app.ModuleBasics)
+func NewRootCmd() *cobra.Command {
+	encodingConfig := encoding.MakeConfig()
 	initClientCtx := client.Context{}.
 		WithCodec(encodingConfig.Codec).
 		WithInterfaceRegistry(encodingConfig.InterfaceRegistry).
@@ -97,11 +103,31 @@ func NewRootCmd() (*cobra.Command, params.EncodingConfig) {
 				return err
 			}
 
+			// This needs to go after ReadFromClientConfig, as that function
+			// sets the RPC client needed for SIGN_MODE_TEXTUAL. This sign mode
+			// is only available if the client is online.
+			if !initClientCtx.Offline {
+				enabledSignModes := tx.DefaultSignModes
+				enabledSignModes = append(enabledSignModes, signing.SignMode_SIGN_MODE_TEXTUAL)
+				txConfigOpts := tx.ConfigOptions{
+					EnabledSignModes:           enabledSignModes,
+					TextualCoinMetadataQueryFn: txmodule.NewGRPCCoinMetadataQueryFn(initClientCtx),
+				}
+				txConfig, err := tx.NewTxConfigWithOptions(
+					initClientCtx.Codec,
+					txConfigOpts,
+				)
+				if err != nil {
+					return err
+				}
+
+				initClientCtx = initClientCtx.WithTxConfig(txConfig)
+			}
+
 			if err := client.SetCmdClientContextHandler(initClientCtx, cmd); err != nil {
 				return err
 			}
 
-			// TODO: define our own token
 			customAppTemplate, customAppConfig := initAppConfig()
 			customTMConfig := initTendermintConfig()
 
@@ -111,23 +137,25 @@ func NewRootCmd() (*cobra.Command, params.EncodingConfig) {
 
 	cfg := sdk.GetConfig()
 	cfg.Seal()
-
+	a := appCreator{}
 	rootCmd.AddCommand(
 		ethermintclient.ValidateChainID(
 			InitCmd(app.ModuleBasics, app.DefaultNodeHome),
 		),
-		genutilcli.CollectGenTxsCmd(banktypes.GenesisBalancesIterator{}, app.DefaultNodeHome, genutiltypes.DefaultMessageValidator),
-		genutilcli.MigrateGenesisCmd(),
-		genutilcli.GenTxCmd(app.ModuleBasics, encodingConfig.TxConfig, banktypes.GenesisBalancesIterator{}, app.DefaultNodeHome),
+		genutilcli.InitCmd(app.ModuleBasics, app.DefaultNodeHome),
+		genutilcli.CollectGenTxsCmd(banktypes.GenesisBalancesIterator{}, app.DefaultNodeHome, genutiltypes.DefaultMessageValidator, authcodec.NewBech32Codec(sdk.GetConfig().GetBech32ValidatorAddrPrefix())),
+		//genutilcli.MigrateGenesisCmd(),
+		genutilcli.GenTxCmd(app.ModuleBasics, encodingConfig.TxConfig, banktypes.GenesisBalancesIterator{}, app.DefaultNodeHome, authcodec.NewBech32Codec(sdk.GetConfig().GetBech32ValidatorAddrPrefix())),
 		genutilcli.ValidateGenesisCmd(app.ModuleBasics),
 		AddGenesisAccountCmd(app.DefaultNodeHome),
 		tmcli.NewCompletionCmd(rootCmd, true),
 		NewTestnetCmd(app.ModuleBasics, banktypes.GenesisBalancesIterator{}),
+		ethermintdebug.Cmd(),
 		AddIbcCaclulateCommand(debug.Cmd()),
-		config.Cmd(),
+		pruning.Cmd(a.newApp, app.DefaultNodeHome),
+		snapshot.Cmd(a.newApp),
 	)
 
-	a := appCreator{encodingConfig}
 	ethermintserver.AddCommands(
 		rootCmd,
 		ethermintserver.NewDefaultStartOptions(a.newApp, app.DefaultNodeHome),
@@ -137,7 +165,7 @@ func NewRootCmd() (*cobra.Command, params.EncodingConfig) {
 
 	// add keybase, auxiliary RPC, query, and tx child commands
 	rootCmd.AddCommand(
-		rpc.StatusCommand(),
+		server.StatusCommand(),
 		queryCommand(),
 		txCommand(),
 		ethermintclient.KeyCommands(app.DefaultNodeHome),
@@ -150,7 +178,7 @@ func NewRootCmd() (*cobra.Command, params.EncodingConfig) {
 	// add rosetta
 	rootCmd.AddCommand(rosettaCmd.RosettaCommand(encodingConfig.InterfaceRegistry, encodingConfig.Codec))
 
-	return rootCmd, encodingConfig
+	return rootCmd
 }
 
 func addModuleInitFlags(startCmd *cobra.Command) {
@@ -168,9 +196,10 @@ func queryCommand() *cobra.Command {
 	}
 
 	cmd.AddCommand(
-		authcmd.GetAccountCmd(),
 		rpc.ValidatorCommand(),
-		rpc.BlockCommand(),
+		server.QueryBlocksCmd(),
+		server.QueryBlockCmd(),
+		server.QueryBlockResultsCmd(),
 		authcmd.QueryTxsByEventsCmd(),
 		authcmd.QueryTxCmd(),
 	)
@@ -224,12 +253,11 @@ func initAppConfig() (string, interface{}) {
 }
 
 type appCreator struct {
-	encCfg params.EncodingConfig
 }
 
 // newApp is an appCreator
 func (a appCreator) newApp(logger log.Logger, db dbm.DB, traceStore io.Writer, appOpts servertypes.AppOptions) servertypes.Application {
-	var cache sdk.MultiStorePersistentCache
+	var cache storetypes.MultiStorePersistentCache
 
 	if cast.ToBool(appOpts.Get(sdkserver.FlagInterBlockCache)) {
 		cache = store.NewCommitKVStoreCacheManager()
@@ -245,12 +273,12 @@ func (a appCreator) newApp(logger log.Logger, db dbm.DB, traceStore io.Writer, a
 		panic(err)
 	}
 
-	snapshotDir := filepath.Join(cast.ToString(appOpts.Get(flags.FlagHome)), "data", "snapshots")
-	snapshotDB, err := dbm.NewDB("metadata", sdkserver.GetAppDBBackend(appOpts), snapshotDir)
+	//snapshotDir := filepath.Join(cast.ToString(appOpts.Get(flags.FlagHome)), "data", "snapshots")
+	//snapshotDB, err := dbm.NewDB("metadata", sdkserver.GetAppDBBackend(appOpts), snapshotDir)
 	if err != nil {
 		panic(err)
 	}
-	snapshotStore, err := snapshots.NewStore(snapshotDB, snapshotDir)
+	//snapshotStore, err := snapshots.NewStore(snapshotDB, snapshotDir)
 	if err != nil {
 		panic(err)
 	}
@@ -281,7 +309,6 @@ func (a appCreator) newApp(logger log.Logger, db dbm.DB, traceStore io.Writer, a
 		logger, db, traceStore, true, skipUpgradeHeights,
 		cast.ToString(appOpts.Get(flags.FlagHome)),
 		cast.ToUint(appOpts.Get(sdkserver.FlagInvCheckPeriod)),
-		a.encCfg,
 		appOpts,
 		wasmOpts,
 		baseapp.SetPruning(pruningOpts),
@@ -293,21 +320,13 @@ func (a appCreator) newApp(logger log.Logger, db dbm.DB, traceStore io.Writer, a
 		baseapp.SetTrace(cast.ToBool(appOpts.Get(sdkserver.FlagTrace))),
 		baseapp.SetIndexEvents(cast.ToStringSlice(appOpts.Get(sdkserver.FlagIndexEvents))),
 		baseapp.SetChainID(chainID),
-
-		baseapp.SetSnapshot(
-			snapshotStore,
-			snapshottypes.NewSnapshotOptions(
-				cast.ToUint64(appOpts.Get(sdkserver.FlagStateSyncSnapshotInterval)),
-				cast.ToUint32(appOpts.Get(sdkserver.FlagStateSyncSnapshotKeepRecent)),
-			),
-		),
 	)
 
 	return uptickApp
 }
 
 // createIrisappAndExport creates a new irisapp (optionally at a given height) and exports state.
-func (a appCreator) appExport(
+func (ac appCreator) appExport(
 	logger log.Logger,
 	db dbm.DB,
 	traceStore io.Writer,
@@ -325,13 +344,13 @@ func (a appCreator) appExport(
 	}
 
 	if height == -1 {
-		uptickApp = app.NewUptick(logger, db, traceStore, false, map[int64]bool{}, "", uint(1), a.encCfg, appOpts, emptyWasmOpts)
+		uptickApp = app.NewUptick(logger, db, traceStore, false, map[int64]bool{}, "", uint(1), appOpts, emptyWasmOpts)
 
 		if err := uptickApp.LoadHeight(height); err != nil {
 			return servertypes.ExportedApp{}, err
 		}
 	} else {
-		uptickApp = app.NewUptick(logger, db, traceStore, true, map[int64]bool{}, "", uint(1), a.encCfg, appOpts, emptyWasmOpts)
+		uptickApp = app.NewUptick(logger, db, traceStore, true, map[int64]bool{}, "", uint(1), appOpts, emptyWasmOpts)
 
 	}
 

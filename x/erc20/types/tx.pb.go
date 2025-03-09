@@ -6,12 +6,12 @@ package types
 import (
 	context "context"
 	fmt "fmt"
-	github_com_cosmos_cosmos_sdk_types "github.com/cosmos/cosmos-sdk/types"
 	types "github.com/cosmos/cosmos-sdk/types"
-	types1 "github.com/cosmos/ibc-go/v7/modules/core/02-client/types"
-	_ "github.com/gogo/protobuf/gogoproto"
 	grpc1 "github.com/cosmos/gogoproto/grpc"
+	types1 "github.com/cosmos/ibc-go/v8/modules/core/02-client/types"
+	_ "github.com/gogo/protobuf/gogoproto"
 
+	cosmossdk_io_math "cosmossdk.io/math"
 	proto "github.com/cosmos/gogoproto/proto"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	grpc "google.golang.org/grpc"
@@ -140,7 +140,7 @@ type MsgConvertERC20 struct {
 	// ERC20 token contract address registered on erc20 bridge
 	ContractAddress string `protobuf:"bytes,1,opt,name=contract_address,json=contractAddress,proto3" json:"contract_address,omitempty"`
 	// amount of ERC20 tokens to mint
-	Amount github_com_cosmos_cosmos_sdk_types.Int `protobuf:"bytes,2,opt,name=amount,proto3,customtype=github.com/cosmos/cosmos-sdk/types.Int" json:"amount"`
+	Amount cosmossdk_io_math.Int `protobuf:"bytes,2,opt,name=amount,proto3,customtype=github.com/cosmos/cosmos-sdk/types.Int" json:"amount"`
 	// bech32 address to receive SDK coins.
 	Receiver string `protobuf:"bytes,3,opt,name=receiver,proto3" json:"receiver,omitempty"`
 	// sender hex address from the owner of the given ERC20 tokens
@@ -241,7 +241,7 @@ var xxx_messageInfo_MsgConvertERC20Response proto.InternalMessageInfo
 type MsgTransferERC20 struct {
 	EvmContractAddress string `protobuf:"bytes,1,opt,name=evm_contract_address,json=evmContractAddress,proto3" json:"evm_contract_address,omitempty"`
 	// tokenID to convert
-	Amount github_com_cosmos_cosmos_sdk_types.Int `protobuf:"bytes,2,opt,name=amount,proto3,customtype=github.com/cosmos/cosmos-sdk/types.Int" json:"amount"`
+	Amount cosmossdk_io_math.Int `protobuf:"bytes,2,opt,name=amount,proto3,customtype=github.com/cosmos/cosmos-sdk/types.Int" json:"amount"`
 	// the port on which the packet will be sent
 	SourcePort string `protobuf:"bytes,3,opt,name=source_port,json=sourcePort,proto3" json:"source_port,omitempty"`
 	// the channel by which the packet will be sent

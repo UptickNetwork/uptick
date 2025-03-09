@@ -1,12 +1,12 @@
 package keeper
 
 import (
+	sdkerrors "cosmossdk.io/errors"
+	"cosmossdk.io/x/nft"
+	"github.com/UptickNetwork/uptick/x/collection/types"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
-	"github.com/cosmos/cosmos-sdk/x/nft"
-
-	"github.com/UptickNetwork/uptick/x/collection/types"
+	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
 )
 
 // SaveDenom issues a denom according to the given params
@@ -58,7 +58,7 @@ func (k Keeper) TransferDenomOwner(
 
 	// authorize
 	if srcOwner.String() != denom.Creator {
-		return sdkerrors.Wrapf(sdkerrors.ErrUnauthorized, "%s is not allowed to transfer denom %s", srcOwner.String(), denomID)
+		return sdkerrors.Wrapf(errortypes.ErrUnauthorized, "%s is not allowed to transfer denom %s", srcOwner.String(), denomID)
 	}
 
 	denomMetadata := &types.DenomMetadata{

@@ -2,23 +2,24 @@ package keeper
 
 import (
 	"context"
-	ibctransfertypes "github.com/cosmos/ibc-go/v7/modules/apps/transfer/types"
-	channeltypes "github.com/cosmos/ibc-go/v7/modules/core/04-channel/types"
+	"cosmossdk.io/math"
+	ibctransfertypes "github.com/cosmos/ibc-go/v8/modules/apps/transfer/types"
+	channeltypes "github.com/cosmos/ibc-go/v8/modules/core/04-channel/types"
 	"math/big"
 	"strings"
 
+	sdkerrors "cosmossdk.io/errors"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 
 	"github.com/UptickNetwork/uptick/contracts"
+	appType "github.com/UptickNetwork/uptick/types"
 	"github.com/UptickNetwork/uptick/x/erc20/types"
-	transfertypes "github.com/cosmos/ibc-go/v7/modules/apps/transfer/types"
+	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
+	transfertypes "github.com/cosmos/ibc-go/v8/modules/apps/transfer/types"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	evmtypes "github.com/evmos/ethermint/x/evm/types"
-
-	appType "github.com/UptickNetwork/uptick/types"
 )
 
 var _ types.MsgServer = &Keeper{}
@@ -237,7 +238,7 @@ func (k Keeper) convertERC20NativeCoin(
 	balanceToken := k.balanceOf(ctx, erc20, contract, sender)
 
 	// Burn escrowed tokens
-	_, err := k.CallEVM(ctx, erc20, types.ModuleAddress, contract, true, "burnCoins", sender, msg.Amount.BigInt())
+	_, err := k.CallEVM(ctx, erc20, types.ModuleAddress, contract, true, "burnCoins", sender, msg.Amount)
 	if err != nil {
 		return nil, err
 	}
@@ -275,7 +276,7 @@ func (k Keeper) convertERC20NativeCoin(
 				types.EventTypeConvertERC20,
 				sdk.NewAttribute(sdk.AttributeKeySender, msg.Sender),
 				sdk.NewAttribute(types.AttributeKeyReceiver, msg.Receiver),
-				sdk.NewAttribute(sdk.AttributeKeyAmount, msg.Amount.String()),
+				sdk.NewAttribute(sdk.AttributeKeyAmount, msg.Amount),
 				sdk.NewAttribute(types.AttributeKeyCosmosCoin, pair.Denom),
 				sdk.NewAttribute(types.AttributeKeyERC20Token, msg.ContractAddress),
 			),
@@ -307,7 +308,7 @@ func (k Keeper) convertERC20NativeToken(
 	balanceToken := k.balanceOf(ctx, erc20, contract, types.ModuleAddress)
 
 	// Escrow tokens on module account
-	transferData, err := erc20.Pack("transfer", types.ModuleAddress, msg.Amount.BigInt())
+	transferData, err := erc20.Pack("transfer", types.ModuleAddress, msg.Amount)
 	if err != nil {
 		return nil, err
 	}
@@ -324,7 +325,7 @@ func (k Keeper) convertERC20NativeToken(
 	}
 
 	if !unpackedRet.Value {
-		return nil, sdkerrors.Wrap(sdkerrors.ErrLogic, "failed to execute transfer")
+		return nil, sdkerrors.Wrap(errortypes.ErrLogic, "failed to execute transfer")
 	}
 
 	// Check expected escrow balance after transfer execution
@@ -371,7 +372,7 @@ func (k Keeper) convertERC20NativeToken(
 				types.EventTypeConvertERC20,
 				sdk.NewAttribute(sdk.AttributeKeySender, msg.Sender),
 				sdk.NewAttribute(types.AttributeKeyReceiver, msg.Receiver),
-				sdk.NewAttribute(sdk.AttributeKeyAmount, msg.Amount.String()),
+				sdk.NewAttribute(sdk.AttributeKeyAmount, msg.Amount),
 				sdk.NewAttribute(types.AttributeKeyCosmosCoin, pair.Denom),
 				sdk.NewAttribute(types.AttributeKeyERC20Token, msg.ContractAddress),
 			),
@@ -420,7 +421,7 @@ func (k Keeper) convertCoinNativeERC20(
 	}
 
 	if !unpackedRet.Value {
-		return nil, sdkerrors.Wrap(sdkerrors.ErrLogic, "failed to execute unescrow tokens from user")
+		return nil, sdkerrors.Wrap(errortypes.ErrLogic, "failed to execute unescrow tokens from user")
 	}
 
 	// Check expected Receiver balance after transfer execution
@@ -518,7 +519,7 @@ func (k Keeper) refundPacketToken(ctx sdk.Context, packet channeltypes.Packet, d
 	}
 
 	// parse the transfer amount
-	transferAmount, ok := sdk.NewIntFromString(data.Amount)
+	transferAmount, ok := math.NewIntFromString(data.Amount)
 	if !ok {
 		return sdkerrors.Wrapf(transfertypes.ErrInvalidAmount, "unable to parse transfer amount (%s) into math.Int", data.Amount)
 	}

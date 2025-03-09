@@ -1,20 +1,19 @@
 package internft
 
 import (
+	context "context"
+	nftkeeper "cosmossdk.io/x/nft/keeper"
+	nfttypes "github.com/UptickNetwork/uptick/x/collection/types"
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
-
-	nfttypes "github.com/UptickNetwork/uptick/x/collection/types"
-	nftkeeper "github.com/cosmos/cosmos-sdk/x/nft/keeper"
 )
 
 type (
 	// AccountKeeper defines the contract required for account APIs.
 	AccountKeeper interface {
-		NewAccountWithAddress(ctx sdk.Context, addr sdk.AccAddress) authtypes.AccountI
+		NewAccountWithAddress(ctx context.Context, addr sdk.AccAddress) sdk.AccountI
 		// Set an account in the store.
-		SetAccount(sdk.Context, authtypes.AccountI)
+		SetAccount(context.Context, sdk.AccountI)
 		GetModuleAddress(name string) sdk.AccAddress
 	}
 	// InterNftKeeper defines the ICS721 Keeper

@@ -1,8 +1,8 @@
 package keeper
 
 import (
+	"cosmossdk.io/log"
 	"fmt"
-	"github.com/cometbft/cometbft/libs/log"
 
 	"github.com/UptickNetwork/evm-nft-convert/types"
 	ibcnfttransferkeeper "github.com/bianjieai/nft-transfer/keeper"
