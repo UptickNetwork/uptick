@@ -57,6 +57,7 @@ To learn how the Uptick works from a high-level perspective, go to the [Introduc
 
 The following chat channels and forums are a great spot to ask questions about Uptick:
 
+
 ## Contributing
 
 Looking for a good place to start contributing? Check out some [`good first issues`](https://github.com/UptickNetwork/uptick/issues?q=is%3Aopen+is%3Aissue+label%3A%22good+first+issue%22).
