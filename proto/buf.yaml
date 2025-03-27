@@ -1,4 +1,16 @@
 version: v1
+name: buf.build/uptick/wasm-nft-convert
+deps:
+  - buf.build/cosmos/cosmos-sdk:v0.50.0
+  - buf.build/cosmos/cosmos-proto:1935555c206d4afb9e94615dfd0fad31
+  - buf.build/cosmos/gogo-proto:a14993478f40695898ed8a86931094b6656e8a5d
+  - buf.build/googleapis/googleapis:8d7204855ec14631a499bd7393ce1970
+  - buf.build/cosmos/ics23:b1abd8678aab07165efd453c96796a179eb3131f
+  - buf.build/cosmos/ibc:266dbe8e0fc54582bc1b2cb572b4c9b8
+
+breaking:
+  use:
+    - FILE
 lint:
   use:
     - DEFAULT
@@ -10,10 +22,8 @@ lint:
     - SERVICE_SUFFIX
     - PACKAGE_VERSION_SUFFIX
     - RPC_REQUEST_STANDARD_NAME
-    - RPC_REQUEST_RESPONSE_UNIQUE
+    - ENUM_NO_ALLOW_ALIAS
     - RPC_RESPONSE_STANDARD_NAME
-    - RPC_REQUEST_RESPONSE_UNIQUE
-    - COMMENT_MESSAGE
-breaking:
-  use:
-    - FILE
+  ignore:
+    - tendermint
+  allow_comment_ignores: true

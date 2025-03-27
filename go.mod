@@ -1,22 +1,22 @@
 module github.com/UptickNetwork/uptick
 
-go 1.23.0
-
-toolchain go1.24.0
+go 1.23.5
 
 require (
 	cosmossdk.io/simapp v0.0.0-20240118210941-3897926e722e
-	cosmossdk.io/tools/rosetta v0.2.1
+	cosmossdk.io/tools/rosetta v0.2.1 // indirect
 	github.com/CosmWasm/wasmd v0.53.2
-	github.com/UptickNetwork/evm-nft-convert v1.0.9-0.20250307101348-251a4879e0b5
-	github.com/UptickNetwork/wasm-nft-convert v1.0.6-0.20250307094337-ca0f1399597b
+	github.com/UptickNetwork/evm-nft-convert v1.0.11
+	github.com/UptickNetwork/wasm-nft-convert v1.0.7
 	github.com/bianjieai/nft-transfer v1.1.3-ibc-v8.6.1
 	github.com/btcsuite/btcd v0.24.2 // indirect
 	github.com/btcsuite/btcd/btcutil v1.1.6 // indirect
-	github.com/cometbft/cometbft v0.38.15
-	github.com/cometbft/cometbft-db v0.14.1
-	github.com/cosmos/cosmos-sdk v0.50.11-lsm
+	github.com/cometbft/cometbft v0.38.16
+	github.com/cometbft/cometbft-db v0.14.1 // indirect
+	github.com/cosmos/cosmos-sdk v0.50.11
 	github.com/cosmos/go-bip39 v1.0.0
+	github.com/cosmos/ibc-apps/middleware/packet-forward-middleware/v8 v8.1.0
+	github.com/cosmos/ibc-apps/modules/ibc-hooks/v8 v8.0.0-00010101000000-000000000000
 	github.com/cosmos/ibc-go/v8 v8.6.1
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/ethereum/go-ethereum v1.10.26
@@ -28,13 +28,12 @@ require (
 	github.com/hashicorp/go-version v1.6.0 // indirect
 	github.com/improbable-eng/grpc-web v0.15.0 // indirect
 	github.com/linxGnu/grocksdb v1.8.14 // indirect
-	github.com/onsi/ginkgo/v2 v2.20.1
 	github.com/pkg/errors v0.9.1
 	github.com/rakyll/statik v0.1.7
 	github.com/rs/cors v1.11.1 // indirect
 	github.com/spf13/cast v1.7.1
 	github.com/spf13/cobra v1.8.1
-	github.com/spf13/viper v1.19.0
+	github.com/spf13/viper v1.19.0 // indirect
 	github.com/stretchr/testify v1.10.0
 	github.com/tidwall/gjson v1.17.0
 	github.com/tidwall/sjson v1.2.5 // indirect
@@ -54,7 +53,7 @@ require (
 	cosmossdk.io/api v0.7.6 // indirect
 	cosmossdk.io/client/v2 v2.0.0-beta.7 // indirect
 	cosmossdk.io/collections v0.4.0 // indirect
-	cosmossdk.io/core v0.11.1 // indirect
+	cosmossdk.io/core v0.11.1
 	cosmossdk.io/depinject v1.1.0 // indirect
 	cosmossdk.io/errors v1.0.1
 	cosmossdk.io/log v1.5.0
@@ -74,6 +73,7 @@ require (
 	cosmossdk.io/x/nft v0.1.1
 	github.com/cosmos/cosmos-db v1.1.1
 	github.com/cosmos/ibc-go/modules/capability v1.0.1
+	github.com/cosmos/ibc-go/modules/light-clients/08-wasm v0.4.2-0.20240730185033-ccd4dc278e72
 )
 
 require (
@@ -109,12 +109,10 @@ require (
 	github.com/ghodss/yaml v1.0.0 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
-	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/gogo/googleapis v1.4.1 // indirect
 	github.com/golang/mock v1.6.0 // indirect
 	github.com/google/flatbuffers v1.12.1 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
-	github.com/google/pprof v0.0.0-20240827171923-fa2c70bbbfe5 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.4 // indirect
 	github.com/hashicorp/go-hclog v1.5.0 // indirect
@@ -123,6 +121,7 @@ require (
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/hashicorp/yamux v0.1.1 // indirect
 	github.com/huandu/skiplist v1.2.0 // indirect
+	github.com/iancoleman/orderedmap v0.3.0 // indirect
 	github.com/iancoleman/strcase v0.3.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.4 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
@@ -152,8 +151,8 @@ require (
 	go.opentelemetry.io/otel/trace v1.34.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/arch v0.3.0 // indirect
+	golang.org/x/mod v0.20.0 // indirect
 	golang.org/x/time v0.10.0 // indirect
-	golang.org/x/tools v0.24.0 // indirect
 	google.golang.org/genproto v0.0.0-20240701130421-f6361c86f094 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250227231956-55c901821b1e // indirect
 	gotest.tools/v3 v3.5.1 // indirect
@@ -165,7 +164,7 @@ require (
 	cloud.google.com/go/iam v1.1.9 // indirect
 	cloud.google.com/go/storage v1.41.0 // indirect; indirectx
 	filippo.io/edwards25519 v1.1.0 // indirect
-	github.com/99designs/keyring v1.2.1 // indirect
+	github.com/99designs/keyring v1.2.2 // indirect
 	github.com/StackExchange/wmi v1.2.1 // indirect
 	github.com/VictoriaMetrics/fastcache v1.6.0 // indirect
 	github.com/aws/aws-sdk-go v1.44.224 // indirect
@@ -180,7 +179,7 @@ require (
 	github.com/coinbase/rosetta-sdk-go v0.7.9 // indirect
 	github.com/cosmos/btcutil v1.0.5 // indirect
 	github.com/cosmos/cosmos-proto v1.0.0-beta.5 // indirect
-	github.com/cosmos/iavl v1.2.2 // indirect
+	github.com/cosmos/iavl v1.2.3 // indirect
 	github.com/cosmos/ledger-cosmos-go v0.14.0 // indirect
 	github.com/danieljoos/wincred v1.1.2 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.3.0 // indirect
@@ -259,11 +258,11 @@ require (
 	github.com/ulikunitz/xz v0.5.11 // indirect
 	go.etcd.io/bbolt v1.4.0-alpha.0.0.20240404170359-43604f3112c5 // indirect
 	golang.org/x/oauth2 v0.26.0 // indirect
-	golang.org/x/sync v0.11.0 // indirect
+	golang.org/x/sync v0.11.0
 	golang.org/x/sys v0.30.0 // indirect
 	golang.org/x/term v0.29.0 // indirect
 	google.golang.org/api v0.223.0 // indirect
-	google.golang.org/protobuf v1.36.5 // indirect
+	google.golang.org/protobuf v1.36.5
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
@@ -272,8 +271,10 @@ require (
 )
 
 replace (
+	cosmossdk.io/tools/rosetta => cosmossdk.io/tools/rosetta v0.2.1-0.20230613133644-0a778132a60f
 	// use cosmos fork of keyring
 	github.com/99designs/keyring => github.com/cosmos/keyring v1.2.0
+	github.com/cosmos/ibc-apps/modules/ibc-hooks/v8 => github.com/public-awesome/ibc-apps/modules/ibc-hooks/v8 v8.0.0-20250129183033-079b03c57592
 	github.com/cosmos/ibc-go/v7 => github.com/uptSmart/ibc-go/v7 v7.3.0-erc20
 	github.com/evmos/ethermint => github.com/bianjieai/ethermint v0.22.0-irishub-20240512.0.20250103062036-dc2ecd5cc643
 	github.com/gin-gonic/gin => github.com/gin-gonic/gin v1.9.1

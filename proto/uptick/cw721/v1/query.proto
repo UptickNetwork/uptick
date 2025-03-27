@@ -2,10 +2,10 @@ syntax = "proto3";
 package uptick.cw721.v1;
 
 import "cosmos/base/query/v1beta1/pagination.proto";
-import "uptick/cw721/v1/genesis.proto";
-import "uptick/cw721/v1/cw721.proto";
-import "google/api/annotations.proto";
 import "gogoproto/gogo.proto";
+import "google/api/annotations.proto";
+import "uptick/cw721/v1/cw721.proto";
+import "uptick/cw721/v1/genesis.proto";
 
 option go_package = "github.com/UptickNetwork/wasm-nft-convert/cw721/types";
 
@@ -22,10 +22,10 @@ service Query {
   }
 
   // WasmContract retrieves a registered wasm contract
-  rpc WasmContract(QueryWasmAddressRequest) returns (QueryTokenPairResponse) {
-    option (google.api.http).get = "/uptick/erc721/v1/wasm_contract/{port}/{channel}/{classId}";
+  rpc WasmContract(QueryWasmAddressRequest) returns (QueryWasmContractResponse) {
+    option (google.api.http).get = "/uptick/erc721/v1/wasm_contract/{port}/{channel}/{class_id}";
   }
-  
+
   // Params retrieves the cw721 module params
   rpc Params(QueryParamsRequest) returns (QueryParamsResponse) {
     option (google.api.http).get = "/uptick/cw721/v1/params";
@@ -42,7 +42,7 @@ message QueryTokenPairsRequest {
 // QueryTokenPairsResponse is the response type for the Query/TokenPairs RPC
 // method.
 message QueryTokenPairsResponse {
-  repeated TokenPair token_pairs = 1 [ (gogoproto.nullable) = false ];
+  repeated TokenPair token_pairs = 1 [(gogoproto.nullable) = false];
   // pagination defines the pagination in the response.
   cosmos.base.query.v1beta1.PageResponse pagination = 2;
 }
@@ -60,16 +60,14 @@ message QueryWasmAddressRequest {
   // the Cosmos nft classID
   string port = 1;
   string channel = 2;
-  string classId = 3;
+  string class_id = 3;
 }
-
 
 // QueryTokenPairResponse is the response type for the Query/TokenPair RPC
 // method.
 message QueryTokenPairResponse {
-  TokenPair token_pair = 1 [ (gogoproto.nullable) = false ];
+  TokenPair token_pair = 1 [(gogoproto.nullable) = false];
 }
-
 
 // QueryParamsRequest is the request type for the Query/Params RPC method.
 message QueryParamsRequest {}
@@ -77,5 +75,10 @@ message QueryParamsRequest {}
 // QueryParamsResponse is the response type for the Query/Params RPC
 // method.
 message QueryParamsResponse {
-  Params params = 1 [ (gogoproto.nullable) = false ];
+  Params params = 1 [(gogoproto.nullable) = false];
+}
+
+// QueryWasmContractResponse is the response type for the Query/WasmContract RPC method.
+message QueryWasmContractResponse {
+  TokenPair token_pair = 1 [(gogoproto.nullable) = false];
 }

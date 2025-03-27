@@ -51,13 +51,13 @@ message MsgIssueDenomResponse {}
 message MsgTransferNFT {
   option (gogoproto.equal) = true;
 
-  string id = 1 ;
+  string id = 1;
   string denom_id = 2 [
     (gogoproto.moretags) = "yaml:\"denom_id\"",
     (gogoproto.customname) = "DenomId"
   ];
   string name = 3;
-  string uri = 4 [ (gogoproto.customname) = "URI" ];
+  string uri = 4 [(gogoproto.customname) = "URI"];
   string data = 5;
   string sender = 6;
   string recipient = 7;
@@ -71,13 +71,13 @@ message MsgTransferNFTResponse {}
 message MsgEditNFT {
   option (gogoproto.equal) = true;
 
-  string id = 1 ;
+  string id = 1;
   string denom_id = 2 [
     (gogoproto.moretags) = "yaml:\"denom_id\"",
     (gogoproto.customname) = "DenomId"
   ];
   string name = 3;
-  string uri = 4 [ (gogoproto.customname) = "URI" ];
+  string uri = 4 [(gogoproto.customname) = "URI"];
   string data = 5;
   string sender = 6;
   string uri_hash = 7;
@@ -90,13 +90,13 @@ message MsgEditNFTResponse {}
 message MsgMintNFT {
   option (gogoproto.equal) = true;
 
-  string id = 1 ;
+  string id = 1;
   string denom_id = 2 [
     (gogoproto.moretags) = "yaml:\"denom_id\"",
     (gogoproto.customname) = "DenomId"
   ];
   string name = 3;
-  string uri = 4 [ (gogoproto.customname) = "URI" ];
+  string uri = 4 [(gogoproto.customname) = "URI"];
   string data = 5;
   string sender = 6;
   string recipient = 7;
@@ -110,7 +110,7 @@ message MsgMintNFTResponse {}
 message MsgBurnNFT {
   option (gogoproto.equal) = true;
 
-  string id = 1 ;
+  string id = 1;
   string denom_id = 2 [
     (gogoproto.moretags) = "yaml:\"denom_id\"",
     (gogoproto.customname) = "DenomId"
@@ -125,7 +125,7 @@ message MsgBurnNFTResponse {}
 // recipient.
 message MsgTransferDenom {
   option (gogoproto.equal) = true;
-  string id = 1 ;
+  string id = 1;
   string sender = 2;
   string recipient = 3;
 }

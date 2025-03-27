@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
 	tmrand "github.com/cometbft/cometbft/libs/rand"
 	"github.com/cometbft/cometbft/node"
 	tmclient "github.com/cometbft/cometbft/rpc/client"
@@ -28,8 +29,6 @@ import (
 	"testing"
 	"time"
 
-	//"cosmossdk.io/simapp"
-	//"cosmossdk.io/simapp/params"
 	"github.com/cosmos/cosmos-sdk/baseapp"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/tx"
@@ -49,7 +48,6 @@ import (
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	"github.com/evmos/ethermint/crypto/hd"
 
-	"github.com/evmos/ethermint/encoding"
 	"github.com/evmos/ethermint/server/config"
 	ethermint "github.com/evmos/ethermint/types"
 	evmtypes "github.com/evmos/ethermint/x/evm/types"
@@ -103,17 +101,20 @@ type Config struct {
 // DefaultConfig returns a sane default configuration suitable for nearly all
 // testing requirements.
 func DefaultConfig() Config {
-	encCfg := encoding.MakeConfig()
-	app := app.NewUptick(log.NewNopLogger(), dbm.NewMemDB(), nil, true, map[int64]bool{}, "", uint(1), nil, nil)
+	//encCfg := encoding.MakeConfig()
+	//initAppOptions := viper.New()
+	//app := app.NewUptick(log.NewNopLogger(), dbm.NewMemDB(), nil, true, initAppOptions, []wasmkeeper.Option{})
+	tempApp := setup(nil)
+	encCfg := tempApp.EncodingConfig()
 
 	return Config{
 		Codec:             encCfg.Codec,
 		TxConfig:          encCfg.TxConfig,
-		LegacyAmino:       encCfg.Amino,
+		LegacyAmino:       encCfg.LegacyAmino,
 		InterfaceRegistry: encCfg.InterfaceRegistry,
 		AccountRetriever:  authtypes.AccountRetriever{},
 		AppConstructor:    NewAppConstructor(),
-		GenesisState:      app.DefaultGenesis(),
+		GenesisState:      tempApp.DefaultGenesis(),
 		TimeoutCommit:     2 * time.Second,
 		ChainID:           fmt.Sprintf("uptick_%d-1", tmrand.Int63n(9999999999999)+1),
 		NumValidators:     4,
@@ -134,11 +135,12 @@ func DefaultConfig() Config {
 func NewAppConstructor() AppConstructor {
 
 	return func(val Validator) servertypes.Application {
+
 		return app.NewUptick(
-			val.Ctx.Logger, dbm.NewMemDB(), nil, true, make(map[int64]bool), val.Ctx.Config.RootDir, 0,
+			val.Ctx.Logger, dbm.NewMemDB(), nil, true,
 			nil,
 			nil,
-			nil,
+
 			baseapp.SetPruning(pruningtypes.NewPruningOptionsFromString(val.AppConfig.Pruning)),
 			baseapp.SetMinGasPrices(val.AppConfig.MinGasPrices),
 		)
@@ -433,7 +435,9 @@ func New(l Logger, baseDir string, cfg Config) (*Network, error) {
 			sdk.NewCoin(cfg.BondDenom, cfg.BondedTokens),
 			stakingtypes.NewDescription(nodeDirName, "", "", "", ""),
 			stakingtypes.NewCommissionRates(commission, math.LegacyOneDec(), math.LegacyOneDec()),
+			math.OneInt(),
 		)
+
 		if err != nil {
 			return nil, err
 		}
@@ -721,4 +725,36 @@ func trapSignal(cleanupFunc func()) {
 
 		os.Exit(exitCode)
 	}()
+}
+
+type AppWrapper struct {
+	*app.Uptick
+}
+
+// EmptyAppOptions is a stub implementing AppOptions
+type EmptyAppOptions struct{}
+
+// Get implements AppOptions
+func (ao EmptyAppOptions) Get(o string) interface{} {
+	return nil
+}
+
+func setup(
+	appOpts servertypes.AppOptions,
+	baseAppOptions ...func(*baseapp.BaseApp),
+) *AppWrapper {
+	db := dbm.NewMemDB()
+	if appOpts == nil {
+		appOpts = EmptyAppOptions{}
+	}
+	app := app.NewUptick(
+		log.NewNopLogger(),
+		db,
+		nil,
+		true,
+		appOpts,
+		[]wasmkeeper.Option{},
+		baseAppOptions...,
+	)
+	return &AppWrapper{app}
 }
