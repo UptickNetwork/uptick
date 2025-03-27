@@ -10,10 +10,11 @@ import (
 	nfttypes "github.com/UptickNetwork/uptick/x/collection/types"
 	erc20types "github.com/UptickNetwork/uptick/x/erc20/types"
 	cw721types "github.com/UptickNetwork/wasm-nft-convert/types"
+	ibcnfttransfertypes "github.com/bianjieai/nft-transfer/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	authzkeeper "github.com/cosmos/cosmos-sdk/x/authz/keeper"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
-	consensusparamtypes "github.com/cosmos/cosmos-sdk/x/consensus/types"
+	consensustypes "github.com/cosmos/cosmos-sdk/x/consensus/types"
 	crisistypes "github.com/cosmos/cosmos-sdk/x/crisis/types"
 	distrtypes "github.com/cosmos/cosmos-sdk/x/distribution/types"
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
@@ -21,16 +22,15 @@ import (
 	paramstypes "github.com/cosmos/cosmos-sdk/x/params/types"
 	slashingtypes "github.com/cosmos/cosmos-sdk/x/slashing/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
+	ibchookstypes "github.com/cosmos/ibc-apps/modules/ibc-hooks/v8/types"
 	capabilitytypes "github.com/cosmos/ibc-go/modules/capability/types"
-
+	ibcwasmtypes "github.com/cosmos/ibc-go/modules/light-clients/08-wasm/types"
+	icacontrollertypes "github.com/cosmos/ibc-go/v8/modules/apps/27-interchain-accounts/controller/types"
 	icahosttypes "github.com/cosmos/ibc-go/v8/modules/apps/27-interchain-accounts/host/types"
 	ibctransfertypes "github.com/cosmos/ibc-go/v8/modules/apps/transfer/types"
 	ibcexported "github.com/cosmos/ibc-go/v8/modules/core/exported"
-
 	evmtypes "github.com/evmos/ethermint/x/evm/types"
 	feemarkettypes "github.com/evmos/ethermint/x/feemarket/types"
-
-	ibcnfttransfertypes "github.com/bianjieai/nft-transfer/types"
 )
 
 func (appKeepers *AppKeepers) genStoreKeys() {
@@ -44,16 +44,20 @@ func (appKeepers *AppKeepers) genStoreKeys() {
 		minttypes.StoreKey,
 		distrtypes.StoreKey,
 		slashingtypes.StoreKey,
+		crisistypes.StoreKey,
 		govtypes.StoreKey,
-		feegrant.StoreKey,
 		paramstypes.StoreKey,
 		ibcexported.StoreKey,
 		upgradetypes.StoreKey,
+		consensustypes.StoreKey,
 		evidencetypes.StoreKey,
 		ibctransfertypes.StoreKey,
+		ibcnfttransfertypes.StoreKey,
+		icahosttypes.StoreKey,
 		capabilitytypes.StoreKey,
-
+		feegrant.StoreKey,
 		authzkeeper.StoreKey,
+
 		// ethermint keys
 		evmtypes.StoreKey,
 		feemarkettypes.StoreKey,
@@ -63,12 +67,10 @@ func (appKeepers *AppKeepers) genStoreKeys() {
 		cw721types.StoreKey,
 		nfttypes.StoreKey,
 
-		// nfttypes.StoreKey,
-		ibcnfttransfertypes.StoreKey,
-		icahosttypes.StoreKey,
+		ibcwasmtypes.StoreKey,
+		icacontrollertypes.StoreKey,
 		wasmtypes.StoreKey,
-		consensusparamtypes.StoreKey,
-		crisistypes.StoreKey,
+		ibchookstypes.StoreKey,
 	)
 
 	// Define transient store keys

@@ -8,10 +8,9 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/x/auth/tx"
 	"github.com/cosmos/gogoproto/proto"
-	"google.golang.org/protobuf/reflect/protoreflect"
-
 	enccodec "github.com/evmos/ethermint/encoding/codec"
 	evmtypes "github.com/evmos/ethermint/x/evm/types"
+	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
 // MakeEncodingConfig creates an EncodingConfig for an amino based test configuration.

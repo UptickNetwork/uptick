@@ -1,0 +1,53 @@
+# Protocol Documentation
+{{ range .Files }}
+# {{ .Name }}
+
+{{ .Description }}
+
+{{ range .Messages }}
+## {{ .LongName }}
+{{ .Description }}
+
+{{ if .HasFields }}
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+{{ range .Fields -}}
+| {{ .Name }} | {{ .LongType }} | {{ .Label }} | {{ .Description }} |
+{{ end }}
+{{ end }}
+
+{{ end }}
+
+{{ range .Enums }}
+## {{ .LongName }}
+{{ .Description }}
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+{{ range .Values -}}
+| {{ .Name }} | {{ .Number }} | {{ .Description }} |
+{{ end }}
+
+{{ end }}
+
+{{ range .Extensions }}
+## File-level Extensions
+| Extension | Type | Base | Number | Description |
+| --------- | ---- | ---- | ------ | ----------- |
+{{ range . -}}
+| {{ .Name }} | {{ .LongType }} | {{ .ContainingLongType }} | {{ .Number }} | {{ .Description }} |
+{{ end }}
+{{ end }}
+
+{{ range .Services }}
+## {{ .Name }}
+{{ .Description }}
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+{{ range .Methods -}}
+| {{ .Name }} | {{ .RequestLongType }} | {{ .ResponseLongType }} | {{ .Description }} |
+{{ end }}
+{{ end }}
+
+{{ end }} 

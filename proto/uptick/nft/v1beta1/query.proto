@@ -1,19 +1,18 @@
 syntax = "proto3";
-package cosmos.nft.v1beta1;
+package uptick.nft.v1beta1;
 
 import "cosmos/base/query/v1beta1/pagination.proto";
 import "google/api/annotations.proto";
 import "uptick/nft/v1beta1/nft.proto";
 
-option go_package = "github.com/UptickNetwork/uptick/x/nft";
+option go_package = "github.com/UptickNetwork/uptick/x/nft/types";
 
 // Query defines the gRPC querier service.
 service Query {
   // Balance queries the number of NFTs of a given class owned by the owner,
   // same as balanceOf in ERC721
   rpc Balance(QueryBalanceRequest) returns (QueryBalanceResponse) {
-    option (google.api.http).get =
-        "/cosmos/nft/v1beta1/balance/{owner}/{class_id}";
+    option (google.api.http).get = "/cosmos/nft/v1beta1/balance/{owner}/{class_id}";
   }
 
   // Owner queries the owner of the NFT based on its class and id, same as
@@ -57,7 +56,9 @@ message QueryBalanceRequest {
 }
 
 // QueryBalanceResponse is the response type for the Query/Balance RPC method
-message QueryBalanceResponse { uint64 amount = 1; }
+message QueryBalanceResponse {
+  uint64 amount = 1;
+}
 
 // QueryOwnerRequest is the request type for the Query/Owner RPC method
 message QueryOwnerRequest {
@@ -66,13 +67,19 @@ message QueryOwnerRequest {
 }
 
 // QueryOwnerResponse is the response type for the Query/Owner RPC method
-message QueryOwnerResponse { string owner = 1; }
+message QueryOwnerResponse {
+  string owner = 1;
+}
 
 // QuerySupplyRequest is the request type for the Query/Supply RPC method
-message QuerySupplyRequest { string class_id = 1; }
+message QuerySupplyRequest {
+  string class_id = 1;
+}
 
 // QuerySupplyResponse is the response type for the Query/Supply RPC method
-message QuerySupplyResponse { uint64 amount = 1; }
+message QuerySupplyResponse {
+  uint64 amount = 1;
+}
 
 // QueryNFTstRequest is the request type for the Query/NFTs RPC method
 message QueryNFTsRequest {
@@ -83,7 +90,7 @@ message QueryNFTsRequest {
 
 // QueryNFTsResponse is the response type for the Query/NFTs RPC methods
 message QueryNFTsResponse {
-  repeated cosmos.nft.v1beta1.NFT nfts = 1;
+  repeated uptick.nft.v1beta1.NFT nfts = 1;
   cosmos.base.query.v1beta1.PageResponse pagination = 2;
 }
 
@@ -94,13 +101,19 @@ message QueryNFTRequest {
 }
 
 // QueryNFTResponse is the response type for the Query/NFT RPC method
-message QueryNFTResponse { cosmos.nft.v1beta1.NFT nft = 1; }
+message QueryNFTResponse {
+  uptick.nft.v1beta1.NFT nft = 1;
+}
 
 // QueryClassRequest is the request type for the Query/Class RPC method
-message QueryClassRequest { string class_id = 1; }
+message QueryClassRequest {
+  string class_id = 1;
+}
 
 // QueryClassResponse is the response type for the Query/Class RPC method
-message QueryClassResponse { cosmos.nft.v1beta1.Class class = 1; }
+message QueryClassResponse {
+  uptick.nft.v1beta1.Class class = 1;
+}
 
 // QueryClassesRequest is the request type for the Query/Classes RPC method
 message QueryClassesRequest {
@@ -110,6 +123,6 @@ message QueryClassesRequest {
 
 // QueryClassesResponse is the response type for the Query/Classes RPC method
 message QueryClassesResponse {
-  repeated cosmos.nft.v1beta1.Class classes = 1;
+  repeated uptick.nft.v1beta1.Class classes = 1;
   cosmos.base.query.v1beta1.PageResponse pagination = 2;
 }
