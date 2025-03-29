@@ -3,12 +3,13 @@ package app
 import (
 	"context"
 	"fmt"
-	sigtypes "github.com/cosmos/cosmos-sdk/types/tx/signing"
-	txmodule "github.com/cosmos/cosmos-sdk/x/auth/tx/config"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
+
+	sigtypes "github.com/cosmos/cosmos-sdk/types/tx/signing"
+	txmodule "github.com/cosmos/cosmos-sdk/x/auth/tx/config"
 
 	"cosmossdk.io/client/v2/autocli"
 	"cosmossdk.io/core/appmodule"
@@ -395,6 +396,8 @@ func NewUptick(
 				},
 			),
 		})
+	app.BasicModuleManager.RegisterLegacyAminoCodec(legacyAmino)
+	app.BasicModuleManager.RegisterInterfaces(interfaceRegistry)
 
 	enabledSignModes := append([]sigtypes.SignMode(nil), authtx.DefaultSignModes...)
 	enabledSignModes = append(enabledSignModes, sigtypes.SignMode_SIGN_MODE_TEXTUAL)
@@ -537,7 +540,6 @@ func NewUptick(
 	app.configurator = module.NewConfigurator(app.codec, app.MsgServiceRouter(), app.GRPCQueryRouter())
 
 	app.mm.RegisterInvariants(app.CrisisKeeper)
-
 	app.RegisterServices()
 
 	// create the simulation manager and define the order of the modules for deterministic simulations
@@ -625,12 +627,6 @@ func NewUptick(
 		app.SetStoreLoader(upgradetypes.UpgradeStoreLoader(upgradeInfo.Height, &storeUpgrades))
 	}
 
-	if loadLatest {
-		if err := app.LoadLatestVersion(); err != nil {
-			tmos.Exit(err.Error())
-		}
-	}
-
 	// Finally start the tpsCounter.
 	app.tpsCounter = newTPSCounter(logger)
 	go func() {
@@ -638,6 +634,21 @@ func NewUptick(
 		// so we have to ignore this error explicitly.
 		_ = app.tpsCounter.start(context.Background())
 	}()
+
+	if loadLatest {
+		if err := app.LoadLatestVersion(); err != nil {
+			tmos.Exit(err.Error())
+		}
+
+		// Initialize and seal the capability keeper so all persistent capabilities
+		// are loaded in-memory and prevent any further modules from creating scoped
+		// sub-keepers.
+		// This must be done during creation of baseapp rather than in InitChain so
+		// that in-memory capabilities get regenerated on app restart.
+		// Note that since this reads from the store, we can only perform it when
+		// `loadLatest` is set to true.
+		app.CapabilityKeeper.Seal()
+	}
 
 	return app
 }
