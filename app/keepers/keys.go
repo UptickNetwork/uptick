@@ -14,7 +14,6 @@ import (
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	authzkeeper "github.com/cosmos/cosmos-sdk/x/authz/keeper"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
-	consensustypes "github.com/cosmos/cosmos-sdk/x/consensus/types"
 	crisistypes "github.com/cosmos/cosmos-sdk/x/crisis/types"
 	distrtypes "github.com/cosmos/cosmos-sdk/x/distribution/types"
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
@@ -22,9 +21,7 @@ import (
 	paramstypes "github.com/cosmos/cosmos-sdk/x/params/types"
 	slashingtypes "github.com/cosmos/cosmos-sdk/x/slashing/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
-	ibchookstypes "github.com/cosmos/ibc-apps/modules/ibc-hooks/v8/types"
 	capabilitytypes "github.com/cosmos/ibc-go/modules/capability/types"
-	ibcwasmtypes "github.com/cosmos/ibc-go/modules/light-clients/08-wasm/types"
 	icacontrollertypes "github.com/cosmos/ibc-go/v8/modules/apps/27-interchain-accounts/controller/types"
 	icahosttypes "github.com/cosmos/ibc-go/v8/modules/apps/27-interchain-accounts/host/types"
 	ibctransfertypes "github.com/cosmos/ibc-go/v8/modules/apps/transfer/types"
@@ -49,7 +46,7 @@ func (appKeepers *AppKeepers) genStoreKeys() {
 		paramstypes.StoreKey,
 		ibcexported.StoreKey,
 		upgradetypes.StoreKey,
-		consensustypes.StoreKey,
+		//consensustypes.StoreKey,
 		evidencetypes.StoreKey,
 		ibctransfertypes.StoreKey,
 		ibcnfttransfertypes.StoreKey,
@@ -67,10 +64,11 @@ func (appKeepers *AppKeepers) genStoreKeys() {
 		cw721types.StoreKey,
 		nfttypes.StoreKey,
 
-		ibcwasmtypes.StoreKey,
+		//ibcwasmtypes.StoreKey,
 		icacontrollertypes.StoreKey,
 		wasmtypes.StoreKey,
-		ibchookstypes.StoreKey,
+		//ibchookstypes.StoreKey,
+		//packetforwardtypes.StoreKey,
 	)
 
 	// Define transient store keys

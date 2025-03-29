@@ -1,13 +1,14 @@
-package main
+package cmd
 
 import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	"github.com/cosmos/cosmos-sdk/version"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/cosmos/cosmos-sdk/version"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -104,7 +105,6 @@ func InitCmd(mbm module.BasicManager, defaultNodeHome string) *cobra.Command {
 				}
 			}
 
-			// Get initial height
 			initHeight, _ := cmd.Flags().GetInt64(flags.FlagInitHeight)
 			if initHeight < 1 {
 				initHeight = 1
@@ -149,7 +149,7 @@ func InitCmd(mbm module.BasicManager, defaultNodeHome string) *cobra.Command {
 			appGenesis.AppState = appState
 			appGenesis.InitialHeight = initHeight
 			if err := genutil.ExportGenesisFile(appGenesis, genFile); err != nil {
-				return errors.Wrap(err, "Failed to export gensis file")
+				return errors.Wrap(err, "Failed to export genesis file")
 			}
 
 			toPrint := newPrintInfo(config.Moniker, chainID, nodeID, "", appState)
@@ -163,6 +163,7 @@ func InitCmd(mbm module.BasicManager, defaultNodeHome string) *cobra.Command {
 	cmd.Flags().BoolP(genutilcli.FlagOverwrite, "o", false, "overwrite the genesis.json file")
 	cmd.Flags().Bool(genutilcli.FlagRecover, false, "provide seed phrase to recover existing key instead of creating")
 	cmd.Flags().String(flags.FlagChainID, "", "genesis file chain-id, if left blank will be randomly created")
+	cmd.Flags().Int64(flags.FlagInitHeight, 1, "initial block height")
 
 	return cmd
 }
