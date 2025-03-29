@@ -14,6 +14,7 @@ import (
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	authzkeeper "github.com/cosmos/cosmos-sdk/x/authz/keeper"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
+	consensustypes "github.com/cosmos/cosmos-sdk/x/consensus/types"
 	crisistypes "github.com/cosmos/cosmos-sdk/x/crisis/types"
 	distrtypes "github.com/cosmos/cosmos-sdk/x/distribution/types"
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
@@ -46,7 +47,7 @@ func (appKeepers *AppKeepers) genStoreKeys() {
 		paramstypes.StoreKey,
 		ibcexported.StoreKey,
 		upgradetypes.StoreKey,
-		//consensustypes.StoreKey,
+		consensustypes.StoreKey,
 		evidencetypes.StoreKey,
 		ibctransfertypes.StoreKey,
 		ibcnfttransfertypes.StoreKey,

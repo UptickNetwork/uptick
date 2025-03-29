@@ -117,22 +117,18 @@ type AppKeepers struct {
 	IBCTransferKeeper ibctransferkeeper.Keeper
 	FeeGrantKeeper    feegrantkeeper.Keeper
 
-	//ICAControllerKeeper icacontrollerkeeper.Keeper
 	ICAHostKeeper icahostkeeper.Keeper
 
 	// make scoped keepers public for test purposes
-	ScopedIBCKeeper      capabilitykeeper.ScopedKeeper
-	ScopedTransferKeeper capabilitykeeper.ScopedKeeper
-	//scopedIBCMockKeeper       capabilitykeeper.ScopedKeeper
+	ScopedIBCKeeper           capabilitykeeper.ScopedKeeper
+	ScopedTransferKeeper      capabilitykeeper.ScopedKeeper
 	ScopedNFTTransferKeeper   capabilitykeeper.ScopedKeeper
 	ScopedICAHostKeeper       capabilitykeeper.ScopedKeeper
 	ScopedICAControllerKeeper capabilitykeeper.ScopedKeeper
 
-	IBCNFTTransferKeeper ibcnfttransferkeeper.Keeper
-
+	IBCNFTTransferKeeper  ibcnfttransferkeeper.Keeper
 	ConsensusParamsKeeper consensusparamkeeper.Keeper
-
-	AuthzKeeper authzkeeper.Keeper
+	AuthzKeeper           authzkeeper.Keeper
 	// Ethermint keepers
 	EvmKeeper       *evmkeeper.Keeper
 	FeeMarketKeeper feemarketkeeper.Keeper
@@ -141,23 +137,12 @@ type AppKeepers struct {
 	Erc721Keeper erc721keeper.Keeper
 	Cw721Keeper  cw721keeper.Keeper
 	EVMIBCKeeper evmIBCKeepr.Keeper
-
-	NFTKeeper nftkeeper.Keeper
-
-	//Add ICS721 for nft ibc transfer
-	// ICS721Keeper ibcnfttransferkeeper.Keeper
-
+	NFTKeeper    nftkeeper.Keeper
 	// this line is used by starport scaffolding # stargate/app/keeperDeclaration
-	WasmKeeper       wasmkeeper.Keeper
-	WasmConfig       wasmtypes.WasmConfig
-	ContractKeeper   *wasmkeeper.PermissionedKeeper
-	ScopedWasmKeeper capabilitykeeper.ScopedKeeper
-	//IBCWasmKeeper       ibcwasmkeeper.Keeper
-	//IBCHooksKeeper      ibchookskeeper.Keeper
-	//Ics20WasmHooks      *ibchooks.WasmHooks
-	//HooksICS4Wrapper    ibchooks.ICS4Middleware
-	//PacketForwardKeeper *packetforwardkeeper.Keeper
-
+	WasmKeeper           wasmkeeper.Keeper
+	WasmConfig           wasmtypes.WasmConfig
+	ContractKeeper       *wasmkeeper.PermissionedKeeper
+	ScopedWasmKeeper     capabilitykeeper.ScopedKeeper
 	TransferModule       transfer.AppModule
 	ICAModule            ica.AppModule
 	IBCNftTransferModule nfttransfer.AppModule
@@ -221,7 +206,7 @@ func New(
 	appKeepers.ScopedWasmKeeper = appKeepers.CapabilityKeeper.ScopeToModule(wasmtypes.ModuleName)
 	appKeepers.ScopedICAControllerKeeper = appKeepers.CapabilityKeeper.ScopeToModule(icacontrollertypes.SubModuleName)
 
-	appKeepers.CapabilityKeeper.Seal()
+	//appKeepers.CapabilityKeeper.Seal()
 
 	// use custom Ethermint account for contracts
 	appKeepers.AccountKeeper = authkeeper.NewAccountKeeper(
@@ -412,7 +397,6 @@ func New(
 
 	ibcRouter := porttypes.NewRouter().
 		AddRoute(icahosttypes.SubModuleName, icaHostIBCModule).
-		//AddRoute(icacontrollertypes.SubModuleName, icaControllerStack).
 		AddRoute(ibctransfertypes.ModuleName, transferStack).
 		AddRoute(ibcnfttransfertypes.ModuleName, ercTransferStack).
 		AddRoute(wasmtypes.ModuleName, wasm.NewIBCHandler(appKeepers.WasmKeeper, appKeepers.IBCKeeper.ChannelKeeper, appKeepers.IBCKeeper.ChannelKeeper))
