@@ -3,21 +3,9 @@ package network
 import (
 	"bufio"
 	"context"
-	"cosmossdk.io/log"
-	"cosmossdk.io/math"
 	"encoding/json"
 	"errors"
 	"fmt"
-	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
-	tmrand "github.com/cometbft/cometbft/libs/rand"
-	"github.com/cometbft/cometbft/node"
-	tmclient "github.com/cometbft/cometbft/rpc/client"
-	dbm "github.com/cosmos/cosmos-db"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/spf13/cobra"
-	"golang.org/x/sync/errgroup"
-	"google.golang.org/grpc"
 	"net/http"
 	"net/url"
 	"os"
@@ -28,6 +16,21 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"cosmossdk.io/log"
+	"cosmossdk.io/math"
+	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
+	tmrand "github.com/cometbft/cometbft/libs/rand"
+	"github.com/cometbft/cometbft/node"
+	tmclient "github.com/cometbft/cometbft/rpc/client"
+	dbm "github.com/cosmos/cosmos-db"
+	"github.com/cosmos/cosmos-sdk/client/flags"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+	"golang.org/x/sync/errgroup"
+	"google.golang.org/grpc"
 
 	"github.com/cosmos/cosmos-sdk/baseapp"
 	"github.com/cosmos/cosmos-sdk/client"
@@ -101,22 +104,30 @@ type Config struct {
 // DefaultConfig returns a sane default configuration suitable for nearly all
 // testing requirements.
 func DefaultConfig() Config {
-	//encCfg := encoding.MakeConfig()
-	//initAppOptions := viper.New()
-	//app := app.NewUptick(log.NewNopLogger(), dbm.NewMemDB(), nil, true, initAppOptions, []wasmkeeper.Option{})
-	tempApp := setup(nil)
-	encCfg := tempApp.EncodingConfig()
+	chainID := fmt.Sprintf("uptick_%d-1", tmrand.Int63n(9999999999999)+1)
+	initAppOptions := viper.New()
+	tempDir := tempDir()
+	initAppOptions.Set(flags.FlagHome, tempDir)
+	app := app.NewUptick(
+		log.NewNopLogger(),
+		dbm.NewMemDB(),
+		nil,
+		true,
+		initAppOptions,
+		[]wasmkeeper.Option{},
+		baseapp.SetChainID(chainID),
+	)
 
 	return Config{
-		Codec:             encCfg.Codec,
-		TxConfig:          encCfg.TxConfig,
-		LegacyAmino:       encCfg.LegacyAmino,
-		InterfaceRegistry: encCfg.InterfaceRegistry,
+		Codec:             app.AppCodec(),
+		TxConfig:          app.GetTxConfig(),
+		LegacyAmino:       app.LegacyAmino(),
+		InterfaceRegistry: app.InterfaceRegistry(),
 		AccountRetriever:  authtypes.AccountRetriever{},
-		AppConstructor:    NewAppConstructor(),
-		GenesisState:      tempApp.DefaultGenesis(),
+		AppConstructor:    NewAppConstructor(chainID),
+		GenesisState:      app.DefaultGenesis(),
 		TimeoutCommit:     2 * time.Second,
-		ChainID:           fmt.Sprintf("uptick_%d-1", tmrand.Int63n(9999999999999)+1),
+		ChainID:           chainID,
 		NumValidators:     4,
 		BondDenom:         ethermint.AttoPhoton,
 		MinGasPrices:      fmt.Sprintf("0.000006%s", ethermint.AttoPhoton),
@@ -132,17 +143,21 @@ func DefaultConfig() Config {
 }
 
 // NewAppConstructor returns a new Uptick AppConstructor
-func NewAppConstructor() AppConstructor {
+func NewAppConstructor(chainID string) AppConstructor {
 
 	return func(val Validator) servertypes.Application {
 
+		initAppOptions := viper.New()
+		tempDir := tempDir()
+		initAppOptions.Set(flags.FlagHome, tempDir)
+
 		return app.NewUptick(
 			val.Ctx.Logger, dbm.NewMemDB(), nil, true,
-			nil,
-			nil,
-
+			initAppOptions,
+			[]wasmkeeper.Option{},
 			baseapp.SetPruning(pruningtypes.NewPruningOptionsFromString(val.AppConfig.Pruning)),
 			baseapp.SetMinGasPrices(val.AppConfig.MinGasPrices),
+			baseapp.SetChainID(chainID),
 		)
 	}
 }
@@ -226,6 +241,7 @@ func NewCLILogger(cmd *cobra.Command) CLILogger {
 
 // New creates a new Network for integration tests or in-process testnets run via the CLI
 func New(l Logger, baseDir string, cfg Config) (*Network, error) {
+	initPortPool()
 	// only one caller/test can create and use a network at a time
 	l.Log("acquiring test network lock")
 	lock.Lock()
@@ -275,6 +291,7 @@ func New(l Logger, baseDir string, cfg Config) (*Network, error) {
 		tmCfg.RPC.ListenAddress = ""
 		appCfg.GRPC.Enable = false
 		appCfg.GRPCWeb.Enable = false
+		appCfg.JSONRPC.Enable = false
 		apiListenAddr := ""
 		if i == 0 {
 			if cfg.APIAddress != "" {
@@ -616,6 +633,9 @@ func (n *Network) WaitForNextBlock() error {
 // in a defer.
 func (n *Network) Cleanup() {
 	defer func() {
+		for len(portPool) > 0 {
+			<-portPool
+		}
 		lock.Unlock()
 		n.Logger.Log("released test network lock")
 	}()
@@ -739,22 +759,26 @@ func (ao EmptyAppOptions) Get(o string) interface{} {
 	return nil
 }
 
-func setup(
-	appOpts servertypes.AppOptions,
-	baseAppOptions ...func(*baseapp.BaseApp),
-) *AppWrapper {
-	db := dbm.NewMemDB()
-	if appOpts == nil {
-		appOpts = EmptyAppOptions{}
+var tempDir = func() string {
+	dir, err := os.MkdirTemp("", ".uptickd")
+	if err != nil {
+		panic(fmt.Sprintf("failed creating temp directory: %s", err.Error()))
 	}
-	app := app.NewUptick(
-		log.NewNopLogger(),
-		db,
-		nil,
-		true,
-		appOpts,
-		[]wasmkeeper.Option{},
-		baseAppOptions...,
-	)
-	return &AppWrapper{app}
+	defer os.RemoveAll(dir)
+
+	return dir
+}
+
+// initPortPool 初始化端口池，填充可用的端口号
+func initPortPool() {
+	// 清空现有的端口池
+	for len(portPool) > 0 {
+		<-portPool
+	}
+
+	// 填充新的端口号 (从26656开始，这是Tendermint的默认端口范围)
+	for i := 0; i < 200; i++ {
+		port := fmt.Sprintf("%d", 26656+i)
+		portPool <- port
+	}
 }

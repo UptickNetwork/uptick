@@ -1,7 +1,8 @@
-package main_test
+package cmd_test
 
 import (
 	"fmt"
+	uptickd "github.com/UptickNetwork/uptick/cmd/uptickd/cmd"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -11,7 +12,6 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/genutil/client/cli"
 
 	"github.com/UptickNetwork/uptick/app"
-	uptickd "github.com/UptickNetwork/uptick/cmd/uptickd"
 )
 
 func TestInitCmd(t *testing.T) {
