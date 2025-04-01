@@ -260,10 +260,15 @@ github.com/Shopify/toxiproxy v2.1.4+incompatible/go.mod h1:OXgGpZ6Cli1/URJOF1DMx
 github.com/StackExchange/wmi v0.0.0-20180116203802-5d049714c4a6/go.mod h1:3eOhrUMpNV+6aFIbp5/iudMxNCF27Vw2OZgy4xEx0Fg=
 github.com/StackExchange/wmi v1.2.1 h1:VIkavFPXSjcnS+O8yTq7NI32k0R5Aj+v39y29VYDOSA=
 github.com/StackExchange/wmi v1.2.1/go.mod h1:rcmrprowKIVzvc+NUiLncP2uuArMWLCbu9SBzvHz7e8=
+github.com/UptickNetwork/evm-nft-convert v1.0.9 h1:r0mXgTu228yskKmnXrvcKyLrSBAIQFBnjl093OGaVp4=
+github.com/UptickNetwork/evm-nft-convert v1.0.9/go.mod h1:HFOb009HLI4mJVJQWh3nGbMaQRRMNIxly8tlcHn8pLA=
+github.com/UptickNetwork/evm-nft-convert v1.0.10-0.20250401130700-2226eea49739 h1:50MIlJ7yllP0OXEr30zLDfFrwzeTMYjfJoF25mJEVwQ=
+github.com/UptickNetwork/evm-nft-convert v1.0.10-0.20250401130700-2226eea49739/go.mod h1:jil2zKfw7rrQ/6rigJlQnyI3oAs4D4ubiDkDeXf/LXs=
 github.com/UptickNetwork/evm-nft-convert v1.0.11 h1:0TaTHbWCweR6vmTSOdUSBKs88h41BVx1lgJS7GNAow0=
 github.com/UptickNetwork/evm-nft-convert v1.0.11/go.mod h1:WsPbfdwug2F8WdzpAR1s+Sq1FuwFcLJXVpdZJKpbjr8=
-github.com/UptickNetwork/wasm-nft-convert v1.0.7 h1:pqD6TL1YeOV/e+UbwE6ktMLJiEnVuB8ilAq/LBvz6nY=
-github.com/UptickNetwork/wasm-nft-convert v1.0.7/go.mod h1:LGOObOHWhnt+lZcisP7fDhIPdf6RIsChXZZTUpfmhXU=
+github.com/UptickNetwork/wasm-nft-convert v1.0.6/go.mod h1:dWyfg2/pb2mh0MJ3Bx7K0o29QizogylJfD6A5y+b470=
+github.com/UptickNetwork/wasm-nft-convert v1.0.7-0.20250401130654-0e31deb2b54b h1:GBfylNoyJfLOHqbZjyw3mJY1XiWQDbP4z4BOJTPkdKc=
+github.com/UptickNetwork/wasm-nft-convert v1.0.7-0.20250401130654-0e31deb2b54b/go.mod h1:de7n31NsZAzmXx9zBE1Kj0LdO2uxxqtv+hxr9yYUwiA=
 github.com/VictoriaMetrics/fastcache v1.6.0 h1:C/3Oi3EiBCqufydp1neRZkqcwmEiuRT9c3fqvvgKm5o=
 github.com/VictoriaMetrics/fastcache v1.6.0/go.mod h1:0qHz5QP0GMX4pfmMA/zt5RgfNuXJrTP0zS7DqpHGGTw=
 github.com/VividCortex/gohistogram v1.0.0 h1:6+hBz+qvs0JOrrNhhmR7lFxo5sINxBCGXrdtl/UvroE=
@@ -477,6 +482,8 @@ github.com/cosmos/ibc-go/modules/light-clients/08-wasm v0.4.2-0.20240730185033-c
 github.com/cosmos/ibc-go/modules/light-clients/08-wasm v0.4.2-0.20240730185033-ccd4dc278e72/go.mod h1:yiulzyQAZ+Ci802z/kVQqTA3lGiSJOmDpTq7kZxOUNE=
 github.com/cosmos/ibc-go/v8 v8.6.1 h1:35JQ9HttSDNLjy4J/ZxmmFbzw0cRVjoCRKkc3ngDZms=
 github.com/cosmos/ibc-go/v8 v8.6.1/go.mod h1:Hd3kDFNOhQ/EnYt8qb84/r78tA/lOYC3IkLMbpurs3I=
+github.com/cosmos/ibc-go/v8 v8.7.0 h1:HqhVOkO8bDpClXE81DFQgFjroQcTvtpm0tCS7SQVKVY=
+github.com/cosmos/ibc-go/v8 v8.7.0/go.mod h1:G2z+Q6ZQSMcyHI2+BVcJdvfOupb09M2h/tgpXOEdY6k=
 github.com/cosmos/ics23/go v0.11.0 h1:jk5skjT0TqX5e5QJbEnwXIS2yI2vnmLOgpQPeM5RtnU=
 github.com/cosmos/ics23/go v0.11.0/go.mod h1:A8OjxPE67hHST4Icw94hOxxFEJMBG031xIGF/JHNIY0=
 github.com/cosmos/keyring v1.2.0 h1:8C1lBP9xhImmIabyXW4c3vFjjLiBdGCmfLUfeZlV1Yo=

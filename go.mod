@@ -6,8 +6,6 @@ require (
 	cosmossdk.io/simapp v0.0.0-20240118210941-3897926e722e
 	cosmossdk.io/tools/rosetta v0.2.1 // indirect
 	github.com/CosmWasm/wasmd v0.53.2
-	github.com/UptickNetwork/evm-nft-convert v1.0.11
-	github.com/UptickNetwork/wasm-nft-convert v1.0.7
 	github.com/bianjieai/nft-transfer v1.1.3-ibc-v8.6.1
 	github.com/btcsuite/btcd v0.24.2 // indirect
 	github.com/btcsuite/btcd/btcutil v1.1.6 // indirect
@@ -15,9 +13,7 @@ require (
 	github.com/cometbft/cometbft-db v0.14.1 // indirect
 	github.com/cosmos/cosmos-sdk v0.50.11
 	github.com/cosmos/go-bip39 v1.0.0
-	github.com/cosmos/ibc-apps/middleware/packet-forward-middleware/v8 v8.1.0
-	github.com/cosmos/ibc-apps/modules/ibc-hooks/v8 v8.0.0-00010101000000-000000000000
-	github.com/cosmos/ibc-go/v8 v8.6.1
+	github.com/cosmos/ibc-go/v8 v8.7.0
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/ethereum/go-ethereum v1.10.26
 	github.com/evmos/ethermint v0.22.0
@@ -85,6 +81,8 @@ require (
 	github.com/CosmWasm/wasmvm/v2 v2.1.4 // indirect
 	github.com/DataDog/datadog-go v3.2.0+incompatible // indirect
 	github.com/DataDog/zstd v1.5.5 // indirect
+	github.com/UptickNetwork/evm-nft-convert v1.0.10-0.20250401130700-2226eea49739 // indirect
+	github.com/UptickNetwork/wasm-nft-convert v1.0.7-0.20250401130654-0e31deb2b54b // indirect
 	github.com/bits-and-blooms/bitset v1.8.0 // indirect
 	github.com/bytedance/sonic v1.12.3 // indirect
 	github.com/bytedance/sonic/loader v0.2.0 // indirect
