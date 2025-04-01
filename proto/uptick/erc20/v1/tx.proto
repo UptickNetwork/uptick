@@ -3,6 +3,7 @@ package uptick.erc20.v1;
 
 import "amino/amino.proto";
 import "cosmos/base/v1beta1/coin.proto";
+import "cosmos/msg/v1/msg.proto";
 import "gogoproto/gogo.proto";
 import "google/api/annotations.proto";
 import "ibc/core/client/v1/client.proto";
@@ -11,6 +12,7 @@ option go_package = "github.com/UptickNetwork/uptick/x/erc20/types";
 
 // Msg defines the erc20 Msg service.
 service Msg {
+  option (cosmos.msg.v1.service) = true;
   // ConvertCoin mints a ERC20 representation of the SDK Coin denom that is
   // registered on the token mapping.
   rpc ConvertCoin(MsgConvertCoin) returns (MsgConvertCoinResponse) {
@@ -30,6 +32,7 @@ service Msg {
 
 // MsgConvertCoin defines a Msg to convert a Cosmos Coin to a ERC20 token
 message MsgConvertCoin {
+  option (cosmos.msg.v1.signer) = "sender";
   // Cosmos coin which denomination is registered on erc20 bridge.
   // The coin amount defines the total ERC20 tokens to convert.
   cosmos.base.v1beta1.Coin coin = 1 [(gogoproto.nullable) = false];
@@ -44,6 +47,7 @@ message MsgConvertCoinResponse {}
 
 // MsgConvertERC20 defines a Msg to convert an ERC20 token to a Cosmos SDK coin.
 message MsgConvertERC20 {
+  option (cosmos.msg.v1.signer) = "sender";
   // ERC20 token contract address registered on erc20 bridge
   string contract_address = 1;
   // amount of ERC20 tokens to mint
@@ -65,6 +69,7 @@ message MsgConvertERC20Response {}
 // It contains information about the token contract, amount, source and destination of the transfer,
 // timeout parameters and optional memo
 message MsgTransferERC20 {
+  option (cosmos.msg.v1.signer) = "evm_sender";
   option (gogoproto.equal) = false;
   option (gogoproto.goproto_getters) = false;
 
