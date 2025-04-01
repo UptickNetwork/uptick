@@ -1,6 +1,7 @@
 syntax = "proto3";
 package uptick.evm_ibc.v1;
 
+import "cosmos/msg/v1/msg.proto";
 import "gogoproto/gogo.proto";
 import "google/api/annotations.proto";
 import "ibc/core/client/v1/client.proto";
@@ -9,6 +10,7 @@ option go_package = "github.com/UptickNetwork/uptick/x/evmIBC/types";
 
 // Msg defines the erc721 Msg service.
 service Msg {
+  option (cosmos.msg.v1.service) = true;
   // TransferERC721 defines a method to transfer ERC721 tokens between chains via IBC
   rpc TransferERC721(MsgTransferERC721) returns (MsgTransferERC721Response) {
     option (google.api.http).get = "/uptick/erc721/v1/tx/ibc-transfer-erc721";
@@ -19,6 +21,7 @@ service Msg {
 // It contains information about the token contract, token IDs, source and destination of the transfer,
 // timeout parameters and optional memo
 message MsgTransferERC721 {
+  option (cosmos.msg.v1.signer) = "evm_sender";
   option (gogoproto.equal) = false;
   option (gogoproto.goproto_getters) = false;
 
