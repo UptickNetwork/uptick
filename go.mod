@@ -81,7 +81,7 @@ require (
 	github.com/CosmWasm/wasmvm/v2 v2.1.4 // indirect
 	github.com/DataDog/datadog-go v3.2.0+incompatible // indirect
 	github.com/DataDog/zstd v1.5.5 // indirect
-	github.com/UptickNetwork/evm-nft-convert v1.0.10-0.20250401130700-2226eea49739 // indirect
+	github.com/UptickNetwork/evm-nft-convert v1.0.10-0.20250402103203-90f8aaa75b21 // indirect
 	github.com/UptickNetwork/wasm-nft-convert v1.0.7-0.20250401130654-0e31deb2b54b // indirect
 	github.com/bits-and-blooms/bitset v1.8.0 // indirect
 	github.com/bytedance/sonic v1.12.3 // indirect
