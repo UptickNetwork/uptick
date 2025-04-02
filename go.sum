@@ -264,6 +264,8 @@ github.com/UptickNetwork/evm-nft-convert v1.0.9 h1:r0mXgTu228yskKmnXrvcKyLrSBAIQ
 github.com/UptickNetwork/evm-nft-convert v1.0.9/go.mod h1:HFOb009HLI4mJVJQWh3nGbMaQRRMNIxly8tlcHn8pLA=
 github.com/UptickNetwork/evm-nft-convert v1.0.10-0.20250401130700-2226eea49739 h1:50MIlJ7yllP0OXEr30zLDfFrwzeTMYjfJoF25mJEVwQ=
 github.com/UptickNetwork/evm-nft-convert v1.0.10-0.20250401130700-2226eea49739/go.mod h1:jil2zKfw7rrQ/6rigJlQnyI3oAs4D4ubiDkDeXf/LXs=
+github.com/UptickNetwork/evm-nft-convert v1.0.10-0.20250402103203-90f8aaa75b21 h1:0nPM72r40YKGKQVqyQfe/VZX11oY2XECCv6qw4PCvOA=
+github.com/UptickNetwork/evm-nft-convert v1.0.10-0.20250402103203-90f8aaa75b21/go.mod h1:jil2zKfw7rrQ/6rigJlQnyI3oAs4D4ubiDkDeXf/LXs=
 github.com/UptickNetwork/evm-nft-convert v1.0.11 h1:0TaTHbWCweR6vmTSOdUSBKs88h41BVx1lgJS7GNAow0=
 github.com/UptickNetwork/evm-nft-convert v1.0.11/go.mod h1:WsPbfdwug2F8WdzpAR1s+Sq1FuwFcLJXVpdZJKpbjr8=
 github.com/UptickNetwork/wasm-nft-convert v1.0.6/go.mod h1:dWyfg2/pb2mh0MJ3Bx7K0o29QizogylJfD6A5y+b470=
