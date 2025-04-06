@@ -2,11 +2,9 @@ package main
 
 import (
 	"fmt"
-	"github.com/UptickNetwork/uptick/cmd/uptickd/cmd"
-	"os"
-
 	svrcmd "github.com/cosmos/cosmos-sdk/server/cmd"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	"os"
 
 	"github.com/UptickNetwork/uptick/app"
 	cmdcfg "github.com/UptickNetwork/uptick/cmd/config"
@@ -14,9 +12,9 @@ import (
 
 func main() {
 	setupConfig()
-	cmdcfg.RegisterDenoms()
+	//cmdcfg.RegisterDenoms()
 
-	rootCmd := cmd.NewRootCmd()
+	rootCmd, _ := NewRootCmd()
 
 	if err := svrcmd.Execute(rootCmd, "uptickd", app.DefaultNodeHome); err != nil {
 		fmt.Fprintln(rootCmd.OutOrStderr(), err)

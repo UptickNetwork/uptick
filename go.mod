@@ -4,7 +4,8 @@ go 1.23.5
 
 require (
 	cosmossdk.io/simapp v0.0.0-20240118210941-3897926e722e
-	cosmossdk.io/tools/rosetta v0.2.1 // indirect
+	cosmossdk.io/tools/confix v0.1.2
+	cosmossdk.io/tools/rosetta v0.2.1
 	github.com/CosmWasm/wasmd v0.53.2
 	github.com/bianjieai/nft-transfer v1.1.3-ibc-v8.6.1
 	github.com/btcsuite/btcd v0.24.2 // indirect
@@ -29,7 +30,7 @@ require (
 	github.com/rs/cors v1.11.1 // indirect
 	github.com/spf13/cast v1.7.1
 	github.com/spf13/cobra v1.8.1
-	github.com/spf13/viper v1.19.0 // indirect
+	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.10.0
 	github.com/tidwall/gjson v1.17.0
 	github.com/tidwall/sjson v1.2.5 // indirect
@@ -47,7 +48,7 @@ require (
 
 require (
 	cosmossdk.io/api v0.7.6 // indirect
-	cosmossdk.io/client/v2 v2.0.0-beta.7 // indirect
+	cosmossdk.io/client/v2 v2.0.0-beta.7
 	cosmossdk.io/collections v0.4.0 // indirect
 	cosmossdk.io/core v0.11.1
 	cosmossdk.io/depinject v1.1.0 // indirect
@@ -67,9 +68,10 @@ require (
 
 require (
 	cosmossdk.io/x/nft v0.1.1
+	github.com/UptickNetwork/evm-nft-convert v1.0.10-0.20250406011849-1f850bab427a
+	github.com/UptickNetwork/wasm-nft-convert v1.0.7-0.20250401130654-0e31deb2b54b
 	github.com/cosmos/cosmos-db v1.1.1
 	github.com/cosmos/ibc-go/modules/capability v1.0.1
-	github.com/cosmos/ibc-go/modules/light-clients/08-wasm v0.4.2-0.20240730185033-ccd4dc278e72
 )
 
 require (
@@ -81,8 +83,6 @@ require (
 	github.com/CosmWasm/wasmvm/v2 v2.1.4 // indirect
 	github.com/DataDog/datadog-go v3.2.0+incompatible // indirect
 	github.com/DataDog/zstd v1.5.5 // indirect
-	github.com/UptickNetwork/evm-nft-convert v1.0.10-0.20250402103203-90f8aaa75b21 // indirect
-	github.com/UptickNetwork/wasm-nft-convert v1.0.7-0.20250401130654-0e31deb2b54b // indirect
 	github.com/bits-and-blooms/bitset v1.8.0 // indirect
 	github.com/bytedance/sonic v1.12.3 // indirect
 	github.com/bytedance/sonic/loader v0.2.0 // indirect
@@ -98,6 +98,8 @@ require (
 	github.com/cosmos/gogogateway v1.2.0 // indirect
 	github.com/cosmos/ics23/go v0.11.0 // indirect
 	github.com/cosmos/rosetta-sdk-go v0.10.0 // indirect
+	github.com/creachadair/atomicfile v0.3.1 // indirect
+	github.com/creachadair/tomledit v0.0.24 // indirect
 	github.com/deckarep/golang-set v1.8.0 // indirect
 	github.com/dgraph-io/badger/v4 v4.2.0 // indirect
 	github.com/distribution/reference v0.5.0 // indirect
@@ -119,7 +121,6 @@ require (
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/hashicorp/yamux v0.1.1 // indirect
 	github.com/huandu/skiplist v1.2.0 // indirect
-	github.com/iancoleman/orderedmap v0.3.0 // indirect
 	github.com/iancoleman/strcase v0.3.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.4 // indirect
 	github.com/kr/pretty v0.3.1 // indirect

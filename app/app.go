@@ -3,10 +3,13 @@ package app
 import (
 	"context"
 	"fmt"
+	"github.com/cosmos/cosmos-sdk/version"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
+
+	"cosmossdk.io/math"
 
 	sigtypes "github.com/cosmos/cosmos-sdk/types/tx/signing"
 	txmodule "github.com/cosmos/cosmos-sdk/x/auth/tx/config"
@@ -39,8 +42,6 @@ import (
 	erc20types "github.com/UptickNetwork/uptick/x/erc20/types"
 
 	"cosmossdk.io/x/nft"
-	"github.com/cosmos/cosmos-sdk/x/consensus"
-
 	"github.com/cosmos/cosmos-sdk/baseapp"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/flags"
@@ -56,7 +57,6 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/mempool"
 	"github.com/cosmos/cosmos-sdk/types/module"
-	"github.com/cosmos/cosmos-sdk/version"
 	"github.com/cosmos/cosmos-sdk/x/auth"
 	authsims "github.com/cosmos/cosmos-sdk/x/auth/simulation"
 	authtx "github.com/cosmos/cosmos-sdk/x/auth/tx"
@@ -65,6 +65,7 @@ import (
 	authzmodule "github.com/cosmos/cosmos-sdk/x/authz/module"
 	"github.com/cosmos/cosmos-sdk/x/bank"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
+	"github.com/cosmos/cosmos-sdk/x/consensus"
 	"github.com/cosmos/cosmos-sdk/x/crisis"
 	distr "github.com/cosmos/cosmos-sdk/x/distribution"
 	distrtypes "github.com/cosmos/cosmos-sdk/x/distribution/types"
@@ -103,7 +104,6 @@ import (
 
 	"cosmossdk.io/log"
 	"cosmossdk.io/simapp"
-	storetypes "cosmossdk.io/store/types"
 	"cosmossdk.io/x/evidence"
 	feegrantmodule "cosmossdk.io/x/feegrant/module"
 	"cosmossdk.io/x/upgrade"
@@ -122,10 +122,7 @@ import (
 	cw721types "github.com/UptickNetwork/wasm-nft-convert/types"
 	nfttransfer "github.com/bianjieai/nft-transfer"
 
-	//ibcwasm "github.com/cosmos/ibc-go/modules/light-clients/08-wasm"
 	ica "github.com/cosmos/ibc-go/v8/modules/apps/27-interchain-accounts"
-	icacontrollertypes "github.com/cosmos/ibc-go/v8/modules/apps/27-interchain-accounts/controller/types"
-	icahosttypes "github.com/cosmos/ibc-go/v8/modules/apps/27-interchain-accounts/host/types"
 	icatypes "github.com/cosmos/ibc-go/v8/modules/apps/27-interchain-accounts/types"
 )
 
@@ -157,6 +154,15 @@ const (
 var (
 	// DefaultNodeHome default home directories for the application daemon
 	DefaultNodeHome string
+
+	feemarketParams = feemarkettypes.Params{
+		NoBaseFee:                false,
+		BaseFeeChangeDenominator: 8,
+		ElasticityMultiplier:     4,
+		BaseFee:                  math.NewInt(10000000000),
+		MinGasPrice:              math.LegacyNewDecFromInt(math.NewInt(10000000000)),
+		MinGasMultiplier:         math.LegacyNewDecWithPrec(5, 1),
+	}
 
 	// ModuleBasics defines the module BasicManager is in charge of setting up basic,
 	// non-dependant module elements, such as codec registration
@@ -365,6 +371,8 @@ func NewUptick(
 		// nftmodule.NewAppModule(appCodec, app.NF	app.mm.SetOrderBeginBlockers(TKeeper, app.AccountKeeper, app.BankKeeper),
 		// ibc modules
 		ibc.NewAppModule(app.IBCKeeper),
+		ica.NewAppModule(nil, &app.ICAHostKeeper),
+		ibctm.NewAppModule(),
 		app.TransferModule,
 		app.IBCNftTransferModule,
 		app.ICAModule,
@@ -533,8 +541,46 @@ func NewUptick(
 		ibcnfttransfertypes.ModuleName,
 		icatypes.ModuleName,
 		wasmtypes.ModuleName,
-		consensusparamtypes.ModuleName,
 		cw721types.ModuleName,
+		consensusparamtypes.ModuleName,
+	)
+
+	app.mm.SetOrderExportGenesis(
+		// SDK modules
+		capabilitytypes.ModuleName,
+		authtypes.ModuleName,
+		banktypes.ModuleName,
+		distrtypes.ModuleName,
+		// NOTE: staking requires the claiming hook
+		stakingtypes.ModuleName,
+		slashingtypes.ModuleName,
+		govtypes.ModuleName,
+		minttypes.ModuleName,
+		ibcexported.ModuleName,
+		// Ethermint modules
+		// evm module denomination is used by the feesplit module, in AnteHandle
+		evmtypes.ModuleName,
+		// NOTE: feemarket module needs to be initialized before genutil module:
+		// gentx transactions use MinGasPriceDecorator.AnteHandle
+		feemarkettypes.ModuleName,
+		genutiltypes.ModuleName,
+		evidencetypes.ModuleName,
+		ibctransfertypes.ModuleName,
+		authz.ModuleName,
+		feegrant.ModuleName,
+		paramstypes.ModuleName,
+		upgradetypes.ModuleName,
+		vestingtypes.ModuleName,
+
+		erc20types.ModuleName,
+		erc721types.ModuleName,
+		crisistypes.ModuleName,
+		nfttypes.ModuleName,
+		ibcnfttransfertypes.ModuleName,
+		icatypes.ModuleName,
+		wasmtypes.ModuleName,
+		cw721types.ModuleName,
+		consensusparamtypes.ModuleName,
 	)
 	// Create and set the configurator
 	app.configurator = module.NewConfigurator(app.codec, app.MsgServiceRouter(), app.GRPCQueryRouter())
@@ -598,13 +644,6 @@ func NewUptick(
 	app.SetEndBlocker(app.EndBlocker)
 	app.RegisterUpgradePlans()
 
-	// Register all module services
-	//for _, m := range app.mm.Modules {
-	//	if mod, ok := m.(module.HasServices); ok {
-	//		mod.RegisterServices(app.configurator)
-	//	}
-	//}
-
 	if manager := app.SnapshotManager(); manager != nil {
 		err := manager.RegisterExtensions(
 			wasmkeeper.NewWasmSnapshotter(app.CommitMultiStore(), &app.WasmKeeper),
@@ -614,17 +653,13 @@ func NewUptick(
 		}
 	}
 
-	upgradeInfo, err := app.UpgradeKeeper.ReadUpgradeInfoFromDisk()
-	if err != nil {
-		panic(err)
-	}
-
-	if upgradeInfo.Name == "multiverse" && !app.UpgradeKeeper.IsSkipHeight(upgradeInfo.Height) {
-		storeUpgrades := storetypes.StoreUpgrades{
-			Added: []string{icacontrollertypes.StoreKey, icahosttypes.StoreKey},
+	if loadLatest {
+		if err := app.LoadLatestVersion(); err != nil {
+			tmos.Exit(err.Error())
 		}
 
-		app.SetStoreLoader(upgradetypes.UpgradeStoreLoader(upgradeInfo.Height, &storeUpgrades))
+		// Initialize and seal the capability keeper
+		app.CapabilityKeeper.Seal()
 	}
 
 	// Finally start the tpsCounter.
@@ -634,21 +669,6 @@ func NewUptick(
 		// so we have to ignore this error explicitly.
 		_ = app.tpsCounter.start(context.Background())
 	}()
-
-	if loadLatest {
-		if err := app.LoadLatestVersion(); err != nil {
-			tmos.Exit(err.Error())
-		}
-
-		// Initialize and seal the capability keeper so all persistent capabilities
-		// are loaded in-memory and prevent any further modules from creating scoped
-		// sub-keepers.
-		// This must be done during creation of baseapp rather than in InitChain so
-		// that in-memory capabilities get regenerated on app restart.
-		// Note that since this reads from the store, we can only perform it when
-		// `loadLatest` is set to true.
-		app.CapabilityKeeper.Seal()
-	}
 
 	return app
 }
@@ -665,20 +685,6 @@ func (app *Uptick) BeginBlocker(ctx sdk.Context) (sdk.BeginBlock, error) {
 func (app *Uptick) EndBlocker(ctx sdk.Context) (sdk.EndBlock, error) {
 	return app.mm.EndBlock(ctx)
 }
-
-//func (app *Uptick) DeliverTx(req abci.RequestDeliverTx) (res abci.ResponseDeliverTx) {
-//	defer func() {
-//		// TODO: Record the count along with the code and or reason so as to display
-//		// in the transactions per second live dashboards.
-//		if res.IsErr() {
-//			app.tpsCounter.incrementFailure()
-//		} else {
-//			app.tpsCounter.incrementSuccess()
-//		}
-//	}()
-//
-//	return app.BaseApp.DeliverTx(req)
-//}
 
 // InitChainer application update at chain initialization
 func (app *Uptick) InitChainer(ctx sdk.Context, req *abci.RequestInitChain) (*abci.ResponseInitChain, error) {
