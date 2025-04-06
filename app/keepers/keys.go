@@ -52,6 +52,7 @@ func (appKeepers *AppKeepers) genStoreKeys() {
 		ibctransfertypes.StoreKey,
 		ibcnfttransfertypes.StoreKey,
 		icahosttypes.StoreKey,
+		icacontrollertypes.StoreKey,
 		capabilitytypes.StoreKey,
 		feegrant.StoreKey,
 		authzkeeper.StoreKey,
@@ -66,7 +67,6 @@ func (appKeepers *AppKeepers) genStoreKeys() {
 		nfttypes.StoreKey,
 
 		//ibcwasmtypes.StoreKey,
-		icacontrollertypes.StoreKey,
 		wasmtypes.StoreKey,
 		//ibchookstypes.StoreKey,
 		//packetforwardtypes.StoreKey,

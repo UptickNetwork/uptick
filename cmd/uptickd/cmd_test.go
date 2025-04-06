@@ -1,8 +1,8 @@
-package cmd_test
+package main_test
 
 import (
 	"fmt"
-	uptickd "github.com/UptickNetwork/uptick/cmd/uptickd/cmd"
+	uptickd "github.com/UptickNetwork/uptick/cmd/uptickd"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -15,7 +15,7 @@ import (
 )
 
 func TestInitCmd(t *testing.T) {
-	rootCmd := uptickd.NewRootCmd()
+	rootCmd, _ := uptickd.NewRootCmd()
 	rootCmd.SetArgs([]string{
 		"init",        // Test the init cmd
 		"uptick-test", // Moniker

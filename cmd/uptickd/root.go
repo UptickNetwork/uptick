@@ -1,37 +1,39 @@
-package cmd
+package main
 
 import (
 	"cosmossdk.io/client/v2/autocli"
+	"cosmossdk.io/log"
 	rosettaCmd "cosmossdk.io/tools/rosetta/cmd"
 	"errors"
 	"fmt"
+	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
 	"github.com/UptickNetwork/uptick/app/params"
+	uptickparams "github.com/UptickNetwork/uptick/app/params"
 	cmdcfg "github.com/UptickNetwork/uptick/cmd/config"
+	tmcfg "github.com/cometbft/cometbft/config"
+	tmcli "github.com/cometbft/cometbft/libs/cli"
+	dbm "github.com/cosmos/cosmos-db"
 	"github.com/cosmos/cosmos-sdk/client/pruning"
 	"github.com/cosmos/cosmos-sdk/client/rpc"
 	"github.com/cosmos/cosmos-sdk/client/snapshot"
 	addresscodec "github.com/cosmos/cosmos-sdk/codec/address"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
+	"github.com/cosmos/cosmos-sdk/types/tx/signing"
 	authcmd "github.com/cosmos/cosmos-sdk/x/auth/client/cli"
+	"github.com/cosmos/cosmos-sdk/x/auth/tx"
+	txmodule "github.com/cosmos/cosmos-sdk/x/auth/tx/config"
+	genutiltypes "github.com/cosmos/cosmos-sdk/x/genutil/types"
 	srvflags "github.com/evmos/ethermint/server/flags"
-	"github.com/spf13/viper"
-
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/cast"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"io"
 	"os"
 
-	"cosmossdk.io/log"
-	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
-	tmcfg "github.com/cometbft/cometbft/config"
-	tmcli "github.com/cometbft/cometbft/libs/cli"
-	dbm "github.com/cosmos/cosmos-db"
-	"github.com/prometheus/client_golang/prometheus"
-
+	confixcmd "cosmossdk.io/tools/confix/cmd"
 	"github.com/UptickNetwork/uptick/app"
-	//"github.com/UptickNetwork/uptick/app/params"
-
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/config"
 	"github.com/cosmos/cosmos-sdk/client/flags"
@@ -54,7 +56,7 @@ const (
 
 // NewRootCmd creates a new root command for uptickd. It is called once in the
 // main function.
-func NewRootCmd() *cobra.Command {
+func NewRootCmd() (*cobra.Command, params.EncodingConfig) {
 
 	initAppOptions := viper.New()
 	tempDir := tempDir()
@@ -77,7 +79,7 @@ func NewRootCmd() *cobra.Command {
 		WithLegacyAmino(encodingConfig.LegacyAmino).
 		WithInput(os.Stdin).
 		WithAccountRetriever(authtypes.AccountRetriever{}).
-		WithBroadcastMode(flags.BroadcastSync).
+		WithBroadcastMode(flags.FlagBroadcastMode).
 		WithHomeDir(app.DefaultNodeHome).
 		WithKeyringOptions(hd.EthSecp256k1Option()).
 		WithViper(EnvPrefix)
@@ -87,9 +89,10 @@ func NewRootCmd() *cobra.Command {
 		Short: "Uptick Daemon",
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
 			// set the default command outputs
-			//cmd.SetOut(cmd.OutOrStdout())
-			//cmd.SetErr(cmd.ErrOrStderr())
+			cmd.SetOut(cmd.OutOrStdout())
+			cmd.SetErr(cmd.ErrOrStderr())
 
+			initClientCtx = initClientCtx.WithCmdContext(cmd.Context())
 			initClientCtx, err := client.ReadPersistentCommandFlags(initClientCtx, cmd.Flags())
 			if err != nil {
 				return err
@@ -98,6 +101,26 @@ func NewRootCmd() *cobra.Command {
 			initClientCtx, err = config.ReadFromClientConfig(initClientCtx)
 			if err != nil {
 				return err
+			}
+
+			// This needs to go after ReadFromClientConfig, as that function
+			// sets the RPC client needed for SIGN_MODE_TEXTUAL. This sign mode
+			// is only available if the client is online.
+			if !initClientCtx.Offline {
+				enabledSignModes := append(tx.DefaultSignModes, signing.SignMode_SIGN_MODE_TEXTUAL) //nolint:gocritic
+				txConfigOpts := tx.ConfigOptions{
+					EnabledSignModes:           enabledSignModes,
+					TextualCoinMetadataQueryFn: txmodule.NewGRPCCoinMetadataQueryFn(initClientCtx),
+				}
+				txConfig, err := tx.NewTxConfigWithOptions(
+					initClientCtx.Codec,
+					txConfigOpts,
+				)
+				if err != nil {
+					return err
+				}
+
+				initClientCtx = initClientCtx.WithTxConfig(txConfig)
 			}
 
 			if err := client.SetCmdClientContextHandler(initClientCtx, cmd); err != nil {
@@ -112,22 +135,29 @@ func NewRootCmd() *cobra.Command {
 		SilenceUsage: true,
 	}
 
-	//cfg := sdk.GetConfig()
-	//cfg.Seal()
-	ac := appCreator{}
+	cfg := sdk.GetConfig()
+	cfg.Seal()
+	ac := appCreator{encodingConfig}
 	rootCmd.AddCommand(
-		//ethermintclient.ValidateChainID(
-		//	InitCmd(app.ModuleBasics, app.DefaultNodeHome),
-		//),
-		genutilcli.InitCmd(app.ModuleBasics, app.DefaultNodeHome),
-		//genutilcli.CollectGenTxsCmd(banktypes.GenesisBalancesIterator{}, app.DefaultNodeHome, genutiltypes.DefaultMessageValidator, authcodec.NewBech32Codec(sdk.GetConfig().GetBech32ValidatorAddrPrefix())),
-		//genutilcli.MigrateGenesisCmd(),
-		//genutilcli.GenTxCmd(app.ModuleBasics, encodingConfig.TxConfig, banktypes.GenesisBalancesIterator{}, app.DefaultNodeHome, authcodec.NewBech32Codec(sdk.GetConfig().GetBech32ValidatorAddrPrefix())),
-		genutilcli.ValidateGenesisCmd(app.ModuleBasics),
+		ethermintclient.ValidateChainID(
+			InitCmd(tempApplication.BasicModuleManager, app.DefaultNodeHome),
+		),
+
+		genutilcli.CollectGenTxsCmd(banktypes.GenesisBalancesIterator{},
+			app.DefaultNodeHome,
+			genutiltypes.DefaultMessageValidator,
+			tempApplication.GetTxConfig().SigningContext().ValidatorAddressCodec(),
+		),
+
+		MigrateGenesisCmd(),
+		genutilcli.GenTxCmd(tempApplication.BasicModuleManager, tempApplication.GetTxConfig(), banktypes.GenesisBalancesIterator{}, app.DefaultNodeHome, tempApplication.GetTxConfig().SigningContext().ValidatorAddressCodec()),
+		genutilcli.ValidateGenesisCmd(tempApplication.BasicModuleManager),
 		AddGenesisAccountCmd(app.DefaultNodeHome),
 		tmcli.NewCompletionCmd(rootCmd, true),
 		NewTestnetCmd(tempApplication.BasicModuleManager, banktypes.GenesisBalancesIterator{}),
 		AddIbcCaclulateCommand(debug.Cmd()),
+		debug.Cmd(),
+		confixcmd.ConfigCommand(),
 		pruning.Cmd(ac.newApp, app.DefaultNodeHome),
 		snapshot.Cmd(ac.newApp),
 	)
@@ -148,10 +178,10 @@ func NewRootCmd() *cobra.Command {
 		ethermintclient.KeyCommands(app.DefaultNodeHome),
 	)
 
-	//autoCliOpts := enrichAutoCliOpts(tempApplication.AutoCliOpts(), initClientCtx)
-	//if err := autoCliOpts.EnhanceRootCommand(rootCmd); err != nil {
-	//	panic(err)
-	//}
+	autoCliOpts := enrichAutoCliOpts(tempApplication.AutoCliOpts(), initClientCtx)
+	if err := autoCliOpts.EnhanceRootCommand(rootCmd); err != nil {
+		panic(err)
+	}
 
 	rootCmd, err := srvflags.AddTxFlags(rootCmd)
 	if err != nil {
@@ -161,7 +191,7 @@ func NewRootCmd() *cobra.Command {
 	// add rosetta
 	rootCmd.AddCommand(rosettaCmd.RosettaCommand(encodingConfig.InterfaceRegistry, encodingConfig.Codec))
 
-	return rootCmd
+	return rootCmd, encodingConfig
 }
 
 func enrichAutoCliOpts(autoCliOpts autocli.AppOptions, clientCtx client.Context) autocli.AppOptions {
@@ -209,6 +239,10 @@ func queryCommand() *cobra.Command {
 		server.QueryBlockResultsCmd(),
 		authcmd.QueryTxsByEventsCmd(),
 		authcmd.QueryTxCmd(),
+
+		//authcmd.GetAccountCmd(),
+		//rpc.BlockCommand(),
+		//rpc.QueryEventForTxCmd(),
 	)
 
 	app.ModuleBasics.AddQueryCommands(cmd)
@@ -255,11 +289,12 @@ func initAppConfig() (string, interface{}) {
 
 	srvCfg.StateSync.SnapshotInterval = 1500
 	srvCfg.StateSync.SnapshotKeepRecent = 2
-
+	srvCfg.IAVLDisableFastNode = false
 	return customAppTemplate, srvCfg
 }
 
 type appCreator struct {
+	encCfg uptickparams.EncodingConfig
 }
 
 // newApp is an appCreator

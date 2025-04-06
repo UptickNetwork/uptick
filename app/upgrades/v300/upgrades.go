@@ -1,4 +1,4 @@
-package v30
+package v300
 
 import (
 	"context"
@@ -13,6 +13,8 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
 	paramstypes "github.com/cosmos/cosmos-sdk/x/params/types"
+	icacontrollertypes "github.com/cosmos/ibc-go/v8/modules/apps/27-interchain-accounts/controller/types"
+	icahosttypes "github.com/cosmos/ibc-go/v8/modules/apps/27-interchain-accounts/host/types"
 	feemarkettypes "github.com/evmos/ethermint/x/feemarket/types"
 )
 
@@ -29,9 +31,11 @@ var (
 
 // Upgrade defines a struct containing necessary fields that a SoftwareUpgradeProposal
 var Upgrade = upgrades.Upgrade{
-	UpgradeName:               "v0.3.0",
+	UpgradeName:               "v3.0.0",
 	UpgradeHandlerConstructor: upgradeHandlerConstructor,
-	StoreUpgrades:             &storetypes.StoreUpgrades{},
+	StoreUpgrades: &storetypes.StoreUpgrades{
+		Added: []string{icacontrollertypes.StoreKey, icahosttypes.StoreKey},
+	},
 }
 
 func upgradeHandlerConstructor(

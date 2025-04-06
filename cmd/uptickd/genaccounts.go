@@ -1,9 +1,12 @@
-package cmd
+package main
 
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
+
+	"github.com/spf13/cobra"
 
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/flags"
@@ -11,13 +14,21 @@ import (
 	"github.com/cosmos/cosmos-sdk/server"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
-	vestingtypes "github.com/cosmos/cosmos-sdk/x/auth/vesting/types"
+	authvesting "github.com/cosmos/cosmos-sdk/x/auth/vesting/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	"github.com/cosmos/cosmos-sdk/x/genutil"
 	genutiltypes "github.com/cosmos/cosmos-sdk/x/genutil/types"
-	"github.com/spf13/cobra"
 
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/evmos/ethermint/crypto/hd"
 	ethermint "github.com/evmos/ethermint/types"
+	evmtypes "github.com/evmos/ethermint/x/evm/types"
+)
+
+const (
+	flagVestingStart = "vesting-start-time"
+	flagVestingEnd   = "vesting-end-time"
+	flagVestingAmt   = "vesting-amount"
 )
 
 // AddGenesisAccountCmd returns add-genesis-account cobra Command.
@@ -39,26 +50,38 @@ contain valid denominations. Accounts may optionally be supplied with vesting pa
 
 			config.SetRoot(clientCtx.HomeDir)
 
+			var kr keyring.Keyring
 			addr, err := sdk.AccAddressFromBech32(args[0])
 			if err != nil {
 				inBuf := bufio.NewReader(cmd.InOrStdin())
-				keyringBackend, err := cmd.Flags().GetString(flags.FlagKeyringBackend)
-				if err != nil {
-					return err
+				keyringBackend, _ := cmd.Flags().GetString(flags.FlagKeyringBackend)
+
+				if keyringBackend != "" && clientCtx.Keyring == nil {
+					var err error
+					kr, err = keyring.New(
+						sdk.KeyringServiceName(),
+						keyringBackend,
+						clientCtx.HomeDir,
+						inBuf,
+						clientCtx.Codec,
+						hd.EthSecp256k1Option(),
+					)
+					if err != nil {
+						return err
+					}
+				} else {
+					kr = clientCtx.Keyring
 				}
 
-				// attempt to lookup address from Keybase if no address was provided
-				kb, err := keyring.New(sdk.KeyringServiceName(), keyringBackend, clientCtx.HomeDir, inBuf, clientCtx.Codec)
+				info, err := kr.Key(args[0])
 				if err != nil {
-					return err
+					return fmt.Errorf("failed to get address from Keyring: %w", err)
 				}
 
-				info, err := kb.Key(args[0])
+				addr, err = info.GetAddress()
 				if err != nil {
-					return fmt.Errorf("failed to get address from Keybase: %w", err)
+					return fmt.Errorf("failed to get address from Keyring: %w", err)
 				}
-
-				addr, _ = info.GetAddress()
 			}
 
 			coins, err := sdk.ParseCoinsNormalized(args[1])
@@ -66,15 +89,15 @@ contain valid denominations. Accounts may optionally be supplied with vesting pa
 				return fmt.Errorf("failed to parse coins: %w", err)
 			}
 
-			vestingStart, err := cmd.Flags().GetInt64("vesting-start-time")
+			vestingStart, err := cmd.Flags().GetInt64(flagVestingStart)
 			if err != nil {
 				return err
 			}
-			vestingEnd, err := cmd.Flags().GetInt64("vesting-end-time")
+			vestingEnd, err := cmd.Flags().GetInt64(flagVestingEnd)
 			if err != nil {
 				return err
 			}
-			vestingAmtStr, err := cmd.Flags().GetString("vesting-amount")
+			vestingAmtStr, err := cmd.Flags().GetString(flagVestingAmt)
 			if err != nil {
 				return err
 			}
@@ -91,19 +114,29 @@ contain valid denominations. Accounts may optionally be supplied with vesting pa
 			baseAccount := authtypes.NewBaseAccount(addr, nil, 0, 0)
 
 			if !vestingAmt.IsZero() {
-				baseVestingAccount, err := vestingtypes.NewBaseVestingAccount(baseAccount, vestingAmt.Sort(), vestingEnd)
+				baseVestingAccount, err := authvesting.NewBaseVestingAccount(baseAccount, vestingAmt.Sort(), vestingEnd)
 				if err != nil {
 					return err
 				}
+				if (balances.Coins.IsZero() && !baseVestingAccount.OriginalVesting.IsZero()) ||
+					baseVestingAccount.OriginalVesting.IsAnyGT(balances.Coins) {
+					return errors.New("vesting amount cannot be greater than total amount")
+				}
 
-				if (vestingStart != 0) && (vestingStart <= vestingEnd) {
-					genAccount = vestingtypes.NewContinuousVestingAccountRaw(baseVestingAccount, vestingStart)
-				} else {
-					genAccount = vestingtypes.NewDelayedVestingAccountRaw(baseVestingAccount)
+				switch {
+				case vestingStart != 0 && vestingEnd != 0:
+					genAccount = authvesting.NewContinuousVestingAccountRaw(baseVestingAccount, vestingStart)
+
+				case vestingEnd != 0:
+					genAccount = authvesting.NewDelayedVestingAccountRaw(baseVestingAccount)
+
+				default:
+					return errors.New("invalid vesting parameters; must supply start and end time or end time")
 				}
 			} else {
 				genAccount = &ethermint.EthAccount{
 					BaseAccount: baseAccount,
+					CodeHash:    common.BytesToHash(evmtypes.EmptyCodeHash).Hex(),
 				}
 			}
 
@@ -170,9 +203,9 @@ contain valid denominations. Accounts may optionally be supplied with vesting pa
 
 	cmd.Flags().String(flags.FlagHome, defaultNodeHome, "The application home directory")
 	cmd.Flags().String(flags.FlagKeyringBackend, flags.DefaultKeyringBackend, "Select keyring's backend (os|file|kwallet|pass|test)")
-	cmd.Flags().String("vesting-amount", "", "amount of coins for vesting accounts")
-	cmd.Flags().Int64("vesting-start-time", 0, "schedule start time (unix epoch) for vesting accounts")
-	cmd.Flags().Int64("vesting-end-time", 0, "schedule end time (unix epoch) for vesting accounts")
+	cmd.Flags().String(flagVestingAmt, "", "amount of coins for vesting accounts")
+	cmd.Flags().Int64(flagVestingStart, 0, "schedule start time (unix epoch) for vesting accounts")
+	cmd.Flags().Int64(flagVestingEnd, 0, "schedule end time (unix epoch) for vesting accounts")
 	flags.AddQueryFlagsToCmd(cmd)
 
 	return cmd

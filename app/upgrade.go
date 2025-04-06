@@ -6,12 +6,12 @@ import (
 	upgradetypes "cosmossdk.io/x/upgrade/types"
 
 	"github.com/UptickNetwork/uptick/app/upgrades"
-	v30 "github.com/UptickNetwork/uptick/app/upgrades/v30"
+	v300 "github.com/UptickNetwork/uptick/app/upgrades/v300"
 )
 
 var (
 	router = upgrades.NewUpgradeRouter().
-		Register(v30.Upgrade)
+		Register(v300.Upgrade)
 )
 
 // RegisterUpgradePlans register a handler of upgrade plan
