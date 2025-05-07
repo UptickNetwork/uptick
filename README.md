@@ -64,4 +64,3 @@ Looking for a good place to start contributing? Check out some [`good first issu
 
 For additional instructions, standards and style guides, please refer to the [Contributing](./CONTRIBUTING.md) document.
 
-
