@@ -262,8 +262,6 @@ github.com/Shopify/toxiproxy v2.1.4+incompatible/go.mod h1:OXgGpZ6Cli1/URJOF1DMx
 github.com/StackExchange/wmi v0.0.0-20180116203802-5d049714c4a6/go.mod h1:3eOhrUMpNV+6aFIbp5/iudMxNCF27Vw2OZgy4xEx0Fg=
 github.com/StackExchange/wmi v1.2.1 h1:VIkavFPXSjcnS+O8yTq7NI32k0R5Aj+v39y29VYDOSA=
 github.com/StackExchange/wmi v1.2.1/go.mod h1:rcmrprowKIVzvc+NUiLncP2uuArMWLCbu9SBzvHz7e8=
-github.com/UptickNetwork/evm-nft-convert v1.0.10-0.20250402103203-90f8aaa75b21 h1:0nPM72r40YKGKQVqyQfe/VZX11oY2XECCv6qw4PCvOA=
-github.com/UptickNetwork/evm-nft-convert v1.0.10-0.20250402103203-90f8aaa75b21/go.mod h1:jil2zKfw7rrQ/6rigJlQnyI3oAs4D4ubiDkDeXf/LXs=
 github.com/UptickNetwork/evm-nft-convert v1.0.10-0.20250406011849-1f850bab427a h1:RBbpa0H5eGZEHqgtv+tgXJ8toOcHIo5hotUiaKDMRjk=
 github.com/UptickNetwork/evm-nft-convert v1.0.10-0.20250406011849-1f850bab427a/go.mod h1:jil2zKfw7rrQ/6rigJlQnyI3oAs4D4ubiDkDeXf/LXs=
 github.com/UptickNetwork/wasm-nft-convert v1.0.7-0.20250401130654-0e31deb2b54b h1:GBfylNoyJfLOHqbZjyw3mJY1XiWQDbP4z4BOJTPkdKc=

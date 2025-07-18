@@ -13,8 +13,10 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
 	paramstypes "github.com/cosmos/cosmos-sdk/x/params/types"
+	ica "github.com/cosmos/ibc-go/v8/modules/apps/27-interchain-accounts"
 	icacontrollertypes "github.com/cosmos/ibc-go/v8/modules/apps/27-interchain-accounts/controller/types"
 	icahosttypes "github.com/cosmos/ibc-go/v8/modules/apps/27-interchain-accounts/host/types"
+	icatypes "github.com/cosmos/ibc-go/v8/modules/apps/27-interchain-accounts/types"
 	feemarkettypes "github.com/evmos/ethermint/x/feemarket/types"
 )
 
@@ -72,6 +74,9 @@ func upgradeHandlerConstructor(
 			module.InitGenesis(ctx, ibcnfttransfertypes.ModuleCdc, bz)
 		}
 
+		// initialize ICS27 module
+		initICAModule(ctx, m, vm)
+
 		return box.ModuleManager.RunMigrations(ctx, c, vm)
 	}
 }
@@ -79,4 +84,17 @@ func upgradeHandlerConstructor(
 func generateFeemarketParams(enableHeight int64) feemarkettypes.Params {
 	feemarketParams.EnableHeight = enableHeight
 	return feemarketParams
+}
+
+func initICAModule(ctx sdk.Context, m *module.Manager, fromVM module.VersionMap) {
+	icaModule := m.Modules[icatypes.ModuleName].(ica.AppModule)
+	fromVM[icatypes.ModuleName] = icaModule.ConsensusVersion()
+	controllerParams := icacontrollertypes.Params{}
+	hostParams := icahosttypes.Params{
+		HostEnabled:   true,
+		AllowMessages: []string{"*"},
+	}
+
+	ctx.Logger().Info("start to run ica migrations...")
+	icaModule.InitModule(ctx, controllerParams, hostParams)
 }
