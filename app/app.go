@@ -3,23 +3,23 @@ package app
 import (
 	"context"
 	"fmt"
-	"github.com/cosmos/cosmos-sdk/version"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 
-	"cosmossdk.io/math"
+	"github.com/cosmos/cosmos-sdk/version"
 
-	sigtypes "github.com/cosmos/cosmos-sdk/types/tx/signing"
-	txmodule "github.com/cosmos/cosmos-sdk/x/auth/tx/config"
+	"cosmossdk.io/math"
 
 	"cosmossdk.io/client/v2/autocli"
 	"cosmossdk.io/core/appmodule"
 	evidencetypes "cosmossdk.io/x/evidence/types"
 	"cosmossdk.io/x/feegrant"
 	ibcnfttransfertypes "github.com/bianjieai/nft-transfer/types"
+	sigtypes "github.com/cosmos/cosmos-sdk/types/tx/signing"
 	authcodec "github.com/cosmos/cosmos-sdk/x/auth/codec"
+	txmodule "github.com/cosmos/cosmos-sdk/x/auth/tx/config"
 	vestingtypes "github.com/cosmos/cosmos-sdk/x/auth/vesting/types"
 	"github.com/cosmos/cosmos-sdk/x/authz"
 	consensusparamtypes "github.com/cosmos/cosmos-sdk/x/consensus/types"
@@ -83,7 +83,6 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/staking"
 	stakingkeeper "github.com/cosmos/cosmos-sdk/x/staking/keeper"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
-	"github.com/cosmos/ibc-go/v8/modules/apps/transfer"
 	ibctransfertypes "github.com/cosmos/ibc-go/v8/modules/apps/transfer/types"
 	ibc "github.com/cosmos/ibc-go/v8/modules/core"
 	ibckeeper "github.com/cosmos/ibc-go/v8/modules/core/keeper"
@@ -120,8 +119,6 @@ import (
 	erc721types "github.com/UptickNetwork/evm-nft-convert/types"
 	cw721 "github.com/UptickNetwork/wasm-nft-convert"
 	cw721types "github.com/UptickNetwork/wasm-nft-convert/types"
-	nfttransfer "github.com/bianjieai/nft-transfer"
-
 	ica "github.com/cosmos/ibc-go/v8/modules/apps/27-interchain-accounts"
 	icatypes "github.com/cosmos/ibc-go/v8/modules/apps/27-interchain-accounts/types"
 )
@@ -163,49 +160,6 @@ var (
 		MinGasPrice:              math.LegacyNewDecFromInt(math.NewInt(10000000000)),
 		MinGasMultiplier:         math.LegacyNewDecWithPrec(5, 1),
 	}
-
-	// ModuleBasics defines the module BasicManager is in charge of setting up basic,
-	// non-dependant module elements, such as codec registration
-	// and genesis verification.
-	ModuleBasics = module.NewBasicManager(
-		auth.AppModuleBasic{},
-		genutil.AppModuleBasic{},
-		bank.AppModuleBasic{},
-		capability.AppModuleBasic{},
-		staking.AppModuleBasic{},
-		mint.AppModuleBasic{},
-		distr.AppModuleBasic{},
-		gov.NewAppModuleBasic(
-			[]govclient.ProposalHandler{
-				paramsclient.ProposalHandler,
-				// Uptick proposal types
-				erc20client.RegisterCoinProposalHandler,
-				erc20client.RegisterERC20ProposalHandler,
-				erc20client.ToggleTokenRelayProposalHandler,
-			},
-		),
-		params.AppModuleBasic{},
-		crisis.AppModuleBasic{},
-		slashing.AppModuleBasic{},
-		ibc.AppModuleBasic{},
-		ibctm.AppModuleBasic{},
-		authzmodule.AppModuleBasic{},
-		feegrantmodule.AppModuleBasic{},
-		upgrade.AppModuleBasic{},
-		evidence.AppModuleBasic{},
-		transfer.AppModuleBasic{},
-		vesting.AppModuleBasic{},
-		evm.AppModuleBasic{},
-		feemarket.AppModuleBasic{},
-		erc20.AppModuleBasic{},
-		erc721.AppModuleBasic{},
-		cw721.AppModuleBasic{},
-		nftmodule.AppModuleBasic{},
-		nfttransfer.AppModuleBasic{},
-		wasm.AppModuleBasic{},
-		ica.AppModuleBasic{},
-		consensus.AppModuleBasic{},
-	)
 
 	// module account permissions
 	maccPerms = map[string][]string{
@@ -255,8 +209,8 @@ type Uptick struct {
 	legacyAmino       *codec.LegacyAmino
 
 	// the module manager
-	mm                 *module.Manager
-	BasicModuleManager module.BasicManager
+	mm *module.Manager
+	bm module.BasicManager
 	// simulation manager
 	sm         *module.SimulationManager
 	tpsCounter *tpsCounter
@@ -394,18 +348,21 @@ func NewUptick(
 	// non-dependant module elements, such as codec registration and genesis verification.
 	// By default it is composed of all the module from the module manager.
 	// Additionally, app module basics can be overwritten by passing them as argument.
-	app.BasicModuleManager = module.NewBasicManagerFromManager(
+	app.bm = module.NewBasicManagerFromManager(
 		app.mm,
 		map[string]module.AppModuleBasic{
 			genutiltypes.ModuleName: genutil.NewAppModuleBasic(genutiltypes.DefaultMessageValidator),
 			govtypes.ModuleName: gov.NewAppModuleBasic(
 				[]govclient.ProposalHandler{
 					paramsclient.ProposalHandler,
+					erc20client.RegisterCoinProposalHandler,
+					erc20client.RegisterERC20ProposalHandler,
+					erc20client.ToggleTokenRelayProposalHandler,
 				},
 			),
 		})
-	app.BasicModuleManager.RegisterLegacyAminoCodec(legacyAmino)
-	app.BasicModuleManager.RegisterInterfaces(interfaceRegistry)
+	app.bm.RegisterLegacyAminoCodec(legacyAmino)
+	app.bm.RegisterInterfaces(interfaceRegistry)
 
 	enabledSignModes := append([]sigtypes.SignMode(nil), authtx.DefaultSignModes...)
 	enabledSignModes = append(enabledSignModes, sigtypes.SignMode_SIGN_MODE_TEXTUAL)
@@ -436,7 +393,7 @@ func NewUptick(
 	// NOTE: staking module is required if HistoricalEntries param > 0.
 	// NOTE: capability module's beginblocker must come before any modules using capabilities (e.g. IBC)
 	app.mm.SetOrderBeginBlockers(
-		upgradetypes.ModuleName,
+
 		capabilitytypes.ModuleName,
 		// Note: epochs' begin should be "real" start of epochs, we keep epochs beginblock at the beginning
 		feemarkettypes.ModuleName,
@@ -457,6 +414,7 @@ func NewUptick(
 		authz.ModuleName,
 		feegrant.ModuleName,
 		paramstypes.ModuleName,
+		upgradetypes.ModuleName,
 		vestingtypes.ModuleName,
 		erc20types.ModuleName,
 		erc721types.ModuleName,
@@ -779,7 +737,7 @@ func (app *Uptick) RegisterAPIRoutes(apiSvr *api.Server, apiConfig config.APICon
 	cmtservice.RegisterGRPCGatewayRoutes(clientCtx, apiSvr.GRPCGatewayRouter)
 
 	// Register legacy and grpc-gateway routes for all modules.
-	ModuleBasics.RegisterGRPCGatewayRoutes(clientCtx, apiSvr.GRPCGatewayRouter)
+	app.bm.RegisterGRPCGatewayRoutes(clientCtx, apiSvr.GRPCGatewayRouter)
 
 	// register swagger API from root so that other applications can override easily
 	if apiConfig.Swagger {
@@ -817,11 +775,6 @@ func (app *Uptick) RegisterTendermintService(clientCtx client.Context) {
 func (app *Uptick) RegisterNodeService(clientCtx client.Context, c config.Config) {
 	node.RegisterNodeService(clientCtx, app.GRPCQueryRouter(), c)
 }
-
-//// DefaultGenesis returns a default genesis from the registered AppModuleBasic's.
-//func (app *Uptick) DefaultGenesis() evmostypes.GenesisState {
-//	return app.BasicModuleManager.DefaultGenesis(app.codec)
-//}
 
 // GetBaseApp implements the TestingApp interface.
 func (app *Uptick) GetBaseApp() *baseapp.BaseApp {
@@ -928,7 +881,7 @@ func NoOpMempoolOption() func(*baseapp.BaseApp) {
 
 // DefaultGenesis returns a default genesis from the registered AppModuleBasic's.
 func (app *Uptick) DefaultGenesis() evmostypes.GenesisState {
-	return app.BasicModuleManager.DefaultGenesis(app.AppCodec())
+	return app.bm.DefaultGenesis(app.AppCodec())
 }
 
 // PreBlocker application updates every pre block
@@ -954,4 +907,9 @@ func (app *Uptick) AutoCliOpts() autocli.AppOptions {
 		ValidatorAddressCodec: authcodec.NewBech32Codec(sdk.GetConfig().GetBech32ValidatorAddrPrefix()),
 		ConsensusAddressCodec: authcodec.NewBech32Codec(sdk.GetConfig().GetBech32ConsensusAddrPrefix()),
 	}
+}
+
+// BasicManager return the basic manager
+func (app *Uptick) BasicManager() module.BasicManager {
+	return app.bm
 }

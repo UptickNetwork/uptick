@@ -14,7 +14,7 @@ func main() {
 	setupConfig()
 	//cmdcfg.RegisterDenoms()
 
-	rootCmd, _ := NewRootCmd()
+	rootCmd := NewRootCmd()
 
 	if err := svrcmd.Execute(rootCmd, "uptickd", app.DefaultNodeHome); err != nil {
 		fmt.Fprintln(rootCmd.OutOrStderr(), err)
