@@ -2,10 +2,11 @@ package v300
 
 import (
 	"context"
+	"fmt"
+
 	"cosmossdk.io/math"
 	storetypes "cosmossdk.io/store/types"
 	upgradetypes "cosmossdk.io/x/upgrade/types"
-	"fmt"
 	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
 	"github.com/UptickNetwork/uptick/app/upgrades"
 	ibcnfttransfertypes "github.com/bianjieai/nft-transfer/types"
@@ -36,7 +37,9 @@ var Upgrade = upgrades.Upgrade{
 	UpgradeName:               "v3.0.0",
 	UpgradeHandlerConstructor: upgradeHandlerConstructor,
 	StoreUpgrades: &storetypes.StoreUpgrades{
-		Added: []string{icacontrollertypes.StoreKey, icahosttypes.StoreKey},
+		Added: []string{
+			icacontrollertypes.StoreKey,
+		},
 	},
 }
 
