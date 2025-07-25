@@ -1,4 +1,4 @@
-package v300
+package v030
 
 import (
 	"context"
@@ -34,7 +34,7 @@ var (
 
 // Upgrade defines a struct containing necessary fields that a SoftwareUpgradeProposal
 var Upgrade = upgrades.Upgrade{
-	UpgradeName:               "v3.0.0",
+	UpgradeName:               "v0.3.0",
 	UpgradeHandlerConstructor: upgradeHandlerConstructor,
 	StoreUpgrades: &storetypes.StoreUpgrades{
 		Added: []string{
