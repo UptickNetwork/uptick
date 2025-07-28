@@ -4,7 +4,7 @@ parent:
 -->
 
 <div align="center">
-  <h1> Uptick Netwoark </h1>
+  <h1> Uptick Network </h1>
 </div>
 
 <!-- TODO: add banner -->
