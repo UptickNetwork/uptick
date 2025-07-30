@@ -35,7 +35,12 @@ parent:
   </a>
 </div>
 
-Uptick is an NFT infrastructure network that is a scalable, high-throughput Proof-of-Stake blockchain that is fully compatible and interoperable with Ethereum. It's built using the [Cosmos SDK](https://github.com/cosmos/cosmos-sdk/) which runs on top of [Tendermint Core](https://github.com/cometbft/cometbft) consensus engine.
+Uptick Network is building a business-focused Web3 infrastructure and ecosystem for the real economy. Our open platform supports a full range of NFT and RWA standards, with a strong emphasis on advanced Web3 business protocols and services, along with the multi-chain and cross-chain interoperability.
+
+Through Uptick Infrastructure, Uptick Marketplace, and the Uptick Ecosystem, our mission is to bring fairness, transparency, and economic sovereignty into everyday life, shaping the next generation of the internet.
+
+Uptick Chain is a blockchain network built on the [Cosmos SDK](https://github.com/cosmos/cosmos-sdk/), specifically designed to support NFTs and RWAs. It offers integrated support for the Ethereum Virtual Machine (EVM) and is part of the Inter-Blockchain Communication (IBC) network. Uptick Chain is fully interoperable with both EVM and IBC chains, aligning with the vision of an interconnected 'Internet of Blockchains'.
+<img alt="uptick" src="https://github.com/UptickNetwork/uptick/blob/main/uptick.jpg">
 
 **Note**: Requires [Go 1.17.5+](https://golang.org/dl/)
 
@@ -53,10 +58,16 @@ Or check out the latest [release](https://github.com/UptickNetwork/uptick/releas
 
 To learn how the Uptick works from a high-level perspective, go to the [Introduction](https://docs.uptick.network/intro/overview.html) section from the documentation. You can also check the instructions to [Run a Node](https://docs.uptick.network/quickstart/run_node.html).
 
+[More info about Uptick Network >]( https://www.uptick.network/infohub.html)
 ## Community
 
 The following chat channels and forums are a great spot to ask questions about Uptick:
-
+* [Validator Support >](https://discord.com/channels/781005936260939818/946721096399482951)
+* [ Tech Support>](https://discord.com/channels/781005936260939818/943431354639601715)
+* [Telegram>](https://t.me/uptickproject)
+* [Discord>](https://discord.com/invite/teqX78VZUV)
+* [Medium>](https://uptickproject.medium.com)
+* [X](https://x.com/uptickproject)
 
 ## Contributing
 
