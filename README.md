@@ -43,11 +43,11 @@ Uptick Chain is a blockchain network built on the [Cosmos SDK](https://github.co
 
 <img alt="uptick" src="https://github.com/UptickNetwork/uptick/blob/main/uptick.jpg">
 
-**Note**: Requires [Go 1.17.5+](https://golang.org/dl/)
+**Note**: Requires [Go 1.18+](https://golang.org/dl/)
 
 ## Installation
 
-For prerequisites and detailed build instructions please read the [Installation](https://docs.uptick.network/quickstart/installation.html) instructions. Once the dependencies are installed, run:
+For prerequisites and detailed build instructions please read the [Installation](https://upticknft.gitbook.io/uptick-network-documentation/guides/quickstart/installation) instructions. Once the dependencies are installed, run:
 
 ```bash
 make install
@@ -57,7 +57,7 @@ Or check out the latest [release](https://github.com/UptickNetwork/uptick/releas
 
 ## Quick Start
 
-To learn how the Uptick works from a high-level perspective, go to the [Introduction](https://docs.uptick.network/intro/overview.html) section from the documentation. You can also check the instructions to [Run a Node](https://docs.uptick.network/quickstart/run_node.html).
+To learn how the Uptick works from a high-level perspective, go to the [Introduction](https://upticknft.gitbook.io/uptick-network-documentation/concepts/introduction/overview) section from the documentation. You can also check the instructions to [Run a Node](https://upticknft.gitbook.io/uptick-network-documentation/guides/quickstart/run_node).
 
 [More info about Uptick Network >]( https://www.uptick.network/infohub.html)
 ## Community
@@ -72,7 +72,7 @@ The following chat channels and forums are a great spot to ask questions about U
 
 ## Contributing
 
-Looking for a good place to start contributing? Check out some [`good first issues`](https://github.com/UptickNetwork/uptick/issues?q=is%3Aopen+is%3Aissue+label%3A%22good+first+issue%22).
+Looking for a good place to start contributing? Check out some [`good first issues`](https://github.com/UptickNetwork/uptick/issues).
 
 For additional instructions, standards and style guides, please refer to the [Contributing](./CONTRIBUTING.md) document.
 
