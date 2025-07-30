@@ -64,11 +64,11 @@ To learn how the Uptick works from a high-level perspective, go to the [Introduc
 
 The following chat channels and forums are a great spot to ask questions about Uptick:
 * [Validator Support >](https://discord.com/channels/781005936260939818/946721096399482951)
-* [ Tech Support>](https://discord.com/channels/781005936260939818/943431354639601715)
-* [Telegram>](https://t.me/uptickproject)
-* [Discord>](https://discord.com/invite/teqX78VZUV)
-* [Medium>](https://uptickproject.medium.com)
-* [X](https://x.com/uptickproject)
+* [ Tech Support >](https://discord.com/channels/781005936260939818/943431354639601715)
+* [Telegram >](https://t.me/uptickproject)
+* [Discord >](https://discord.com/invite/teqX78VZUV)
+* [Medium >](https://uptickproject.medium.com)
+* [X >](https://x.com/uptickproject)
 
 ## Contributing
 
