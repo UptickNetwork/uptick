@@ -40,6 +40,7 @@ Uptick Network is building a business-focused Web3 infrastructure and ecosystem 
 Through Uptick Infrastructure, Uptick Marketplace, and the Uptick Ecosystem, our mission is to bring fairness, transparency, and economic sovereignty into everyday life, shaping the next generation of the internet.
 
 Uptick Chain is a blockchain network built on the [Cosmos SDK](https://github.com/cosmos/cosmos-sdk/), specifically designed to support NFTs and RWAs. It offers integrated support for the Ethereum Virtual Machine (EVM) and is part of the Inter-Blockchain Communication (IBC) network. Uptick Chain is fully interoperable with both EVM and IBC chains, aligning with the vision of an interconnected 'Internet of Blockchains'.
+
 <img alt="uptick" src="https://github.com/UptickNetwork/uptick/blob/main/uptick.jpg">
 
 **Note**: Requires [Go 1.17.5+](https://golang.org/dl/)
