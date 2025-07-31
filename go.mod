@@ -275,8 +275,8 @@ replace (
 	cosmossdk.io/tools/rosetta => cosmossdk.io/tools/rosetta v0.2.1-0.20230613133644-0a778132a60f
 	// use cosmos fork of keyring
 	github.com/99designs/keyring => github.com/cosmos/keyring v1.2.0
-	github.com/UptickNetwork/evm-nft-convert => github.com/UptickNetwork/evm-nft-convert v1.0.10-0.20250731061253-8d894e7acbf2
-	github.com/UptickNetwork/wasm-nft-convert => github.com/UptickNetwork/wasm-nft-convert v1.0.7-0.20250731061656-32beb6a675a4
+	github.com/UptickNetwork/evm-nft-convert => github.com/UptickNetwork/evm-nft-convert v1.1.2
+	github.com/UptickNetwork/wasm-nft-convert => github.com/UptickNetwork/wasm-nft-convert v1.1.2
 	github.com/cosmos/ibc-apps/modules/ibc-hooks/v8 => github.com/public-awesome/ibc-apps/modules/ibc-hooks/v8 v8.0.0-20250129183033-079b03c57592
 	github.com/evmos/ethermint => github.com/bianjieai/ethermint v0.23.0-irishub
 	github.com/gin-gonic/gin => github.com/gin-gonic/gin v1.9.1

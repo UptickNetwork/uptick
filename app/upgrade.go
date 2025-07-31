@@ -1,8 +1,6 @@
 package app
 
 import (
-	"fmt"
-
 	upgradetypes "cosmossdk.io/x/upgrade/types"
 
 	"github.com/UptickNetwork/uptick/app/upgrades"
@@ -33,17 +31,41 @@ func (app *Uptick) toolbox() upgrades.Toolbox {
 func (app *Uptick) setupUpgradeStoreLoaders() {
 	upgradeInfo, err := app.UpgradeKeeper.ReadUpgradeInfoFromDisk()
 	if err != nil {
-		panic(fmt.Sprintf("failed to read upgrade info from disk %s", err))
+		// If there's no upgrade info, just return without setting up store loader
+		return
+	}
+
+	// If upgradeInfo has no height, return without setting up store loader
+	if upgradeInfo.Height == 0 {
+		return
 	}
 
 	if app.UpgradeKeeper.IsSkipHeight(upgradeInfo.Height) {
 		return
 	}
 
+	// Check if the upgrade exists in our router
+	upgrade, exists := router.Routers()[upgradeInfo.Name]
+	if !exists {
+		// If upgrade doesn't exist in our router, return without setting up store loader
+		return
+	}
+
+	// Always apply store upgrades for v0.3.0 upgrade to ensure icacontroller store is added
+	if upgradeInfo.Name == "v0.3.0" && upgrade.StoreUpgrades != nil {
+		app.SetStoreLoader(
+			upgradetypes.UpgradeStoreLoader(
+				upgradeInfo.Height,
+				upgrade.StoreUpgrades,
+			),
+		)
+		return
+	}
+
 	app.SetStoreLoader(
 		upgradetypes.UpgradeStoreLoader(
 			upgradeInfo.Height,
-			router.UpgradeInfo(upgradeInfo.Name).StoreUpgrades,
+			upgrade.StoreUpgrades,
 		),
 	)
 }
