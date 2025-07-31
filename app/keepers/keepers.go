@@ -65,6 +65,8 @@ import (
 	icacontrollerkeeper "github.com/cosmos/ibc-go/v8/modules/apps/27-interchain-accounts/controller/keeper"
 	icacontrollertypes "github.com/cosmos/ibc-go/v8/modules/apps/27-interchain-accounts/controller/types"
 
+	"path/filepath"
+
 	icahost "github.com/cosmos/ibc-go/v8/modules/apps/27-interchain-accounts/host"
 	icahostkeeper "github.com/cosmos/ibc-go/v8/modules/apps/27-interchain-accounts/host/keeper"
 	icahosttypes "github.com/cosmos/ibc-go/v8/modules/apps/27-interchain-accounts/host/types"
@@ -85,7 +87,6 @@ import (
 	feemarketkeeper "github.com/evmos/ethermint/x/feemarket/keeper"
 	feemarkettypes "github.com/evmos/ethermint/x/feemarket/types"
 	"github.com/spf13/cast"
-	"path/filepath"
 )
 
 var wasmCapabilities = []string{
@@ -347,6 +348,30 @@ func New(
 		appKeepers.BankKeeper,
 	)
 
+	// Create Ethermint keepers first
+	appKeepers.FeeMarketKeeper = feemarketkeeper.NewKeeper(
+		appCodec,
+		authtypes.NewModuleAddress(govtypes.ModuleName),
+		appKeepers.keys[feemarkettypes.StoreKey],
+		appKeepers.tkeys[feemarkettypes.TransientKey],
+		appKeepers.GetSubspace(feemarkettypes.ModuleName),
+	)
+
+	appKeepers.EvmKeeper = evmkeeper.NewKeeper(
+		appCodec,
+		appKeepers.keys[evmtypes.StoreKey],
+		appKeepers.tkeys[evmtypes.TransientKey],
+		authtypes.NewModuleAddress(govtypes.ModuleName),
+		appKeepers.AccountKeeper,
+		appKeepers.BankKeeper,
+		appKeepers.StakingKeeper,
+		appKeepers.FeeMarketKeeper,
+		nil,
+		geth.NewEVM,
+		cast.ToString(appOpts.Get(srvflags.EVMTracer)),
+		appKeepers.GetSubspace(evmtypes.ModuleName),
+	)
+
 	// Uptick Keeper
 	appKeepers.Erc20Keeper = erc20keeper.NewKeeper(
 		appCodec,
@@ -408,30 +433,7 @@ func New(
 	// Set IBC Router
 	appKeepers.IBCKeeper.SetRouter(ibcRouter)
 
-	// Create Ethermint keepers
-	appKeepers.FeeMarketKeeper = feemarketkeeper.NewKeeper(
-		appCodec,
-		authtypes.NewModuleAddress(govtypes.ModuleName),
-		appKeepers.keys[feemarkettypes.StoreKey],
-		appKeepers.tkeys[feemarkettypes.TransientKey],
-		appKeepers.GetSubspace(feemarkettypes.ModuleName),
-	)
-
-	appKeepers.EvmKeeper = evmkeeper.NewKeeper(
-		appCodec,
-		appKeepers.keys[evmtypes.StoreKey],
-		appKeepers.tkeys[evmtypes.TransientKey],
-		authtypes.NewModuleAddress(govtypes.ModuleName),
-		appKeepers.AccountKeeper,
-		appKeepers.BankKeeper,
-		appKeepers.StakingKeeper,
-		appKeepers.FeeMarketKeeper,
-		nil,
-		geth.NewEVM,
-		cast.ToString(appOpts.Get(srvflags.EVMTracer)),
-		appKeepers.GetSubspace(evmtypes.ModuleName),
-	)
-
+	// Set EVM hooks after Erc20Keeper is initialized
 	appKeepers.EvmKeeper = appKeepers.EvmKeeper.SetHooks(
 		evmkeeper.NewMultiEvmHooks(
 			appKeepers.Erc20Keeper.Hooks(),
