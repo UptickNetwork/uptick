@@ -262,10 +262,10 @@ github.com/Shopify/toxiproxy v2.1.4+incompatible/go.mod h1:OXgGpZ6Cli1/URJOF1DMx
 github.com/StackExchange/wmi v0.0.0-20180116203802-5d049714c4a6/go.mod h1:3eOhrUMpNV+6aFIbp5/iudMxNCF27Vw2OZgy4xEx0Fg=
 github.com/StackExchange/wmi v1.2.1 h1:VIkavFPXSjcnS+O8yTq7NI32k0R5Aj+v39y29VYDOSA=
 github.com/StackExchange/wmi v1.2.1/go.mod h1:rcmrprowKIVzvc+NUiLncP2uuArMWLCbu9SBzvHz7e8=
-github.com/UptickNetwork/evm-nft-convert v1.1.0 h1:lU3x7BtGCHkc52OQqBo1JoQRtBuKJl2nKuMAVQ2r/bU=
-github.com/UptickNetwork/evm-nft-convert v1.1.0/go.mod h1:jil2zKfw7rrQ/6rigJlQnyI3oAs4D4ubiDkDeXf/LXs=
-github.com/UptickNetwork/wasm-nft-convert v1.1.0 h1:B6Bj+IN5QR5oBLOgow+A6N4yQDp1U2zFHgRXZXocsX4=
-github.com/UptickNetwork/wasm-nft-convert v1.1.0/go.mod h1:de7n31NsZAzmXx9zBE1Kj0LdO2uxxqtv+hxr9yYUwiA=
+github.com/UptickNetwork/evm-nft-convert v1.0.10-0.20250731061253-8d894e7acbf2 h1:XBpQvRmrnFwtPjK+WkyfAet7ERsiDJ9JPnBVrmgsw7U=
+github.com/UptickNetwork/evm-nft-convert v1.0.10-0.20250731061253-8d894e7acbf2/go.mod h1:7fMW7+WxJRG9cG0cY6rQBH83ZnnRCNRcVN1V9Qj+Jpc=
+github.com/UptickNetwork/wasm-nft-convert v1.0.7-0.20250731061656-32beb6a675a4 h1:s6XLeTjVqzN1S3OOLgKiyIYgYdvHNMjJsmRw2RMoAMQ=
+github.com/UptickNetwork/wasm-nft-convert v1.0.7-0.20250731061656-32beb6a675a4/go.mod h1:lSfqOPWX2F3CAwjVHhg3gzTsR+rj13NXF4ytYvOSmxA=
 github.com/VictoriaMetrics/fastcache v1.6.0/go.mod h1:0qHz5QP0GMX4pfmMA/zt5RgfNuXJrTP0zS7DqpHGGTw=
 github.com/VictoriaMetrics/fastcache v1.12.1 h1:i0mICQuojGDL3KblA7wUNlY5lOK6a4bwt3uRKnkZU40=
 github.com/VictoriaMetrics/fastcache v1.12.1/go.mod h1:tX04vaqcNoQeGLD+ra5pU5sWkuxnzWhEzLwhP9w653o=
@@ -463,8 +463,8 @@ github.com/cosmos/cosmos-db v1.1.1 h1:FezFSU37AlBC8S98NlSagL76oqBRWq/prTPvFcEJNC
 github.com/cosmos/cosmos-db v1.1.1/go.mod h1:AghjcIPqdhSLP/2Z0yha5xPH3nLnskz81pBx3tcVSAw=
 github.com/cosmos/cosmos-proto v1.0.0-beta.5 h1:eNcayDLpip+zVLRLYafhzLvQlSmyab+RC5W7ZfmxJLA=
 github.com/cosmos/cosmos-proto v1.0.0-beta.5/go.mod h1:hQGLpiIUloJBMdQMMWb/4wRApmI9hjHH05nefC0Ojec=
-github.com/cosmos/cosmos-sdk v0.50.11-lsm h1:fExTM8+aWWgDCnU+P41yYJHQWTRBouQZJNfLbjYvk3o=
-github.com/cosmos/cosmos-sdk v0.50.11-lsm/go.mod h1:NflT1/PkUKwiAI2H6pZbn5I3bVYcY05qzk64XgZwkmw=
+github.com/cosmos/cosmos-sdk v0.50.11 h1:LxR1aAc8kixdrs3itO+3a44sFoc+vjxVAOyPFx22yjk=
+github.com/cosmos/cosmos-sdk v0.50.11/go.mod h1:gt14Meok2IDCjbDtjwkbUcgVNEpUBDN/4hg9cCUtLgw=
 github.com/cosmos/go-bip39 v1.0.0 h1:pcomnQdrdH22njcAatO0yWojsUnCO3y2tNoV1cb6hHY=
 github.com/cosmos/go-bip39 v1.0.0/go.mod h1:RNJv0H/pOIVgxw6KS7QeX2a0Uo0aKUlfhZ4xuwvCdJw=
 github.com/cosmos/gogogateway v1.2.0 h1:Ae/OivNhp8DqBi/sh2A8a1D0y638GpL3tkmLQAiKxTE=
