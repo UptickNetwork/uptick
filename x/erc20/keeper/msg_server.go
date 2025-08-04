@@ -2,11 +2,12 @@ package keeper
 
 import (
 	"context"
+	"math/big"
+	"strings"
+
 	"cosmossdk.io/math"
 	ibctransfertypes "github.com/cosmos/ibc-go/v8/modules/apps/transfer/types"
 	channeltypes "github.com/cosmos/ibc-go/v8/modules/core/04-channel/types"
-	"math/big"
-	"strings"
 
 	sdkerrors "cosmossdk.io/errors"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -51,7 +52,7 @@ func (k Keeper) TransferERC20(
 		return nil, sdkerrors.Wrapf(err, "failed to AccAddressFromBech32 %v-%v", receiver, err)
 	}
 	sender := common.HexToAddress(msg.EvmSender)
-	pair, err := k.MintingEnabled(ctx, sender.Bytes(), receiver, msg.EvmContractAddress)
+	pair, err := k.MintingEnabled(ctx, sdk.AccAddress(sender.Bytes()), receiver, msg.EvmContractAddress)
 	if err != nil {
 		return nil, sdkerrors.Wrapf(err, "failed to MintingEnabled %v", err)
 	}
@@ -88,7 +89,7 @@ func (k Keeper) ConvertCoin(
 	receiver := common.HexToAddress(msg.Receiver)
 	sender, _ := sdk.AccAddressFromBech32(msg.Sender)
 
-	pair, err := k.MintingEnabled(ctx, sender, receiver.Bytes(), msg.Coin.Denom)
+	pair, err := k.MintingEnabled(ctx, sender, sdk.AccAddress(receiver.Bytes()), msg.Coin.Denom)
 	if err != nil {
 		return nil, err
 	}
@@ -130,7 +131,7 @@ func (k Keeper) ConvertERC20(
 	receiver, _ := sdk.AccAddressFromBech32(msg.Receiver)
 	sender := common.HexToAddress(msg.Sender)
 
-	pair, err := k.MintingEnabled(ctx, sender.Bytes(), receiver, msg.ContractAddress)
+	pair, err := k.MintingEnabled(ctx, sdk.AccAddress(sender.Bytes()), receiver, msg.ContractAddress)
 	if err != nil {
 		return nil, err
 	}

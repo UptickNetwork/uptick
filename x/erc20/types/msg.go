@@ -114,8 +114,10 @@ func (msg *MsgConvertERC20) GetSignBytes() []byte {
 
 // GetSigners defines whose signature is required
 func (msg MsgConvertERC20) GetSigners() []sdk.AccAddress {
-	addr := common.HexToAddress(msg.Sender)
-	return []sdk.AccAddress{addr.Bytes()}
+	// Convert hex address to bech32 address for signing
+	hexAddr := common.HexToAddress(msg.Sender)
+	bech32Addr := sdk.AccAddress(hexAddr.Bytes())
+	return []sdk.AccAddress{bech32Addr}
 }
 
 // ----------- MsgTransferERC20 --------------------
@@ -144,6 +146,8 @@ func (msg *MsgTransferERC20) GetSignBytes() []byte {
 
 // GetSigners defines whose signature is required
 func (msg MsgTransferERC20) GetSigners() []sdk.AccAddress {
-	addr := common.HexToAddress(msg.EvmSender)
-	return []sdk.AccAddress{addr.Bytes()}
+	// Convert hex address to bech32 address for signing
+	hexAddr := common.HexToAddress(msg.EvmSender)
+	bech32Addr := sdk.AccAddress(hexAddr.Bytes())
+	return []sdk.AccAddress{bech32Addr}
 }
