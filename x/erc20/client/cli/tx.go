@@ -112,8 +112,8 @@ func NewConvertERC20Cmd() *cobra.Command {
 				return fmt.Errorf("invalid amount %s", args[1])
 			}
 
-			from := common.BytesToAddress(cliCtx.GetFromAddress().Bytes())
-
+			//from := common.BytesToAddress(cliCtx.GetFromAddress().Bytes())
+			from := cliCtx.GetFromAddress()
 			receiver := cliCtx.GetFromAddress()
 			if len(args) == 3 {
 				receiver, err = sdk.AccAddressFromBech32(args[2])
@@ -126,7 +126,7 @@ func NewConvertERC20Cmd() *cobra.Command {
 				ContractAddress: contract,
 				Amount:          amount,
 				Receiver:        receiver.String(),
-				Sender:          from.Hex(),
+				Sender:          from.String(),
 			}
 
 			if err := msg.ValidateBasic(); err != nil {
@@ -455,8 +455,8 @@ func NewTransferERC20Cmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			evmSender := common.BytesToAddress(cliCtx.GetFromAddress().Bytes())
-
+			//evmSender := common.BytesToAddress(cliCtx.GetFromAddress().Bytes())
+			sender := cliCtx.GetFromAddress().String()
 			evmContractAddress := args[0]
 			if err := ethermint.ValidateAddress(evmContractAddress); err != nil {
 				return fmt.Errorf("invalid erc20 contract address %w", err)
@@ -535,7 +535,7 @@ func NewTransferERC20Cmd() *cobra.Command {
 				Amount:             amount,
 				SourcePort:         sourcePort,
 				SourceChannel:      sourceChannel,
-				EvmSender:          evmSender.Hex(),
+				EvmSender:          sender,
 				CosmosReceiver:     cosmosReceiver,
 				TimeoutHeight:      timeoutHeight,
 				TimeoutTimestamp:   timeoutTimestamp,

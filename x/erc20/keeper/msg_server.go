@@ -34,25 +34,26 @@ func (k Keeper) TransferERC20(
 	*types.MsgTransferERC20Response, error,
 ) {
 
-	cosmosSender, err := appType.ConvertAddressEvm2Cosmos(msg.EvmSender)
-	if err != nil {
-		return nil, sdkerrors.Wrapf(err, "failed to ConvertAddressEvm2Cosmos %v", err)
-	}
+	//cosmosSender, err := appType.ConvertAddressEvm2Cosmos(msg.EvmSender)
+	//if err != nil {
+	//	return nil, sdkerrors.Wrapf(err, "failed to ConvertAddressEvm2Cosmos %v", err)
+	//}
 	ctx := sdk.UnwrapSDKContext(goCtx)
 
 	convertMsg := types.MsgConvertERC20{
 		ContractAddress: msg.EvmContractAddress,
 		Amount:          msg.Amount,
-		Receiver:        cosmosSender,
+		Receiver:        msg.EvmSender,
 		Sender:          msg.EvmSender,
 	}
 	k.ConvertERC20(ctx, &convertMsg)
-	receiver, err := sdk.AccAddressFromBech32(cosmosSender)
+	receiver, err := sdk.AccAddressFromBech32(msg.EvmSender)
 	if err != nil {
 		return nil, sdkerrors.Wrapf(err, "failed to AccAddressFromBech32 %v-%v", receiver, err)
 	}
-	sender := common.HexToAddress(msg.EvmSender)
-	pair, err := k.MintingEnabled(ctx, sdk.AccAddress(sender.Bytes()), receiver, msg.EvmContractAddress)
+	from, _ := sdk.AccAddressFromBech32(msg.EvmSender)
+	sender := common.BytesToAddress(from.Bytes())
+	pair, err := k.MintingEnabled(ctx, sender.Bytes(), receiver, msg.EvmContractAddress)
 	if err != nil {
 		return nil, sdkerrors.Wrapf(err, "failed to MintingEnabled %v", err)
 	}
@@ -61,7 +62,7 @@ func (k Keeper) TransferERC20(
 	ibcMsg := ibctransfertypes.MsgTransfer{
 		SourcePort:       msg.SourcePort,
 		SourceChannel:    msg.SourceChannel,
-		Sender:           cosmosSender,
+		Sender:           msg.EvmSender,
 		Token:            coins[0],
 		Receiver:         msg.CosmosReceiver,
 		TimeoutHeight:    msg.TimeoutHeight,
@@ -89,7 +90,7 @@ func (k Keeper) ConvertCoin(
 	receiver := common.HexToAddress(msg.Receiver)
 	sender, _ := sdk.AccAddressFromBech32(msg.Sender)
 
-	pair, err := k.MintingEnabled(ctx, sender, sdk.AccAddress(receiver.Bytes()), msg.Coin.Denom)
+	pair, err := k.MintingEnabled(ctx, sender, receiver.Bytes(), msg.Coin.Denom)
 	if err != nil {
 		return nil, err
 	}
@@ -129,9 +130,11 @@ func (k Keeper) ConvertERC20(
 
 	// Error checked during msg validation
 	receiver, _ := sdk.AccAddressFromBech32(msg.Receiver)
-	sender := common.HexToAddress(msg.Sender)
+	from, _ := sdk.AccAddressFromBech32(msg.Sender)
+	sender := common.BytesToAddress(from.Bytes())
+	//sender := common.HexToAddress(from.String())
 
-	pair, err := k.MintingEnabled(ctx, sdk.AccAddress(sender.Bytes()), receiver, msg.ContractAddress)
+	pair, err := k.MintingEnabled(ctx, sender.Bytes(), receiver, msg.ContractAddress)
 	if err != nil {
 		return nil, err
 	}
@@ -239,7 +242,7 @@ func (k Keeper) convertERC20NativeCoin(
 	balanceToken := k.balanceOf(ctx, erc20, contract, sender)
 
 	// Burn escrowed tokens
-	_, err := k.CallEVM(ctx, erc20, types.ModuleAddress, contract, true, "burnCoins", sender, msg.Amount)
+	_, err := k.CallEVM(ctx, erc20, types.ModuleAddress, contract, true, "burnCoins", sender, msg.Amount.BigInt())
 	if err != nil {
 		return nil, err
 	}
@@ -309,7 +312,7 @@ func (k Keeper) convertERC20NativeToken(
 	balanceToken := k.balanceOf(ctx, erc20, contract, types.ModuleAddress)
 
 	// Escrow tokens on module account
-	transferData, err := erc20.Pack("transfer", types.ModuleAddress, msg.Amount)
+	transferData, err := erc20.Pack("transfer", types.ModuleAddress, msg.Amount.BigInt())
 	if err != nil {
 		return nil, err
 	}

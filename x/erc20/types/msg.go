@@ -97,13 +97,21 @@ func (msg MsgConvertERC20) ValidateBasic() error {
 	if !msg.Amount.IsPositive() {
 		return sdkerrors.Wrapf(errortypes.ErrInvalidCoins, "cannot mint a non-positive amount")
 	}
-	_, err := sdk.AccAddressFromBech32(msg.Receiver)
-	if err != nil {
-		return sdkerrors.Wrap(err, "invalid reciver address")
+	_, ReceiverErr := sdk.AccAddressFromBech32(msg.Receiver)
+	if ReceiverErr != nil {
+		return sdkerrors.Wrap(ReceiverErr, "invalid receiver address")
 	}
-	if !common.IsHexAddress(msg.Sender) {
-		return sdkerrors.Wrapf(errortypes.ErrInvalidAddress, "invalid sender hex address %s", msg.Sender)
+
+	_, SenderErr := sdk.AccAddressFromBech32(msg.Sender)
+	if SenderErr != nil {
+		return sdkerrors.Wrap(SenderErr, "invalid sender address")
 	}
+
+	//if !common.IsHexAddress(strings.ToLower(msg.Sender)) {
+	//	fmt.Printf("msg ValidateBasic 107\n")
+	//	return sdkerrors.Wrapf(errortypes.ErrInvalidAddress, "invalid sender hex address %s", msg.Sender)
+	//}
+
 	return nil
 }
 
@@ -133,9 +141,14 @@ func (msg MsgTransferERC20) ValidateBasic() error {
 	if !common.IsHexAddress(msg.EvmContractAddress) {
 		return sdkerrors.Wrapf(errortypes.ErrInvalidAddress, "invalid contract hex address '%s'", msg.EvmContractAddress)
 	}
-	if !common.IsHexAddress(msg.EvmSender) {
-		return sdkerrors.Wrapf(errortypes.ErrInvalidAddress, "invalid sender hex address %s", msg.EvmSender)
+	//if !common.IsHexAddress(msg.EvmSender) {
+	//	return sdkerrors.Wrapf(errortypes.ErrInvalidAddress, "invalid sender hex address %s", msg.EvmSender)
+	//}
+	_, SenderErr := sdk.AccAddressFromBech32(msg.EvmSender)
+	if SenderErr != nil {
+		return sdkerrors.Wrap(SenderErr, "invalid sender address")
 	}
+
 	return nil
 }
 
