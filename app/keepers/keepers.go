@@ -414,6 +414,62 @@ func New(
 		internft.NewInterNftKeeper(appCodec, appKeepers.NFTKeeper, appKeepers.AccountKeeper),
 		appKeepers.ScopedNFTTransferKeeper,
 	)
+
+	wasmDir := filepath.Join(homePath, "data")
+	wasmConfig, err := wasm.ReadWasmConfig(appOpts)
+	if err != nil {
+		panic("error while reading wasm config: " + err.Error())
+	}
+	appKeepers.WasmConfig = wasmConfig
+	// The last arguments can contain custom message handlers, and custom query handlers,
+	// if we want to allow any custom callbacks
+	appKeepers.WasmKeeper = wasmkeeper.NewKeeper(
+		appCodec,
+		runtime.NewKVStoreService(appKeepers.keys[wasmtypes.StoreKey]),
+		appKeepers.AccountKeeper,
+		appKeepers.BankKeeper,
+		appKeepers.StakingKeeper,
+		distrkeeper.NewQuerier(appKeepers.DistrKeeper),
+		nil,
+		appKeepers.IBCKeeper.ChannelKeeper,
+		appKeepers.IBCKeeper.PortKeeper,
+		appKeepers.ScopedWasmKeeper,
+		appKeepers.IBCTransferKeeper,
+		bApp.MsgServiceRouter(),
+		bApp.GRPCQueryRouter(),
+		wasmDir,
+		wasmConfig,
+		GetWasmCapabilities(),
+		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
+		wasmOpts...,
+	)
+
+	appKeepers.Cw721Keeper = cw721keeper.NewKeeper(
+		appKeepers.keys[cw721types.StoreKey],
+		appCodec,
+		appKeepers.GetSubspace(cw721types.ModuleName),
+		appKeepers.AccountKeeper,
+		appKeepers.NFTKeeper,
+		appKeepers.WasmKeeper,
+		appKeepers.ContractKeeper,
+		appKeepers.IBCNFTTransferKeeper,
+	)
+
+	appKeepers.Erc721Keeper = erc721keeper.NewKeeper(
+		appKeepers.keys[erc721types.StoreKey],
+		appCodec,
+		appKeepers.GetSubspace(erc721types.ModuleName),
+		appKeepers.AccountKeeper,
+		appKeepers.NFTKeeper,
+		appKeepers.EvmKeeper,
+		appKeepers.IBCNFTTransferKeeper,
+	)
+
+	appKeepers.EVMIBCKeeper = evmIBCKeepr.NewKeeper(appKeepers.IBCNFTTransferKeeper)
+
+	appKeepers.EVMIBCKeeper.SetCw721Keeper(appKeepers.Cw721Keeper)
+	appKeepers.EVMIBCKeeper.SetErc721Keeper(appKeepers.Erc721Keeper)
+
 	appKeepers.IBCNftTransferModule = nfttransfer.NewAppModule(appKeepers.IBCNFTTransferKeeper)
 	nftTransferIBCModule := nfttransfer.NewIBCModule(appKeepers.IBCNFTTransferKeeper)
 	ercTransferStack := evmIBC.NewIBCMiddleware(appKeepers.EVMIBCKeeper, nftTransferIBCModule)
@@ -516,59 +572,7 @@ func New(
 	//	authtypes.NewModuleAddress(govtypes.ModuleName).String(),
 	//)
 
-	appKeepers.Erc721Keeper = erc721keeper.NewKeeper(
-		appKeepers.keys[erc721types.StoreKey],
-		appCodec,
-		appKeepers.GetSubspace(erc721types.ModuleName),
-		appKeepers.AccountKeeper,
-		appKeepers.NFTKeeper,
-		appKeepers.EvmKeeper,
-		appKeepers.IBCNFTTransferKeeper,
-	)
-
 	// this line is used by starport scaffolding # stargate/app/keeperDefinition
-	wasmDir := filepath.Join(homePath, "data")
-	wasmConfig, err := wasm.ReadWasmConfig(appOpts)
-	if err != nil {
-		panic("error while reading wasm config: " + err.Error())
-	}
-	appKeepers.WasmConfig = wasmConfig
-	// The last arguments can contain custom message handlers, and custom query handlers,
-	// if we want to allow any custom callbacks
-	appKeepers.WasmKeeper = wasmkeeper.NewKeeper(
-		appCodec,
-		runtime.NewKVStoreService(appKeepers.keys[wasmtypes.StoreKey]),
-		appKeepers.AccountKeeper,
-		appKeepers.BankKeeper,
-		appKeepers.StakingKeeper,
-		distrkeeper.NewQuerier(appKeepers.DistrKeeper),
-		nil,
-		appKeepers.IBCKeeper.ChannelKeeper,
-		appKeepers.IBCKeeper.PortKeeper,
-		appKeepers.ScopedWasmKeeper,
-		appKeepers.IBCTransferKeeper,
-		bApp.MsgServiceRouter(),
-		bApp.GRPCQueryRouter(),
-		wasmDir,
-		wasmConfig,
-		GetWasmCapabilities(),
-		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
-		wasmOpts...,
-	)
-
-	appKeepers.Cw721Keeper = cw721keeper.NewKeeper(
-		appKeepers.keys[cw721types.StoreKey],
-		appCodec,
-		appKeepers.GetSubspace(cw721types.ModuleName),
-		appKeepers.AccountKeeper,
-		appKeepers.NFTKeeper,
-		appKeepers.WasmKeeper,
-		appKeepers.ContractKeeper,
-		appKeepers.IBCNFTTransferKeeper,
-	)
-
-	appKeepers.EVMIBCKeeper.SetCw721Keeper(appKeepers.Cw721Keeper)
-	appKeepers.EVMIBCKeeper.SetErc721Keeper(appKeepers.Erc721Keeper)
 
 	return appKeepers
 }

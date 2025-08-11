@@ -69,7 +69,7 @@ message MsgConvertERC20Response {}
 // It contains information about the token contract, amount, source and destination of the transfer,
 // timeout parameters and optional memo
 message MsgTransferERC20 {
-  option (cosmos.msg.v1.signer) = "evm_sender";
+  option (cosmos.msg.v1.signer) = "cosmos_sender";
   option (gogoproto.equal) = false;
   option (gogoproto.goproto_getters) = false;
 
@@ -85,7 +85,7 @@ message MsgTransferERC20 {
   // the channel by which the packet will be sent
   string source_channel = 4;
   // the sender address
-  string evm_sender = 5;
+  string cosmos_sender = 5;
   // the recipient address on the destination chain
   string cosmos_receiver = 6;
   // Timeout height relative to the current block height.
