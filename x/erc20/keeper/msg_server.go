@@ -43,15 +43,15 @@ func (k Keeper) TransferERC20(
 	convertMsg := types.MsgConvertERC20{
 		ContractAddress: msg.EvmContractAddress,
 		Amount:          msg.Amount,
-		Receiver:        msg.EvmSender,
-		Sender:          msg.EvmSender,
+		Receiver:        msg.CosmosSender,
+		Sender:          msg.CosmosSender,
 	}
 	k.ConvertERC20(ctx, &convertMsg)
-	receiver, err := sdk.AccAddressFromBech32(msg.EvmSender)
+	receiver, err := sdk.AccAddressFromBech32(msg.CosmosSender)
 	if err != nil {
 		return nil, sdkerrors.Wrapf(err, "failed to AccAddressFromBech32 %v-%v", receiver, err)
 	}
-	from, _ := sdk.AccAddressFromBech32(msg.EvmSender)
+	from, _ := sdk.AccAddressFromBech32(msg.CosmosSender)
 	sender := common.BytesToAddress(from.Bytes())
 	pair, err := k.MintingEnabled(ctx, sender.Bytes(), receiver, msg.EvmContractAddress)
 	if err != nil {
@@ -62,7 +62,7 @@ func (k Keeper) TransferERC20(
 	ibcMsg := ibctransfertypes.MsgTransfer{
 		SourcePort:       msg.SourcePort,
 		SourceChannel:    msg.SourceChannel,
-		Sender:           msg.EvmSender,
+		Sender:           msg.CosmosSender,
 		Token:            coins[0],
 		Receiver:         msg.CosmosReceiver,
 		TimeoutHeight:    msg.TimeoutHeight,
@@ -130,8 +130,8 @@ func (k Keeper) ConvertERC20(
 
 	// Error checked during msg validation
 	receiver, _ := sdk.AccAddressFromBech32(msg.Receiver)
-	from, _ := sdk.AccAddressFromBech32(msg.Sender)
-	sender := common.BytesToAddress(from.Bytes())
+	bech32Address, _ := sdk.AccAddressFromBech32(msg.Sender)
+	sender := common.BytesToAddress(bech32Address.Bytes())
 	//sender := common.HexToAddress(from.String())
 
 	pair, err := k.MintingEnabled(ctx, sender.Bytes(), receiver, msg.ContractAddress)

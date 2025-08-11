@@ -535,7 +535,7 @@ func NewTransferERC20Cmd() *cobra.Command {
 				Amount:             amount,
 				SourcePort:         sourcePort,
 				SourceChannel:      sourceChannel,
-				EvmSender:          sender,
+				CosmosSender:       sender,
 				CosmosReceiver:     cosmosReceiver,
 				TimeoutHeight:      timeoutHeight,
 				TimeoutTimestamp:   timeoutTimestamp,

@@ -21,7 +21,7 @@ service Msg {
 // It contains information about the token contract, token IDs, source and destination of the transfer,
 // timeout parameters and optional memo
 message MsgTransferERC721 {
-  option (cosmos.msg.v1.signer) = "evm_sender";
+  option (cosmos.msg.v1.signer) = "cosmos_sender";
   option (gogoproto.equal) = false;
   option (gogoproto.goproto_getters) = false;
 
@@ -38,7 +38,7 @@ message MsgTransferERC721 {
   // the non fungible tokens to be transferred
   repeated string cosmos_token_ids = 6;
   // the sender address
-  string evm_sender = 7;
+  string cosmos_sender = 7;
   // the recipient address on the destination chain
   string cosmos_receiver = 8;
   // Timeout height relative to the current block height.

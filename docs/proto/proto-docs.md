@@ -1072,7 +1072,7 @@ timeout parameters and optional memo
 | amount | string |  | tokenID to convert |
 | source_port | string |  | the port on which the packet will be sent |
 | source_channel | string |  | the channel by which the packet will be sent |
-| evm_sender | string |  | the sender address |
+| cosmos_sender | string |  | the sender address |
 | cosmos_receiver | string |  | the recipient address on the destination chain |
 | timeout_height | ibc.core.client.v1.Height |  | Timeout height relative to the current block height.
 The timeout is disabled when set to 0. |
@@ -1201,7 +1201,7 @@ timeout parameters and optional memo
 | source_channel | string |  | the channel by which the packet will be sent |
 | class_id | string |  | the class_id of tokens to be transferred |
 | cosmos_token_ids | string | repeated | the non fungible tokens to be transferred |
-| evm_sender | string |  | the sender address |
+| cosmos_sender | string |  | the sender address |
 | cosmos_receiver | string |  | the recipient address on the destination chain |
 | timeout_height | ibc.core.client.v1.Height |  | Timeout height relative to the current block height.
 The timeout is disabled when set to 0. |

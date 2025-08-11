@@ -1,8 +1,10 @@
 package evmIBC
 
 import (
-	sdkerrors "cosmossdk.io/errors"
 	"encoding/json"
+	"strings"
+
+	sdkerrors "cosmossdk.io/errors"
 	"github.com/bianjieai/nft-transfer/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
@@ -11,7 +13,6 @@ import (
 	porttypes "github.com/cosmos/ibc-go/v8/modules/core/05-port/types"
 	"github.com/cosmos/ibc-go/v8/modules/core/exported"
 	"github.com/ethereum/go-ethereum/common"
-	"strings"
 
 	"github.com/UptickNetwork/uptick/ibc"
 	"github.com/UptickNetwork/uptick/x/evmIBC/keeper"

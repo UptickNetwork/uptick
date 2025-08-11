@@ -68,7 +68,7 @@ require (
 
 require (
 	cosmossdk.io/x/nft v0.1.1
-	github.com/UptickNetwork/evm-nft-convert v1.1.0
+	github.com/UptickNetwork/evm-nft-convert v1.1.3
 	github.com/UptickNetwork/wasm-nft-convert v1.1.0
 	github.com/cosmos/cosmos-db v1.1.1
 	github.com/cosmos/ibc-go/modules/capability v1.0.1
@@ -275,7 +275,7 @@ replace (
 	cosmossdk.io/tools/rosetta => cosmossdk.io/tools/rosetta v0.2.1-0.20230613133644-0a778132a60f
 	// use cosmos fork of keyring
 	github.com/99designs/keyring => github.com/cosmos/keyring v1.2.0
-	github.com/UptickNetwork/evm-nft-convert => github.com/UptickNetwork/evm-nft-convert v1.1.2
+	github.com/UptickNetwork/evm-nft-convert => github.com/UptickNetwork/evm-nft-convert v1.1.3
 	github.com/UptickNetwork/wasm-nft-convert => github.com/UptickNetwork/wasm-nft-convert v1.1.2
 	github.com/cosmos/ibc-apps/modules/ibc-hooks/v8 => github.com/public-awesome/ibc-apps/modules/ibc-hooks/v8 v8.0.0-20250129183033-079b03c57592
 	github.com/evmos/ethermint => github.com/bianjieai/ethermint v0.23.0-irishub

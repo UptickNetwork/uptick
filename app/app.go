@@ -32,7 +32,6 @@ import (
 	"github.com/UptickNetwork/uptick/app/ante"
 	"github.com/UptickNetwork/uptick/app/keepers"
 	uptickparams "github.com/UptickNetwork/uptick/app/params"
-	"github.com/UptickNetwork/uptick/app/rpc"
 	_ "github.com/UptickNetwork/uptick/client/docs/statik"
 	evmostypes "github.com/UptickNetwork/uptick/types"
 	nftmodule "github.com/UptickNetwork/uptick/x/collection/module"
@@ -544,7 +543,7 @@ func NewUptick(
 	app.configurator = module.NewConfigurator(app.codec, app.MsgServiceRouter(), app.GRPCQueryRouter())
 
 	app.mm.RegisterInvariants(app.CrisisKeeper)
-	app.RegisterServices()
+	app.mm.RegisterServices(app.configurator)
 
 	// create the simulation manager and define the order of the modules for deterministic simulations
 	app.sm = module.NewSimulationManager(
@@ -744,17 +743,6 @@ func (app *Uptick) RegisterAPIRoutes(apiSvr *api.Server, apiConfig config.APICon
 		RegisterSwaggerAPI(clientCtx, apiSvr.Router)
 	}
 
-}
-
-// RegisterServices implements the Application.RegisterTxService method.
-func (app *Uptick) RegisterServices() {
-	for _, mod := range app.mm.Modules {
-		m, ok := mod.(module.AppModule)
-		if !ok {
-			panic("unable to cast mod into AppModule")
-		}
-		rpc.RegisterService(app.codec, m, app.configurator, app.AppKeepers)
-	}
 }
 
 func (app *Uptick) RegisterTxService(clientCtx client.Context) {
