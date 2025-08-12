@@ -1,0 +1,55 @@
+syntax = "proto3";
+package uptick.evm_ibc.v1;
+
+import "cosmos/msg/v1/msg.proto";
+import "gogoproto/gogo.proto";
+import "google/api/annotations.proto";
+import "ibc/core/client/v1/client.proto";
+
+option go_package = "github.com/UptickNetwork/uptick/x/evmIBC/types";
+
+// Msg defines the erc721 Msg service.
+service Msg {
+  option (cosmos.msg.v1.service) = true;
+  // TransferERC721 defines a method to transfer ERC721 tokens between chains via IBC
+  rpc TransferERC721(MsgTransferERC721) returns (MsgTransferERC721Response) {
+    option (google.api.http).get = "/uptick/erc721/v1/tx/ibc-transfer-erc721";
+  }
+}
+
+// MsgTransferERC721 defines a message to transfer ERC721 tokens between chains via IBC
+// It contains information about the token contract, token IDs, source and destination of the transfer,
+// timeout parameters and optional memo
+message MsgTransferERC721 {
+  option (cosmos.msg.v1.signer) = "cosmos_sender";
+  option (gogoproto.equal) = false;
+  option (gogoproto.goproto_getters) = false;
+
+  string evm_contract_address = 1;
+  // tokenID to convert
+  repeated string evm_token_ids = 2;
+
+  // the port on which the packet will be sent
+  string source_port = 3;
+  // the channel by which the packet will be sent
+  string source_channel = 4;
+  // the class_id of tokens to be transferred
+  string class_id = 5;
+  // the non fungible tokens to be transferred
+  repeated string cosmos_token_ids = 6;
+  // the sender address
+  string cosmos_sender = 7;
+  // the recipient address on the destination chain
+  string cosmos_receiver = 8;
+  // Timeout height relative to the current block height.
+  // The timeout is disabled when set to 0.
+  ibc.core.client.v1.Height timeout_height = 9 [(gogoproto.nullable) = false];
+  // Timeout timestamp in absolute nanoseconds since unix epoch.
+  // The timeout is disabled when set to 0.
+  uint64 timeout_timestamp = 10;
+  // optional memo
+  string memo = 11;
+}
+
+// MsgTransferERC721Response defines the response type for TransferERC721 RPC
+message MsgTransferERC721Response {}

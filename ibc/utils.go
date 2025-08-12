@@ -1,13 +1,14 @@
 package ibc
 
 import (
+	sdkerrors "cosmossdk.io/errors"
+	"cosmossdk.io/math"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
-
-	transfertypes "github.com/cosmos/ibc-go/v7/modules/apps/transfer/types"
-	channeltypes "github.com/cosmos/ibc-go/v7/modules/core/04-channel/types"
 
 	uptick "github.com/UptickNetwork/uptick/types"
+	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
+	transfertypes "github.com/cosmos/ibc-go/v8/modules/apps/transfer/types"
+	channeltypes "github.com/cosmos/ibc-go/v8/modules/core/04-channel/types"
 )
 
 // GetTransferSenderRecipient returns the sender and recipient sdk.AccAddresses
@@ -24,7 +25,7 @@ func GetTransferSenderRecipient(packet channeltypes.Packet) (
 	// unmarshal packet data to obtain the sender and recipient
 	var data transfertypes.FungibleTokenPacketData
 	if err := transfertypes.ModuleCdc.UnmarshalJSON(packet.GetData(), &data); err != nil {
-		return nil, nil, "", "", sdkerrors.Wrapf(sdkerrors.ErrUnknownRequest, "cannot unmarshal ICS-20 transfer packet data")
+		return nil, nil, "", "", sdkerrors.Wrapf(errortypes.ErrUnknownRequest, "cannot unmarshal ICS-20 transfer packet data")
 	}
 
 	// validate the sender bech32 address from the counterparty chain
@@ -49,15 +50,15 @@ func GetTransferAmount(packet channeltypes.Packet) (string, error) {
 	// unmarshal packet data to obtain the sender and recipient
 	var data transfertypes.FungibleTokenPacketData
 	if err := transfertypes.ModuleCdc.UnmarshalJSON(packet.GetData(), &data); err != nil {
-		return "", sdkerrors.Wrapf(sdkerrors.ErrUnknownRequest, "cannot unmarshal ICS-20 transfer packet data")
+		return "", sdkerrors.Wrapf(errortypes.ErrUnknownRequest, "cannot unmarshal ICS-20 transfer packet data")
 	}
 
 	if data.Amount == "" {
-		return "", sdkerrors.Wrapf(sdkerrors.ErrInvalidCoins, "empty amount")
+		return "", sdkerrors.Wrapf(errortypes.ErrInvalidCoins, "empty amount")
 	}
 
-	if _, ok := sdk.NewIntFromString(data.Amount); !ok {
-		return "", sdkerrors.Wrapf(sdkerrors.ErrInvalidCoins, "invalid amount")
+	if _, ok := math.NewIntFromString(data.Amount); !ok {
+		return "", sdkerrors.Wrapf(errortypes.ErrInvalidCoins, "invalid amount")
 	}
 
 	return data.Amount, nil

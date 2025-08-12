@@ -1,14 +1,14 @@
 syntax = "proto3";
-package cosmos.nft.v1beta1;
+package uptick.nft.v1beta1;
 
 import "uptick/nft/v1beta1/nft.proto";
 
-option go_package = "github.com/UptickNetwork/uptick/x/nft";
+option go_package = "github.com/UptickNetwork/uptick/x/nft/types";
 
 // GenesisState defines the nft module's genesis state.
 message GenesisState {
   // class defines the class of the nft type.
-  repeated cosmos.nft.v1beta1.Class classes = 1;
+  repeated uptick.nft.v1beta1.Class classes = 1;
   repeated Entry entries = 2;
 }
 
@@ -18,5 +18,5 @@ message Entry {
   string owner = 1;
 
   // nfts is a group of nfts of the same owner
-  repeated cosmos.nft.v1beta1.NFT nfts = 2;
+  repeated uptick.nft.v1beta1.NFT nfts = 2;
 }

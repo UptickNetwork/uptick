@@ -3,14 +3,15 @@ package keeper
 import (
 	"fmt"
 	ibcnfttransfertypes "github.com/bianjieai/nft-transfer/types"
+	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 
+	sdkerrors "cosmossdk.io/errors"
 	erc721types "github.com/UptickNetwork/evm-nft-convert/types"
 	"github.com/UptickNetwork/uptick/contracts"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 )
 
 // RefundPacketToken handles the erc721 conversion for a native erc721 token
@@ -31,7 +32,7 @@ func (k Keeper) RefundPacketToken(
 		bigTokenId := new(big.Int)
 		_, err := fmt.Sscan(emvTokenId, bigTokenId)
 		if err != nil {
-			sdkerrors.Wrapf(sdkerrors.ErrUnauthorized, "%s error scanning value", err)
+			sdkerrors.Wrapf(errortypes.ErrUnauthorized, "%s error scanning value", err)
 			return err
 		}
 

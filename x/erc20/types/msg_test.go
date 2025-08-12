@@ -1,6 +1,7 @@
 package types
 
 import (
+	"cosmossdk.io/math"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -22,7 +23,7 @@ func TestMsgsTestSuite(t *testing.T) {
 func (suite *MsgsTestSuite) TestMsgConvertCoinGetters() {
 	msgInvalid := MsgConvertCoin{}
 	msg := NewMsgConvertCoin(
-		sdk.NewCoin("test", sdk.NewInt(100)),
+		sdk.NewCoin("test", math.NewInt(100)),
 		tests.GenerateAddress(),
 		sdk.AccAddress(tests.GenerateAddress().Bytes()),
 	)
@@ -43,7 +44,7 @@ func (suite *MsgsTestSuite) TestMsgConvertCoinNew() {
 	}{
 		{
 			"msg convert coin - pass",
-			sdk.NewCoin("test", sdk.NewInt(100)),
+			sdk.NewCoin("test", math.NewInt(100)),
 			tests.GenerateAddress(),
 			sdk.AccAddress(tests.GenerateAddress().Bytes()),
 			true,
@@ -74,7 +75,7 @@ func (suite *MsgsTestSuite) TestMsgConvertCoin() {
 			"invalid denom",
 			sdk.Coin{
 				Denom:  "",
-				Amount: sdk.NewInt(100),
+				Amount: math.NewInt(100),
 			},
 			"0x0000",
 			tests.GenerateAddress().String(),
@@ -84,7 +85,7 @@ func (suite *MsgsTestSuite) TestMsgConvertCoin() {
 			"negative coin amount",
 			sdk.Coin{
 				Denom:  "coin",
-				Amount: sdk.NewInt(-100),
+				Amount: math.NewInt(-100),
 			},
 			"0x0000",
 			tests.GenerateAddress().String(),
@@ -92,35 +93,35 @@ func (suite *MsgsTestSuite) TestMsgConvertCoin() {
 		},
 		{
 			"msg convert coin - invalid sender",
-			sdk.NewCoin("coin", sdk.NewInt(100)),
+			sdk.NewCoin("coin", math.NewInt(100)),
 			tests.GenerateAddress().String(),
 			"uptickinvalid",
 			false,
 		},
 		{
 			"msg convert coin - invalid receiver",
-			sdk.NewCoin("coin", sdk.NewInt(100)),
+			sdk.NewCoin("coin", math.NewInt(100)),
 			"0x0000",
 			sdk.AccAddress(tests.GenerateAddress().Bytes()).String(),
 			false,
 		},
 		{
 			"msg convert coin - pass",
-			sdk.NewCoin("coin", sdk.NewInt(100)),
+			sdk.NewCoin("coin", math.NewInt(100)),
 			tests.GenerateAddress().String(),
 			sdk.AccAddress(tests.GenerateAddress().Bytes()).String(),
 			true,
 		},
 		{
 			"msg convert coin - pass with `erc20/` denom",
-			sdk.NewCoin("erc20/0xdac17f958d2ee523a2206206994597c13d831ec7", sdk.NewInt(100)),
+			sdk.NewCoin("erc20/0xdac17f958d2ee523a2206206994597c13d831ec7", math.NewInt(100)),
 			tests.GenerateAddress().String(),
 			sdk.AccAddress(tests.GenerateAddress().Bytes()).String(),
 			true,
 		},
 		{
 			"msg convert coin - pass with `ibc/{hash}` denom",
-			sdk.NewCoin("ibc/7F1D3FCF4AE79E1554D670D1AD949A9BA4E4A3C76C63093E17E446A46061A7A2", sdk.NewInt(100)),
+			sdk.NewCoin("ibc/7F1D3FCF4AE79E1554D670D1AD949A9BA4E4A3C76C63093E17E446A46061A7A2", math.NewInt(100)),
 			tests.GenerateAddress().String(),
 			sdk.AccAddress(tests.GenerateAddress().Bytes()).String(),
 			true,
@@ -142,7 +143,7 @@ func (suite *MsgsTestSuite) TestMsgConvertCoin() {
 func (suite *MsgsTestSuite) TestMsgConvertERC20Getters() {
 	msgInvalid := MsgConvertERC20{}
 	msg := NewMsgConvertERC20(
-		sdk.NewInt(100),
+		math.NewInt(100),
 		sdk.AccAddress(tests.GenerateAddress().Bytes()),
 		tests.GenerateAddress(),
 		tests.GenerateAddress(),
@@ -156,7 +157,7 @@ func (suite *MsgsTestSuite) TestMsgConvertERC20Getters() {
 func (suite *MsgsTestSuite) TestMsgConvertERC20New() {
 	testCases := []struct {
 		msg        string
-		amount     sdk.Int
+		amount     math.Int
 		receiver   sdk.AccAddress
 		contract   common.Address
 		sender     common.Address
@@ -164,7 +165,7 @@ func (suite *MsgsTestSuite) TestMsgConvertERC20New() {
 	}{
 		{
 			"msg convert erc20 - pass",
-			sdk.NewInt(100),
+			math.NewInt(100),
 			sdk.AccAddress(tests.GenerateAddress().Bytes()),
 			tests.GenerateAddress(),
 			tests.GenerateAddress(),
@@ -187,7 +188,7 @@ func (suite *MsgsTestSuite) TestMsgConvertERC20New() {
 func (suite *MsgsTestSuite) TestMsgConvertERC20() {
 	testCases := []struct {
 		msg        string
-		amount     sdk.Int
+		amount     math.Int
 		receiver   string
 		contract   string
 		sender     string
@@ -195,7 +196,7 @@ func (suite *MsgsTestSuite) TestMsgConvertERC20() {
 	}{
 		{
 			"invalid contract hex address",
-			sdk.NewInt(100),
+			math.NewInt(100),
 			sdk.AccAddress(tests.GenerateAddress().Bytes()).String(),
 			sdk.AccAddress{}.String(),
 			tests.GenerateAddress().String(),
@@ -203,7 +204,7 @@ func (suite *MsgsTestSuite) TestMsgConvertERC20() {
 		},
 		{
 			"negative coin amount",
-			sdk.NewInt(-100),
+			math.NewInt(-100),
 			sdk.AccAddress(tests.GenerateAddress().Bytes()).String(),
 			tests.GenerateAddress().String(),
 			tests.GenerateAddress().String(),
@@ -211,7 +212,7 @@ func (suite *MsgsTestSuite) TestMsgConvertERC20() {
 		},
 		{
 			"invalid receiver address",
-			sdk.NewInt(100),
+			math.NewInt(100),
 			sdk.AccAddress{}.String(),
 			tests.GenerateAddress().String(),
 			tests.GenerateAddress().String(),
@@ -219,7 +220,7 @@ func (suite *MsgsTestSuite) TestMsgConvertERC20() {
 		},
 		{
 			"invalid sender address",
-			sdk.NewInt(100),
+			math.NewInt(100),
 			sdk.AccAddress(tests.GenerateAddress().Bytes()).String(),
 			tests.GenerateAddress().String(),
 			sdk.AccAddress{}.String(),
@@ -227,7 +228,7 @@ func (suite *MsgsTestSuite) TestMsgConvertERC20() {
 		},
 		{
 			"msg convert erc20 - pass",
-			sdk.NewInt(100),
+			math.NewInt(100),
 			sdk.AccAddress(tests.GenerateAddress().Bytes()).String(),
 			tests.GenerateAddress().String(),
 			tests.GenerateAddress().String(),

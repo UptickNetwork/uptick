@@ -1,11 +1,11 @@
 package keeper
 
 import (
-	sdk "github.com/cosmos/cosmos-sdk/types"
-	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
-	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
-
+	sdkerrors "cosmossdk.io/errors"
 	"github.com/UptickNetwork/uptick/x/erc20/types"
+	sdk "github.com/cosmos/cosmos-sdk/types"
+	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
+	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 )
 
 // MintingEnabled checks that:
@@ -34,7 +34,7 @@ func (k Keeper) MintingEnabled(ctx sdk.Context, sender, receiver sdk.AccAddress,
 	}
 
 	if k.bankKeeper.BlockedAddr(receiver.Bytes()) {
-		return types.TokenPair{}, sdkerrors.Wrapf(sdkerrors.ErrUnauthorized, "%s is not allowed to receive transactions", receiver)
+		return types.TokenPair{}, sdkerrors.Wrapf(errortypes.ErrUnauthorized, "%s is not allowed to receive transactions", receiver)
 	}
 
 	// NOTE: ignore amount as only denom is checked on IsSendEnabledCoin

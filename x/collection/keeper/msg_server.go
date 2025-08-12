@@ -2,9 +2,9 @@ package keeper
 
 import (
 	"context"
-	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
-
+	sdkerrors "cosmossdk.io/errors"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
 
 	"github.com/UptickNetwork/uptick/x/collection/types"
 )
@@ -84,7 +84,7 @@ func (k Keeper) MintNFT(goCtx context.Context, msg *types.MsgMintNFT) (*types.Ms
 
 	if denom.MintRestricted && denom.Creator != sender.String() {
 		return nil, sdkerrors.Wrapf(
-			sdkerrors.ErrUnauthorized, "%s is not allowed to mint NFT of denom %s", sender, msg.DenomId)
+			errortypes.ErrUnauthorized, "%s is not allowed to mint NFT of denom %s", sender, msg.DenomId)
 	}
 
 	if err := k.SaveNFT(ctx, msg.DenomId,

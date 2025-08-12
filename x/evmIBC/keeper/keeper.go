@@ -2,7 +2,8 @@ package keeper
 
 import (
 	"fmt"
-	"github.com/cometbft/cometbft/libs/log"
+
+	"cosmossdk.io/log"
 
 	"github.com/UptickNetwork/evm-nft-convert/types"
 	ibcnfttransferkeeper "github.com/bianjieai/nft-transfer/keeper"
@@ -21,17 +22,15 @@ type Keeper struct {
 	erc721keeper erc721keeper.Keeper
 }
 
-//// NewKeeper creates new instances of the erc721 Keeper
-//func NewKeeper(
-//	ek erc721keeper.Keeper,
-//	ik ibcnfttransferkeeper.Keeper,
-//) Keeper {
-//
-//	return Keeper{
-//		erc721keeper: ek,
-//		ibcKeeper:    ik,
-//	}
-//}
+// NewKeeper creates new instances of the erc721 Keeper
+func NewKeeper(
+	ik ibcnfttransferkeeper.Keeper,
+) Keeper {
+
+	return Keeper{
+		ibcKeeper: ik,
+	}
+}
 
 // Logger returns a module-specific logger.
 func (k Keeper) Logger(ctx sdk.Context) log.Logger {

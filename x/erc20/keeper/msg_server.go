@@ -2,23 +2,25 @@ package keeper
 
 import (
 	"context"
-	ibctransfertypes "github.com/cosmos/ibc-go/v7/modules/apps/transfer/types"
-	channeltypes "github.com/cosmos/ibc-go/v7/modules/core/04-channel/types"
 	"math/big"
 	"strings"
 
+	"cosmossdk.io/math"
+	ibctransfertypes "github.com/cosmos/ibc-go/v8/modules/apps/transfer/types"
+	channeltypes "github.com/cosmos/ibc-go/v8/modules/core/04-channel/types"
+
+	sdkerrors "cosmossdk.io/errors"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 
 	"github.com/UptickNetwork/uptick/contracts"
+	appType "github.com/UptickNetwork/uptick/types"
 	"github.com/UptickNetwork/uptick/x/erc20/types"
-	transfertypes "github.com/cosmos/ibc-go/v7/modules/apps/transfer/types"
+	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
+	transfertypes "github.com/cosmos/ibc-go/v8/modules/apps/transfer/types"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	evmtypes "github.com/evmos/ethermint/x/evm/types"
-
-	appType "github.com/UptickNetwork/uptick/types"
 )
 
 var _ types.MsgServer = &Keeper{}
@@ -32,24 +34,25 @@ func (k Keeper) TransferERC20(
 	*types.MsgTransferERC20Response, error,
 ) {
 
-	cosmosSender, err := appType.ConvertAddressEvm2Cosmos(msg.EvmSender)
-	if err != nil {
-		return nil, sdkerrors.Wrapf(err, "failed to ConvertAddressEvm2Cosmos %v", err)
-	}
+	//cosmosSender, err := appType.ConvertAddressEvm2Cosmos(msg.EvmSender)
+	//if err != nil {
+	//	return nil, sdkerrors.Wrapf(err, "failed to ConvertAddressEvm2Cosmos %v", err)
+	//}
 	ctx := sdk.UnwrapSDKContext(goCtx)
 
 	convertMsg := types.MsgConvertERC20{
 		ContractAddress: msg.EvmContractAddress,
 		Amount:          msg.Amount,
-		Receiver:        cosmosSender,
-		Sender:          msg.EvmSender,
+		Receiver:        msg.CosmosSender,
+		Sender:          msg.CosmosSender,
 	}
 	k.ConvertERC20(ctx, &convertMsg)
-	receiver, err := sdk.AccAddressFromBech32(cosmosSender)
+	receiver, err := sdk.AccAddressFromBech32(msg.CosmosSender)
 	if err != nil {
 		return nil, sdkerrors.Wrapf(err, "failed to AccAddressFromBech32 %v-%v", receiver, err)
 	}
-	sender := common.HexToAddress(msg.EvmSender)
+	from, _ := sdk.AccAddressFromBech32(msg.CosmosSender)
+	sender := common.BytesToAddress(from.Bytes())
 	pair, err := k.MintingEnabled(ctx, sender.Bytes(), receiver, msg.EvmContractAddress)
 	if err != nil {
 		return nil, sdkerrors.Wrapf(err, "failed to MintingEnabled %v", err)
@@ -59,7 +62,7 @@ func (k Keeper) TransferERC20(
 	ibcMsg := ibctransfertypes.MsgTransfer{
 		SourcePort:       msg.SourcePort,
 		SourceChannel:    msg.SourceChannel,
-		Sender:           cosmosSender,
+		Sender:           msg.CosmosSender,
 		Token:            coins[0],
 		Receiver:         msg.CosmosReceiver,
 		TimeoutHeight:    msg.TimeoutHeight,
@@ -127,7 +130,9 @@ func (k Keeper) ConvertERC20(
 
 	// Error checked during msg validation
 	receiver, _ := sdk.AccAddressFromBech32(msg.Receiver)
-	sender := common.HexToAddress(msg.Sender)
+	bech32Address, _ := sdk.AccAddressFromBech32(msg.Sender)
+	sender := common.BytesToAddress(bech32Address.Bytes())
+	//sender := common.HexToAddress(from.String())
 
 	pair, err := k.MintingEnabled(ctx, sender.Bytes(), receiver, msg.ContractAddress)
 	if err != nil {
@@ -324,7 +329,7 @@ func (k Keeper) convertERC20NativeToken(
 	}
 
 	if !unpackedRet.Value {
-		return nil, sdkerrors.Wrap(sdkerrors.ErrLogic, "failed to execute transfer")
+		return nil, sdkerrors.Wrap(errortypes.ErrLogic, "failed to execute transfer")
 	}
 
 	// Check expected escrow balance after transfer execution
@@ -420,7 +425,7 @@ func (k Keeper) convertCoinNativeERC20(
 	}
 
 	if !unpackedRet.Value {
-		return nil, sdkerrors.Wrap(sdkerrors.ErrLogic, "failed to execute unescrow tokens from user")
+		return nil, sdkerrors.Wrap(errortypes.ErrLogic, "failed to execute unescrow tokens from user")
 	}
 
 	// Check expected Receiver balance after transfer execution
@@ -518,7 +523,7 @@ func (k Keeper) refundPacketToken(ctx sdk.Context, packet channeltypes.Packet, d
 	}
 
 	// parse the transfer amount
-	transferAmount, ok := sdk.NewIntFromString(data.Amount)
+	transferAmount, ok := math.NewIntFromString(data.Amount)
 	if !ok {
 		return sdkerrors.Wrapf(transfertypes.ErrInvalidAmount, "unable to parse transfer amount (%s) into math.Int", data.Amount)
 	}

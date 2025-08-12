@@ -5,7 +5,7 @@ package types
 
 import (
 	fmt "fmt"
-	_ "github.com/gogo/protobuf/gogoproto"
+	_ "github.com/cosmos/gogoproto/gogoproto"
 	proto "github.com/cosmos/gogoproto/proto"
 	io "io"
 	math "math"
@@ -66,6 +66,8 @@ func (m *BaseNFT) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_BaseNFT proto.InternalMessageInfo
 
+// NFTMetadata defines the metadata for a NFT
+// Contains basic information like name and data
 type NFTMetadata struct {
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	Data string `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
@@ -152,6 +154,8 @@ func (m *Denom) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_Denom proto.InternalMessageInfo
 
+// DenomMetadata defines the metadata for a Denom
+// Contains information about creator, schema, restrictions and additional data
 type DenomMetadata struct {
 	Creator          string `protobuf:"bytes,1,opt,name=creator,proto3" json:"creator,omitempty"`
 	Schema           string `protobuf:"bytes,2,opt,name=schema,proto3" json:"schema,omitempty"`

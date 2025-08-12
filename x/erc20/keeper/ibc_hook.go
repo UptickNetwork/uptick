@@ -1,16 +1,17 @@
 package keeper
 
 import (
+	"cosmossdk.io/math"
 	"fmt"
 
 	"github.com/UptickNetwork/uptick/x/erc20/types"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	capabilitytypes "github.com/cosmos/cosmos-sdk/x/capability/types"
-	transfertypes "github.com/cosmos/ibc-go/v7/modules/apps/transfer/types"
-	clienttypes "github.com/cosmos/ibc-go/v7/modules/core/02-client/types"
-	channeltypes "github.com/cosmos/ibc-go/v7/modules/core/04-channel/types"
-	"github.com/cosmos/ibc-go/v7/modules/core/exported"
+	capabilitytypes "github.com/cosmos/ibc-go/modules/capability/types"
+	transfertypes "github.com/cosmos/ibc-go/v8/modules/apps/transfer/types"
+	clienttypes "github.com/cosmos/ibc-go/v8/modules/core/02-client/types"
+	channeltypes "github.com/cosmos/ibc-go/v8/modules/core/04-channel/types"
+	"github.com/cosmos/ibc-go/v8/modules/core/exported"
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -36,7 +37,7 @@ func (k Keeper) OnRecvPacket(
 		_ = ctx.EventManager().EmitTypedEvent(event)
 		return nil
 	}
-	transferAmount, ok := sdk.NewIntFromString(data.Amount)
+	transferAmount, ok := math.NewIntFromString(data.Amount)
 	if !ok {
 		event.Status = types.STATUS_FAILED
 		event.Message = "Change data.Amount type to int error"

@@ -1,15 +1,15 @@
 package keeper
 
 import (
+	sdkerrors "cosmossdk.io/errors"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
-
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/UptickNetwork/uptick/contracts"
 	"github.com/UptickNetwork/uptick/x/erc20/types"
+	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 // RegisterCoin deploys an erc20 contract and creates the token pair for the existing cosmos coin
@@ -33,7 +33,7 @@ func (k Keeper) RegisterCoin(ctx sdk.Context, coinMetadata banktypes.Metadata) (
 	// check if the coin exists by ensuring the supply is set
 	if !k.bankKeeper.HasSupply(ctx, coinMetadata.Base) {
 		return nil, sdkerrors.Wrapf(
-			sdkerrors.ErrInvalidCoins,
+			errortypes.ErrInvalidCoins,
 			"base denomination '%s' cannot have a supply of 0", coinMetadata.Base,
 		)
 	}

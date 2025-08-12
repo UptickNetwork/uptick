@@ -2,7 +2,6 @@ syntax = "proto3";
 package uptick.cw721.v1;
 
 import "gogoproto/gogo.proto";
-import "cosmos/nft/v1beta1/nft.proto";
 
 option go_package = "github.com/UptickNetwork/wasm-nft-convert/cw721/types";
 
@@ -25,7 +24,6 @@ message TokenPair {
   string cw721_address = 1;
   // cosmos nft class ID to be mapped to
   string class_id = 2;
-
 }
 
 // defines the unique id of nft asset
@@ -36,4 +34,3 @@ message UIDPair {
   // cosmos nft class ID to be mapped to + nftId
   string class_did = 2;
 }
-

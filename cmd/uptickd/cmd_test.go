@@ -2,6 +2,7 @@ package main_test
 
 import (
 	"fmt"
+	uptickd "github.com/UptickNetwork/uptick/cmd/uptickd"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -11,7 +12,6 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/genutil/client/cli"
 
 	"github.com/UptickNetwork/uptick/app"
-	uptickd "github.com/UptickNetwork/uptick/cmd/uptickd"
 )
 
 func TestInitCmd(t *testing.T) {
@@ -23,6 +23,6 @@ func TestInitCmd(t *testing.T) {
 		fmt.Sprintf("--%s=%s", flags.FlagChainID, "uptick_7777-1"),
 	})
 
-	err := svrcmd.Execute(rootCmd, "uptick",app.DefaultNodeHome)
+	err := svrcmd.Execute(rootCmd, "uptick", app.DefaultNodeHome)
 	require.NoError(t, err)
 }
