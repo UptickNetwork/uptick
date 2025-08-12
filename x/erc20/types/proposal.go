@@ -4,14 +4,12 @@ import (
 	"fmt"
 	"strings"
 
+	sdkerrors "cosmossdk.io/errors"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 
-	// v1beta1 "github.com/cosmos/cosmos-sdk/x/gov/types"
-	govcdc "github.com/cosmos/cosmos-sdk/x/gov/codec"
 	"github.com/cosmos/cosmos-sdk/x/gov/types/v1beta1"
-	ibctransfertypes "github.com/cosmos/ibc-go/v7/modules/apps/transfer/types"
+	ibctransfertypes "github.com/cosmos/ibc-go/v8/modules/apps/transfer/types"
 
 	"github.com/ethereum/go-ethereum/common"
 	ethermint "github.com/evmos/ethermint/types"
@@ -40,10 +38,10 @@ func init() {
 	v1beta1.RegisterProposalType(ProposalTypeUpdateTokenPairERC20)
 
 	// v1beta1.
-	govcdc.ModuleCdc.Amino.RegisterConcrete(&RegisterCoinProposal{}, "erc20/RegisterCoinProposal", nil)
-	govcdc.ModuleCdc.Amino.RegisterConcrete(&RegisterERC20Proposal{}, "erc20/RegisterERC20Proposal", nil)
-	govcdc.ModuleCdc.Amino.RegisterConcrete(&ToggleTokenRelayProposal{}, "erc20/ToggleTokenRelayProposal", nil)
-	govcdc.ModuleCdc.Amino.RegisterConcrete(&UpdateTokenPairERC20Proposal{}, "erc20/UpdateTokenPairERC20Proposal", nil)
+	//govcdc.ModuleCdc.Amino.RegisterConcrete(&RegisterCoinProposal{}, "erc20/RegisterCoinProposal", nil)
+	//govcdc.ModuleCdc.Amino.RegisterConcrete(&RegisterERC20Proposal{}, "erc20/RegisterERC20Proposal", nil)
+	//govcdc.ModuleCdc.Amino.RegisterConcrete(&ToggleTokenRelayProposal{}, "erc20/ToggleTokenRelayProposal", nil)
+	//govcdc.ModuleCdc.Amino.RegisterConcrete(&UpdateTokenPairERC20Proposal{}, "erc20/UpdateTokenPairERC20Proposal", nil)
 }
 
 // CreateDenomDescription generates a string with the coin description

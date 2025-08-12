@@ -1,10 +1,11 @@
 package cli
 
 import (
+	"cosmossdk.io/math"
 	"fmt"
 	ibcnfttransfertypes "github.com/bianjieai/nft-transfer/types"
-	clienttypes "github.com/cosmos/ibc-go/v7/modules/core/02-client/types"
-	channelutils "github.com/cosmos/ibc-go/v7/modules/core/04-channel/client/utils"
+	clienttypes "github.com/cosmos/ibc-go/v8/modules/core/02-client/types"
+	channelutils "github.com/cosmos/ibc-go/v8/modules/core/04-channel/client/utils"
 	"github.com/spf13/cobra"
 
 	"github.com/cosmos/cosmos-sdk/client"
@@ -106,13 +107,13 @@ func NewConvertERC20Cmd() *cobra.Command {
 				return fmt.Errorf("invalid ERC20 contract address %w", err)
 			}
 
-			amount, ok := sdk.NewIntFromString(args[1])
+			amount, ok := math.NewIntFromString(args[1])
 			if !ok {
 				return fmt.Errorf("invalid amount %s", args[1])
 			}
 
-			from := common.BytesToAddress(cliCtx.GetFromAddress().Bytes())
-
+			//from := common.BytesToAddress(cliCtx.GetFromAddress().Bytes())
+			from := cliCtx.GetFromAddress()
 			receiver := cliCtx.GetFromAddress()
 			if len(args) == 3 {
 				receiver, err = sdk.AccAddressFromBech32(args[2])
@@ -125,7 +126,7 @@ func NewConvertERC20Cmd() *cobra.Command {
 				ContractAddress: contract,
 				Amount:          amount,
 				Receiver:        receiver.String(),
-				Sender:          from.Hex(),
+				Sender:          from.String(),
 			}
 
 			if err := msg.ValidateBasic(); err != nil {
@@ -212,9 +213,9 @@ Where metadata.json contains (example):
 				return err
 			}
 
-			if err := msg.ValidateBasic(); err != nil {
-				return err
-			}
+			//if err := msg.ValidateBasic(); err != nil {
+			//	return err
+			//}
 
 			return tx.GenerateOrBroadcastTxCLI(clientCtx, cmd.Flags(), msg)
 		},
@@ -278,9 +279,9 @@ func NewRegisterERC20ProposalCmd() *cobra.Command {
 				return err
 			}
 
-			if err := msg.ValidateBasic(); err != nil {
-				return err
-			}
+			//if err := msg.ValidateBasic(); err != nil {
+			//	return err
+			//}
 
 			return tx.GenerateOrBroadcastTxCLI(clientCtx, cmd.Flags(), msg)
 		},
@@ -344,9 +345,9 @@ func NewToggleTokenRelayProposalCmd() *cobra.Command {
 				return err
 			}
 
-			if err := msg.ValidateBasic(); err != nil {
-				return err
-			}
+			//if err := msg.ValidateBasic(); err != nil {
+			//	return err
+			//}
 
 			return tx.GenerateOrBroadcastTxCLI(clientCtx, cmd.Flags(), msg)
 		},
@@ -411,9 +412,9 @@ func NewUpdateTokenPairERC20ProposalCmd() *cobra.Command {
 				return err
 			}
 
-			if err := msg.ValidateBasic(); err != nil {
-				return err
-			}
+			//if err := msg.ValidateBasic(); err != nil {
+			//	return err
+			//}
 
 			return tx.GenerateOrBroadcastTxCLI(clientCtx, cmd.Flags(), msg)
 		},
@@ -454,15 +455,15 @@ func NewTransferERC20Cmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			evmSender := common.BytesToAddress(cliCtx.GetFromAddress().Bytes())
-
+			//evmSender := common.BytesToAddress(cliCtx.GetFromAddress().Bytes())
+			sender := cliCtx.GetFromAddress().String()
 			evmContractAddress := args[0]
 			if err := ethermint.ValidateAddress(evmContractAddress); err != nil {
 				return fmt.Errorf("invalid erc20 contract address %w", err)
 			}
 
 			// amount := args[1]
-			amount, ok := sdk.NewIntFromString(args[1])
+			amount, ok := math.NewIntFromString(args[1])
 			if !ok {
 				return fmt.Errorf("invalid amount %s", args[1])
 			}
@@ -534,7 +535,7 @@ func NewTransferERC20Cmd() *cobra.Command {
 				Amount:             amount,
 				SourcePort:         sourcePort,
 				SourceChannel:      sourceChannel,
-				EvmSender:          evmSender.Hex(),
+				CosmosSender:       sender,
 				CosmosReceiver:     cosmosReceiver,
 				TimeoutHeight:      timeoutHeight,
 				TimeoutTimestamp:   timeoutTimestamp,

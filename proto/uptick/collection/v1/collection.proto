@@ -10,14 +10,16 @@ option (gogoproto.goproto_getters_all) = false;
 message BaseNFT {
   option (gogoproto.equal) = true;
 
-  string id = 1 ;
+  string id = 1;
   string name = 2;
-  string uri = 3 [ (gogoproto.customname) = "URI" ];
+  string uri = 3 [(gogoproto.customname) = "URI"];
   string data = 4;
   string owner = 5;
   string uri_hash = 6;
 }
 
+// NFTMetadata defines the metadata for a NFT
+// Contains basic information like name and data
 message NFTMetadata {
   option (gogoproto.equal) = true;
 
@@ -42,6 +44,8 @@ message Denom {
   string data = 11;
 }
 
+// DenomMetadata defines the metadata for a Denom
+// Contains information about creator, schema, restrictions and additional data
 message DenomMetadata {
   option (gogoproto.equal) = true;
 
@@ -50,7 +54,6 @@ message DenomMetadata {
   bool mint_restricted = 3;
   bool update_restricted = 4;
   string data = 5;
-
 }
 
 // IDCollection defines a type of collection with specified ID
@@ -83,7 +86,9 @@ message Owner {
 message Collection {
   option (gogoproto.equal) = true;
 
-  Denom denom = 1 [ (gogoproto.nullable) = false ];
-  repeated BaseNFT nfts = 2
-      [ (gogoproto.customname) = "NFTs", (gogoproto.nullable) = false ];
+  Denom denom = 1 [(gogoproto.nullable) = false];
+  repeated BaseNFT nfts = 2 [
+    (gogoproto.customname) = "NFTs",
+    (gogoproto.nullable) = false
+  ];
 }

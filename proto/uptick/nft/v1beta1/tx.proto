@@ -1,16 +1,21 @@
 syntax = "proto3";
-package cosmos.nft.v1beta1;
+package uptick.nft.v1beta1;
 
-option go_package = "github.com/UptickNetwork/uptick/x/nft";
+import "cosmos/msg/v1/msg.proto";
+
+option go_package = "github.com/UptickNetwork/uptick/x/nft/types";
 
 // Msg defines the nft Msg service.
 service Msg {
+  option (cosmos.msg.v1.service) = true;
   // Send defines a method to send a nft from one account to another account.
   rpc Send(MsgSend) returns (MsgSendResponse);
 }
+
 // MsgSend represents a message to send a nft from one account to another
 // account.
 message MsgSend {
+  option (cosmos.msg.v1.signer) = "sender";
   // class_id defines the unique identifier of the nft classification, similar
   // to the contract address of ERC721
   string class_id = 1;
@@ -24,5 +29,6 @@ message MsgSend {
   // receiver is the receiver address of nft
   string receiver = 4;
 }
+
 // MsgSendResponse defines the Msg/Send response type.
 message MsgSendResponse {}

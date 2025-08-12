@@ -2,22 +2,23 @@ package evmIBC
 
 import (
 	"encoding/json"
-	"github.com/ethereum/go-ethereum/common"
 	"strings"
 
+	sdkerrors "cosmossdk.io/errors"
 	"github.com/bianjieai/nft-transfer/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
-	capabilitytypes "github.com/cosmos/cosmos-sdk/x/capability/types"
-	channeltypes "github.com/cosmos/ibc-go/v7/modules/core/04-channel/types"
-	porttypes "github.com/cosmos/ibc-go/v7/modules/core/05-port/types"
-	"github.com/cosmos/ibc-go/v7/modules/core/exported"
+	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
+	capabilitytypes "github.com/cosmos/ibc-go/modules/capability/types"
+	channeltypes "github.com/cosmos/ibc-go/v8/modules/core/04-channel/types"
+	porttypes "github.com/cosmos/ibc-go/v8/modules/core/05-port/types"
+	"github.com/cosmos/ibc-go/v8/modules/core/exported"
+	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/UptickNetwork/uptick/ibc"
 	"github.com/UptickNetwork/uptick/x/evmIBC/keeper"
 
 	erc721Types "github.com/UptickNetwork/evm-nft-convert/types"
-	clienttypes "github.com/cosmos/ibc-go/v7/modules/core/02-client/types"
+	clienttypes "github.com/cosmos/ibc-go/v8/modules/core/02-client/types"
 )
 
 var _ porttypes.Middleware = &IBCMiddleware{}
@@ -56,7 +57,7 @@ func (im IBCMiddleware) OnRecvPacket(
 	var data types.NonFungibleTokenPacketData
 	if err := types.ModuleCdc.UnmarshalJSON(packet.GetData(), &data); err != nil {
 		ackResult = channeltypes.NewErrorAcknowledgement(
-			sdkerrors.Wrapf(sdkerrors.ErrInvalidType, "cannot unmarshal ICS-721 nft-transfer packet data"),
+			sdkerrors.Wrapf(errortypes.ErrInvalidType, "cannot unmarshal ICS-721 nft-transfer packet data"),
 		)
 		return ackResult
 	}
@@ -72,7 +73,7 @@ func (im IBCMiddleware) OnRecvPacket(
 		newPackage, dstReceiver := PackageToModuleAccount(packet)
 		if !common.IsHexAddress(dstReceiver) {
 			ackResult = channeltypes.NewErrorAcknowledgement(
-				sdkerrors.Wrapf(sdkerrors.ErrInvalidType, "receiver address format error"),
+				sdkerrors.Wrapf(errortypes.ErrInvalidType, "receiver address format error"),
 			)
 			return ackResult
 		}
@@ -125,13 +126,13 @@ func (im IBCMiddleware) OnAcknowledgementPacket(
 	// decode the data
 	var ack channeltypes.Acknowledgement
 	if err := types.ModuleCdc.UnmarshalJSON(acknowledgement, &ack); err != nil {
-		return sdkerrors.Wrapf(sdkerrors.ErrUnknownRequest,
+		return sdkerrors.Wrapf(errortypes.ErrUnknownRequest,
 			"cannot unmarshal ICS-721 transfer packet acknowledgement: %v", err)
 	}
 
 	var data types.NonFungibleTokenPacketData
 	if err := types.ModuleCdc.UnmarshalJSON(packet.GetData(), &data); err != nil {
-		return sdkerrors.Wrapf(sdkerrors.ErrUnknownRequest,
+		return sdkerrors.Wrapf(errortypes.ErrUnknownRequest,
 			"cannot unmarshal ICS-721 transfer packet data: %s", err.Error())
 	}
 
@@ -182,7 +183,7 @@ func (im IBCMiddleware) OnTimeoutPacket(
 ) error {
 	var data types.NonFungibleTokenPacketData
 	if err := types.ModuleCdc.UnmarshalJSON(packet.GetData(), &data); err != nil {
-		return sdkerrors.Wrapf(sdkerrors.ErrUnknownRequest, "cannot unmarshal ICS-721 transfer packet data: %s", err.Error())
+		return sdkerrors.Wrapf(errortypes.ErrUnknownRequest, "cannot unmarshal ICS-721 transfer packet data: %s", err.Error())
 	}
 	// refund tokens
 	if err := im.keeper.OnTimeoutPacket(ctx, packet, data); err != nil {

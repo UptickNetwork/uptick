@@ -11,13 +11,13 @@ import (
 
 	abci "github.com/cometbft/cometbft/abci/types"
 
+	sdkbftsim "cosmossdk.io/x/nft/simulation"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/codec"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
 	simtypes "github.com/cosmos/cosmos-sdk/types/simulation"
-	sdkbftsim "github.com/cosmos/cosmos-sdk/x/nft/simulation"
 
 	"github.com/UptickNetwork/uptick/x/collection/client/cli"
 	"github.com/UptickNetwork/uptick/x/collection/keeper"
@@ -129,9 +129,9 @@ func (am AppModule) RegisterInvariants(ir sdk.InvariantRegistry) {
 func (AppModule) QuerierRoute() string { return "" }
 
 // LegacyQuerierHandler returns the NFT module sdk.Querier.
-func (am AppModule) LegacyQuerierHandler(_ *codec.LegacyAmino) sdk.Queryable {
-	return nil
-}
+//func (am AppModule) LegacyQuerierHandler(_ *codec.LegacyAmino) sdk.Queryable {
+//	return nil
+//}
 
 // InitGenesis performs genesis initialization for the NFT module. It returns
 // no validator updates.
@@ -172,8 +172,8 @@ func (AppModule) RandomizedParams(r *rand.Rand) []simtypes.Params {
 	return nil
 }
 
-// RegisterStoreDecoder registers a decoder for NFT module's types
-func (am AppModule) RegisterStoreDecoder(sdr sdk.StoreDecoderRegistry) {
+// RegisterStoreDecoder registers a decoder for mint module's types
+func (am AppModule) RegisterStoreDecoder(sdr simtypes.StoreDecoderRegistry) {
 	sdr[types.StoreKey] = sdkbftsim.NewDecodeStore(am.cdc)
 }
 
@@ -183,3 +183,8 @@ func (am AppModule) WeightedOperations(simState module.SimulationState) []simtyp
 }
 
 // WeightedOperations returns the all the NFT module operations with their respective we
+// IsOnePerModuleType implements the depinject.OnePerModuleType interface.
+func (am AppModule) IsOnePerModuleType() {}
+
+// IsAppModule implements the appmodule.AppModule interface.
+func (am AppModule) IsAppModule() {}

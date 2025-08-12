@@ -1,7 +1,7 @@
 syntax = "proto3";
-package cosmos.nft.v1beta1;
+package uptick.nft.v1beta1;
 
-option go_package = "github.com/UptickNetwork/uptick/x/nft";
+option go_package = "github.com/UptickNetwork/uptick/x/nft/types";
 
 // EventSend is emitted on Msg/Send
 message EventSend {

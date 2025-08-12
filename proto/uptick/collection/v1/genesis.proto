@@ -8,5 +8,5 @@ option go_package = "github.com/UptickNetwork/uptick/x/collection/types";
 
 // GenesisState defines the collection module's genesis state
 message GenesisState {
-  repeated Collection collections = 1 [ (gogoproto.nullable) = false ];
+  repeated Collection collections = 1 [(gogoproto.nullable) = false];
 }

@@ -17,7 +17,8 @@ func AddIbcCaclulateCommand(debug *cobra.Command) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			cmd.Printf("IBC Denom %s\n for port:%s ,channel:%s ,denom:%s ", denom, args[0], args[1], args[2])
+			cmd.Printf("IBC Denom: %s\nPort: %s\nChannel: %s\nOriginal Denom: %s\n",
+				denom, args[0], args[1], args[2])
 			return nil
 		},
 	}

@@ -1,7 +1,8 @@
 package types
 
 import (
-	sdkerrors "github.com/cosmos/cosmos-sdk/types/errors"
+	sdkerrors "cosmossdk.io/errors"
+	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
 )
 
 // NewGenesisState creates a new genesis state.
@@ -26,7 +27,7 @@ func ValidateGenesis(data GenesisState) error {
 
 		for _, nft := range c.NFTs {
 			if nft.GetOwner().Empty() {
-				return sdkerrors.Wrap(sdkerrors.ErrInvalidAddress, "missing owner")
+				return sdkerrors.Wrap(errortypes.ErrInvalidAddress, "missing owner")
 			}
 
 			if err := ValidateTokenID(nft.GetID()); err != nil {

@@ -59,6 +59,7 @@ vagrant
 .idea/
 *.iml
 *.code-workspace
+*.xml
 
 # Graphviz
 dependency-graph.png
@@ -79,3 +80,6 @@ node_modules/*
 
 # OpenZeppelin contracts
 contracts/@openzeppelin/*
+
+#vscode
+.vscode/

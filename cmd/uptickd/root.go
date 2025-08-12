@@ -1,55 +1,50 @@
 package main
 
 import (
+	"cosmossdk.io/client/v2/autocli"
+	"cosmossdk.io/log"
+	rosettaCmd "cosmossdk.io/tools/rosetta/cmd"
 	"errors"
 	"fmt"
-	"github.com/CosmWasm/wasmd/x/wasm"
 	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
+	"github.com/UptickNetwork/uptick/app/params"
+	uptickparams "github.com/UptickNetwork/uptick/app/params"
+	cmdcfg "github.com/UptickNetwork/uptick/cmd/config"
 	tmcfg "github.com/cometbft/cometbft/config"
+	tmcli "github.com/cometbft/cometbft/libs/cli"
+	dbm "github.com/cosmos/cosmos-db"
+	"github.com/cosmos/cosmos-sdk/client/pruning"
+	"github.com/cosmos/cosmos-sdk/client/rpc"
+	"github.com/cosmos/cosmos-sdk/client/snapshot"
+	addresscodec "github.com/cosmos/cosmos-sdk/codec/address"
+	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/cosmos/cosmos-sdk/types/module"
+	authcmd "github.com/cosmos/cosmos-sdk/x/auth/client/cli"
 	genutiltypes "github.com/cosmos/cosmos-sdk/x/genutil/types"
+	srvflags "github.com/evmos/ethermint/server/flags"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/spf13/viper"
-
-	"io"
-	"os"
-	"path/filepath"
-
 	"github.com/spf13/cast"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+	"io"
+	"os"
 
-	dbm "github.com/cometbft/cometbft-db"
-	tmcli "github.com/cometbft/cometbft/libs/cli"
-	"github.com/cometbft/cometbft/libs/log"
-
-	"cosmossdk.io/simapp/params"
-	"github.com/cosmos/cosmos-sdk/baseapp"
+	confixcmd "cosmossdk.io/tools/confix/cmd"
+	"github.com/UptickNetwork/uptick/app"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/config"
 	"github.com/cosmos/cosmos-sdk/client/flags"
-	"github.com/cosmos/cosmos-sdk/client/rpc"
-	sdkserver "github.com/cosmos/cosmos-sdk/server"
+	"github.com/cosmos/cosmos-sdk/server"
 	servertypes "github.com/cosmos/cosmos-sdk/server/types"
-	"github.com/cosmos/cosmos-sdk/snapshots"
-	"github.com/cosmos/cosmos-sdk/store"
-	sdk "github.com/cosmos/cosmos-sdk/types"
-	authcmd "github.com/cosmos/cosmos-sdk/x/auth/client/cli"
-	"github.com/cosmos/cosmos-sdk/x/auth/types"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	"github.com/cosmos/cosmos-sdk/x/crisis"
 	genutilcli "github.com/cosmos/cosmos-sdk/x/genutil/client/cli"
 	ethermintclient "github.com/evmos/ethermint/client"
 	"github.com/evmos/ethermint/client/debug"
 	"github.com/evmos/ethermint/crypto/hd"
-	"github.com/evmos/ethermint/encoding"
 	ethermintserver "github.com/evmos/ethermint/server"
 	servercfg "github.com/evmos/ethermint/server/config"
-	srvflags "github.com/evmos/ethermint/server/flags"
-
-	"github.com/UptickNetwork/uptick/app"
-	cmdcfg "github.com/UptickNetwork/uptick/cmd/config"
-
-	rosettaCmd "cosmossdk.io/tools/rosetta/cmd"
-	snapshottypes "github.com/cosmos/cosmos-sdk/snapshots/types"
 )
 
 const (
@@ -58,17 +53,30 @@ const (
 
 // NewRootCmd creates a new root command for uptickd. It is called once in the
 // main function.
-func NewRootCmd() (*cobra.Command, params.EncodingConfig) {
+func NewRootCmd() *cobra.Command {
 
-	encodingConfig := encoding.MakeConfig(app.ModuleBasics)
+	initAppOptions := viper.New()
+	tempDir := tempDir()
+	initAppOptions.Set(flags.FlagHome, tempDir)
+	tempApplication := app.NewUptick(log.NewNopLogger(), dbm.NewMemDB(), nil, true, initAppOptions, []wasmkeeper.Option{})
+	encodingConfig := tempApplication.EncodingConfig()
+
+	defer func() {
+		if err := tempApplication.Close(); err != nil {
+			panic(err)
+		}
+		if tempDir != app.DefaultNodeHome {
+			os.RemoveAll(tempDir)
+		}
+	}()
 	initClientCtx := client.Context{}.
 		WithCodec(encodingConfig.Codec).
 		WithInterfaceRegistry(encodingConfig.InterfaceRegistry).
 		WithTxConfig(encodingConfig.TxConfig).
-		WithLegacyAmino(encodingConfig.Amino).
+		WithLegacyAmino(encodingConfig.LegacyAmino).
 		WithInput(os.Stdin).
-		WithAccountRetriever(types.AccountRetriever{}).
-		WithBroadcastMode(flags.FlagBroadcastMode).
+		WithAccountRetriever(authtypes.AccountRetriever{}).
+		WithBroadcastMode(flags.BroadcastSync).
 		WithHomeDir(app.DefaultNodeHome).
 		WithKeyringOptions(hd.EthSecp256k1Option()).
 		WithViper(EnvPrefix)
@@ -77,16 +85,6 @@ func NewRootCmd() (*cobra.Command, params.EncodingConfig) {
 		Use:   app.Name,
 		Short: "Uptick Daemon",
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
-			// set the default command outputs
-			cmd.SetOut(cmd.OutOrStdout())
-			cmd.SetErr(cmd.ErrOrStderr())
-
-			//// Disable ledger temporarily
-			//useLedger, _ := cmd.Flags().GetBool(flags.FlagUseLedger)
-			//if useLedger {
-			//	return errors.New("--ledger flag passed: Ledger device is currently not supported")
-			//}
-
 			initClientCtx, err := client.ReadPersistentCommandFlags(initClientCtx, cmd.Flags())
 			if err != nil {
 				return err
@@ -97,51 +95,62 @@ func NewRootCmd() (*cobra.Command, params.EncodingConfig) {
 				return err
 			}
 
-			if err := client.SetCmdClientContextHandler(initClientCtx, cmd); err != nil {
+			if err = client.SetCmdClientContextHandler(initClientCtx, cmd); err != nil {
 				return err
 			}
 
-			// TODO: define our own token
 			customAppTemplate, customAppConfig := initAppConfig()
 			customTMConfig := initTendermintConfig()
 
-			return sdkserver.InterceptConfigsPreRunHandler(cmd, customAppTemplate, customAppConfig, customTMConfig)
+			return server.InterceptConfigsPreRunHandler(cmd, customAppTemplate, customAppConfig, customTMConfig)
 		},
+		SilenceUsage: true,
 	}
 
-	cfg := sdk.GetConfig()
-	cfg.Seal()
-
+	ac := appCreator{}
 	rootCmd.AddCommand(
 		ethermintclient.ValidateChainID(
-			InitCmd(app.ModuleBasics, app.DefaultNodeHome),
+			InitCmd(tempApplication.BasicManager(), app.DefaultNodeHome),
 		),
-		genutilcli.CollectGenTxsCmd(banktypes.GenesisBalancesIterator{}, app.DefaultNodeHome, genutiltypes.DefaultMessageValidator),
-		genutilcli.MigrateGenesisCmd(),
-		genutilcli.GenTxCmd(app.ModuleBasics, encodingConfig.TxConfig, banktypes.GenesisBalancesIterator{}, app.DefaultNodeHome),
-		genutilcli.ValidateGenesisCmd(app.ModuleBasics),
+		genutilcli.CollectGenTxsCmd(banktypes.GenesisBalancesIterator{},
+			app.DefaultNodeHome,
+			genutiltypes.DefaultMessageValidator,
+			tempApplication.GetTxConfig().SigningContext().ValidatorAddressCodec(),
+		),
+		MigrateGenesisCmd(),
+		genutilcli.GenTxCmd(tempApplication.BasicManager(), tempApplication.GetTxConfig(), banktypes.GenesisBalancesIterator{}, app.DefaultNodeHome, tempApplication.GetTxConfig().SigningContext().ValidatorAddressCodec()),
+		genutilcli.ValidateGenesisCmd(tempApplication.BasicManager()),
 		AddGenesisAccountCmd(app.DefaultNodeHome),
 		tmcli.NewCompletionCmd(rootCmd, true),
-		NewTestnetCmd(app.ModuleBasics, banktypes.GenesisBalancesIterator{}),
+		NewTestnetCmd(tempApplication.BasicManager(), banktypes.GenesisBalancesIterator{}),
 		AddIbcCaclulateCommand(debug.Cmd()),
-		config.Cmd(),
+		debug.Cmd(),
+		confixcmd.ConfigCommand(),
+		pruning.Cmd(ac.newApp, app.DefaultNodeHome),
+		snapshot.Cmd(ac.newApp),
 	)
 
-	a := appCreator{encodingConfig}
 	ethermintserver.AddCommands(
 		rootCmd,
-		ethermintserver.NewDefaultStartOptions(a.newApp, app.DefaultNodeHome),
-		a.appExport,
+		ethermintserver.NewDefaultStartOptions(ac.newApp, app.DefaultNodeHome),
+		ac.appExport,
 		addModuleInitFlags,
 	)
 
 	// add keybase, auxiliary RPC, query, and tx child commands
 	rootCmd.AddCommand(
-		rpc.StatusCommand(),
+		server.StatusCommand(),
+		genesisCommand(tempApplication.BasicManager(), encodingConfig),
 		queryCommand(),
-		txCommand(),
+		txCommand(tempApplication.BasicManager()),
 		ethermintclient.KeyCommands(app.DefaultNodeHome),
 	)
+
+	autoCliOpts := enrichAutoCliOpts(tempApplication.AutoCliOpts(), initClientCtx)
+	if err := autoCliOpts.EnhanceRootCommand(rootCmd); err != nil {
+		panic(err)
+	}
+
 	rootCmd, err := srvflags.AddTxFlags(rootCmd)
 	if err != nil {
 		panic(err)
@@ -149,8 +158,31 @@ func NewRootCmd() (*cobra.Command, params.EncodingConfig) {
 
 	// add rosetta
 	rootCmd.AddCommand(rosettaCmd.RosettaCommand(encodingConfig.InterfaceRegistry, encodingConfig.Codec))
+	return rootCmd
+}
 
-	return rootCmd, encodingConfig
+func enrichAutoCliOpts(autoCliOpts autocli.AppOptions, clientCtx client.Context) autocli.AppOptions {
+	autoCliOpts.AddressCodec = addresscodec.NewBech32Codec(sdk.GetConfig().GetBech32AccountAddrPrefix())
+	autoCliOpts.ValidatorAddressCodec = addresscodec.NewBech32Codec(sdk.GetConfig().GetBech32ValidatorAddrPrefix())
+	autoCliOpts.ConsensusAddressCodec = addresscodec.NewBech32Codec(sdk.GetConfig().GetBech32ConsensusAddrPrefix())
+
+	autoCliOpts.ClientCtx = clientCtx
+
+	return autoCliOpts
+}
+
+// genesisCommand builds genesis-related `simd genesis` command. Users may provide application specific commands as a parameter
+func genesisCommand(basicManager module.BasicManager, encodingConfig params.EncodingConfig, cmds ...*cobra.Command) *cobra.Command {
+	cmd := genutilcli.Commands(
+		encodingConfig.TxConfig,
+		basicManager,
+		app.DefaultNodeHome,
+	)
+
+	for _, subCmd := range cmds {
+		cmd.AddCommand(subCmd)
+	}
+	return cmd
 }
 
 func addModuleInitFlags(startCmd *cobra.Command) {
@@ -168,20 +200,24 @@ func queryCommand() *cobra.Command {
 	}
 
 	cmd.AddCommand(
-		authcmd.GetAccountCmd(),
 		rpc.ValidatorCommand(),
-		rpc.BlockCommand(),
+		server.QueryBlocksCmd(),
+		server.QueryBlockCmd(),
+		server.QueryBlockResultsCmd(),
 		authcmd.QueryTxsByEventsCmd(),
 		authcmd.QueryTxCmd(),
+
+		//authcmd.GetAccountCmd(),
+		//rpc.BlockCommand(),
+		//rpc.QueryEventForTxCmd(),
 	)
 
-	app.ModuleBasics.AddQueryCommands(cmd)
 	cmd.PersistentFlags().String(flags.FlagChainID, "", "The network chain ID")
 
 	return cmd
 }
 
-func txCommand() *cobra.Command {
+func txCommand(basicManager module.BasicManager) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                        "tx",
 		Short:                      "Transactions subcommands",
@@ -201,7 +237,7 @@ func txCommand() *cobra.Command {
 		authcmd.GetDecodeCommand(),
 	)
 
-	app.ModuleBasics.AddTxCommands(cmd)
+	basicManager.AddTxCommands(cmd)
 	cmd.PersistentFlags().String(flags.FlagChainID, "", "The network chain ID")
 
 	return cmd
@@ -219,95 +255,35 @@ func initAppConfig() (string, interface{}) {
 
 	srvCfg.StateSync.SnapshotInterval = 1500
 	srvCfg.StateSync.SnapshotKeepRecent = 2
-
+	srvCfg.IAVLDisableFastNode = false
 	return customAppTemplate, srvCfg
 }
 
 type appCreator struct {
-	encCfg params.EncodingConfig
+	encCfg uptickparams.EncodingConfig
 }
 
 // newApp is an appCreator
 func (a appCreator) newApp(logger log.Logger, db dbm.DB, traceStore io.Writer, appOpts servertypes.AppOptions) servertypes.Application {
-	var cache sdk.MultiStorePersistentCache
 
-	if cast.ToBool(appOpts.Get(sdkserver.FlagInterBlockCache)) {
-		cache = store.NewCommitKVStoreCacheManager()
-	}
-
-	skipUpgradeHeights := make(map[int64]bool)
-	for _, h := range cast.ToIntSlice(appOpts.Get(sdkserver.FlagUnsafeSkipUpgrades)) {
-		skipUpgradeHeights[int64(h)] = true
-	}
-
-	pruningOpts, err := sdkserver.GetPruningOptionsFromFlags(appOpts)
-	if err != nil {
-		panic(err)
-	}
-
-	snapshotDir := filepath.Join(cast.ToString(appOpts.Get(flags.FlagHome)), "data", "snapshots")
-	snapshotDB, err := dbm.NewDB("metadata", sdkserver.GetAppDBBackend(appOpts), snapshotDir)
-	if err != nil {
-		panic(err)
-	}
-	snapshotStore, err := snapshots.NewStore(snapshotDB, snapshotDir)
-	if err != nil {
-		panic(err)
-	}
-
-	var wasmOpts []wasm.Option
+	var wasmOpts []wasmkeeper.Option
 	if cast.ToBool(appOpts.Get("telemetry.enabled")) {
 		wasmOpts = append(wasmOpts, wasmkeeper.WithVMCacheMetrics(prometheus.DefaultRegisterer))
 	}
-
-	// Setup chainId
-	chainID := cast.ToString(appOpts.Get(flags.FlagChainID))
-	if len(chainID) == 0 {
-		v := viper.New()
-		v.AddConfigPath(filepath.Join(flags.FlagHome, "config"))
-		v.SetConfigName("client")
-		v.SetConfigType("toml")
-		if err := v.ReadInConfig(); err != nil {
-			panic(err)
-		}
-		conf := new(config.ClientConfig)
-		if err := v.Unmarshal(conf); err != nil {
-			panic(err)
-		}
-		chainID = conf.ChainID
-	}
-
-	uptickApp := app.NewUptick(
-		logger, db, traceStore, true, skipUpgradeHeights,
-		cast.ToString(appOpts.Get(flags.FlagHome)),
-		cast.ToUint(appOpts.Get(sdkserver.FlagInvCheckPeriod)),
-		a.encCfg,
+	baseappOptions := server.DefaultBaseappOptions(appOpts)
+	return app.NewUptick(
+		logger,
+		db,
+		traceStore,
+		true,
 		appOpts,
 		wasmOpts,
-		baseapp.SetPruning(pruningOpts),
-		baseapp.SetMinGasPrices(cast.ToString(appOpts.Get(sdkserver.FlagMinGasPrices))),
-		baseapp.SetHaltHeight(cast.ToUint64(appOpts.Get(sdkserver.FlagHaltHeight))),
-		baseapp.SetHaltTime(cast.ToUint64(appOpts.Get(sdkserver.FlagHaltTime))),
-		baseapp.SetMinRetainBlocks(cast.ToUint64(appOpts.Get(sdkserver.FlagMinRetainBlocks))),
-		baseapp.SetInterBlockCache(cache),
-		baseapp.SetTrace(cast.ToBool(appOpts.Get(sdkserver.FlagTrace))),
-		baseapp.SetIndexEvents(cast.ToStringSlice(appOpts.Get(sdkserver.FlagIndexEvents))),
-		baseapp.SetChainID(chainID),
-
-		baseapp.SetSnapshot(
-			snapshotStore,
-			snapshottypes.NewSnapshotOptions(
-				cast.ToUint64(appOpts.Get(sdkserver.FlagStateSyncSnapshotInterval)),
-				cast.ToUint32(appOpts.Get(sdkserver.FlagStateSyncSnapshotKeepRecent)),
-			),
-		),
+		baseappOptions...,
 	)
-
-	return uptickApp
 }
 
 // createIrisappAndExport creates a new irisapp (optionally at a given height) and exports state.
-func (a appCreator) appExport(
+func (ac appCreator) appExport(
 	logger log.Logger,
 	db dbm.DB,
 	traceStore io.Writer,
@@ -319,20 +295,20 @@ func (a appCreator) appExport(
 ) (servertypes.ExportedApp, error) {
 	var uptickApp *app.Uptick
 	homePath, ok := appOpts.Get(flags.FlagHome).(string)
-	var emptyWasmOpts []wasm.Option
 	if !ok || homePath == "" {
 		return servertypes.ExportedApp{}, errors.New("application home is not set")
 	}
 
+	var loadLatest bool
 	if height == -1 {
-		uptickApp = app.NewUptick(logger, db, traceStore, false, map[int64]bool{}, "", uint(1), a.encCfg, appOpts, emptyWasmOpts)
-
+		loadLatest = true
+	}
+	var emptyWasmOpts []wasmkeeper.Option
+	uptickApp = app.NewUptick(logger, db, traceStore, loadLatest, appOpts, emptyWasmOpts)
+	if height != -1 {
 		if err := uptickApp.LoadHeight(height); err != nil {
 			return servertypes.ExportedApp{}, err
 		}
-	} else {
-		uptickApp = app.NewUptick(logger, db, traceStore, true, map[int64]bool{}, "", uint(1), a.encCfg, appOpts, emptyWasmOpts)
-
 	}
 
 	return uptickApp.ExportAppStateAndValidators(forZeroHeight, jailAllowedAddrs, modulesToExport)
@@ -343,9 +319,19 @@ func (a appCreator) appExport(
 func initTendermintConfig() *tmcfg.Config {
 	cfg := tmcfg.DefaultConfig()
 
-	// to put a higher strain on node memory, use these values:
+	// these values put a higher strain on node memory
 	// cfg.P2P.MaxNumInboundPeers = 100
 	// cfg.P2P.MaxNumOutboundPeers = 40
 
 	return cfg
+}
+
+var tempDir = func() string {
+	dir, err := os.MkdirTemp("", ".uptickd")
+	if err != nil {
+		panic(fmt.Sprintf("failed creating temp directory: %s", err.Error()))
+	}
+	defer os.RemoveAll(dir)
+
+	return dir
 }
