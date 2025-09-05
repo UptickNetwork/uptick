@@ -142,7 +142,7 @@ type AppKeepers struct {
 	Cw721Keeper  cw721keeper.Keeper
 	EVMIBCKeeper evmIBCKeepr.Keeper
 	NFTKeeper    nftkeeper.Keeper
-	// this line is used by starport scaffolding # stargate/app/keeperDeclaration
+	// wasm keepers
 	WasmKeeper           wasmkeeper.Keeper
 	WasmConfig           wasmtypes.WasmConfig
 	ContractKeeper       *wasmkeeper.PermissionedKeeper
@@ -187,6 +187,7 @@ func New(
 		appKeepers.tkeys[paramstypes.TStoreKey],
 	)
 
+	// consensus params keeper
 	appKeepers.ConsensusParamsKeeper = consensusparamkeeper.NewKeeper(
 		appCodec,
 		runtime.NewKVStoreService(appKeepers.keys[consensusparamtypes.StoreKey]),
