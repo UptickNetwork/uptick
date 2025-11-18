@@ -68,7 +68,6 @@ func (k Keeper) OnRecvPacket(
 	}
 
 	write()
-	ctx.EventManager().EmitEvents(cctx.EventManager().Events())
 	event.Status = erc20Types.STATUS_SUCCESS
 	_ = ctx.EventManager().EmitTypedEvent(event)
 
