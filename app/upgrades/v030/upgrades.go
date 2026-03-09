@@ -34,7 +34,7 @@ var (
 
 // Upgrade defines a struct containing necessary fields that a SoftwareUpgradeProposal
 var Upgrade = upgrades.Upgrade{
-	UpgradeName:               "v0.3.0",
+	UpgradeName:               "v0.3.1",
 	UpgradeHandlerConstructor: upgradeHandlerConstructor,
 	StoreUpgrades: &storetypes.StoreUpgrades{
 		Added: []string{

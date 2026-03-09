@@ -51,8 +51,8 @@ func (app *Uptick) setupUpgradeStoreLoaders() {
 		return
 	}
 
-	// Always apply store upgrades for v0.3.0 upgrade to ensure icacontroller store is added
-	if upgradeInfo.Name == "v0.3.0" && upgrade.StoreUpgrades != nil {
+	// Always apply store upgrades for v0.3.1 upgrade to ensure icacontroller store is added
+	if upgradeInfo.Name == "v0.3.1" && upgrade.StoreUpgrades != nil {
 		app.SetStoreLoader(
 			upgradetypes.UpgradeStoreLoader(
 				upgradeInfo.Height,
