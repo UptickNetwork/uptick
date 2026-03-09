@@ -24,16 +24,17 @@ type HandlerOptions struct {
 	BankKeeper    evmtypes.BankKeeper
 	IBCKeeper     *ibckeeper.Keeper
 	//FeeMarketKeeper evmtypes.FeeMarketKeeper
-	FeeMarketKeeper   ethante.FeeMarketKeeper
-	EvmKeeper         ethante.EVMKeeper
-	FeegrantKeeper    ante.FeegrantKeeper
-	SignModeHandler   *txsigning.HandlerMap
-	SigGasConsumer    func(meter storetypes.GasMeter, sig signing.SignatureV2, params authtypes.Params) error
-	TxCounterStoreKey storetypes.StoreKey
-	WasmConfig        wasmTypes.WasmConfig
-	Cdc               codec.BinaryCodec
-	MaxTxGasWanted    uint64
-	TxFeeChecker      ante.TxFeeChecker
+	FeeMarketKeeper         ethante.FeeMarketKeeper
+	EvmKeeper               ethante.EVMKeeper
+	FeegrantKeeper          ante.FeegrantKeeper
+	SignModeHandler         *txsigning.HandlerMap
+	SigGasConsumer          func(meter storetypes.GasMeter, sig signing.SignatureV2, params authtypes.Params) error
+	TxCounterStoreKey       storetypes.StoreKey
+	WasmConfig              wasmTypes.WasmConfig
+	Cdc                     codec.BinaryCodec
+	MaxTxGasWanted          uint64
+	TxFeeChecker            ante.TxFeeChecker
+	MaxWasmDispatchMsgCount uint64 // 限制 CosmWasm DispatchMsg 中嵌套消息的最大数量
 }
 
 // Validate checks if the keepers are defined
@@ -80,6 +81,8 @@ func newCosmosAnteHandler(options HandlerOptions) sdk.AnteHandler {
 		ante.NewSetUpContextDecorator(),
 		//	ante.NewRejectExtensionOptionsDecorator(),
 		ante.NewValidateBasicDecorator(),
+		// 添加 CosmWasm 安全检查，必须在早期执行以检查所有消息
+		NewWasmSecurityDecorator(options.Cdc, options.EvmKeeper, options.MaxTxGasWanted),
 		ethante.NewMinGasPriceDecorator(options.FeeMarketKeeper, options.EvmKeeper),
 		ante.NewTxTimeoutHeightDecorator(),
 		ante.NewValidateMemoDecorator(options.AccountKeeper),
@@ -103,6 +106,8 @@ func newCosmosAnteHandlerEip712(options HandlerOptions) sdk.AnteHandler {
 		ethante.RejectMessagesDecorator{}, // reject MsgEthereumTxs
 		ante.NewSetUpContextDecorator(),
 		ante.NewValidateBasicDecorator(),
+		// 添加 CosmWasm 安全检查，必须在早期执行以检查所有消息
+		NewWasmSecurityDecorator(options.Cdc, options.EvmKeeper, options.MaxTxGasWanted),
 		ethante.NewMinGasPriceDecorator(options.FeeMarketKeeper, options.EvmKeeper),
 		ante.NewTxTimeoutHeightDecorator(),
 		ante.NewValidateMemoDecorator(options.AccountKeeper),
