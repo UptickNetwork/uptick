@@ -5,11 +5,13 @@ import (
 
 	"github.com/UptickNetwork/uptick/app/upgrades"
 	v030 "github.com/UptickNetwork/uptick/app/upgrades/v030"
+	v031 "github.com/UptickNetwork/uptick/app/upgrades/v031"
 )
 
 var (
 	router = upgrades.NewUpgradeRouter().
-		Register(v030.Upgrade)
+		Register(v030.Upgrade).
+		Register(v031.Upgrade)
 )
 
 // RegisterUpgradePlans register a handler of upgrade plan
@@ -48,17 +50,6 @@ func (app *Uptick) setupUpgradeStoreLoaders() {
 	upgrade, exists := router.Routers()[upgradeInfo.Name]
 	if !exists {
 		// If upgrade doesn't exist in our router, return without setting up store loader
-		return
-	}
-
-	// Always apply store upgrades for v0.3.0 upgrade to ensure icacontroller store is added
-	if upgradeInfo.Name == "v0.3.0" && upgrade.StoreUpgrades != nil {
-		app.SetStoreLoader(
-			upgradetypes.UpgradeStoreLoader(
-				upgradeInfo.Height,
-				upgrade.StoreUpgrades,
-			),
-		)
 		return
 	}
 
