@@ -1,6 +1,6 @@
 module github.com/UptickNetwork/uptick
 
-go 1.24.0
+go 1.23.5
 
 require (
 	cosmossdk.io/simapp v0.0.0-20240118210941-3897926e722e
@@ -10,13 +10,13 @@ require (
 	github.com/bianjieai/nft-transfer v1.1.3-ibc-v8.6.1
 	github.com/btcsuite/btcd v0.24.2 // indirect
 	github.com/btcsuite/btcd/btcutil v1.1.6 // indirect
-	github.com/cometbft/cometbft v0.38.19
+	github.com/cometbft/cometbft v0.38.21
 	github.com/cometbft/cometbft-db v0.14.1 // indirect
 	github.com/cosmos/cosmos-sdk v0.50.14
 	github.com/cosmos/go-bip39 v1.0.0
 	github.com/cosmos/ibc-go/v8 v8.7.0
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
-	github.com/ethereum/go-ethereum v1.13.15
+	github.com/ethereum/go-ethereum v1.10.26
 	github.com/evmos/ethermint v1.10.26
 	github.com/golang/protobuf v1.5.4
 	github.com/gorilla/mux v1.8.1
@@ -37,10 +37,10 @@ require (
 	github.com/tyler-smith/go-bip39 v1.1.0 // indirect
 	github.com/zondax/hid v0.9.2 // indirect
 	go.opencensus.io v0.24.0
-	golang.org/x/crypto v0.45.0 // indirect
+	golang.org/x/crypto v0.36.0 // indirect
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56 // indirect
-	golang.org/x/net v0.47.0 // indirect
-	golang.org/x/text v0.31.0 // indirect
+	golang.org/x/net v0.38.0 // indirect
+	golang.org/x/text v0.23.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250204164813-702378808489
 	google.golang.org/grpc v1.70.0
 	sigs.k8s.io/yaml v1.4.0 // indirect
@@ -68,8 +68,8 @@ require (
 
 require (
 	cosmossdk.io/x/nft v0.1.1
-	github.com/UptickNetwork/evm-nft-convert v1.1.3
-	github.com/UptickNetwork/wasm-nft-convert v1.1.0
+	github.com/UptickNetwork/evm-nft-convert v1.1.4
+	github.com/UptickNetwork/wasm-nft-convert v1.1.3
 	github.com/cosmos/cosmos-db v1.1.1
 	github.com/cosmos/ibc-go/modules/capability v1.0.1
 )
@@ -83,7 +83,6 @@ require (
 	github.com/CosmWasm/wasmvm/v2 v2.1.5 // indirect
 	github.com/DataDog/datadog-go v3.2.0+incompatible // indirect
 	github.com/DataDog/zstd v1.5.5 // indirect
-	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/bits-and-blooms/bitset v1.20.0 // indirect
 	github.com/bytedance/sonic v1.12.3 // indirect
 	github.com/bytedance/sonic/loader v0.2.0 // indirect
@@ -96,26 +95,22 @@ require (
 	github.com/cockroachdb/pebble v1.1.2 // indirect
 	github.com/cockroachdb/redact v1.1.5 // indirect
 	github.com/cockroachdb/tokenbucket v0.0.0-20230807174530-cc333fc44b06 // indirect
-	github.com/consensys/gnark-crypto v0.18.1 // indirect
 	github.com/cosmos/gogogateway v1.2.0 // indirect
 	github.com/cosmos/ics23/go v0.11.0 // indirect
 	github.com/cosmos/rosetta-sdk-go v0.10.0 // indirect
-	github.com/crate-crypto/go-ipa v0.0.0-20231025140028-3c0104f4b233 // indirect
-	github.com/crate-crypto/go-kzg-4844 v0.7.0 // indirect
 	github.com/creachadair/atomicfile v0.3.1 // indirect
 	github.com/creachadair/tomledit v0.0.24 // indirect
-	github.com/deckarep/golang-set/v2 v2.1.0 // indirect
+	github.com/deckarep/golang-set v1.8.0 // indirect
 	github.com/dgraph-io/badger/v4 v4.2.0 // indirect
 	github.com/distribution/reference v0.5.0 // indirect
+	github.com/edsrzf/mmap-go v1.0.0 // indirect
 	github.com/emicklei/dot v1.6.2 // indirect
-	github.com/ethereum/c-kzg-4844 v0.4.0 // indirect
 	github.com/fatih/color v1.15.0 // indirect
-	github.com/gballet/go-verkle v0.1.1-0.20231031103413-a67434b50f46 // indirect
 	github.com/getsentry/sentry-go v0.27.0 // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
-	github.com/gofrs/flock v0.8.1 // indirect
+	github.com/go-stack/stack v1.8.1 // indirect
 	github.com/gogo/googleapis v1.4.1 // indirect
 	github.com/golang/mock v1.6.0 // indirect
 	github.com/google/flatbuffers v2.0.8+incompatible // indirect
@@ -138,13 +133,14 @@ require (
 	github.com/oasisprotocol/curve25519-voi v0.0.0-20230904125328-1f23a7beb09a // indirect
 	github.com/oklog/run v1.1.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
+	github.com/prometheus/tsdb v0.7.1 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
+	github.com/rjeczalik/notify v0.9.1 // indirect
 	github.com/rogpeppe/go-internal v1.13.1 // indirect
 	github.com/sagikazarmark/locafero v0.4.0 // indirect
 	github.com/sagikazarmark/slog-shim v0.1.0 // indirect
 	github.com/shamaton/msgpack/v2 v2.2.0 // indirect
 	github.com/sourcegraph/conc v0.3.0 // indirect
-	github.com/supranational/blst v0.3.11 // indirect
 	github.com/tidwall/btree v1.7.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
@@ -158,11 +154,10 @@ require (
 	go.opentelemetry.io/otel/trace v1.34.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/arch v0.3.0 // indirect
-	golang.org/x/mod v0.29.0 // indirect
 	golang.org/x/time v0.10.0 // indirect
-	golang.org/x/tools v0.38.0 // indirect
 	google.golang.org/genproto v0.0.0-20240701130421-f6361c86f094 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250227231956-55c901821b1e // indirect
+	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
 	gotest.tools/v3 v3.5.1 // indirect
 	pgregory.net/rapid v1.1.0 // indirect
 )
@@ -171,7 +166,7 @@ require (
 	cloud.google.com/go v0.115.0 // indirect
 	cloud.google.com/go/iam v1.1.9 // indirect
 	cloud.google.com/go/storage v1.41.0 // indirect; indirectx
-	filippo.io/edwards25519 v1.1.0 // indirect
+	filippo.io/edwards25519 v1.1.1 // indirect
 	github.com/99designs/keyring v1.2.2 // indirect
 	github.com/StackExchange/wmi v1.2.1 // indirect
 	github.com/VictoriaMetrics/fastcache v1.12.1 // indirect
@@ -264,9 +259,9 @@ require (
 	github.com/ulikunitz/xz v0.5.14 // indirect
 	go.etcd.io/bbolt v1.4.0-alpha.0.0.20240404170359-43604f3112c5 // indirect
 	golang.org/x/oauth2 v0.27.0 // indirect
-	golang.org/x/sync v0.18.0
-	golang.org/x/sys v0.38.0 // indirect
-	golang.org/x/term v0.37.0 // indirect
+	golang.org/x/sync v0.12.0
+	golang.org/x/sys v0.31.0 // indirect
+	golang.org/x/term v0.30.0 // indirect
 	google.golang.org/api v0.223.0 // indirect
 	google.golang.org/protobuf v1.36.5
 	gopkg.in/ini.v1 v1.67.0 // indirect
@@ -279,10 +274,8 @@ replace (
 	cosmossdk.io/tools/rosetta => cosmossdk.io/tools/rosetta v0.2.1-0.20230613133644-0a778132a60f
 	// use cosmos fork of keyring
 	github.com/99designs/keyring => github.com/cosmos/keyring v1.2.0
-	github.com/UptickNetwork/evm-nft-convert => github.com/UptickNetwork/evm-nft-convert v1.1.3
-	github.com/UptickNetwork/wasm-nft-convert => github.com/UptickNetwork/wasm-nft-convert v1.1.2
 	github.com/cosmos/ibc-apps/modules/ibc-hooks/v8 => github.com/public-awesome/ibc-apps/modules/ibc-hooks/v8 v8.0.0-20250129183033-079b03c57592
-	github.com/evmos/ethermint => github.com/bianjieai/ethermint v0.23.0-irishub
+	github.com/evmos/ethermint => github.com/UptickNetwork/ethermint v0.23.0
 	github.com/gin-gonic/gin => github.com/gin-gonic/gin v1.9.1
 	github.com/syndtr/goleveldb => github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
 )
