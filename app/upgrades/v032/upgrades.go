@@ -33,6 +33,8 @@ import (
 )
 
 var (
+	upgradeName = "v0.3.2"
+
 	create2FactoryAddress = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
 	create2FactoryRuntime = "0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe03601600081602082378035828234f58015156039578182fd5b8082525050506014600cf3"
 
@@ -51,7 +53,7 @@ var (
 
 // Upgrade defines a struct containing necessary fields that a SoftwareUpgradeProposal
 var Upgrade = upgrades.Upgrade{
-	UpgradeName:               "v0.3.2",
+	UpgradeName:               upgradeName,
 	UpgradeHandlerConstructor: upgradeHandlerConstructor,
 	StoreUpgrades:             &storetypes.StoreUpgrades{},
 }
@@ -63,7 +65,7 @@ func upgradeHandlerConstructor(
 ) upgradetypes.UpgradeHandler {
 	return func(context context.Context, _ upgradetypes.Plan, vm module.VersionMap) (module.VersionMap, error) {
 		ctx := sdk.UnwrapSDKContext(context)
-		ctx.Logger().Info("executing upgrade plan", "name", Upgrade.UpgradeName)
+		ctx.Logger().Info("executing upgrade plan", "name", upgradeName)
 
 		migrateConsensusParamsToXConsensus(ctx, box)
 		if err := ensureConsensusBlockGasForEVM(ctx, box.ConsensusParamsKeeper); err != nil {
