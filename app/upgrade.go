@@ -6,12 +6,14 @@ import (
 	"github.com/UptickNetwork/uptick/app/upgrades"
 	v030 "github.com/UptickNetwork/uptick/app/upgrades/v030"
 	v031 "github.com/UptickNetwork/uptick/app/upgrades/v031"
+	v032 "github.com/UptickNetwork/uptick/app/upgrades/v032"
 )
 
 var (
 	router = upgrades.NewUpgradeRouter().
 		Register(v030.Upgrade).
-		Register(v031.Upgrade)
+		Register(v031.Upgrade).
+		Register(v032.Upgrade)
 )
 
 // RegisterUpgradePlans register a handler of upgrade plan
