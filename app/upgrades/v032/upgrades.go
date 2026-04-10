@@ -67,29 +67,38 @@ func upgradeHandlerConstructor(
 		ctx := sdk.UnwrapSDKContext(context)
 		ctx.Logger().Info("executing upgrade plan", "name", upgradeName)
 
-		migrateConsensusParamsToXConsensus(ctx, box)
+		if needsV031Bootstrap(vm) {
+			migrateConsensusParamsToXConsensus(ctx, box)
+			if err := setFeemarketParams(ctx, box); err != nil {
+				return vm, err
+			}
+			if err := setWasmParams(ctx, box); err != nil {
+				return vm, err
+			}
+			if err := initIBCNFTTransferGenesis(ctx, box); err != nil {
+				return vm, err
+			}
+			initICAModule(ctx, m, vm)
+		} else {
+			ctx.Logger().Info("skip v031 bootstrap steps; chain already bootstrapped")
+		}
 		if err := ensureConsensusBlockGasForEVM(ctx, box.ConsensusParamsKeeper); err != nil {
 			return vm, fmt.Errorf("ensure consensus block gas for EVM: %w", err)
 		}
-		if err := setFeemarketParams(ctx, box); err != nil {
-			return vm, err
-		}
-		if err := setWasmParams(ctx, box); err != nil {
-			return vm, err
-		}
-		if err := initIBCNFTTransferGenesis(ctx, box); err != nil {
-			return vm, err
-		}
-		initICAModule(ctx, m, vm)
 		if err := injectEVMRuntimeContract(ctx, box); err != nil {
 			return vm, fmt.Errorf("inject EVM runtime contract: %w", err)
 		}
-		if err := enableEVMShanghaiUpgrade(ctx, box); err != nil {
-			return vm, fmt.Errorf("enable EVM Shanghai upgrade: %w", err)
+		if err := enableEVMShanghaiCancunPragueUpgrade(ctx, box); err != nil {
+			return vm, fmt.Errorf("enable EVM Shanghai/Cancun/Prague upgrade: %w", err)
 		}
 
 		return box.ModuleManager.RunMigrations(ctx, c, vm)
 	}
+}
+
+// needsV031Bootstrap returns true when this chain still needs v031-style bootstrap steps.
+func needsV031Bootstrap(vm module.VersionMap) bool {
+	return vm[icatypes.ModuleName] == 0 || vm[ibcnfttransfertypes.ModuleName] == 0
 }
 
 func migrateConsensusParamsToXConsensus(ctx sdk.Context, box upgrades.Toolbox) {
@@ -204,19 +213,25 @@ func injectEVMRuntimeContract(ctx sdk.Context, box upgrades.Toolbox) error {
 	return nil
 }
 
-// enableEVMShanghaiUpgrade sets ShanghaiBlock and CancunBlock in the EVM ChainConfig and
+// enableEVMShanghaiCancunPragueUpgrade sets Shanghai/Cancun/Prague in the EVM ChainConfig and
 // appends EIP-3855 to ExtraEIPs so the interpreter enables PUSH0 (Solidity 0.8.20+ bytecode).
-func enableEVMShanghaiUpgrade(ctx sdk.Context, box upgrades.Toolbox) error {
-	evmParams := box.EvmKeeper.GetParams(ctx)
-	zero := math.ZeroInt()
-	evmParams.ChainConfig.ShanghaiBlock = &zero
-	evmParams.ChainConfig.CancunBlock = &zero
-	if !slices.Contains(evmParams.ExtraEIPs, eip3855Extra) {
-		evmParams.ExtraEIPs = append(evmParams.ExtraEIPs, eip3855Extra)
-	}
+// Note: "Prague" is the execution-layer fork for Pectra.
+func enableEVMShanghaiCancunPragueUpgrade(ctx sdk.Context, box upgrades.Toolbox) error {
+	evmParams := applyEVMForkParams(box.EvmKeeper.GetParams(ctx))
 	if err := box.EvmKeeper.SetParams(ctx, evmParams); err != nil {
 		return fmt.Errorf("set evm params: %w", err)
 	}
-	ctx.Logger().Info("EVM Shanghai fork heights set; EIP-3855 (PUSH0) enabled via ExtraEIPs")
+	ctx.Logger().Info("EVM Shanghai/Cancun/Prague fork heights set; EIP-3855 (PUSH0) enabled via ExtraEIPs")
 	return nil
+}
+
+func applyEVMForkParams(evmParams evmtypes.Params) evmtypes.Params {
+	zero := math.ZeroInt()
+	evmParams.ChainConfig.ShanghaiBlock = &zero
+	evmParams.ChainConfig.CancunBlock = &zero
+	evmParams.ChainConfig.PragueBlock = &zero
+	if !slices.Contains(evmParams.ExtraEIPs, eip3855Extra) {
+		evmParams.ExtraEIPs = append(evmParams.ExtraEIPs, eip3855Extra)
+	}
+	return evmParams
 }
