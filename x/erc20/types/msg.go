@@ -102,9 +102,8 @@ func (msg MsgConvertERC20) ValidateBasic() error {
 		return sdkerrors.Wrap(ReceiverErr, "invalid receiver address")
 	}
 
-	_, SenderErr := sdk.AccAddressFromBech32(msg.Sender)
-	if SenderErr != nil {
-		return sdkerrors.Wrap(SenderErr, "invalid sender address")
+	if !common.IsHexAddress(msg.Sender) {
+		return sdkerrors.Wrapf(errortypes.ErrInvalidAddress, "invalid sender hex address %s", msg.Sender)
 	}
 
 	//if !common.IsHexAddress(strings.ToLower(msg.Sender)) {
@@ -122,11 +121,10 @@ func (msg *MsgConvertERC20) GetSignBytes() []byte {
 
 // GetSigners defines whose signature is required
 func (msg MsgConvertERC20) GetSigners() []sdk.AccAddress {
-	// Convert hex address to bech32 address for signing
-	addr, err := sdk.AccAddressFromBech32(msg.Sender)
-	if err != nil {
+	if !common.IsHexAddress(msg.Sender) {
 		return nil
 	}
+	addr := sdk.AccAddress(common.HexToAddress(msg.Sender).Bytes())
 	return []sdk.AccAddress{addr}
 
 }
