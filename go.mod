@@ -283,7 +283,7 @@ replace (
 	// use cosmos fork of keyring
 	github.com/99designs/keyring => github.com/cosmos/keyring v1.2.0
 	github.com/cosmos/ibc-apps/modules/ibc-hooks/v8 => github.com/public-awesome/ibc-apps/modules/ibc-hooks/v8 v8.0.0-20250129183033-079b03c57592
-	github.com/evmos/ethermint => github.com/UptickNetwork/ethermint v0.24.1-0.20260411025020-ba867a4df9f4
+	github.com/evmos/ethermint => github.com/UptickNetwork/ethermint v0.24.1-0.20260412061125-2d292680d55a
 	github.com/gin-gonic/gin => github.com/gin-gonic/gin v1.9.1
 	github.com/syndtr/goleveldb => github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
 )

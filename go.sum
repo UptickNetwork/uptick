@@ -683,8 +683,8 @@ github.com/Shopify/toxiproxy v2.1.4+incompatible/go.mod h1:OXgGpZ6Cli1/URJOF1DMx
 github.com/StackExchange/wmi v0.0.0-20180116203802-5d049714c4a6/go.mod h1:3eOhrUMpNV+6aFIbp5/iudMxNCF27Vw2OZgy4xEx0Fg=
 github.com/StackExchange/wmi v1.2.1 h1:VIkavFPXSjcnS+O8yTq7NI32k0R5Aj+v39y29VYDOSA=
 github.com/StackExchange/wmi v1.2.1/go.mod h1:rcmrprowKIVzvc+NUiLncP2uuArMWLCbu9SBzvHz7e8=
-github.com/UptickNetwork/ethermint v0.24.1-0.20260411025020-ba867a4df9f4 h1:C8n5iQP4EX5ZqYF0Vo4nb0HyiaWfWJb/RzWGwVBcZBQ=
-github.com/UptickNetwork/ethermint v0.24.1-0.20260411025020-ba867a4df9f4/go.mod h1:pQLLrCywO0OQPmy/gF0LmZzljUWLsg1ZdT+EM58gZ1o=
+github.com/UptickNetwork/ethermint v0.24.1-0.20260412061125-2d292680d55a h1:hqPUE0huvQ5PojqLzW5Odg6fWz1QNgoNXbUku6mSObQ=
+github.com/UptickNetwork/ethermint v0.24.1-0.20260412061125-2d292680d55a/go.mod h1:pQLLrCywO0OQPmy/gF0LmZzljUWLsg1ZdT+EM58gZ1o=
 github.com/UptickNetwork/evm-nft-convert v1.1.5-0.20260411030341-0418f83f7e1e h1:Qg5Xo43DsN9J+qgeOEdCahNjShstwSaF9+eraxSPfyg=
 github.com/UptickNetwork/evm-nft-convert v1.1.5-0.20260411030341-0418f83f7e1e/go.mod h1:oBycqM8FBgeT84NbCHRar1rIaEYClATVDy7/SQGOHmY=
 github.com/UptickNetwork/wasm-nft-convert v1.1.4-0.20260411025755-daf0acc1e846 h1:gAJIWi4SybxPI/csLeOTHIutzhUAOQ7nw43BO389YOw=
