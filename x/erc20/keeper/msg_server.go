@@ -3,7 +3,6 @@ package keeper
 import (
 	"context"
 	"math/big"
-	"strings"
 
 	"cosmossdk.io/math"
 	ibctransfertypes "github.com/cosmos/ibc-go/v8/modules/apps/transfer/types"
@@ -69,10 +68,20 @@ func (k Keeper) TransferERC20(
 		TimeoutTimestamp: msg.TimeoutTimestamp,
 		Memo:             msg.Memo + types.TransferERC20Memo,
 	}
-	_, err = k.ibcKeeper.Transfer(goCtx, &ibcMsg)
+	resp, err := k.ibcKeeper.Transfer(goCtx, &ibcMsg)
 	if err != nil {
 		return nil, sdkerrors.Wrapf(err, "failed to ibc Transfer%v", err)
 	}
+
+	k.SetIBCTransferProvenance(
+		ctx,
+		ibcMsg.SourcePort,
+		ibcMsg.SourceChannel,
+		resp.Sequence,
+		ibcMsg.Sender,
+		ibcMsg.Token.Denom,
+		ibcMsg.Token.Amount.String(),
+	)
 
 	return &types.MsgTransferERC20Response{}, nil
 
@@ -517,8 +526,9 @@ func (k Keeper) monitorApprovalEvent(res *evmtypes.MsgEthereumTxResponse) error 
 // were burnt in the original send so new tokens are minted and sent to
 // the sending address.
 func (k Keeper) refundPacketToken(ctx sdk.Context, packet channeltypes.Packet, data transfertypes.FungibleTokenPacketData) error {
-	// NOTE: packet data type already checked in handler.go
-	if !strings.Contains(data.Memo, types.TransferERC20Memo) {
+	// Only refund ERC20 representation for packets created via MsgTransferERC20.
+	// Memo substrings are user-controlled and must not authorize minting.
+	if !k.ConsumeIBCTransferProvenance(ctx, packet, data) {
 		return nil
 	}
 
