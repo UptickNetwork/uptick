@@ -69,6 +69,36 @@ func TestErrorAckProvenanceConsumedOnRefund(t *testing.T) {
 	require.False(t, k.HasIBCTransferProvenance(ctx, packet, data))
 }
 
+// TestProvenanceKeyUsesPacketDenomNotBankHash ensures ack matching uses the ICS-20
+// packet denomination (trace path), not the bank ibc/HASH voucher denomination.
+func TestProvenanceKeyUsesPacketDenomNotBankHash(t *testing.T) {
+	k, ctx := newProvenanceKeeper(t)
+
+	packet := channeltypes.Packet{
+		Sequence:      13,
+		SourcePort:    "transfer",
+		SourceChannel: "channel-3",
+	}
+	packetData := transfertypes.FungibleTokenPacketData{
+		Denom:  "transfer/channel-3/uptick/uptick",
+		Amount: "100",
+		Sender: "uptick1kwla7qu828jn4ljn3s2uz3823km0gctktmulat",
+	}
+	bankDenom := "ibc/4EB1D3A1CC4CC7A949A6CEB0D1E97FD37C71EE8754FA9AB6FC3E0F0B6DA74926"
+
+	k.SetIBCTransferProvenance(
+		ctx, packet.SourcePort, packet.SourceChannel, packet.Sequence,
+		packetData.Sender, bankDenom, packetData.Amount,
+	)
+	require.False(t, k.HasIBCTransferProvenance(ctx, packet, packetData))
+
+	k.SetIBCTransferProvenance(
+		ctx, packet.SourcePort, packet.SourceChannel, packet.Sequence,
+		packetData.Sender, packetData.Denom, packetData.Amount,
+	)
+	require.True(t, k.HasIBCTransferProvenance(ctx, packet, packetData))
+}
+
 // TestSuccessAckClearsProvenance ensures successful acknowledgements delete pending provenance.
 func TestSuccessAckClearsProvenance(t *testing.T) {
 	k, ctx := newProvenanceKeeper(t)
