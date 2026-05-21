@@ -106,10 +106,11 @@ func (k Keeper) OnAcknowledgementPacket(ctx sdk.Context, packet channeltypes.Pac
 
 	switch ack.Response.(type) {
 	case *channeltypes.Acknowledgement_Error:
-		k.refundPacketToken(ctx, packet, data)
+		return k.refundPacketToken(ctx, packet, data)
 	default:
 		// the acknowledgement succeeded on the receiving chain so nothing
 		// needs to be executed and no error needs to be returned
+		k.DeleteIBCTransferProvenance(ctx, packet, data)
+		return nil
 	}
-	return nil
 }
