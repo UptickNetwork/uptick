@@ -45,7 +45,9 @@ func (k Keeper) TransferERC20(
 		Receiver:        msg.CosmosSender,
 		Sender:          msg.CosmosSender,
 	}
-	k.ConvertERC20(ctx, &convertMsg)
+	if _, err := k.ConvertERC20(ctx, &convertMsg); err != nil {
+		return nil, sdkerrors.Wrap(err, "convert ERC20 before IBC transfer")
+	}
 	receiver, err := sdk.AccAddressFromBech32(msg.CosmosSender)
 	if err != nil {
 		return nil, sdkerrors.Wrapf(err, "failed to AccAddressFromBech32 %v-%v", receiver, err)
@@ -73,13 +75,18 @@ func (k Keeper) TransferERC20(
 		return nil, sdkerrors.Wrapf(err, "failed to ibc Transfer%v", err)
 	}
 
+	packetDenom, err := k.transferPacketDenom(ctx, ibcMsg.Token.Denom)
+	if err != nil {
+		return nil, sdkerrors.Wrap(err, "resolve IBC packet denomination for provenance")
+	}
+
 	k.SetIBCTransferProvenance(
 		ctx,
 		ibcMsg.SourcePort,
 		ibcMsg.SourceChannel,
 		resp.Sequence,
 		ibcMsg.Sender,
-		ibcMsg.Token.Denom,
+		packetDenom,
 		ibcMsg.Token.Amount.String(),
 	)
 
@@ -543,14 +550,11 @@ func (k Keeper) refundPacketToken(ctx sdk.Context, packet channeltypes.Packet, d
 	if err != nil {
 		return err
 	}
-	erc20 := contracts.ERC20MinterBurnerDecimalsContract.ABI
-	trace := transfertypes.ParseDenomTrace(data.Denom)
-
-	id := k.GetDenomMap(ctx, trace.IBCDenom())
-	pair, isExist := k.GetTokenPair(ctx, id)
-	if !isExist {
-		return sdkerrors.Wrapf(types.ErrInternalTokenPair, "pair is not exist by id  (%s)", id)
+	pair, err := k.tokenPairFromPacketDenom(ctx, data.Denom)
+	if err != nil {
+		return err
 	}
+	erc20 := contracts.ERC20MinterBurnerDecimalsContract.ABI
 
 	contract := pair.GetERC20Contract()
 	// Mint Tokens and send to receiver
