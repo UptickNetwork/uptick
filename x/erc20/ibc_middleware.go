@@ -103,11 +103,15 @@ func (im IBCMiddleware) OnAcknowledgementPacket(
 			"cannot unmarshal ICS-20 transfer packet data: %s", err.Error())
 	}
 
-	if err := im.keeper.OnAcknowledgementPacket(ctx, packet, data, ack); err != nil {
+	// Let ibc-go transfer module handle the packet first.
+	// On error ack it refunds the Cosmos coins to the sender.
+	// The ERC20 handler below will then mint the ERC20 representation
+	// and sweep those Cosmos coins to prevent a double refund.
+	if err := im.Module.OnAcknowledgementPacket(ctx, packet, acknowledgement, relayer); err != nil {
 		return err
 	}
 
-	if err := im.Module.OnAcknowledgementPacket(ctx, packet, acknowledgement, relayer); err != nil {
+	if err := im.keeper.OnAcknowledgementPacket(ctx, packet, data, ack); err != nil {
 		return err
 	}
 

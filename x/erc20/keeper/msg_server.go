@@ -562,5 +562,28 @@ func (k Keeper) refundPacketToken(ctx sdk.Context, packet channeltypes.Packet, d
 	if err != nil {
 		return err
 	}
+
+	// Sweep the Cosmos coins already refunded by the ibc-go transfer module
+	// back to the ERC20 module account. Without this, the sender would receive
+	// both the ERC20 tokens (minted above) and the Cosmos coins (from ibc-go),
+	// resulting in a double refund.
+	cosmosSender, err := sdk.AccAddressFromBech32(data.Sender)
+	if err != nil {
+		return err
+	}
+	coins := sdk.NewCoins(sdk.NewCoin(pair.Denom, transferAmount))
+	if err := k.bankKeeper.SendCoinsFromAccountToModule(ctx, cosmosSender, types.ModuleName, coins); err != nil {
+		return err
+	}
+
+	// For NativeERC20 pairs the Cosmos coins were freshly minted during the
+	// original ConvertERC20, so they must be burned. For NativeCoin pairs the
+	// coins were unescrowed from the module — they stay escrowed there.
+	if pair.IsNativeERC20() {
+		if err := k.bankKeeper.BurnCoins(ctx, types.ModuleName, coins); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
