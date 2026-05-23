@@ -123,10 +123,22 @@ func (k Keeper) OnAcknowledgementPacket(ctx sdk.Context, packet channeltypes.Pac
 	case *channeltypes.Acknowledgement_Error:
 		if strings.Contains(data.Memo, erc721types.TransferERC721Memo) {
 			data.ClassId = k.getRefundClassId(packet, data)
-			k.RefundPacketToken(ctx, data)
+			if err := k.RefundPacketToken(ctx, data); err != nil {
+				return err
+			}
+			// Redirect the NFT refund to the module address so the sender
+			// does not receive both the ERC721 and the NFT (double refund).
+			nftData := data
+			nftData.Sender = erc721types.AccModuleAddress.String()
+			return k.ibcKeeper.OnAcknowledgementPacket(ctx, packet, nftData, ack)
 		} else if strings.Contains(data.Memo, cw721Types.TransferCW721Memo) {
 			data.ClassId = k.getRefundClassId(packet, data)
-			k.cw721Keeper.RefundPacketToken(ctx, data)
+			if err := k.cw721Keeper.RefundPacketToken(ctx, data); err != nil {
+				return err
+			}
+			nftData := data
+			nftData.Sender = cw721Types.AccModuleAddress.String()
+			return k.ibcKeeper.OnAcknowledgementPacket(ctx, packet, nftData, ack)
 		}
 	default:
 		// the acknowledgement succeeded on the receiving chain so nothing
@@ -141,10 +153,22 @@ func (k Keeper) OnTimeoutPacket(ctx sdk.Context, packet channeltypes.Packet, dat
 
 	if strings.Contains(data.Memo, erc721types.TransferERC721Memo) {
 		data.ClassId = k.getRefundClassId(packet, data)
-		k.RefundPacketToken(ctx, data)
+		if err := k.RefundPacketToken(ctx, data); err != nil {
+			return err
+		}
+		// Redirect the NFT refund to the module address so the sender
+		// does not receive both the ERC721 and the NFT (double refund).
+		nftData := data
+		nftData.Sender = erc721types.AccModuleAddress.String()
+		return k.ibcKeeper.OnTimeoutPacket(ctx, packet, nftData)
 	} else if strings.Contains(data.Memo, cw721Types.TransferCW721Memo) {
 		data.ClassId = k.getRefundClassId(packet, data)
-		k.cw721Keeper.RefundPacketToken(ctx, data)
+		if err := k.cw721Keeper.RefundPacketToken(ctx, data); err != nil {
+			return err
+		}
+		nftData := data
+		nftData.Sender = cw721Types.AccModuleAddress.String()
+		return k.ibcKeeper.OnTimeoutPacket(ctx, packet, nftData)
 	}
 	return nil
 }
