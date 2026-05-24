@@ -68,8 +68,8 @@ require (
 
 require (
 	cosmossdk.io/x/nft v0.1.1
-	github.com/UptickNetwork/evm-nft-convert v1.2.0
-	github.com/UptickNetwork/wasm-nft-convert v1.2.0
+	github.com/UptickNetwork/evm-nft-convert v1.2.1
+	github.com/UptickNetwork/wasm-nft-convert v1.2.1
 	github.com/cosmos/cosmos-db v1.1.1
 	github.com/cosmos/ibc-go/modules/capability v1.0.1
 )
