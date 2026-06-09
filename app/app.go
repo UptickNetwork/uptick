@@ -587,6 +587,10 @@ func NewUptick(
 		SignModeHandler:   txConfig.SignModeHandler(),
 		SigGasConsumer:    SigVerificationGasConsumer,
 		MaxTxGasWanted:    maxGasWanted,
+		DisabledAuthzMsgs: []string{
+			sdk.MsgTypeURL(&evmtypes.MsgEthereumTx{}),
+			sdk.MsgTypeURL(&vestingtypes.MsgCreateVestingAccount{}),
+		},
 	}
 
 	if err := options.Validate(); err != nil {

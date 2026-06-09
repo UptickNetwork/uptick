@@ -3,12 +3,12 @@ package keeper
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	erc721types "github.com/UptickNetwork/evm-nft-convert/types"
 	erc20Types "github.com/UptickNetwork/uptick/x/erc20/types"
+	evmibctypes "github.com/UptickNetwork/uptick/x/evmIBC/types"
 	cw721Types "github.com/UptickNetwork/wasm-nft-convert/types"
-
-	"strings"
 
 	"github.com/bianjieai/nft-transfer/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -121,7 +121,8 @@ func (k Keeper) OnAcknowledgementPacket(ctx sdk.Context, packet channeltypes.Pac
 
 	switch ack.Response.(type) {
 	case *channeltypes.Acknowledgement_Error:
-		if strings.Contains(data.Memo, erc721types.TransferERC721Memo) {
+		switch evmibctypes.OutboundConvertKind(data) {
+		case evmibctypes.ConvertKindERC721:
 			data.ClassId = k.getRefundClassId(packet, data)
 			if err := k.RefundPacketToken(ctx, data); err != nil {
 				return err
@@ -131,7 +132,7 @@ func (k Keeper) OnAcknowledgementPacket(ctx sdk.Context, packet channeltypes.Pac
 			nftData := data
 			nftData.Sender = erc721types.AccModuleAddress.String()
 			return k.ibcKeeper.OnAcknowledgementPacket(ctx, packet, nftData, ack)
-		} else if strings.Contains(data.Memo, cw721Types.TransferCW721Memo) {
+		case evmibctypes.ConvertKindCW721:
 			data.ClassId = k.getRefundClassId(packet, data)
 			if err := k.cw721Keeper.RefundPacketToken(ctx, data); err != nil {
 				return err
@@ -151,7 +152,8 @@ func (k Keeper) OnAcknowledgementPacket(ctx sdk.Context, packet channeltypes.Pac
 // never received and has been timed out.
 func (k Keeper) OnTimeoutPacket(ctx sdk.Context, packet channeltypes.Packet, data types.NonFungibleTokenPacketData) error {
 
-	if strings.Contains(data.Memo, erc721types.TransferERC721Memo) {
+	switch evmibctypes.OutboundConvertKind(data) {
+	case evmibctypes.ConvertKindERC721:
 		data.ClassId = k.getRefundClassId(packet, data)
 		if err := k.RefundPacketToken(ctx, data); err != nil {
 			return err
@@ -161,7 +163,7 @@ func (k Keeper) OnTimeoutPacket(ctx sdk.Context, packet channeltypes.Packet, dat
 		nftData := data
 		nftData.Sender = erc721types.AccModuleAddress.String()
 		return k.ibcKeeper.OnTimeoutPacket(ctx, packet, nftData)
-	} else if strings.Contains(data.Memo, cw721Types.TransferCW721Memo) {
+	case evmibctypes.ConvertKindCW721:
 		data.ClassId = k.getRefundClassId(packet, data)
 		if err := k.cw721Keeper.RefundPacketToken(ctx, data); err != nil {
 			return err
