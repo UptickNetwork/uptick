@@ -16,9 +16,9 @@ import (
 
 	"github.com/UptickNetwork/uptick/ibc"
 	"github.com/UptickNetwork/uptick/x/evmIBC/keeper"
+	evmibctypes "github.com/UptickNetwork/uptick/x/evmIBC/types"
 
 	erc721Types "github.com/UptickNetwork/evm-nft-convert/types"
-	cw721Types "github.com/UptickNetwork/wasm-nft-convert/types"
 	clienttypes "github.com/cosmos/ibc-go/v8/modules/core/02-client/types"
 )
 
@@ -115,11 +115,6 @@ func PackageToModuleAccount(packet channeltypes.Packet) (channeltypes.Packet, st
 	return packet, dstReceiver
 }
 
-func hasConvertMemo(memo string) bool {
-	return strings.Contains(memo, erc721Types.TransferERC721Memo) ||
-		strings.Contains(memo, cw721Types.TransferCW721Memo)
-}
-
 // OnAcknowledgementPacket implements the IBCModule interface
 // If fees are not enabled, this callback will default to the ibc-core packet callback.
 func (im IBCMiddleware) OnAcknowledgementPacket(
@@ -145,7 +140,7 @@ func (im IBCMiddleware) OnAcknowledgementPacket(
 	// On error ack for convert packets the evmIBC keeper handles both the
 	// ERC721/CW721 refund and the NFT-side refund (routed to module address).
 	// Skip the nft-transfer module to prevent double refund of the NFT.
-	if _, isError := ack.Response.(*channeltypes.Acknowledgement_Error); isError && hasConvertMemo(data.Memo) {
+	if _, isError := ack.Response.(*channeltypes.Acknowledgement_Error); isError && evmibctypes.IsOutboundConvertPacket(data) {
 		return im.keeper.OnAcknowledgementPacket(ctx, packet, data, ack)
 	}
 
@@ -198,7 +193,7 @@ func (im IBCMiddleware) OnTimeoutPacket(
 	// For convert packets the keeper handles both ERC721/CW721 and NFT sides.
 	// Skip the nft-transfer module to prevent double refund.
 	// For non-convert packets delegate to the nft-transfer module directly.
-	if hasConvertMemo(data.Memo) {
+	if evmibctypes.IsOutboundConvertPacket(data) {
 		if err := im.keeper.OnTimeoutPacket(ctx, packet, data); err != nil {
 			return err
 		}
