@@ -68,7 +68,6 @@ func (appKeepers *AppKeepers) genStoreKeys() {
 
 		//ibcwasmtypes.StoreKey,
 		wasmtypes.StoreKey,
-		//ibchookstypes.StoreKey,
 		//packetforwardtypes.StoreKey,
 	)
 

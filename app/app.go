@@ -72,6 +72,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/gov"
 	govclient "github.com/cosmos/cosmos-sdk/x/gov/client"
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
+	govv1 "github.com/cosmos/cosmos-sdk/x/gov/types/v1"
 	"github.com/cosmos/cosmos-sdk/x/mint"
 	minttypes "github.com/cosmos/cosmos-sdk/x/mint/types"
 	"github.com/cosmos/cosmos-sdk/x/params"
@@ -590,6 +591,11 @@ func NewUptick(
 		DisabledAuthzMsgs: []string{
 			sdk.MsgTypeURL(&evmtypes.MsgEthereumTx{}),
 			sdk.MsgTypeURL(&vestingtypes.MsgCreateVestingAccount{}),
+			// Governance messages: prevent delegation of governance actions via authz
+			sdk.MsgTypeURL(&govv1.MsgSubmitProposal{}),
+			sdk.MsgTypeURL(&govv1.MsgVote{}),
+			sdk.MsgTypeURL(&govv1.MsgVoteWeighted{}),
+			sdk.MsgTypeURL(&govv1.MsgDeposit{}),
 		},
 	}
 

@@ -1,18 +1,16 @@
-FROM golang:stretch AS build-env
+FROM golang:1.23-bookworm AS build-env
 
 WORKDIR /go/src/github.com/UptickNetwork/uptick
 
-RUN apt update
-RUN apt install git -y
+RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
 
 COPY . .
 
 RUN make build
 
-FROM golang:stretch
+FROM debian:bookworm-slim
 
-RUN apt update
-RUN apt install ca-certificates jq -y
+RUN apt-get update && apt-get install -y ca-certificates jq && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /root
 

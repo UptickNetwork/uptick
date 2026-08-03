@@ -26,6 +26,7 @@ type Keeper struct {
 	evmKeeper     types.EVMKeeper
 	ics4Wrapper   porttypes.ICS4Wrapper
 	ibcKeeper     ibctransferkeeper.Keeper
+	ibcKeeperSet  bool
 }
 
 // NewKeeper creates new instances of the erc20 Keeper
@@ -70,6 +71,10 @@ func (k *Keeper) SetICS4Wrapper(ics4Wrapper porttypes.ICS4Wrapper) {
 // SetIBCKeeper sets the ICS4 wrapper to the keeper.
 // It panics if already set
 func (k *Keeper) SetIBCKeeper(ibcKeeper ibctransferkeeper.Keeper) {
-
+	// prevent accidental overwrite
+	if k.ibcKeeperSet {
+		panic("IBC keeper already set")
+	}
+	k.ibcKeeperSet = true
 	k.ibcKeeper = ibcKeeper
 }

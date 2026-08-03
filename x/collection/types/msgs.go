@@ -58,6 +58,13 @@ func (msg MsgIssueDenom) ValidateBasic() error {
 		return err
 	}
 
+	if len(msg.Name) == 0 {
+		return sdkerrors.Wrap(ErrInvalidDenom, "denom name cannot be empty")
+	}
+	if len(msg.Symbol) == 0 {
+		return sdkerrors.Wrap(ErrInvalidDenom, "denom symbol cannot be empty")
+	}
+
 	if _, err := sdk.AccAddressFromBech32(msg.Sender); err != nil {
 		return sdkerrors.Wrapf(errortypes.ErrInvalidAddress, "invalid sender address (%s)", err)
 	}
@@ -108,6 +115,10 @@ func (msg MsgTransferNFT) Type() string { return TypeMsgTransferNFT }
 // ValidateBasic Implements Msg.
 func (msg MsgTransferNFT) ValidateBasic() error {
 	if err := ValidateDenomID(msg.DenomId); err != nil {
+		return err
+	}
+
+	if err := ValidateTokenURI(msg.URI); err != nil {
 		return err
 	}
 

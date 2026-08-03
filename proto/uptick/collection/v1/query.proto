@@ -41,7 +41,7 @@ service Query {
   }
 }
 
-// QuerySupplyRequest is the request type for the Query/HTLC RPC method
+// QuerySupplyRequest is the request type for the Query/Supply RPC method
 message QuerySupplyRequest {
   string denom_id = 1 [(gogoproto.moretags) = "yaml:\"denom_id\""];
   string owner = 2;

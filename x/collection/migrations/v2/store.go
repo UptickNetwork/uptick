@@ -37,12 +37,10 @@ func Migrate(ctx sdk.Context,
 	)
 	for ; iterator.Valid(); iterator.Next() {
 		var denom types.Denom
-		cdc.MustUnmarshal(iterator.Value(), &denom)
-
-		//delete unused key
-		store.Delete(KeyDenom(denom.Id))
-		store.Delete(KeyDenomName(denom.Name))
-		store.Delete(KeyCollection(denom.Id))
+		if err := cdc.Unmarshal(iterator.Value(), &denom); err != nil {
+			logger.Error("failed to unmarshal denom during v2 migration", "error", err.Error())
+			continue
+		}
 
 		creator, err := sdk.AccAddressFromBech32(denom.Creator)
 		if err != nil {
@@ -63,6 +61,11 @@ func Migrate(ctx sdk.Context,
 		); err != nil {
 			return err
 		}
+
+		// delete old keys only after new data is successfully saved
+		store.Delete(KeyDenom(denom.Id))
+		store.Delete(KeyDenomName(denom.Name))
+		store.Delete(KeyCollection(denom.Id))
 
 		tokenInDenom, err := migrateToken(ctx, k, logger, denom.Id)
 		if err != nil {
@@ -97,16 +100,15 @@ func migrateToken(
 	iterator = storetypes.KVStorePrefixIterator(store, KeyNFT(denomID, ""))
 	for ; iterator.Valid(); iterator.Next() {
 		var baseNFT types.BaseNFT
-		k.cdc.MustUnmarshal(iterator.Value(), &baseNFT)
+		if err := k.cdc.Unmarshal(iterator.Value(), &baseNFT); err != nil {
+			logger.Error("failed to unmarshal NFT during v2 migration", "error", err.Error())
+			continue
+		}
 
 		owner, err := sdk.AccAddressFromBech32(baseNFT.Owner)
 		if err != nil {
 			return 0, err
 		}
-
-		//delete unused key
-		store.Delete(KeyNFT(denomID, baseNFT.Id))
-		store.Delete(KeyOwner(owner, denomID, baseNFT.Id))
 
 		if err := k.saveNFT(ctx, denomID,
 			baseNFT.Id,
@@ -118,6 +120,10 @@ func migrateToken(
 		); err != nil {
 			return 0, err
 		}
+
+		// delete old keys only after new data is successfully saved
+		store.Delete(KeyNFT(denomID, baseNFT.Id))
+		store.Delete(KeyOwner(owner, denomID, baseNFT.Id))
 		total++
 	}
 	logger.Info("migrate nft success", "denomID", denomID, "nftNum", total)

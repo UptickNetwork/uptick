@@ -27,22 +27,7 @@ func (k Keeper) SaveCollection(ctx sdk.Context, collection types.Collection) err
 
 // SetCollection saves all NFTs and returns an error if there already exists
 func (k Keeper) SetCollection(ctx sdk.Context, collection types.Collection) error {
-
-	for _, nft := range collection.NFTs {
-		if err := k.SaveNFT(
-			ctx,
-			collection.Denom.Id,
-			nft.GetID(),
-			nft.GetName(),
-			nft.GetURI(),
-			nft.GetURIHash(),
-			nft.GetData(),
-			nft.GetOwner(),
-		); err != nil {
-			return err
-		}
-	}
-	return nil
+	return k.SaveCollection(ctx, collection)
 }
 
 // GetCollection returns the collection by the specified denom ID

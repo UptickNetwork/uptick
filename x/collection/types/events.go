@@ -1,6 +1,6 @@
 package types
 
-// NFT module event types
+// collection module event types
 var (
 	EventTypeIssueDenom    = "issue_denom"
 	EventTypeTransfer      = "transfer_nft"

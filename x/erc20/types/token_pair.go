@@ -14,7 +14,7 @@ func NewTokenPair(erc20Address common.Address, denom string, enabled bool, contr
 	return TokenPair{
 		Erc20Address:  erc20Address.String(),
 		Denom:         denom,
-		Enabled:       true,
+		Enabled:       enabled,
 		ContractOwner: contractOwner,
 	}
 }

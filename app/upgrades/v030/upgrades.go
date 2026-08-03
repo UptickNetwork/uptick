@@ -58,20 +58,20 @@ func upgradeHandlerConstructor(
 		baseapp.MigrateParams(ctx, baseAppLegacySS, &box.ConsensusParamsKeeper.ParamsStore)
 
 		if err := box.FeeMarketKeeper.SetParams(ctx, generateFeemarketParams(ctx.BlockHeight())); err != nil {
-			panic(fmt.Errorf("failed to FeeMarketKeeper SetParams "))
+			return vm, fmt.Errorf("failed to FeeMarketKeeper SetParams: %w", err)
 		}
 
 		wasmParams := box.WasmKeeper.GetParams(ctx)
-		wasmParams.CodeUploadAccess.Permission = wasmtypes.AccessTypeEverybody
-		wasmParams.InstantiateDefaultPermission = wasmtypes.AccessTypeEverybody
+		wasmParams.CodeUploadAccess.Permission = wasmtypes.AccessTypeNobody
+		wasmParams.InstantiateDefaultPermission = wasmtypes.AccessTypeNobody
 		if err := box.WasmKeeper.SetParams(ctx, wasmParams); err != nil {
-			panic(fmt.Errorf("failed to wasmKeeper SetParams "))
+			return vm, fmt.Errorf("failed to wasmKeeper SetParams: %w", err)
 		}
 
 		gs := ibcnfttransfertypes.DefaultGenesisState()
 		bz, err := ibcnfttransfertypes.ModuleCdc.MarshalJSON(gs)
 		if err != nil {
-			panic(fmt.Errorf("failed to ModuleCdc %s: %w", ibcnfttransfertypes.ModuleName, err))
+			return vm, fmt.Errorf("failed to ModuleCdc %s: %w", ibcnfttransfertypes.ModuleName, err)
 		}
 		if module, ok := box.ModuleManager.Modules[ibcnfttransfertypes.ModuleName].(module.HasGenesis); ok {
 			module.InitGenesis(ctx, ibcnfttransfertypes.ModuleCdc, bz)

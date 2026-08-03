@@ -54,4 +54,9 @@ func (p *Params) ParamSetPairs() paramtypes.ParamSetPairs {
 	}
 }
 
-func (p Params) Validate() error { return nil }
+func (p Params) Validate() error {
+	if p.EnableEVMHook && !p.EnableErc20 {
+		return fmt.Errorf("EnableEVMHook cannot be true when EnableErc20 is false")
+	}
+	return nil
+}

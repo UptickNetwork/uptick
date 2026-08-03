@@ -42,7 +42,7 @@ message RegisterCoinProposal {
   cosmos.bank.v1beta1.Metadata metadata = 3 [(gogoproto.nullable) = false];
 }
 
-// RegisterCoinProposal is a gov Content type to register a token pair
+// RegisterERC20Proposal is a gov Content type to register an ERC20 token pair
 message RegisterERC20Proposal {
   option (gogoproto.equal) = false;
   // title of the proposal

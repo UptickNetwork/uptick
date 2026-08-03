@@ -26,6 +26,7 @@ var _ porttypes.Middleware = &IBCMiddleware{}
 
 const convertERC721 = "erc721"
 const convertCW721 = "cw721"
+const maxMemoLength = 1024
 
 // IBCMiddleware implements the ICS26 callbacks for the transfer middleware given
 // the claim keeper and the underlying application.
@@ -61,6 +62,10 @@ func (im IBCMiddleware) OnRecvPacket(
 			sdkerrors.Wrapf(errortypes.ErrInvalidType, "cannot unmarshal ICS-721 nft-transfer packet data"),
 		)
 		return ackResult
+	}
+
+	if len(data.Memo) > maxMemoLength {
+		return im.Module.OnRecvPacket(ctx, packet, relayer)
 	}
 
 	var packageMemo PackageMemo
@@ -140,8 +145,16 @@ func (im IBCMiddleware) OnAcknowledgementPacket(
 	// On error ack for convert packets the evmIBC keeper handles both the
 	// ERC721/CW721 refund and the NFT-side refund (routed to module address).
 	// Skip the nft-transfer module to prevent double refund of the NFT.
+	// Use a cache context to ensure atomicity: if the NFT-side refund fails
+	// after the ERC721/CW721 refund, the entire operation is rolled back.
 	if _, isError := ack.Response.(*channeltypes.Acknowledgement_Error); isError && evmibctypes.IsOutboundConvertPacket(data) {
-		return im.keeper.OnAcknowledgementPacket(ctx, packet, data, ack)
+		cctx, commit := ctx.CacheContext()
+		if err := im.keeper.OnAcknowledgementPacket(cctx, packet, data, ack); err != nil {
+			return err
+		}
+		commit()
+		ctx.EventManager().EmitEvents(cctx.EventManager().Events())
+		return nil
 	}
 
 	if err := im.keeper.OnAcknowledgementPacket(ctx, packet, data, ack); err != nil {

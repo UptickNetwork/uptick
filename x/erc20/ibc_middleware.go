@@ -81,6 +81,23 @@ func (im IBCMiddleware) GetAppVersion(
 	return im.keeper.GetAppVersion(ctx, portID, channelID)
 }
 
+// OnTimeoutPacket implements the IBCModule interface and cleans up
+// IBC transfer provenance records on packet timeout to prevent storage leaks.
+func (im IBCMiddleware) OnTimeoutPacket(
+	ctx sdk.Context,
+	packet channeltypes.Packet,
+	relayer sdk.AccAddress,
+) error {
+	var data transfertypes.FungibleTokenPacketData
+	if err := transfertypes.ModuleCdc.UnmarshalJSON(packet.GetData(), &data); err == nil {
+		// Clean up provenance to prevent storage leak on timeout.
+		// On a successful ACK, provenance is cleaned up in OnAcknowledgementPacket.
+		// On timeout, no ACK is ever received, so we clean up here.
+		_ = im.keeper.ConsumeIBCTransferProvenance(ctx, packet, data)
+	}
+	return im.Module.OnTimeoutPacket(ctx, packet, relayer)
+}
+
 // OnAcknowledgementPacket implements the IBCModule interface
 // If fees are not enabled, this callback will default to the ibc-core packet callback.
 func (im IBCMiddleware) OnAcknowledgementPacket(

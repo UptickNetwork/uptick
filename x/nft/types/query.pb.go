@@ -315,7 +315,7 @@ func (m *QuerySupplyResponse) GetAmount() uint64 {
 	return 0
 }
 
-// QueryNFTstRequest is the request type for the Query/NFTs RPC method
+// QueryNFTsRequest is the request type for the Query/NFTs RPC method
 type QueryNFTsRequest struct {
 	ClassId    string             `protobuf:"bytes,1,opt,name=class_id,json=classId,proto3" json:"class_id,omitempty"`
 	Owner      string             `protobuf:"bytes,2,opt,name=owner,proto3" json:"owner,omitempty"`

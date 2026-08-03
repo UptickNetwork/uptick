@@ -39,22 +39,27 @@ func (k Keeper) TransferERC20(
 	//}
 	ctx := sdk.UnwrapSDKContext(goCtx)
 
+	// Use a cache context to ensure atomicity of the entire operation.
+	// If the IBC transfer fails after the ERC20 conversion, the conversion
+	// must be rolled back to prevent double-spend or stuck token scenarios.
+	cctx, commit := ctx.CacheContext()
+
 	convertMsg := types.MsgConvertERC20{
 		ContractAddress: msg.EvmContractAddress,
 		Amount:          msg.Amount,
 		Receiver:        msg.CosmosSender,
 		Sender:          msg.CosmosSender,
 	}
-	if _, err := k.ConvertERC20(ctx, &convertMsg); err != nil {
+	if _, err := k.ConvertERC20(cctx, &convertMsg); err != nil {
 		return nil, sdkerrors.Wrap(err, "convert ERC20 before IBC transfer")
 	}
 	receiver, err := sdk.AccAddressFromBech32(msg.CosmosSender)
 	if err != nil {
-		return nil, sdkerrors.Wrapf(err, "failed to AccAddressFromBech32 %v-%v", receiver, err)
+		return nil, sdkerrors.Wrapf(err, "invalid cosmos sender address %s", msg.CosmosSender)
 	}
-	from, _ := sdk.AccAddressFromBech32(msg.CosmosSender)
+	from := receiver
 	sender := common.BytesToAddress(from.Bytes())
-	pair, err := k.MintingEnabled(ctx, sender.Bytes(), receiver, msg.EvmContractAddress)
+	pair, err := k.MintingEnabled(cctx, sender.Bytes(), receiver, msg.EvmContractAddress)
 	if err != nil {
 		return nil, sdkerrors.Wrapf(err, "failed to MintingEnabled %v", err)
 	}
@@ -70,10 +75,16 @@ func (k Keeper) TransferERC20(
 		TimeoutTimestamp: msg.TimeoutTimestamp,
 		Memo:             msg.Memo + types.TransferERC20Memo,
 	}
-	resp, err := k.ibcKeeper.Transfer(goCtx, &ibcMsg)
+	cctxGo := sdk.WrapSDKContext(cctx)
+	resp, err := k.ibcKeeper.Transfer(cctxGo, &ibcMsg)
 	if err != nil {
 		return nil, sdkerrors.Wrapf(err, "failed to ibc Transfer%v", err)
 	}
+
+	// Only commit the cache context (including the ERC20 conversion) after
+	// the IBC transfer succeeds, ensuring full atomicity of the two-step operation.
+	commit()
+	ctx.EventManager().EmitEvents(cctx.EventManager().Events())
 
 	packetDenom, err := k.transferPacketDenom(ctx, ibcMsg.Token.Denom)
 	if err != nil {
@@ -104,7 +115,10 @@ func (k Keeper) ConvertCoin(
 
 	// Error checked during msg validation
 	receiver := common.HexToAddress(msg.Receiver)
-	sender, _ := sdk.AccAddressFromBech32(msg.Sender)
+	sender, err := sdk.AccAddressFromBech32(msg.Sender)
+	if err != nil {
+		return nil, sdkerrors.Wrapf(err, "invalid sender address %s", msg.Sender)
+	}
 
 	pair, err := k.MintingEnabled(ctx, sender, receiver.Bytes(), msg.Coin.Denom)
 	if err != nil {
@@ -145,8 +159,14 @@ func (k Keeper) ConvertERC20(
 	ctx := sdk.UnwrapSDKContext(goCtx)
 
 	// Error checked during msg validation
-	receiver, _ := sdk.AccAddressFromBech32(msg.Receiver)
-	bech32Address, _ := sdk.AccAddressFromBech32(msg.Sender)
+	receiver, err := sdk.AccAddressFromBech32(msg.Receiver)
+	if err != nil {
+		return nil, sdkerrors.Wrapf(err, "invalid receiver address %s", msg.Receiver)
+	}
+	bech32Address, err := sdk.AccAddressFromBech32(msg.Sender)
+	if err != nil {
+		return nil, sdkerrors.Wrapf(err, "invalid sender address %s", msg.Sender)
+	}
 	sender := common.BytesToAddress(bech32Address.Bytes())
 	//sender := common.HexToAddress(from.String())
 
@@ -196,7 +216,10 @@ func (k Keeper) convertCoinNativeCoin(
 	coins := sdk.Coins{msg.Coin}
 	erc20 := contracts.ERC20MinterBurnerDecimalsContract.ABI
 	contract := pair.GetERC20Contract()
-	balanceToken := k.balanceOf(ctx, erc20, contract, receiver)
+	balanceToken, err := k.balanceOf(ctx, erc20, contract, receiver)
+	if err != nil {
+		return nil, err
+	}
 
 	// Escrow Coins on module account
 	if err := k.bankKeeper.SendCoinsFromAccountToModule(ctx, sender, types.ModuleName, coins); err != nil {
@@ -204,14 +227,17 @@ func (k Keeper) convertCoinNativeCoin(
 	}
 
 	// Mint Tokens and send to receiver
-	_, err := k.CallEVM(ctx, erc20, types.ModuleAddress, contract, true, "mint", receiver, msg.Coin.Amount.BigInt())
+	_, err = k.CallEVM(ctx, erc20, types.ModuleAddress, contract, true, "mint", receiver, msg.Coin.Amount.BigInt())
 	if err != nil {
 		return nil, err
 	}
 
 	// Check expected Receiver balance after transfer execution
 	tokens := msg.Coin.Amount.BigInt()
-	balanceTokenAfter := k.balanceOf(ctx, erc20, contract, receiver)
+	balanceTokenAfter, err := k.balanceOf(ctx, erc20, contract, receiver)
+	if err != nil {
+		return nil, err
+	}
 	exp := big.NewInt(0).Add(balanceToken, tokens)
 	if r := balanceTokenAfter.Cmp(exp); r != 0 {
 		return nil, sdkerrors.Wrapf(
@@ -255,10 +281,13 @@ func (k Keeper) convertERC20NativeCoin(
 	erc20 := contracts.ERC20MinterBurnerDecimalsContract.ABI
 	contract := pair.GetERC20Contract()
 	balanceCoin := k.bankKeeper.GetBalance(ctx, receiver, pair.Denom)
-	balanceToken := k.balanceOf(ctx, erc20, contract, sender)
+	balanceToken, err := k.balanceOf(ctx, erc20, contract, sender)
+	if err != nil {
+		return nil, err
+	}
 
 	// Burn escrowed tokens
-	_, err := k.CallEVM(ctx, erc20, types.ModuleAddress, contract, true, "burnCoins", sender, msg.Amount.BigInt())
+	_, err = k.CallEVM(ctx, erc20, types.ModuleAddress, contract, true, "burnCoins", sender, msg.Amount.BigInt())
 	if err != nil {
 		return nil, err
 	}
@@ -280,7 +309,10 @@ func (k Keeper) convertERC20NativeCoin(
 
 	// Check expected Sender balance after transfer execution
 	tokens := coins[0].Amount.BigInt()
-	balanceTokenAfter := k.balanceOf(ctx, erc20, contract, sender)
+	balanceTokenAfter, err := k.balanceOf(ctx, erc20, contract, sender)
+	if err != nil {
+		return nil, err
+	}
 	expToken := big.NewInt(0).Sub(balanceToken, tokens)
 	if r := balanceTokenAfter.Cmp(expToken); r != 0 {
 		return nil, sdkerrors.Wrapf(
@@ -325,7 +357,10 @@ func (k Keeper) convertERC20NativeToken(
 	erc20 := contracts.ERC20MinterBurnerDecimalsContract.ABI
 	contract := pair.GetERC20Contract()
 	balanceCoin := k.bankKeeper.GetBalance(ctx, receiver, pair.Denom)
-	balanceToken := k.balanceOf(ctx, erc20, contract, types.ModuleAddress)
+	balanceToken, err := k.balanceOf(ctx, erc20, contract, types.ModuleAddress)
+	if err != nil {
+		return nil, err
+	}
 
 	// Escrow tokens on module account
 	transferData, err := erc20.Pack("transfer", types.ModuleAddress, msg.Amount.BigInt())
@@ -350,7 +385,10 @@ func (k Keeper) convertERC20NativeToken(
 
 	// Check expected escrow balance after transfer execution
 	tokens := coins[0].Amount.BigInt()
-	balanceTokenAfter := k.balanceOf(ctx, erc20, contract, types.ModuleAddress)
+	balanceTokenAfter, err := k.balanceOf(ctx, erc20, contract, types.ModuleAddress)
+	if err != nil {
+		return nil, err
+	}
 	expToken := big.NewInt(0).Add(balanceToken, tokens)
 	if r := balanceTokenAfter.Cmp(expToken); r != 0 {
 		return nil, sdkerrors.Wrapf(
@@ -421,7 +459,10 @@ func (k Keeper) convertCoinNativeERC20(
 
 	erc20 := contracts.ERC20MinterBurnerDecimalsContract.ABI
 	contract := pair.GetERC20Contract()
-	balanceToken := k.balanceOf(ctx, erc20, contract, receiver)
+	balanceToken, err := k.balanceOf(ctx, erc20, contract, receiver)
+	if err != nil {
+		return nil, err
+	}
 
 	// Escrow Coins on module account
 	if err := k.bankKeeper.SendCoinsFromAccountToModule(ctx, sender, types.ModuleName, coins); err != nil {
@@ -446,7 +487,10 @@ func (k Keeper) convertCoinNativeERC20(
 
 	// Check expected Receiver balance after transfer execution
 	tokens := msg.Coin.Amount.BigInt()
-	balanceTokenAfter := k.balanceOf(ctx, erc20, contract, receiver)
+	balanceTokenAfter, err := k.balanceOf(ctx, erc20, contract, receiver)
+	if err != nil {
+		return nil, err
+	}
 	exp := big.NewInt(0).Add(balanceToken, tokens)
 	if r := balanceTokenAfter.Cmp(exp); r != 0 {
 		return nil, sdkerrors.Wrapf(
@@ -488,23 +532,23 @@ func (k Keeper) balanceOf(
 	ctx sdk.Context,
 	abi abi.ABI,
 	contract, account common.Address,
-) *big.Int {
+) (*big.Int, error) {
 	res, err := k.CallEVM(ctx, abi, types.ModuleAddress, contract, false, "balanceOf", account)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 
 	unpacked, err := abi.Unpack("balanceOf", res.Ret)
 	if err != nil || len(unpacked) == 0 {
-		return nil
+		return nil, err
 	}
 
 	balance, ok := unpacked[0].(*big.Int)
 	if !ok {
-		return nil
+		return nil, sdkerrors.Wrapf(types.ErrABIUnpack, "failed to unpack balanceOf result")
 	}
 
-	return balance
+	return balance, nil
 }
 
 // monitorApprovalEvent returns an error if the given transactions logs include
@@ -518,7 +562,7 @@ func (k Keeper) monitorApprovalEvent(res *evmtypes.MsgEthereumTxResponse) error 
 	logApprovalSigHash := crypto.Keccak256Hash(logApprovalSig)
 
 	for _, log := range res.Logs {
-		if log.Topics[0] == logApprovalSigHash.Hex() {
+		if len(log.Topics) > 0 && log.Topics[0] == logApprovalSigHash.Hex() {
 			return sdkerrors.Wrapf(
 				types.ErrUnexpectedEvent, "unexpected Approval event",
 			)
@@ -557,8 +601,13 @@ func (k Keeper) refundPacketToken(ctx sdk.Context, packet channeltypes.Packet, d
 	erc20 := contracts.ERC20MinterBurnerDecimalsContract.ABI
 
 	contract := pair.GetERC20Contract()
+
+	// Use a cache context to ensure atomicity: if any step fails, the entire
+	// refund is rolled back to prevent double-refund or token-loss scenarios.
+	cctx, commit := ctx.CacheContext()
+
 	// Mint Tokens and send to receiver
-	_, err = k.CallEVM(ctx, erc20, types.ModuleAddress, contract, true, "mint", common.HexToAddress(evmSender), transferAmount.BigInt())
+	_, err = k.CallEVM(cctx, erc20, types.ModuleAddress, contract, true, "mint", common.HexToAddress(evmSender), transferAmount.BigInt())
 	if err != nil {
 		return err
 	}
@@ -572,7 +621,7 @@ func (k Keeper) refundPacketToken(ctx sdk.Context, packet channeltypes.Packet, d
 		return err
 	}
 	coins := sdk.NewCoins(sdk.NewCoin(pair.Denom, transferAmount))
-	if err := k.bankKeeper.SendCoinsFromAccountToModule(ctx, cosmosSender, types.ModuleName, coins); err != nil {
+	if err := k.bankKeeper.SendCoinsFromAccountToModule(cctx, cosmosSender, types.ModuleName, coins); err != nil {
 		return err
 	}
 
@@ -580,10 +629,13 @@ func (k Keeper) refundPacketToken(ctx sdk.Context, packet channeltypes.Packet, d
 	// original ConvertERC20, so they must be burned. For NativeCoin pairs the
 	// coins were unescrowed from the module — they stay escrowed there.
 	if pair.IsNativeERC20() {
-		if err := k.bankKeeper.BurnCoins(ctx, types.ModuleName, coins); err != nil {
+		if err := k.bankKeeper.BurnCoins(cctx, types.ModuleName, coins); err != nil {
 			return err
 		}
 	}
+
+	// Commit all state changes atomically
+	commit()
 
 	return nil
 }

@@ -106,11 +106,6 @@ func (msg MsgConvertERC20) ValidateBasic() error {
 		return sdkerrors.Wrapf(errortypes.ErrInvalidAddress, "invalid sender hex address %s", msg.Sender)
 	}
 
-	//if !common.IsHexAddress(strings.ToLower(msg.Sender)) {
-	//	fmt.Printf("msg ValidateBasic 107\n")
-	//	return sdkerrors.Wrapf(errortypes.ErrInvalidAddress, "invalid sender hex address %s", msg.Sender)
-	//}
-
 	return nil
 }
 
@@ -145,6 +140,9 @@ func (msg MsgTransferERC20) ValidateBasic() error {
 	//if !common.IsHexAddress(msg.EvmSender) {
 	//	return sdkerrors.Wrapf(errortypes.ErrInvalidAddress, "invalid sender hex address %s", msg.EvmSender)
 	//}
+	if msg.Amount.IsNil() || !msg.Amount.IsPositive() {
+		return sdkerrors.Wrapf(errortypes.ErrInvalidCoins, "cannot transfer a non-positive amount")
+	}
 	_, SenderErr := sdk.AccAddressFromBech32(msg.CosmosSender)
 	if SenderErr != nil {
 		return sdkerrors.Wrap(SenderErr, "invalid sender address")
@@ -161,7 +159,7 @@ func (msg *MsgTransferERC20) GetSignBytes() []byte {
 // GetSigners defines whose signature is required
 func (msg MsgTransferERC20) GetSigners() []sdk.AccAddress {
 
-	addr, err := sdk.AccAddressFromBech32(msg.CosmosReceiver)
+	addr, err := sdk.AccAddressFromBech32(msg.CosmosSender)
 	if err != nil {
 		return nil
 	}

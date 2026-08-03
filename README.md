@@ -43,7 +43,7 @@ Uptick Chain is a blockchain network built on the [Cosmos SDK](https://github.co
 
 <img alt="uptick" src="https://github.com/UptickNetwork/uptick/blob/main/uptick.jpg">
 
-**Note**: Requires [Go 1.18+](https://golang.org/dl/)
+**Note**: Requires [Go 1.23+](https://golang.org/dl/)
 
 ## Installation
 

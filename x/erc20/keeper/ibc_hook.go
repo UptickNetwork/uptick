@@ -4,9 +4,11 @@ import (
 	"cosmossdk.io/math"
 	"fmt"
 
+	sdkerrors "cosmossdk.io/errors"
 	"github.com/UptickNetwork/uptick/x/erc20/types"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
 	capabilitytypes "github.com/cosmos/ibc-go/modules/capability/types"
 	transfertypes "github.com/cosmos/ibc-go/v8/modules/apps/transfer/types"
 	clienttypes "github.com/cosmos/ibc-go/v8/modules/core/02-client/types"
@@ -34,30 +36,56 @@ func (k Keeper) OnRecvPacket(
 	if err := transfertypes.ModuleCdc.UnmarshalJSON(packet.GetData(), &data); err != nil {
 		event.Status = types.STATUS_FAILED
 		event.Message = err.Error()
-		_ = ctx.EventManager().EmitTypedEvent(event)
-		return nil
+		if err := ctx.EventManager().EmitTypedEvent(event); err != nil {
+			k.Logger(ctx).Error("failed to emit IBC event", "status", event.Status, "error", err.Error())
+		}
+		return channeltypes.NewErrorAcknowledgement(
+			sdkerrors.Wrapf(errortypes.ErrInvalidType, "cannot unmarshal ICS-20 transfer packet data"),
+		)
 	}
 	transferAmount, ok := math.NewIntFromString(data.Amount)
 	if !ok {
 		event.Status = types.STATUS_FAILED
 		event.Message = "Change data.Amount type to int error"
-		_ = ctx.EventManager().EmitTypedEvent(event)
-		return nil
+		if err := ctx.EventManager().EmitTypedEvent(event); err != nil {
+			k.Logger(ctx).Error("failed to emit IBC event", "status", event.Status, "error", err.Error())
+		}
+		return channeltypes.NewErrorAcknowledgement(
+			sdkerrors.Wrapf(transfertypes.ErrInvalidAmount, "unable to parse transfer amount (%s) into math.Int", data.Amount),
+		)
 	}
-	receiver, _ := sdk.AccAddressFromBech32(data.Receiver)
-	denom, err := types.IBCDenom(packet.GetDestPort(), packet.GetDestChannel(), data.Denom)
+	receiver, err := sdk.AccAddressFromBech32(data.Receiver)
+	if err != nil {
+		event.Status = types.STATUS_FAILED
+		event.Message = fmt.Sprintf("invalid receiver address: %s", data.Receiver)
+		if err := ctx.EventManager().EmitTypedEvent(event); err != nil {
+			k.Logger(ctx).Error("failed to emit IBC event", "status", event.Status, "error", err.Error())
+		}
+		return channeltypes.NewErrorAcknowledgement(
+			sdkerrors.Wrapf(errortypes.ErrInvalidAddress, "invalid receiver address: %s", data.Receiver),
+		)
+	}
+	denom, err = types.IBCDenom(packet.GetDestPort(), packet.GetDestChannel(), data.Denom)
 	if err != nil {
 		event.Status = types.STATUS_FAILED
 		event.Message = err.Error()
-		_ = ctx.EventManager().EmitTypedEvent(event)
-		return nil
+		if err := ctx.EventManager().EmitTypedEvent(event); err != nil {
+			k.Logger(ctx).Error("failed to emit IBC event", "status", event.Status, "error", err.Error())
+		}
+		return channeltypes.NewErrorAcknowledgement(
+			sdkerrors.Wrapf(errortypes.ErrInvalidRequest, "invalid IBC denom: %s", err.Error()),
+		)
 	}
 
 	if !k.IsDenomRegistered(ctx, denom) {
 		event.Status = types.STATUS_FAILED
 		event.Message = fmt.Sprintf("denom %s not registered", denom)
-		_ = ctx.EventManager().EmitTypedEvent(event)
-		return nil
+		if err := ctx.EventManager().EmitTypedEvent(event); err != nil {
+			k.Logger(ctx).Error("failed to emit IBC event", "status", event.Status, "error", err.Error())
+		}
+		return channeltypes.NewErrorAcknowledgement(
+			sdkerrors.Wrapf(types.ErrTokenPairNotFound, "denom %s not registered", denom),
+		)
 	}
 	msg := types.NewMsgConvertCoin(
 		sdk.NewCoin(denom, transferAmount),
@@ -65,20 +93,26 @@ func (k Keeper) OnRecvPacket(
 		receiver,
 	)
 	// use cctx to ConvertCoin
-	context := sdk.WrapSDKContext(cctx)
-	_, err = k.ConvertCoin(context, msg)
+	goCtx := sdk.WrapSDKContext(cctx)
+	_, err = k.ConvertCoin(goCtx, msg)
 	if err != nil {
 		event.Status = types.STATUS_FAILED
 		event.Message = err.Error()
-		_ = ctx.EventManager().EmitTypedEvent(event)
-		return nil
+		if err := ctx.EventManager().EmitTypedEvent(event); err != nil {
+			k.Logger(ctx).Error("failed to emit IBC event", "status", event.Status, "error", err.Error())
+		}
+		return channeltypes.NewErrorAcknowledgement(
+			sdkerrors.Wrapf(errortypes.ErrInvalidRequest, "failed to convert coin: %s", err.Error()),
+		)
 	}
 
 	write()
 	ctx.EventManager().EmitEvents(cctx.EventManager().Events())
 	event.Status = types.STATUS_SUCCESS
-	_ = ctx.EventManager().EmitTypedEvent(event)
-	return nil
+	if err := ctx.EventManager().EmitTypedEvent(event); err != nil {
+		k.Logger(ctx).Error("failed to emit IBC event", "status", event.Status, "error", err.Error())
+	}
+	return channeltypes.NewResultAcknowledgement([]byte{byte(1)})
 }
 
 func (k Keeper) SendPacket(

@@ -194,7 +194,7 @@ func (m *RegisterCoinProposal) GetMetadata() types.Metadata {
 	return types.Metadata{}
 }
 
-// RegisterCoinProposal is a gov Content type to register a token pair
+// RegisterERC20Proposal is a gov Content type to register an ERC20 token pair
 type RegisterERC20Proposal struct {
 	// title of the proposal
 	Title string `protobuf:"bytes,1,opt,name=title,proto3" json:"title,omitempty"`

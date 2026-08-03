@@ -26,8 +26,8 @@ func (k Keeper) RegisterCoin(ctx sdk.Context, coinMetadata banktypes.Metadata) (
 	}
 
 	// check if the denomination already registered
-	if k.IsDenomRegistered(ctx, coinMetadata.Name) {
-		return nil, sdkerrors.Wrapf(types.ErrTokenPairAlreadyExists, "coin denomination already registered: %s", coinMetadata.Name)
+	if k.IsDenomRegistered(ctx, coinMetadata.Base) {
+		return nil, sdkerrors.Wrapf(types.ErrTokenPairAlreadyExists, "coin denomination already registered: %s", coinMetadata.Base)
 	}
 
 	// check if the coin exists by ensuring the supply is set
@@ -38,10 +38,10 @@ func (k Keeper) RegisterCoin(ctx sdk.Context, coinMetadata banktypes.Metadata) (
 		)
 	}
 
-	//modify the naming rules of the ibc proposal
-	//if err := k.verifyMetadata(ctx, coinMetadata); err != nil {
-	//	return nil, sdkerrors.Wrapf(types.ErrInternalTokenPair, "coin metadata is invalid %s", coinMetadata.Name)
-	//}
+	// verify metadata consistency with existing bank metadata
+	if err := k.verifyMetadata(ctx, coinMetadata); err != nil {
+		return nil, sdkerrors.Wrapf(types.ErrInternalTokenPair, "coin metadata is invalid %s", coinMetadata.Name)
+	}
 
 	addr, err := k.DeployERC20Contract(ctx, coinMetadata)
 	if err != nil {
@@ -74,6 +74,9 @@ func (k Keeper) DeployERC20Contract(
 	coinMetadata banktypes.Metadata,
 ) (common.Address, error) {
 	//modify decimal digit setting logic
+	if len(coinMetadata.DenomUnits) < 2 {
+		return common.Address{}, sdkerrors.Wrapf(types.ErrInternalTokenPair, "coin metadata DenomUnits must have at least 2 entries, got %d", len(coinMetadata.DenomUnits))
+	}
 	decimals := uint8(coinMetadata.DenomUnits[1].Exponent)
 	ctorArgs, err := contracts.ERC20MinterBurnerDecimalsContract.ABI.Pack(
 		"",

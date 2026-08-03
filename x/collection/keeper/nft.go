@@ -162,7 +162,7 @@ func (k Keeper) RemoveNFT(ctx sdk.Context, denomID, tokenID string, owner sdk.Ac
 func (k Keeper) GetNFT(ctx sdk.Context, denomID, tokenID string) (nft exported.NFT, err error) {
 	token, exist := k.nk.GetNFT(ctx, denomID, tokenID)
 	if !exist {
-		return nil, sdkerrors.Wrapf(types.ErrUnknownNFT, "not found NFT: %s", denomID)
+		return nil, sdkerrors.Wrapf(types.ErrUnknownNFT, "not found NFT %s from collection %s", tokenID, denomID)
 	}
 
 	var nftMetadata types.NFTMetadata

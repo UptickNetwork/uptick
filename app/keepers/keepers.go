@@ -548,19 +548,6 @@ func New(
 		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
 	)
 
-	// Configure the hooks keeper
-	//appKeepers.IBCHooksKeeper = ibchookskeeper.NewKeeper(
-	//	appKeepers.keys[ibchookstypes.StoreKey],
-	//)
-
-	//stargazePrefix := sdk.GetConfig().GetBech32AccountAddrPrefix()
-	//wasmHooks := ibchooks.NewWasmHooks(&appKeepers.IBCHooksKeeper, nil, stargazePrefix) // The contract keeper needs to be set later
-	//appKeepers.Ics20WasmHooks = &wasmHooks
-	//appKeepers.HooksICS4Wrapper = ibchooks.NewICS4Middleware(
-	//	appKeepers.IBCKeeper.ChannelKeeper,
-	//	appKeepers.Ics20WasmHooks,
-	//)
-
 	// Initialize the packet forward middleware Keeper
 	//appKeepers.PacketForwardKeeper = packetforwardkeeper.NewKeeper(
 	//	appCodec,

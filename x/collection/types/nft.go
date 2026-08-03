@@ -33,8 +33,7 @@ func (bNFT BaseNFT) GetName() string {
 
 // GetOwner return the owner of BaseNFT
 func (bNFT BaseNFT) GetOwner() sdk.AccAddress {
-	owner, _ := sdk.AccAddressFromBech32(bNFT.Owner)
-	return owner
+	return sdk.MustAccAddressFromBech32(bNFT.Owner)
 }
 
 // GetURI return the URI of BaseNFT

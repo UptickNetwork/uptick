@@ -42,8 +42,7 @@ func SigVerificationGasConsumer(
 		meter.ConsumeGas(secp256k1VerifyCost, "ante verify: eth_secp256k1")
 		return nil
 	case *ed25519.PubKey:
-		// Validator keys
-		meter.ConsumeGas(params.SigVerifyCostED25519, "ante verify: ed25519")
+		// Validator keys - ED25519 is not supported for transaction signing
 		return sdkerrors.Wrap(errortypes.ErrInvalidPubKey, "ED25519 public keys are unsupported")
 
 	case multisig.PubKey:

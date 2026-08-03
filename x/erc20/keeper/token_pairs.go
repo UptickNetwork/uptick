@@ -20,7 +20,10 @@ func (k Keeper) GetAllTokenPairs(ctx sdk.Context) []types.TokenPair {
 
 	for ; iterator.Valid(); iterator.Next() {
 		var tokenPair types.TokenPair
-		k.cdc.MustUnmarshal(iterator.Value(), &tokenPair)
+		if err := k.cdc.Unmarshal(iterator.Value(), &tokenPair); err != nil {
+			k.Logger(ctx).Error("failed to unmarshal token pair", "error", err.Error())
+			continue
+		}
 
 		tokenPairs = append(tokenPairs, tokenPair)
 	}
@@ -50,7 +53,10 @@ func (k Keeper) GetTokenPair(ctx sdk.Context, id []byte) (types.TokenPair, bool)
 		return types.TokenPair{}, false
 	}
 
-	k.cdc.MustUnmarshal(bz, &tokenPair)
+	if err := k.cdc.Unmarshal(bz, &tokenPair); err != nil {
+		k.Logger(ctx).Error("failed to unmarshal token pair", "error", err.Error())
+		return types.TokenPair{}, false
+	}
 	return tokenPair, true
 }
 
@@ -67,6 +73,10 @@ func (k Keeper) DeleteTokenPair(ctx sdk.Context, tokenPair types.TokenPair) {
 	store := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixTokenPair)
 	key := tokenPair.GetID()
 	store.Delete(key)
+
+	// Clean up reverse mappings to prevent stale data
+	k.DeleteDenomMap(ctx, tokenPair.Denom)
+	k.DeleteERC20Map(ctx, tokenPair.GetERC20Contract())
 }
 
 // GetERC20Map returns the token pair id for the given address
@@ -97,6 +107,12 @@ func (k Keeper) DeleteERC20Map(ctx sdk.Context, erc20 common.Address) {
 func (k Keeper) SetDenomMap(ctx sdk.Context, denom string, id []byte) {
 	store := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixTokenPairByDenom)
 	store.Set([]byte(denom), id)
+}
+
+// DeleteDenomMap deletes the token pair id for the given denom
+func (k Keeper) DeleteDenomMap(ctx sdk.Context, denom string) {
+	store := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixTokenPairByDenom)
+	store.Delete([]byte(denom))
 }
 
 // IsTokenPairRegistered - check if registered token tokenPair is registered

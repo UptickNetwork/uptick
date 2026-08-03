@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	sdkerrors "cosmossdk.io/errors"
 	erc721types "github.com/UptickNetwork/evm-nft-convert/types"
 	erc20Types "github.com/UptickNetwork/uptick/x/erc20/types"
 	evmibctypes "github.com/UptickNetwork/uptick/x/evmIBC/types"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/bianjieai/nft-transfer/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
 	channeltypes "github.com/cosmos/ibc-go/v8/modules/core/04-channel/types"
 	"github.com/cosmos/ibc-go/v8/modules/core/exported"
 )
@@ -39,7 +41,9 @@ func (k Keeper) OnRecvPacket(
 		event.Status = erc20Types.STATUS_FAILED
 		event.Message = err.Error()
 		_ = ctx.EventManager().EmitTypedEvent(event)
-		return nil
+		return channeltypes.NewErrorAcknowledgement(
+			sdkerrors.Wrapf(errortypes.ErrInvalidType, "cannot unmarshal NFT transfer packet data"),
+		)
 	}
 
 	// add the prefix class check for the case of class id
@@ -64,7 +68,9 @@ func (k Keeper) OnRecvPacket(
 		event.Message = err.Error()
 		k.Logger(ctx).Error("OnRecvPacket ", "err ", err.Error())
 		_ = ctx.EventManager().EmitTypedEvent(event)
-		return nil
+		return channeltypes.NewErrorAcknowledgement(
+			sdkerrors.Wrapf(errortypes.ErrInvalidRequest, "failed to convert NFT: %s", err.Error()),
+		)
 	}
 
 	write()
@@ -73,7 +79,7 @@ func (k Keeper) OnRecvPacket(
 
 	k.Logger(ctx).Info("OnRecvPacket ", "finish OK")
 
-	return nil
+	return channeltypes.NewResultAcknowledgement([]byte{byte(1)})
 
 }
 
@@ -88,7 +94,6 @@ func (k Keeper) ConvertNFTFromErc721(context context.Context, voucherClassID str
 		EvmReceiver:        receiver,
 	}
 
-	fmt.Printf("xxl 002 ConvertNFTFromErc721 msg %v:\n", msg)
 	_, err := k.erc721keeper.ConvertNFT(context, &msg)
 	if err != nil {
 		return err
@@ -178,10 +183,15 @@ func (k Keeper) OnTimeoutPacket(ctx sdk.Context, packet channeltypes.Packet, dat
 func (k Keeper) getRefundClassId(packet channeltypes.Packet, data types.NonFungibleTokenPacketData) string {
 	var voucherClassID string
 
-	if strings.Contains(data.ClassId, "nft-transfer/") {
-		// if types.IsAwayFromOrigin(packet.GetSourcePort(), packet.GetSourceChannel(), data.ClassId) {
-		orgClass, _ := types.RemoveClassPrefix(packet.GetSourcePort(), packet.GetSourceChannel(), data.ClassId)
-		voucherClassID = k.GetVoucherClassID(packet.GetSourcePort(), packet.GetSourceChannel(), orgClass)
+	if strings.HasPrefix(data.ClassId, "nft-transfer/") {
+		orgClass, err := types.RemoveClassPrefix(packet.GetSourcePort(), packet.GetSourceChannel(), data.ClassId)
+		if err != nil {
+			// If prefix removal fails, fall back to the original class ID
+			// to prevent a nil/empty class ID from propagating.
+			voucherClassID = data.ClassId
+		} else {
+			voucherClassID = k.GetVoucherClassID(packet.GetSourcePort(), packet.GetSourceChannel(), orgClass)
+		}
 
 	} else {
 		voucherClassID = data.ClassId

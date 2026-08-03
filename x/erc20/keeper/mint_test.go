@@ -1,100 +1,54 @@
 package keeper_test
 
-//
-//import (
-//	"fmt"
-//
-//	sdk "github.com/cosmos/cosmos-sdk/types"
-//	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
-//
-//	"github.com/evmos/ethermint/tests"
-//
-//	"github.com/UptickNetwork/uptick/x/erc20/types"
-//)
-//
-//func (suite *KeeperTestSuite) TestMintingEnabled() {
-//	sender := sdk.AccAddress(tests.GenerateAddress().Bytes())
-//	receiver := sdk.AccAddress(tests.GenerateAddress().Bytes())
-//	expPair := types.NewTokenPair(tests.GenerateAddress(), "coin", true, types.OWNER_MODULE)
-//	id := expPair.GetID()
-//
-//	testCases := []struct {
-//		name     string
-//		malleate func()
-//		expPass  bool
-//	}{
-//		{
-//			"intrarelaying is disabled globally",
-//			func() {
-//				params := types.DefaultParams()
-//				params.EnableErc20 = false
-//				suite.app.Erc20Keeper.SetParams(suite.ctx, params)
-//			},
-//			false,
-//		},
-//		{
-//			"token pair not found",
-//			func() {},
-//			false,
-//		},
-//		{
-//			"intrarelaying is disabled for the given pair",
-//			func() {
-//				expPair.Enabled = false
-//				suite.app.Erc20Keeper.SetTokenPair(suite.ctx, expPair)
-//				suite.app.Erc20Keeper.SetDenomMap(suite.ctx, expPair.Denom, id)
-//				suite.app.Erc20Keeper.SetERC20Map(suite.ctx, expPair.GetERC20Contract(), id)
-//			},
-//			false,
-//		},
-//		{
-//			"token transfers are disabled",
-//			func() {
-//				expPair.Enabled = true
-//				suite.app.Erc20Keeper.SetTokenPair(suite.ctx, expPair)
-//				suite.app.Erc20Keeper.SetDenomMap(suite.ctx, expPair.Denom, id)
-//				suite.app.Erc20Keeper.SetERC20Map(suite.ctx, expPair.GetERC20Contract(), id)
-//
-//				params := banktypes.DefaultParams()
-//				params.SendEnabled = []*banktypes.SendEnabled{
-//					{Denom: expPair.Denom, Enabled: false},
-//				}
-//				suite.app.BankKeeper.SetParams(suite.ctx, params)
-//			},
-//			false,
-//		},
-//		{
-//			"token not registered",
-//			func() {
-//				suite.app.Erc20Keeper.SetDenomMap(suite.ctx, expPair.Denom, id)
-//				suite.app.Erc20Keeper.SetERC20Map(suite.ctx, expPair.GetERC20Contract(), id)
-//			},
-//			false,
-//		},
-//		{
-//			"ok",
-//			func() {
-//				suite.app.Erc20Keeper.SetTokenPair(suite.ctx, expPair)
-//				suite.app.Erc20Keeper.SetDenomMap(suite.ctx, expPair.Denom, id)
-//				suite.app.Erc20Keeper.SetERC20Map(suite.ctx, expPair.GetERC20Contract(), id)
-//			},
-//			true,
-//		},
-//	}
-//
-//	for _, tc := range testCases {
-//		suite.Run(fmt.Sprintf("Case %s", tc.name), func() {
-//			suite.SetupTest() // reset
-//
-//			tc.malleate()
-//
-//			pair, err := suite.app.Erc20Keeper.MintingEnabled(suite.ctx, sender, receiver, expPair.Erc20Address)
-//			if tc.expPass {
-//				suite.Require().NoError(err)
-//				suite.Require().Equal(expPair, pair)
-//			} else {
-//				suite.Require().Error(err)
-//			}
-//		})
-//	}
-//}
+import (
+	sdk "github.com/cosmos/cosmos-sdk/types"
+	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
+
+	"github.com/UptickNetwork/uptick/x/erc20/types"
+)
+
+func (suite *KeeperTestSuite) TestMintingEnabled() {
+	coinMeta := banktypes.Metadata{
+		Name:    "test",
+		Symbol:  "TST",
+		Base:    "utest",
+		Display: "test",
+		DenomUnits: []*banktypes.DenomUnit{
+			{Denom: "utest", Exponent: 0},
+			{Denom: "test", Exponent: 18},
+		},
+	}
+
+	pair := suite.setupRegisterCoin(coinMeta)
+	suite.Require().NotNil(pair)
+	suite.Require().True(pair.Enabled)
+
+	sender := sdk.AccAddress(suite.address.Bytes())
+	receiver := sdk.AccAddress(suite.address.Bytes())
+
+	// Test valid minting check
+	resultPair, err := suite.app.Erc20Keeper.MintingEnabled(suite.ctx, sender, receiver, pair.Denom)
+	suite.Require().NoError(err)
+	suite.Require().Equal(pair.Denom, resultPair.Denom)
+	suite.Require().True(resultPair.Enabled)
+}
+
+func (suite *KeeperTestSuite) TestMintingEnabledInvalidDenom() {
+	sender := sdk.AccAddress(suite.address.Bytes())
+	receiver := sdk.AccAddress(suite.address.Bytes())
+
+	_, err := suite.app.Erc20Keeper.MintingEnabled(suite.ctx, sender, receiver, "nonexistent")
+	suite.Require().Error(err)
+}
+
+func (suite *KeeperTestSuite) TestMintingEnabledUnregisteredCoin() {
+	sender := sdk.AccAddress(suite.address.Bytes())
+	receiver := sdk.AccAddress(suite.address.Bytes())
+
+	// Get all pairs and find a non-existing one
+	pairs := suite.app.Erc20Keeper.GetAllTokenPairs(suite.ctx)
+	suite.Require().Empty(pairs)
+
+	_, err := suite.app.Erc20Keeper.MintingEnabled(suite.ctx, sender, receiver, types.CreateDenom("utest"))
+	suite.Require().Error(err)
+}

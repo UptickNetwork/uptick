@@ -8,6 +8,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
+	"github.com/cosmos/cosmos-sdk/x/authz"
 	ethante "github.com/evmos/ethermint/app/ante"
 	evmtypes "github.com/evmos/ethermint/x/evm/types"
 )
@@ -40,8 +41,11 @@ func NewWasmSecurityDecorator(cdc codec.BinaryCodec, evmKeeper ethante.EVMKeeper
 
 // AnteHandle inspects CosmWasm messages in the tx to ensure AnteHandler checks are not bypassed
 func (wsd WasmSecurityDecorator) AnteHandle(ctx sdk.Context, tx sdk.Tx, simulate bool, next sdk.AnteHandler) (newCtx sdk.Context, err error) {
-	// Get all messages from the transaction
-	msgs := tx.GetMsgs()
+	// Extract all messages from the transaction, including nested messages (e.g., authz.MsgExec)
+	msgs, err := wsd.ExtractMessagesFromTx(ctx, tx)
+	if err != nil {
+		return ctx, err
+	}
 
 	// Validate each message
 	for _, msg := range msgs {
@@ -172,12 +176,13 @@ func (wsd WasmSecurityDecorator) validateEvmGasLimit(ctx sdk.Context, msg *evmty
 	return nil
 }
 
-// ExtractMessagesFromTx extracts all messages from a transaction
+// ExtractMessagesFromTx extracts all messages from a transaction, including
+// nested messages from authz.MsgExec to prevent ante handler bypass attacks.
 func (wsd WasmSecurityDecorator) ExtractMessagesFromTx(ctx sdk.Context, tx sdk.Tx) ([]sdk.Msg, error) {
 	var allMsgs []sdk.Msg
 	msgs := tx.GetMsgs()
 
-	// Use a queue to process nested messages
+	// Use a queue to process nested messages (e.g., authz.MsgExec inner messages)
 	msgQueue := make([]sdk.Msg, 0, len(msgs))
 	msgQueue = append(msgQueue, msgs...)
 
@@ -196,6 +201,14 @@ func (wsd WasmSecurityDecorator) ExtractMessagesFromTx(ctx sdk.Context, tx sdk.T
 
 		allMsgs = append(allMsgs, msg)
 
+		// Extract nested messages from authz.MsgExec to prevent bypass attacks
+		if execMsg, ok := msg.(*authz.MsgExec); ok {
+			nestedMsgs, err := execMsg.GetMessages()
+			if err != nil {
+				return nil, sdkerrors.Wrapf(err, "failed to unpack authz.MsgExec nested messages")
+			}
+			msgQueue = append(msgQueue, nestedMsgs...)
+		}
 	}
 
 	return allMsgs, nil
