@@ -305,4 +305,6 @@ replace (
 	github.com/evmos/ethermint => github.com/UptickNetwork/ethermint v0.24.4-uptick
 	github.com/gin-gonic/gin => github.com/gin-gonic/gin v1.9.1
 	github.com/syndtr/goleveldb => github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
+	// nft-transfer fork - upgraded to ibc-go v10 locally (will push to UptickNetwork/nft-transfer when network allows)
+	github.com/bianjieai/nft-transfer => ../nft-transfer-fork
 )

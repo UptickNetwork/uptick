@@ -357,7 +357,7 @@ func New(
 			appKeepers.DistrKeeper,
 			appKeepers.BankKeeper,
 			&appKeepers.Erc20Keeper,
-			appKeepers.TransferKeeper,
+			appKeepers.IBCTransferKeeper, // TransferKeeper for IBC precompile
 			appKeepers.IBCKeeper.ChannelKeeper,
 			appKeepers.GovKeeper,
 			appKeepers.SlashingKeeper,
@@ -378,14 +378,13 @@ func New(
 	// Create Transfer Keepers
 	appKeepers.IBCTransferKeeper = ibctransferkeeper.NewKeeper(
 		appCodec,
-		appKeepers.keys[ibctransfertypes.StoreKey],
+		runtime.NewKVStoreService(appKeepers.keys[ibctransfertypes.StoreKey]),
 		appKeepers.GetSubspace(ibctransfertypes.ModuleName),
-		appKeepers.Erc20Keeper,
+		appKeepers.Erc20Keeper, // ICS4Wrapper
 		appKeepers.IBCKeeper.ChannelKeeper,
-		appKeepers.IBCKeeper.PortKeeper,
+		bApp.MsgServiceRouter(), // MessageRouter
 		appKeepers.AccountKeeper,
 		appKeepers.BankKeeper,
-		appKeepers.ScopedTransferKeeper,
 		authtypes.NewModuleAddress(ibctransfertypes.ModuleName).String(),
 	)
 
@@ -405,7 +404,6 @@ func New(
 		appKeepers.IBCKeeper.PortKeeper,
 		appKeepers.AccountKeeper,
 		internft.NewInterNftKeeper(appCodec, appKeepers.NFTKeeper, appKeepers.AccountKeeper),
-		appKeepers.ScopedNFTTransferKeeper,
 	)
 
 	wasmDir := filepath.Join(homePath, "data")

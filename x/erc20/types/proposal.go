@@ -10,7 +10,6 @@ import (
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 
 	"github.com/cosmos/cosmos-sdk/x/gov/types/v1beta1"
-	ibctransfertypes "github.com/cosmos/ibc-go/v10/modules/apps/transfer/types"
 
 	"github.com/ethereum/go-ethereum/common"
 	upticktypes "github.com/UptickNetwork/uptick/types"

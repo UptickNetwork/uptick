@@ -129,7 +129,7 @@ func (k Keeper) ConvertCoin(
 	erc20 := common.HexToAddress(pair.Erc20Address)
 	acc := k.evmKeeper.GetAccountWithoutBalance(ctx, erc20)
 
-	if acc == nil || !acc.IsContract() {
+	if acc == nil || len(acc.CodeHash) == 0 {
 		k.DeleteTokenPair(ctx, pair)
 		k.Logger(ctx).Debug(
 			"deleting selfdestructed token pair from state",
@@ -179,7 +179,7 @@ func (k Keeper) ConvertERC20(
 	erc20 := common.HexToAddress(pair.Erc20Address)
 	acc := k.evmKeeper.GetAccountWithoutBalance(ctx, erc20)
 
-	if acc == nil || !acc.IsContract() {
+	if acc == nil || len(acc.CodeHash) == 0 {
 		k.DeleteTokenPair(ctx, pair)
 		k.Logger(ctx).Debug(
 			"deleting selfdestructed token pair from state",

@@ -498,36 +498,9 @@ func NewTransferERC20Cmd() *cobra.Command {
 			// if the timeouts are not absolute, retrieve latest block height and block timestamp
 			// for the consensus state connected to the destination port/channel
 			if !absoluteTimeouts {
-				consensusState, height, _, err := channelutils.QueryLatestConsensusState(cliCtx, sourcePort, sourceChannel)
-				if err != nil {
-					return err
-				}
-
-				if !timeoutHeight.IsZero() {
-					absoluteHeight := height
-					absoluteHeight.RevisionNumber += timeoutHeight.RevisionNumber
-					absoluteHeight.RevisionHeight += timeoutHeight.RevisionHeight
-					timeoutHeight = absoluteHeight
-				}
-
-				if timeoutTimestamp != 0 {
-					// use local clock time as reference time if it is later than the
-					// consensus state timestamp of the counter party chain, otherwise
-					// still use consensus state timestamp as reference
-					now := time.Now().UnixNano()
-					consensusStateTimestamp := consensusState.GetTimestamp()
-					if now > 0 {
-						now := uint64(now)
-						if now > consensusStateTimestamp {
-							timeoutTimestamp = now + timeoutTimestamp
-						} else {
-							timeoutTimestamp = consensusStateTimestamp + timeoutTimestamp
-						}
-					} else {
-						// return errors.New("local clock time is not greater than Jan 1st, 1970 12:00 AM")
-						return fmt.Errorf("tokenIDs cannot be empty")
-					}
-				}
+				// TODO: channelutils.QueryLatestConsensusState was removed in ibc-go v10
+				// Need to use clientutils.QueryLatestConsensusState or similar replacement
+				return fmt.Errorf("relative timeouts not supported after ibc-go v10 migration - please use absolute timeouts")
 			}
 
 			msg := &types.MsgTransferERC20{

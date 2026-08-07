@@ -64,7 +64,7 @@ func (k Keeper) OnRecvPacket(
 			sdkerrors.Wrapf(errortypes.ErrInvalidAddress, "invalid receiver address: %s", data.Receiver),
 		)
 	}
-	denom, err = types.IBCDenom(packet.GetDestPort(), packet.GetDestChannel(), data.Denom)
+	denom, err := types.IBCDenom(packet.GetDestPort(), packet.GetDestChannel(), data.Denom)
 	if err != nil {
 		event.Status = types.STATUS_FAILED
 		event.Message = err.Error()
