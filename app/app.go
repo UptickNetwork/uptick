@@ -9,6 +9,8 @@ import (
 
 	"github.com/cosmos/cosmos-sdk/version"
 
+	"github.com/ethereum/go-ethereum/common"
+
 	"cosmossdk.io/math"
 
 	"cosmossdk.io/client/v2/autocli"
@@ -624,6 +626,28 @@ func NewUptick(
 
 // Name returns the name of the App
 func (app *Uptick) Name() string { return app.BaseApp.Name() }
+
+// GetMempool returns the app's mempool.
+// Required by cosmos/evm server.Application interface.
+func (app *Uptick) GetMempool() mempool.ExtMempool {
+	if extMempool, ok := app.BaseApp.Mempool().(mempool.ExtMempool); ok {
+		return extMempool
+	}
+	// Fallback: return nil if the mempool doesn't implement ExtMempool
+	return nil
+}
+
+// RegisterPendingTxListener registers a pending tx listener.
+// Required by cosmos/evm server.Application interface.
+func (app *Uptick) RegisterPendingTxListener(listener func(common.Hash)) {
+	// no-op: Uptick does not use pending tx listeners
+}
+
+// SetClientCtx sets the client context on the app.
+// Required by cosmos/evm server.Application interface.
+func (app *Uptick) SetClientCtx(clientCtx client.Context) {
+	// no-op: Uptick does not store client context on the app
+}
 
 // BeginBlocker application updates every begin block
 func (app *Uptick) BeginBlocker(ctx sdk.Context) (sdk.BeginBlock, error) {

@@ -11,7 +11,7 @@ import (
 	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
 	"github.com/UptickNetwork/uptick/app/params"
 	uptickparams "github.com/UptickNetwork/uptick/app/params"
-	cmdcfg "github.com/UptickNetwork/uptick/cmd/config"
+	// cmdcfg "github.com/UptickNetwork/uptick/cmd/config" // TODO: fix config for cosmos/evm
 	tmcfg "github.com/cometbft/cometbft/config"
 	tmcli "github.com/cometbft/cometbft/libs/cli"
 	dbm "github.com/cosmos/cosmos-db"
@@ -132,7 +132,7 @@ func NewRootCmd() *cobra.Command {
 
 	ethermintserver.AddCommands(
 		rootCmd,
-		ethermintserver.NewDefaultStartOptions(ac.newApp, app.DefaultNodeHome),
+		ethermintserver.NewDefaultStartOptions(ac.newEvmApp, app.DefaultNodeHome),
 		ac.appExport,
 		addModuleInitFlags,
 	)
@@ -267,6 +267,10 @@ type appCreator struct {
 
 // newApp is an appCreator
 func (a appCreator) newApp(logger log.Logger, db dbm.DB, traceStore io.Writer, appOpts servertypes.AppOptions) servertypes.Application {
+	return a.newEvmApp(logger, db, traceStore, appOpts)
+}
+
+func (a appCreator) newEvmApp(logger log.Logger, db dbm.DB, traceStore io.Writer, appOpts servertypes.AppOptions) ethermintserver.Application {
 
 	var wasmOpts []wasmkeeper.Option
 	if cast.ToBool(appOpts.Get("telemetry.enabled")) {
