@@ -6,7 +6,7 @@ require (
 	cosmossdk.io/simapp v0.0.0-20240118210941-3897926e722e
 	cosmossdk.io/tools/confix v0.1.2
 	github.com/CosmWasm/wasmd v0.61.14
-	github.com/bianjieai/nft-transfer v1.1.3-ibc-v8.6.1
+	github.com/bianjieai/nft-transfer v1.2.0-ibc-v10
 	github.com/btcsuite/btcd v0.24.2 // indirect
 	github.com/btcsuite/btcd/btcutil v1.1.6 // indirect
 	github.com/cometbft/cometbft v0.38.21
@@ -70,7 +70,6 @@ require (
 	github.com/UptickNetwork/evm-nft-convert v1.2.1
 	github.com/UptickNetwork/wasm-nft-convert v1.2.1
 	github.com/cosmos/cosmos-db v1.1.3
-	github.com/cosmos/ibc-go/modules/capability v1.0.1
 	github.com/onsi/ginkgo/v2 v2.23.4
 )
 
@@ -119,7 +118,6 @@ require (
 	github.com/envoyproxy/protoc-gen-validate v1.3.0 // indirect
 	github.com/ethereum/c-kzg-4844/v2 v2.1.0 // indirect
 	github.com/ethereum/go-verkle v0.2.2 // indirect
-	github.com/evmos/ethermint v1.10.26 // indirect
 	github.com/fatih/color v1.17.0 // indirect
 	github.com/ferranbt/fastssz v0.1.4 // indirect
 	github.com/getsentry/sentry-go v0.42.0 // indirect
@@ -298,6 +296,11 @@ require (
 replace (
 	// use cosmos fork of keyring
 	github.com/99designs/keyring => github.com/cosmos/keyring v1.2.0
+	// sub-repos - upgraded to cosmos/evm + ibc-go v10 locally
+	github.com/UptickNetwork/evm-nft-convert => ../evm-nft-convert
+	github.com/UptickNetwork/wasm-nft-convert => ../wasm-nft-convert
+	// nft-transfer fork - upgraded to ibc-go v10 locally
+	github.com/bianjieai/nft-transfer => ../nft-transfer-fork
 	// use cosmos fork of go-ethereum (required by cosmos/evm)
 	github.com/ethereum/go-ethereum => github.com/cosmos/go-ethereum v1.16.2-cosmos-1
 	// sub-repos (evm-nft-convert, wasm-nft-convert) still depend on ethermint
@@ -305,6 +308,4 @@ replace (
 	github.com/evmos/ethermint => github.com/UptickNetwork/ethermint v0.24.4-uptick
 	github.com/gin-gonic/gin => github.com/gin-gonic/gin v1.9.1
 	github.com/syndtr/goleveldb => github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
-	// nft-transfer fork - upgraded to ibc-go v10 locally (will push to UptickNetwork/nft-transfer when network allows)
-	github.com/bianjieai/nft-transfer => ../nft-transfer-fork
 )

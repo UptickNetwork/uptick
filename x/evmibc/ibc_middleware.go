@@ -1,4 +1,4 @@
-package evmIBC
+package evmibc
 
 import (
 	"encoding/json"
@@ -14,8 +14,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/UptickNetwork/uptick/ibc"
-	"github.com/UptickNetwork/uptick/x/evmIBC/keeper"
-	evmibctypes "github.com/UptickNetwork/uptick/x/evmIBC/types"
+	"github.com/UptickNetwork/uptick/x/evmibc/keeper"
+	evmibctypes "github.com/UptickNetwork/uptick/x/evmibc/types"
 
 	erc721Types "github.com/UptickNetwork/evm-nft-convert/types"
 	clienttypes "github.com/cosmos/ibc-go/v10/modules/core/02-client/types"
@@ -50,6 +50,7 @@ type PackageMemo struct {
 // If fees are not enabled, this callback will default to the ibc-core packet callback.
 func (im IBCMiddleware) OnRecvPacket(
 	ctx sdk.Context,
+	channelVersion string,
 	packet channeltypes.Packet,
 	relayer sdk.AccAddress,
 ) exported.Acknowledgement {
@@ -64,13 +65,13 @@ func (im IBCMiddleware) OnRecvPacket(
 	}
 
 	if len(data.Memo) > maxMemoLength {
-		return im.Module.OnRecvPacket(ctx, packet, relayer)
+		return im.Module.OnRecvPacket(ctx, channelVersion, packet, relayer)
 	}
 
 	var packageMemo PackageMemo
 	err := json.Unmarshal([]byte(data.Memo), &packageMemo)
 	if err != nil {
-		return im.Module.OnRecvPacket(ctx, packet, relayer)
+		return im.Module.OnRecvPacket(ctx, channelVersion, packet, relayer)
 	}
 
 	if strings.ToLower(packageMemo.ConvertTo) == convertERC721 {
@@ -82,7 +83,7 @@ func (im IBCMiddleware) OnRecvPacket(
 			)
 			return ackResult
 		}
-		ack := im.Module.OnRecvPacket(ctx, newPackage, relayer)
+		ack := im.Module.OnRecvPacket(ctx, channelVersion, newPackage, relayer)
 		// return if the acknowledgement is an error ACK
 		if !ack.Success() {
 			return ack
@@ -92,7 +93,7 @@ func (im IBCMiddleware) OnRecvPacket(
 	} else if strings.ToLower(packageMemo.ConvertTo) == convertCW721 {
 
 		newPackage, dstReceiver := PackageToModuleAccount(packet)
-		ack := im.Module.OnRecvPacket(ctx, newPackage, relayer)
+		ack := im.Module.OnRecvPacket(ctx, channelVersion, newPackage, relayer)
 		// return if the acknowledgement is an error ACK
 		if !ack.Success() {
 			return ack
@@ -100,7 +101,7 @@ func (im IBCMiddleware) OnRecvPacket(
 		// im.keeper.
 		return im.keeper.OnRecvPacket(ctx, newPackage, dstReceiver, 1)
 	} else {
-		return im.Module.OnRecvPacket(ctx, packet, relayer)
+		return im.Module.OnRecvPacket(ctx, channelVersion, packet, relayer)
 	}
 
 }
@@ -208,7 +209,7 @@ func (im IBCMiddleware) OnTimeoutPacket(
 			return err
 		}
 	} else {
-		if err := im.Module.OnTimeoutPacket(ctx, packet, relayer); err != nil {
+		if err := im.Module.OnTimeoutPacket(ctx, channelVersion, packet, relayer); err != nil {
 			return err
 		}
 	}

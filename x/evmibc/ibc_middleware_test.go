@@ -1,4 +1,4 @@
-package evmIBC
+package evmibc
 
 import (
 	"testing"

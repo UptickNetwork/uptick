@@ -8,7 +8,7 @@ import (
 	sdkerrors "cosmossdk.io/errors"
 	erc721types "github.com/UptickNetwork/evm-nft-convert/types"
 	erc20Types "github.com/UptickNetwork/uptick/x/erc20/types"
-	evmibctypes "github.com/UptickNetwork/uptick/x/evmIBC/types"
+	evmibctypes "github.com/UptickNetwork/uptick/x/evmibc/types"
 	cw721Types "github.com/UptickNetwork/wasm-nft-convert/types"
 
 	"github.com/bianjieai/nft-transfer/types"
