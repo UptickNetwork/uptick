@@ -111,9 +111,7 @@ func NewRootCmd() *cobra.Command {
 
 	ac := appCreator{}
 	rootCmd.AddCommand(
-		ethermintclient.ValidateChainID(
-			InitCmd(tempApplication.BasicManager(), app.DefaultNodeHome),
-		),
+		InitCmd(tempApplication.BasicManager(), app.DefaultNodeHome),
 		genutilcli.CollectGenTxsCmd(banktypes.GenesisBalancesIterator{},
 			app.DefaultNodeHome,
 			genutiltypes.DefaultMessageValidator,
@@ -124,7 +122,7 @@ func NewRootCmd() *cobra.Command {
 		genutilcli.ValidateGenesisCmd(tempApplication.BasicManager()),
 		AddGenesisAccountCmd(app.DefaultNodeHome),
 		tmcli.NewCompletionCmd(rootCmd, true),
-		NewTestnetCmd(tempApplication.BasicManager(), banktypes.GenesisBalancesIterator{}),
+		// NewTestnetCmd excluded (testnet.go build-constrained)
 		AddIbcCaclulateCommand(debug.Cmd()),
 		debug.Cmd(),
 		confixcmd.ConfigCommand(),
@@ -145,7 +143,7 @@ func NewRootCmd() *cobra.Command {
 		genesisCommand(tempApplication.BasicManager(), encodingConfig),
 		queryCommand(),
 		txCommand(tempApplication.BasicManager()),
-		ethermintclient.KeyCommands(app.DefaultNodeHome),
+		ethermintclient.KeyCommands(app.DefaultNodeHome, false),
 	)
 
 	autoCliOpts := enrichAutoCliOpts(tempApplication.AutoCliOpts(), initClientCtx)
@@ -248,7 +246,9 @@ func txCommand(basicManager module.BasicManager) *cobra.Command {
 // initAppConfig helps to override default appConfig template and configs.
 // return "", nil if no custom configuration is required for the application.
 func initAppConfig() (string, interface{}) {
-	customAppTemplate, customAppConfig := servercfg.AppConfig(cmdcfg.BaseDenom)
+	// customAppTemplate, customAppConfig := config.AppConfig(cmdcfg.BaseDenom) // TODO: fix for cosmos/evm
+	customAppTemplate := ""
+	var customAppConfig interface{} = nil
 
 	srvCfg, ok := customAppConfig.(servercfg.Config)
 	if !ok {

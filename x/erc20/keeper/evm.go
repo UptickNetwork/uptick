@@ -135,7 +135,7 @@ func (k Keeper) CallEVMWithData(
 		SkipFromEOACheck: !commit,
 	}
 
-	res, err := k.evmKeeper.ApplyMessage(ctx, msg, evmtypes.NewNoOpTracer(), commit)
+	res, err := k.evmKeeper.ApplyMessage(ctx, nil, msg, evmtypes.NewNoOpTracer(), commit, false, false)
 	if err != nil {
 		return nil, err
 	}

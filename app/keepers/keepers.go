@@ -71,7 +71,6 @@ import (
 	"github.com/cosmos/ibc-go/v10/modules/apps/transfer"
 	ibctransferkeeper "github.com/cosmos/ibc-go/v10/modules/apps/transfer/keeper"
 	ibctransfertypes "github.com/cosmos/ibc-go/v10/modules/apps/transfer/types"
-	ibcclient "github.com/cosmos/ibc-go/v10/modules/core/02-client"
 	ibcclienttypes "github.com/cosmos/ibc-go/v10/modules/core/02-client/types"
 	ibcconnectiontypes "github.com/cosmos/ibc-go/v10/modules/core/03-connection/types"
 	porttypes "github.com/cosmos/ibc-go/v10/modules/core/05-port/types"
@@ -134,7 +133,7 @@ type AppKeepers struct {
 	NFTKeeper    nftkeeper.Keeper
 	// wasm keepers
 	WasmKeeper           wasmkeeper.Keeper
-	WasmConfig           wasmtypes.WasmConfig
+	WasmConfig           wasmtypes.NodeConfig
 	ContractKeeper       *wasmkeeper.PermissionedKeeper
 	TransferModule       transfer.AppModule
 	ICAModule            ica.AppModule
@@ -288,29 +287,24 @@ func New(
 	// Create IBC Keeper
 	appKeepers.IBCKeeper = ibckeeper.NewKeeper(
 		appCodec,
-		appKeepers.keys[ibcexported.StoreKey],
+		runtime.NewKVStoreService(appKeepers.keys[ibcexported.StoreKey]),
 		appKeepers.GetSubspace(ibcexported.ModuleName),
-		appKeepers.StakingKeeper,
 		appKeepers.UpgradeKeeper,
-		appKeepers.ScopedIBCKeeper,
 		authtypes.NewModuleAddress(ibcexported.ModuleName).String(),
 	)
 
 	// Initialize ICA Host keeper
 	appKeepers.ICAHostKeeper = icahostkeeper.NewKeeper(
 		appCodec,
-		appKeepers.keys[icahosttypes.StoreKey],
+		runtime.NewKVStoreService(appKeepers.keys[icahosttypes.StoreKey]),
 		appKeepers.GetSubspace(icahosttypes.SubModuleName),
 		appKeepers.IBCKeeper.ChannelKeeper,
 		appKeepers.IBCKeeper.ChannelKeeper,
-		appKeepers.IBCKeeper.PortKeeper,
 		appKeepers.AccountKeeper,
-		appKeepers.ScopedICAHostKeeper,
 		bApp.MsgServiceRouter(),
+		bApp.GRPCQueryRouter(),
 		authtypes.NewModuleAddress(icahosttypes.SubModuleName).String(),
 	)
-
-	appKeepers.ICAHostKeeper.WithQueryRouter(bApp.GRPCQueryRouter())
 
 	appKeepers.ICAModule = ica.NewAppModule(&appKeepers.ICAControllerKeeper, &appKeepers.ICAHostKeeper)
 	icaHostIBCModule := icahost.NewIBCModule(appKeepers.ICAHostKeeper)
@@ -328,7 +322,6 @@ func New(
 		authtypes.NewModuleAddress(govtypes.ModuleName),
 		appKeepers.keys[feemarkettypes.StoreKey],
 		appKeepers.tkeys[feemarkettypes.TransientKey],
-		appKeepers.GetSubspace(feemarkettypes.ModuleName),
 	)
 
 	// EVM Keeper - cosmos/evm v0.6.1 NewKeeper signature:
@@ -348,7 +341,7 @@ func New(
 		appKeepers.StakingKeeper,
 		appKeepers.FeeMarketKeeper,
 		&appKeepers.ConsensusParamsKeeper,
-		&appKeepers.Erc20Keeper, // pointer for circular dependency resolution
+		appKeepers.Erc20Keeper, // pointer for circular dependency resolution
 		evmChainID,
 		cast.ToString(appOpts.Get(srvflags.EVMTracer)),
 	).WithStaticPrecompiles(
@@ -356,10 +349,10 @@ func New(
 			*appKeepers.StakingKeeper,
 			appKeepers.DistrKeeper,
 			appKeepers.BankKeeper,
-			&appKeepers.Erc20Keeper,
-			appKeepers.IBCTransferKeeper, // TransferKeeper for IBC precompile
+			nil, // erc20Keeper - uptick uses custom erc20, pass nil for now
+			&appKeepers.IBCTransferKeeper,
 			appKeepers.IBCKeeper.ChannelKeeper,
-			appKeepers.GovKeeper,
+			*appKeepers.GovKeeper,
 			appKeepers.SlashingKeeper,
 			appCodec,
 		),
@@ -401,17 +394,20 @@ func New(
 		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
 		appKeepers.IBCKeeper.ChannelKeeper,
 		appKeepers.IBCKeeper.ChannelKeeper,
-		appKeepers.IBCKeeper.PortKeeper,
+		nftTransferPortKeeperWrapper{appKeepers.IBCKeeper},
 		appKeepers.AccountKeeper,
 		internft.NewInterNftKeeper(appCodec, appKeepers.NFTKeeper, appKeepers.AccountKeeper),
 	)
 
 	wasmDir := filepath.Join(homePath, "data")
-	wasmConfig, err := wasm.ReadWasmConfig(appOpts)
+	nodeConfig, err := wasm.ReadNodeConfig(appOpts)
 	if err != nil {
-		panic("error while reading wasm config: " + err.Error())
+		panic("error while reading wasm node config: " + err.Error())
 	}
-	appKeepers.WasmConfig = wasmConfig
+	appKeepers.WasmConfig = nodeConfig
+	// wasmd v0.61 NewKeeper signature uses NodeConfig + VMConfig instead of WasmConfig
+	vmConfig := wasmtypes.VMConfig{}
+
 	// The last arguments can contain custom message handlers, and custom query handlers,
 	// if we want to allow any custom callbacks
 	appKeepers.WasmKeeper = wasmkeeper.NewKeeper(
@@ -421,15 +417,15 @@ func New(
 		appKeepers.BankKeeper,
 		appKeepers.StakingKeeper,
 		distrkeeper.NewQuerier(appKeepers.DistrKeeper),
-		nil,
+		appKeepers.Erc20Keeper, // ICS4Wrapper
 		appKeepers.IBCKeeper.ChannelKeeper,
-		appKeepers.IBCKeeper.PortKeeper,
-		nil, // ScopedWasmKeeper - removed in ibc-go v10 (no capability module)
-		appKeepers.IBCTransferKeeper,
+		nil,                          // channelKeeperV2 - not used (IBC v2 channels)
+		appKeepers.IBCTransferKeeper, // ICS20TransferPortSource
 		bApp.MsgServiceRouter(),
 		bApp.GRPCQueryRouter(),
 		wasmDir,
-		wasmConfig,
+		nodeConfig,
+		vmConfig,
 		GetWasmCapabilities(),
 		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
 		wasmOpts...,
@@ -463,18 +459,17 @@ func New(
 
 	appKeepers.IBCNftTransferModule = nfttransfer.NewAppModule(appKeepers.IBCNFTTransferKeeper)
 	nftTransferIBCModule := nfttransfer.NewIBCModule(appKeepers.IBCNFTTransferKeeper)
-	ercTransferStack := evmIBC.NewIBCMiddleware(appKeepers.EVMIBCKeeper, nftTransferIBCModule)
+	ercTransferStack := evmibc.NewIBCMiddleware(appKeepers.EVMIBCKeeper, nftTransferIBCModule)
 
 	// create static IBC router, add transfer route, then set and seal it
-	var icaControllerStack porttypes.IBCModule
-	icaControllerStack = icacontroller.NewIBCMiddleware(icaControllerStack, appKeepers.ICAControllerKeeper)
+	icaControllerStack := icacontroller.NewIBCMiddleware(appKeepers.ICAControllerKeeper)
 
 	ibcRouter := porttypes.NewRouter().
 		AddRoute(icahosttypes.SubModuleName, icaHostIBCModule).
 		AddRoute(icacontrollertypes.SubModuleName, icaControllerStack).
 		AddRoute(ibctransfertypes.ModuleName, transferStack).
 		AddRoute(ibcnfttransfertypes.ModuleName, ercTransferStack).
-		AddRoute(wasmtypes.ModuleName, wasm.NewIBCHandler(appKeepers.WasmKeeper, appKeepers.IBCKeeper.ChannelKeeper, appKeepers.IBCKeeper.ChannelKeeper))
+		AddRoute(wasmtypes.ModuleName, wasm.NewIBCHandler(appKeepers.WasmKeeper, appKeepers.IBCKeeper.ChannelKeeper, appKeepers.IBCTransferKeeper, appVersionGetterWrapper{appKeepers.IBCKeeper}))
 
 	// Set IBC Router
 	appKeepers.IBCKeeper.SetRouter(ibcRouter)
@@ -514,7 +509,6 @@ func New(
 	govRouter := govv1beta1.NewRouter()
 	govRouter.AddRoute(govtypes.RouterKey, govv1beta1.ProposalHandler).
 		AddRoute(paramproposal.RouterKey, params.NewParamChangeProposalHandler(appKeepers.ParamsKeeper)).
-		AddRoute(ibcclienttypes.RouterKey, ibcclient.NewClientProposalHandler(appKeepers.IBCKeeper.ClientKeeper)).
 		AddRoute(erc20types.RouterKey, erc20.NewErc20ProposalHandler(appKeepers.Erc20Keeper))
 
 	appKeepers.GovKeeper = govKeeper.SetHooks(govtypes.NewMultiGovHooks(
@@ -527,12 +521,10 @@ func New(
 	// Initialize ICA Controller keeper
 	appKeepers.ICAControllerKeeper = icacontrollerkeeper.NewKeeper(
 		appCodec,
-		appKeepers.keys[icacontrollertypes.StoreKey],
+		runtime.NewKVStoreService(appKeepers.keys[icacontrollertypes.StoreKey]),
 		appKeepers.GetSubspace(icacontrollertypes.SubModuleName),
 		appKeepers.IBCKeeper.ChannelKeeper,
 		appKeepers.IBCKeeper.ChannelKeeper,
-		appKeepers.IBCKeeper.PortKeeper,
-		appKeepers.ScopedICAControllerKeeper,
 		bApp.MsgServiceRouter(),
 		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
 	)
@@ -563,7 +555,8 @@ func initParamsKeeper(
 	// paramsKeeper.Subspace(stakingtypes.ModuleName)
 	paramsKeeper.Subspace(stakingtypes.ModuleName).WithKeyTable(stakingtypes.ParamKeyTable())
 	// paramsKeeper.Subspace(minttypes.ModuleName)
-	paramsKeeper.Subspace(minttypes.ModuleName).WithKeyTable(minttypes.ParamKeyTable())
+	// TODO: minttypes.ParamKeyTable() removed in SDK 0.53 - params managed via authority
+	// paramsKeeper.Subspace(minttypes.ModuleName).WithKeyTable(minttypes.ParamKeyTable())
 	// paramsKeeper.Subspace(distrtypes.ModuleName)
 	paramsKeeper.Subspace(distrtypes.ModuleName).WithKeyTable(distrtypes.ParamKeyTable())
 	// paramsKeeper.Subspace(slashingtypes.ModuleName)
@@ -576,8 +569,9 @@ func initParamsKeeper(
 	paramsKeeper.Subspace(ibcexported.ModuleName).WithKeyTable(keyTable)
 
 	// ethermint subspaces
-	paramsKeeper.Subspace(evmtypes.ModuleName).WithKeyTable(evmtypes.ParamKeyTable())
-	paramsKeeper.Subspace(feemarkettypes.ModuleName).WithKeyTable(feemarkettypes.ParamKeyTable())
+	// TODO: evmtypes.ParamKeyTable() and feemarkettypes.ParamKeyTable() removed in cosmos/evm v0.6.1
+	// paramsKeeper.Subspace(evmtypes.ModuleName).WithKeyTable(evmtypes.ParamKeyTable())
+	// paramsKeeper.Subspace(feemarkettypes.ModuleName).WithKeyTable(feemarkettypes.ParamKeyTable())
 
 	// uptick subspaces
 	paramsKeeper.Subspace(erc20types.ModuleName).WithKeyTable(erc20types.ParamKeyTable())
@@ -595,4 +589,26 @@ func initParamsKeeper(
 
 func GetWasmCapabilities() []string {
 	return append(wasmkeeper.BuiltInCapabilities(), wasmCapabilities...)
+}
+
+// nftTransferPortKeeperWrapper wraps ibc-go v10's IBCKeeper to satisfy
+// nft-transfer's PortKeeper interface.
+// In ibc-go v10, port binding is handled by the IBC router, so BindPort is a no-op.
+type nftTransferPortKeeperWrapper struct {
+	ik *ibckeeper.Keeper
+}
+
+func (w nftTransferPortKeeperWrapper) BindPort(ctx sdk.Context, portID string) error {
+	// no-op: in ibc-go v10, ports are bound via IBC router
+	return nil
+}
+
+// appVersionGetterWrapper wraps ibc-go v10's IBCKeeper to satisfy wasmd's
+// appVersionGetter interface (GetAppVersion).
+type appVersionGetterWrapper struct {
+	ik *ibckeeper.Keeper
+}
+
+func (w appVersionGetterWrapper) GetAppVersion(ctx sdk.Context, portID, channelID string) (string, bool) {
+	return w.ik.ChannelKeeper.GetAppVersion(ctx, portID, channelID)
 }

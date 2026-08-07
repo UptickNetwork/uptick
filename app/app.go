@@ -1,7 +1,6 @@
 package app
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -26,7 +25,8 @@ import (
 	crisistypes "github.com/cosmos/cosmos-sdk/x/crisis/types"
 	genutiltypes "github.com/cosmos/cosmos-sdk/x/genutil/types"
 	ibcexported "github.com/cosmos/ibc-go/v10/modules/core/exported"
-	porttypes "github.com/cosmos/ibc-go/v10/modules/core/05-port/types"
+	ibcclienttypes "github.com/cosmos/ibc-go/v10/modules/core/02-client/types"
+// 	porttypes "github.com/cosmos/ibc-go/v10/modules/core/05-port/types" // removed in ibc-go v10
 	srvflags "github.com/cosmos/evm/server/flags"
 
 	"github.com/UptickNetwork/uptick/app/ante"
@@ -88,7 +88,7 @@ import (
 	ibckeeper "github.com/cosmos/ibc-go/v10/modules/core/keeper"
 	ibctm "github.com/cosmos/ibc-go/v10/modules/light-clients/07-tendermint"
 	upticktypes "github.com/UptickNetwork/uptick/types"
-	"github.com/cosmos/evm/x/vm"
+	vm "github.com/cosmos/evm/x/vm"
 	evmtypes "github.com/cosmos/evm/x/vm/types"
 	"github.com/cosmos/evm/x/feemarket"
 	feemarkettypes "github.com/cosmos/evm/x/feemarket/types"
@@ -154,8 +154,8 @@ var (
 		NoBaseFee:                false,
 		BaseFeeChangeDenominator: 8,
 		ElasticityMultiplier:     4,
-		BaseFee:                  math.NewInt(10000000000),
-		MinGasPrice:              math.LegacyNewDecFromInt(math.NewInt(10000000000)),
+		BaseFee:                  math.LegacyNewDec(10000000000),
+		MinGasPrice:              math.LegacyNewDec(10000000000),
 		MinGasMultiplier:         math.LegacyNewDecWithPrec(5, 1),
 	}
 
@@ -323,13 +323,13 @@ func NewUptick(
 		// ibc modules
 		ibc.NewAppModule(app.IBCKeeper),
 		ica.NewAppModule(nil, &app.ICAHostKeeper),
-		ibctm.NewAppModule(),
+		ibctm.NewAppModule(ibctm.NewLightClientModule(appCodec, ibcclienttypes.NewStoreProvider(runtime.NewKVStoreService(app.GetKey(ibcexported.StoreKey))))),
 		app.TransferModule,
 		app.IBCNftTransferModule,
 		app.ICAModule,
 		// Ethermint app modules
-		evm.NewAppModule(app.EvmKeeper, app.AccountKeeper, app.GetSubspace(evmtypes.ModuleName)),
-		feemarket.NewAppModule(app.FeeMarketKeeper, app.GetSubspace(feemarkettypes.ModuleName)),
+		vm.NewAppModule(app.EvmKeeper, app.AccountKeeper, app.BankKeeper, app.AccountKeeper.AddressCodec()),
+		feemarket.NewAppModule(app.FeeMarketKeeper),
 		// Uptick app modules
 		erc20.NewAppModule(*app.Erc20Keeper, app.AccountKeeper),
 		erc721.NewAppModule(app.Erc721Keeper, app.AccountKeeper),
@@ -550,8 +550,8 @@ func NewUptick(
 		authzmodule.NewAppModule(appCodec, app.AuthzKeeper, app.AccountKeeper, app.BankKeeper, app.interfaceRegistry),
 		ibc.NewAppModule(app.IBCKeeper),
 		app.TransferModule,
-		evm.NewAppModule(app.EvmKeeper, app.AccountKeeper, app.GetSubspace(evmtypes.ModuleName)),
-		feemarket.NewAppModule(app.FeeMarketKeeper, app.GetSubspace(feemarkettypes.ModuleName)),
+		vm.NewAppModule(app.EvmKeeper, app.AccountKeeper, app.BankKeeper, app.AccountKeeper.AddressCodec()),
+		feemarket.NewAppModule(app.FeeMarketKeeper),
 		wasm.NewAppModule(appCodec, &app.WasmKeeper, app.StakingKeeper, app.AccountKeeper, app.BankKeeper, app.MsgServiceRouter(), app.GetSubspace(wasmtypes.ModuleName)),
 		nftmodule.NewAppModule(appCodec, app.NFTKeeper, app.AccountKeeper, app.BankKeeper),
 		app.IBCNftTransferModule,
@@ -569,7 +569,6 @@ func NewUptick(
 		BankKeeper:        app.BankKeeper,
 		IBCKeeper:         app.IBCKeeper,
 		TxCounterStoreKey: app.GetKey(wasm.StoreKey),
-		WasmConfig:        app.WasmConfig,
 		FeeMarketKeeper:   app.FeeMarketKeeper,
 		EvmKeeper:         app.EvmKeeper,
 		FeegrantKeeper:    app.FeeGrantKeeper,
@@ -613,15 +612,12 @@ func NewUptick(
 			tmos.Exit(err.Error())
 		}
 	}
-}
 
-// Finally start the tpsCounter.
-	app.tpsCounter = newTPSCounter(logger)
-	go func() {
-		// Unfortunately golangci-lint is so pedantic
-		// so we have to ignore this error explicitly.
-		_ = app.tpsCounter.start(context.Background())
-	}()
+	// TODO: tpsCounter disabled (unused, references removed SDK types)
+	// app.tpsCounter = newTPSCounter(logger)
+	// go func() {
+	// 	_ = app.tpsCounter.start(context.Background())
+	// }()
 
 	return app
 }
@@ -776,8 +772,8 @@ func (app *Uptick) GetIBCKeeper() *ibckeeper.Keeper {
 }
 
 // GetScopedIBCKeeper implements the TestingApp interface.
-func (app *Uptick) GetScopedIBCKeeper() porttypes.ScopedKeeper {
-	return app.IBCKeeper.ScopedKeeper
+func (app *Uptick) GetScopedIBCKeeper() interface{} {
+	return nil
 }
 
 // GetTxConfig implements the TestingApp interface.

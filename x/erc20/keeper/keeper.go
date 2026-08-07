@@ -13,6 +13,9 @@ import (
 
 	"github.com/UptickNetwork/uptick/x/erc20/types"
 	ibctransferkeeper "github.com/cosmos/ibc-go/v10/modules/apps/transfer/keeper"
+
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/vm"
 )
 
 // Keeper of this module maintains collections of erc20.
@@ -77,4 +80,14 @@ func (k *Keeper) SetIBCKeeper(ibcKeeper ibctransferkeeper.Keeper) {
 	}
 	k.ibcKeeperSet = true
 	k.ibcKeeper = ibcKeeper
+}
+
+// GetERC20PrecompileInstance implements the cosmos/evm Erc20Keeper interface.
+// It returns the ERC20 precompile contract for the given token pair address.
+// Since Uptick uses its own erc20 implementation (not cosmos/evm's), this is a stub
+// that returns false (not found) — precompile integration is handled separately.
+func (k Keeper) GetERC20PrecompileInstance(ctx sdk.Context, address common.Address) (vm.PrecompiledContract, bool, error) {
+	// TODO: implement proper precompile instance lookup
+	// For now, return not found — this allows the EVM keeper to compile
+	return nil, false, nil
 }
