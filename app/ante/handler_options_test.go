@@ -6,8 +6,9 @@ import (
 	wasmTypes "github.com/CosmWasm/wasmd/x/wasm/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	txsigning "github.com/cosmos/cosmos-sdk/types/tx/signing"
-	ethante "github.com/evmos/ethermint/app/ante"
-	evmtypes "github.com/evmos/ethermint/x/evm/types"
+	ethante "github.com/cosmos/evm/ante"
+	anteinterfaces "github.com/cosmos/evm/ante/interfaces"
+	evmtypes "github.com/cosmos/evm/x/vm/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -17,11 +18,11 @@ type stubAcctKeeper struct{ evmtypes.AccountKeeper }
 // stubBankKeeper is a non-nil stub satisfying evmtypes.BankKeeper
 type stubBankKeeper struct{ evmtypes.BankKeeper }
 
-// stubEvmKeeper is a non-nil stub satisfying ethante.EVMKeeper
-type stubEvmKeeper struct{ ethante.EVMKeeper }
+// stubEvmKeeper is a non-nil stub satisfying anteinterfaces.EVMKeeper
+type stubEvmKeeper struct{ anteinterfaces.EVMKeeper }
 
-// stubFeeMarketKeeper is a non-nil stub satisfying ethante.FeeMarketKeeper
-type stubFeeMarketKeeper struct{ ethante.FeeMarketKeeper }
+// stubFeeMarketKeeper is a non-nil stub satisfying anteinterfaces.FeeMarketKeeper
+type stubFeeMarketKeeper struct{ anteinterfaces.FeeMarketKeeper }
 
 func TestHandlerOptionsValidate(t *testing.T) {
 	validOptions := func() HandlerOptions {

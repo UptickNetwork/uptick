@@ -22,13 +22,12 @@ import (
 	paramstypes "github.com/cosmos/cosmos-sdk/x/params/types"
 	slashingtypes "github.com/cosmos/cosmos-sdk/x/slashing/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
-	capabilitytypes "github.com/cosmos/ibc-go/modules/capability/types"
-	icacontrollertypes "github.com/cosmos/ibc-go/v8/modules/apps/27-interchain-accounts/controller/types"
-	icahosttypes "github.com/cosmos/ibc-go/v8/modules/apps/27-interchain-accounts/host/types"
-	ibctransfertypes "github.com/cosmos/ibc-go/v8/modules/apps/transfer/types"
-	ibcexported "github.com/cosmos/ibc-go/v8/modules/core/exported"
-	evmtypes "github.com/evmos/ethermint/x/evm/types"
-	feemarkettypes "github.com/evmos/ethermint/x/feemarket/types"
+	icacontrollertypes "github.com/cosmos/ibc-go/v10/modules/apps/27-interchain-accounts/controller/types"
+	icahosttypes "github.com/cosmos/ibc-go/v10/modules/apps/27-interchain-accounts/host/types"
+	ibctransfertypes "github.com/cosmos/ibc-go/v10/modules/apps/transfer/types"
+	ibcexported "github.com/cosmos/ibc-go/v10/modules/core/exported"
+	evmtypes "github.com/cosmos/evm/x/vm/types"
+	feemarkettypes "github.com/cosmos/evm/x/feemarket/types"
 )
 
 func (appKeepers *AppKeepers) genStoreKeys() {
@@ -53,7 +52,6 @@ func (appKeepers *AppKeepers) genStoreKeys() {
 		ibcnfttransfertypes.StoreKey,
 		icahosttypes.StoreKey,
 		icacontrollertypes.StoreKey,
-		capabilitytypes.StoreKey,
 		feegrant.StoreKey,
 		authzkeeper.StoreKey,
 
@@ -66,9 +64,7 @@ func (appKeepers *AppKeepers) genStoreKeys() {
 		cw721types.StoreKey,
 		nfttypes.StoreKey,
 
-		//ibcwasmtypes.StoreKey,
 		wasmtypes.StoreKey,
-		//packetforwardtypes.StoreKey,
 	)
 
 	// Define transient store keys
@@ -79,7 +75,7 @@ func (appKeepers *AppKeepers) genStoreKeys() {
 	)
 
 	// MemKeys are for information that is stored only in RAM.
-	appKeepers.memKeys = storetypes.NewMemoryStoreKeys(capabilitytypes.MemStoreKey)
+	appKeepers.memKeys = storetypes.NewMemoryStoreKeys()
 
 }
 

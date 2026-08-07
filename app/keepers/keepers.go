@@ -58,34 +58,32 @@ import (
 	slashingtypes "github.com/cosmos/cosmos-sdk/x/slashing/types"
 	stakingkeeper "github.com/cosmos/cosmos-sdk/x/staking/keeper"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
-	capabilitykeeper "github.com/cosmos/ibc-go/modules/capability/keeper"
-	capabilitytypes "github.com/cosmos/ibc-go/modules/capability/types"
-	ica "github.com/cosmos/ibc-go/v8/modules/apps/27-interchain-accounts"
-	icacontroller "github.com/cosmos/ibc-go/v8/modules/apps/27-interchain-accounts/controller"
-	icacontrollerkeeper "github.com/cosmos/ibc-go/v8/modules/apps/27-interchain-accounts/controller/keeper"
-	icacontrollertypes "github.com/cosmos/ibc-go/v8/modules/apps/27-interchain-accounts/controller/types"
+	ica "github.com/cosmos/ibc-go/v10/modules/apps/27-interchain-accounts"
+	icacontroller "github.com/cosmos/ibc-go/v10/modules/apps/27-interchain-accounts/controller"
+	icacontrollerkeeper "github.com/cosmos/ibc-go/v10/modules/apps/27-interchain-accounts/controller/keeper"
+	icacontrollertypes "github.com/cosmos/ibc-go/v10/modules/apps/27-interchain-accounts/controller/types"
 
 	"path/filepath"
 
-	icahost "github.com/cosmos/ibc-go/v8/modules/apps/27-interchain-accounts/host"
-	icahostkeeper "github.com/cosmos/ibc-go/v8/modules/apps/27-interchain-accounts/host/keeper"
-	icahosttypes "github.com/cosmos/ibc-go/v8/modules/apps/27-interchain-accounts/host/types"
-	"github.com/cosmos/ibc-go/v8/modules/apps/transfer"
-	ibctransferkeeper "github.com/cosmos/ibc-go/v8/modules/apps/transfer/keeper"
-	ibctransfertypes "github.com/cosmos/ibc-go/v8/modules/apps/transfer/types"
-	ibcclient "github.com/cosmos/ibc-go/v8/modules/core/02-client"
-	ibcclienttypes "github.com/cosmos/ibc-go/v8/modules/core/02-client/types"
-	ibcconnectiontypes "github.com/cosmos/ibc-go/v8/modules/core/03-connection/types"
-	porttypes "github.com/cosmos/ibc-go/v8/modules/core/05-port/types"
-	ibcexported "github.com/cosmos/ibc-go/v8/modules/core/exported"
-	ibckeeper "github.com/cosmos/ibc-go/v8/modules/core/keeper"
-	srvflags "github.com/evmos/ethermint/server/flags"
-	ethermint "github.com/evmos/ethermint/types"
-	evmkeeper "github.com/evmos/ethermint/x/evm/keeper"
-	evmtypes "github.com/evmos/ethermint/x/evm/types"
-	"github.com/evmos/ethermint/x/evm/vm/geth"
-	feemarketkeeper "github.com/evmos/ethermint/x/feemarket/keeper"
-	feemarkettypes "github.com/evmos/ethermint/x/feemarket/types"
+	icahost "github.com/cosmos/ibc-go/v10/modules/apps/27-interchain-accounts/host"
+	icahostkeeper "github.com/cosmos/ibc-go/v10/modules/apps/27-interchain-accounts/host/keeper"
+	icahosttypes "github.com/cosmos/ibc-go/v10/modules/apps/27-interchain-accounts/host/types"
+	"github.com/cosmos/ibc-go/v10/modules/apps/transfer"
+	ibctransferkeeper "github.com/cosmos/ibc-go/v10/modules/apps/transfer/keeper"
+	ibctransfertypes "github.com/cosmos/ibc-go/v10/modules/apps/transfer/types"
+	ibcclient "github.com/cosmos/ibc-go/v10/modules/core/02-client"
+	ibcclienttypes "github.com/cosmos/ibc-go/v10/modules/core/02-client/types"
+	ibcconnectiontypes "github.com/cosmos/ibc-go/v10/modules/core/03-connection/types"
+	porttypes "github.com/cosmos/ibc-go/v10/modules/core/05-port/types"
+	ibcexported "github.com/cosmos/ibc-go/v10/modules/core/exported"
+	ibckeeper "github.com/cosmos/ibc-go/v10/modules/core/keeper"
+	srvflags "github.com/cosmos/evm/server/flags"
+	upticktypes "github.com/UptickNetwork/uptick/types"
+	evmkeeper "github.com/cosmos/evm/x/vm/keeper"
+	evmtypes "github.com/cosmos/evm/x/vm/types"
+	precompiletypes "github.com/cosmos/evm/precompiles/types"
+	feemarketkeeper "github.com/cosmos/evm/x/feemarket/keeper"
+	feemarkettypes "github.com/cosmos/evm/x/feemarket/types"
 	"github.com/spf13/cast"
 )
 
@@ -106,7 +104,6 @@ type AppKeepers struct {
 	// keepers
 	AccountKeeper       authkeeper.AccountKeeper
 	BankKeeper          bankkeeper.Keeper
-	CapabilityKeeper    *capabilitykeeper.Keeper
 	StakingKeeper       *stakingkeeper.Keeper
 	SlashingKeeper      slashingkeeper.Keeper
 	MintKeeper          mintkeeper.Keeper
@@ -122,13 +119,6 @@ type AppKeepers struct {
 	FeeGrantKeeper      feegrantkeeper.Keeper
 
 	ICAHostKeeper icahostkeeper.Keeper
-
-	// make scoped keepers public for test purposes
-	ScopedIBCKeeper           capabilitykeeper.ScopedKeeper
-	ScopedTransferKeeper      capabilitykeeper.ScopedKeeper
-	ScopedNFTTransferKeeper   capabilitykeeper.ScopedKeeper
-	ScopedICAHostKeeper       capabilitykeeper.ScopedKeeper
-	ScopedICAControllerKeeper capabilitykeeper.ScopedKeeper
 
 	IBCNFTTransferKeeper  ibcnfttransferkeeper.Keeper
 	ConsensusParamsKeeper consensusparamkeeper.Keeper
@@ -146,7 +136,6 @@ type AppKeepers struct {
 	WasmKeeper           wasmkeeper.Keeper
 	WasmConfig           wasmtypes.WasmConfig
 	ContractKeeper       *wasmkeeper.PermissionedKeeper
-	ScopedWasmKeeper     capabilitykeeper.ScopedKeeper
 	TransferModule       transfer.AppModule
 	ICAModule            ica.AppModule
 	IBCNftTransferModule nfttransfer.AppModule
@@ -197,27 +186,11 @@ func New(
 	// set the BaseApp's parameter store
 	bApp.SetParamStore(&appKeepers.ConsensusParamsKeeper.ParamsStore)
 
-	// add capability keeper and ScopeToModule for ibc module
-	appKeepers.CapabilityKeeper = capabilitykeeper.NewKeeper(
-		appCodec,
-		appKeepers.keys[capabilitytypes.StoreKey],
-		appKeepers.memKeys[capabilitytypes.MemStoreKey],
-	)
-	appKeepers.ScopedIBCKeeper = appKeepers.CapabilityKeeper.ScopeToModule(ibcexported.ModuleName)
-	appKeepers.ScopedTransferKeeper = appKeepers.CapabilityKeeper.ScopeToModule(ibctransfertypes.ModuleName)
-	appKeepers.ScopedNFTTransferKeeper = appKeepers.CapabilityKeeper.ScopeToModule(ibcnfttransfertypes.ModuleName)
-	appKeepers.ScopedICAHostKeeper = appKeepers.CapabilityKeeper.ScopeToModule(icahosttypes.SubModuleName)
-
-	appKeepers.ScopedWasmKeeper = appKeepers.CapabilityKeeper.ScopeToModule(wasmtypes.ModuleName)
-	appKeepers.ScopedICAControllerKeeper = appKeepers.CapabilityKeeper.ScopeToModule(icacontrollertypes.SubModuleName)
-
-	//appKeepers.CapabilityKeeper.Seal()
-
 	// use custom Ethermint account for contracts
 	appKeepers.AccountKeeper = authkeeper.NewAccountKeeper(
 		appCodec,
 		runtime.NewKVStoreService(appKeepers.keys[authtypes.StoreKey]),
-		ethermint.ProtoAccount,
+		upticktypes.ProtoAccount,
 		maccPerms,
 		authcodec.NewBech32Codec(sdk.GetConfig().GetBech32AccountAddrPrefix()),
 		sdk.GetConfig().GetBech32AccountAddrPrefix(),
@@ -358,19 +331,38 @@ func New(
 		appKeepers.GetSubspace(feemarkettypes.ModuleName),
 	)
 
+	// EVM Keeper - cosmos/evm v0.6.1 NewKeeper signature:
+	// (cdc, storeKey, transientKey, keys, authority, ak, bankKeeper, sk, fmk, consensusKeeper, erc20Keeper, evmChainID, tracer)
+	// Note: erc20Keeper is passed as pointer to resolve circular dependency (EVMKeeper needs Erc20Keeper, Erc20Keeper needs EVMKeeper)
+	// TransferKeeper must be initialized before EVMKeeper for precompile injection.
+	evmChainID := cast.ToUint64(appOpts.Get(srvflags.EVMChainID))
+
 	appKeepers.EvmKeeper = evmkeeper.NewKeeper(
 		appCodec,
 		appKeepers.keys[evmtypes.StoreKey],
 		appKeepers.tkeys[evmtypes.TransientKey],
+		appKeepers.keys, // map of all KVStoreKeys for cross-module access
 		authtypes.NewModuleAddress(govtypes.ModuleName),
 		appKeepers.AccountKeeper,
 		appKeepers.BankKeeper,
 		appKeepers.StakingKeeper,
 		appKeepers.FeeMarketKeeper,
-		nil,
-		geth.NewEVM,
+		&appKeepers.ConsensusParamsKeeper,
+		&appKeepers.Erc20Keeper, // pointer for circular dependency resolution
+		evmChainID,
 		cast.ToString(appOpts.Get(srvflags.EVMTracer)),
-		appKeepers.GetSubspace(evmtypes.ModuleName),
+	).WithStaticPrecompiles(
+		precompiletypes.DefaultStaticPrecompiles(
+			*appKeepers.StakingKeeper,
+			appKeepers.DistrKeeper,
+			appKeepers.BankKeeper,
+			&appKeepers.Erc20Keeper,
+			appKeepers.TransferKeeper,
+			appKeepers.IBCKeeper.ChannelKeeper,
+			appKeepers.GovKeeper,
+			appKeepers.SlashingKeeper,
+			appCodec,
+		),
 	)
 
 	// Uptick Keeper
@@ -434,7 +426,7 @@ func New(
 		nil,
 		appKeepers.IBCKeeper.ChannelKeeper,
 		appKeepers.IBCKeeper.PortKeeper,
-		appKeepers.ScopedWasmKeeper,
+		nil, // ScopedWasmKeeper - removed in ibc-go v10 (no capability module)
 		appKeepers.IBCTransferKeeper,
 		bApp.MsgServiceRouter(),
 		bApp.GRPCQueryRouter(),
@@ -475,7 +467,6 @@ func New(
 	nftTransferIBCModule := nfttransfer.NewIBCModule(appKeepers.IBCNFTTransferKeeper)
 	ercTransferStack := evmIBC.NewIBCMiddleware(appKeepers.EVMIBCKeeper, nftTransferIBCModule)
 
-	// routerModule := router.NewAppModule(app.RouterKeeper, transferIBCModule)
 	// create static IBC router, add transfer route, then set and seal it
 	var icaControllerStack porttypes.IBCModule
 	icaControllerStack = icacontroller.NewIBCMiddleware(icaControllerStack, appKeepers.ICAControllerKeeper)
@@ -547,18 +538,6 @@ func New(
 		bApp.MsgServiceRouter(),
 		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
 	)
-
-	// Initialize the packet forward middleware Keeper
-	//appKeepers.PacketForwardKeeper = packetforwardkeeper.NewKeeper(
-	//	appCodec,
-	//	appKeepers.keys[packetforwardtypes.StoreKey],
-	//	appKeepers.IBCTransferKeeper,
-	//	appKeepers.IBCKeeper.ChannelKeeper,
-	//	appKeepers.BankKeeper,
-	//	// The ICS4Wrapper is replaced by the HooksICS4Wrapper instead of the channel so that sending can be overridden by the middleware
-	//	appKeepers.HooksICS4Wrapper,
-	//	authtypes.NewModuleAddress(govtypes.ModuleName).String(),
-	//)
 
 	// this line is used by starport scaffolding # stargate/app/keeperDefinition
 

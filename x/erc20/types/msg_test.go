@@ -1,3 +1,8 @@
+//go:build ignore
+// +build ignore
+
+// TODO: cosmos/evm v0.6.1 does not have a "tests" importable package.
+
 package types
 
 import (
@@ -9,7 +14,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/evmos/ethermint/tests"
+	"github.com/cosmos/evm/tests"
 )
 
 type MsgsTestSuite struct {

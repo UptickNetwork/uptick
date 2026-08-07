@@ -38,11 +38,11 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/evmos/ethermint/crypto/hd"
-	"github.com/evmos/ethermint/server/config"
-	srvflags "github.com/evmos/ethermint/server/flags"
-	ethermint "github.com/evmos/ethermint/types"
-	evmtypes "github.com/evmos/ethermint/x/evm/types"
+	"github.com/cosmos/evm/crypto/hd"
+	"github.com/cosmos/evm/server/config"
+	srvflags "github.com/cosmos/evm/server/flags"
+	upticktypes "github.com/UptickNetwork/uptick/types"
+	evmtypes "github.com/cosmos/evm/x/vm/types"
 
 	cmdcfg "github.com/UptickNetwork/uptick/cmd/config"
 	"github.com/UptickNetwork/uptick/testutil/network"
@@ -304,20 +304,20 @@ func initTestnetFiles(
 			return err
 		}
 
-		accStakingTokens := sdk.TokensFromConsensusPower(5000, ethermint.PowerReduction)
+		accStakingTokens := sdk.TokensFromConsensusPower(5000, upticktypes.PowerReduction)
 		coins := sdk.Coins{
 			sdk.NewCoin(cmdcfg.BaseDenom, accStakingTokens),
 		}
 
 		genBalances = append(genBalances, banktypes.Balance{Address: addr.String(), Coins: coins.Sort()})
-		genAccounts = append(genAccounts, &ethermint.EthAccount{
+		genAccounts = append(genAccounts, &upticktypes.EthAccount{
 			BaseAccount: authtypes.NewBaseAccount(addr, nil, 0, 0),
 			CodeHash:    common.BytesToHash(evmtypes.EmptyCodeHash).Hex(),
 		})
 
 		genAccounts = append(genAccounts, authtypes.NewBaseAccount(addr, nil, 0, 0))
 
-		valTokens := sdk.TokensFromConsensusPower(100, ethermint.PowerReduction)
+		valTokens := sdk.TokensFromConsensusPower(100, upticktypes.PowerReduction)
 		createValMsg, err := stakingtypes.NewMsgCreateValidator(
 			sdk.ValAddress(addr).String(),
 			valPubKeys[i],

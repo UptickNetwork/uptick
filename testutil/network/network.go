@@ -49,11 +49,11 @@ import (
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	"github.com/cosmos/cosmos-sdk/x/genutil"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
-	"github.com/evmos/ethermint/crypto/hd"
+	"github.com/cosmos/evm/crypto/hd"
 
-	"github.com/evmos/ethermint/server/config"
-	ethermint "github.com/evmos/ethermint/types"
-	evmtypes "github.com/evmos/ethermint/x/evm/types"
+	"github.com/cosmos/evm/server/config"
+	upticktypes "github.com/UptickNetwork/uptick/types"
+	evmtypes "github.com/cosmos/evm/x/vm/types"
 
 	pruningtypes "cosmossdk.io/store/pruning/types"
 	"github.com/UptickNetwork/uptick/app"
@@ -129,11 +129,11 @@ func DefaultConfig() Config {
 		TimeoutCommit:     2 * time.Second,
 		ChainID:           chainID,
 		NumValidators:     4,
-		BondDenom:         ethermint.AttoPhoton,
-		MinGasPrices:      fmt.Sprintf("0.000006%s", ethermint.AttoPhoton),
-		AccountTokens:     sdk.TokensFromConsensusPower(1000, ethermint.PowerReduction),
-		StakingTokens:     sdk.TokensFromConsensusPower(500, ethermint.PowerReduction),
-		BondedTokens:      sdk.TokensFromConsensusPower(100, ethermint.PowerReduction),
+		BondDenom:         upticktypes.AttoPhoton,
+		MinGasPrices:      fmt.Sprintf("0.000006%s", upticktypes.AttoPhoton),
+		AccountTokens:     sdk.TokensFromConsensusPower(1000, upticktypes.PowerReduction),
+		StakingTokens:     sdk.TokensFromConsensusPower(500, upticktypes.PowerReduction),
+		BondedTokens:      sdk.TokensFromConsensusPower(100, upticktypes.PowerReduction),
 		PruningStrategy:   pruningtypes.PruningOptionNothing,
 		CleanupDir:        true,
 		SigningAlgo:       string(hd.EthSecp256k1Type),
@@ -246,7 +246,7 @@ func New(l Logger, baseDir string, cfg Config) (*Network, error) {
 	l.Log("acquiring test network lock")
 	lock.Lock()
 
-	if !ethermint.IsValidChainID(cfg.ChainID) {
+	if !upticktypes.IsValidChainID(cfg.ChainID) {
 		return nil, fmt.Errorf("invalid chain-id: %s", cfg.ChainID)
 	}
 
@@ -436,7 +436,7 @@ func New(l Logger, baseDir string, cfg Config) (*Network, error) {
 
 		genFiles = append(genFiles, tmCfg.GenesisFile())
 		genBalances = append(genBalances, banktypes.Balance{Address: addr.String(), Coins: balances.Sort()})
-		genAccounts = append(genAccounts, &ethermint.EthAccount{
+		genAccounts = append(genAccounts, &upticktypes.EthAccount{
 			BaseAccount: authtypes.NewBaseAccount(addr, nil, 0, 0),
 			CodeHash:    common.BytesToHash(evmtypes.EmptyCodeHash).Hex(),
 		})
@@ -495,7 +495,7 @@ func New(l Logger, baseDir string, cfg Config) (*Network, error) {
 			return nil, err
 		}
 
-		customAppTemplate, _ := config.AppConfig(ethermint.AttoPhoton)
+		customAppTemplate, _ := config.AppConfig(upticktypes.AttoPhoton)
 		srvconfig.SetConfigTemplate(customAppTemplate)
 		srvconfig.WriteConfigFile(filepath.Join(nodeDir, "config/app.toml"), appCfg)
 

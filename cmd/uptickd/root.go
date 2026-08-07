@@ -3,7 +3,9 @@ package main
 import (
 	"cosmossdk.io/client/v2/autocli"
 	"cosmossdk.io/log"
-	rosettaCmd "cosmossdk.io/tools/rosetta/cmd"
+	// TODO: rosetta disabled - cosmossdk.io/tools/rosetta v0.2.1 is incompatible with SDK 0.53
+	// (sdk.NewIntFromUint64 was removed). Re-enable after forking and fixing rosetta.
+	// rosettaCmd "cosmossdk.io/tools/rosetta/cmd"
 	"errors"
 	"fmt"
 	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
@@ -21,7 +23,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/module"
 	authcmd "github.com/cosmos/cosmos-sdk/x/auth/client/cli"
 	genutiltypes "github.com/cosmos/cosmos-sdk/x/genutil/types"
-	srvflags "github.com/evmos/ethermint/server/flags"
+	srvflags "github.com/cosmos/evm/server/flags"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/cast"
 	"github.com/spf13/cobra"
@@ -40,11 +42,11 @@ import (
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	"github.com/cosmos/cosmos-sdk/x/crisis"
 	genutilcli "github.com/cosmos/cosmos-sdk/x/genutil/client/cli"
-	ethermintclient "github.com/evmos/ethermint/client"
-	"github.com/evmos/ethermint/client/debug"
-	"github.com/evmos/ethermint/crypto/hd"
-	ethermintserver "github.com/evmos/ethermint/server"
-	servercfg "github.com/evmos/ethermint/server/config"
+	ethermintclient "github.com/cosmos/evm/client"
+	"github.com/cosmos/evm/client/debug"
+	"github.com/cosmos/evm/crypto/hd"
+	ethermintserver "github.com/cosmos/evm/server"
+	servercfg "github.com/cosmos/evm/server/config"
 )
 
 const (
@@ -156,8 +158,8 @@ func NewRootCmd() *cobra.Command {
 		panic(err)
 	}
 
-	// add rosetta
-	rootCmd.AddCommand(rosettaCmd.RosettaCommand(encodingConfig.InterfaceRegistry, encodingConfig.Codec))
+	// TODO: rosetta disabled - incompatible with SDK 0.53
+	// rootCmd.AddCommand(rosettaCmd.RosettaCommand(encodingConfig.InterfaceRegistry, encodingConfig.Codec))
 	return rootCmd
 }
 

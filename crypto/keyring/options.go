@@ -3,7 +3,7 @@ package keyring
 import (
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
 
-	"github.com/evmos/ethermint/crypto/hd"
+	"github.com/cosmos/evm/crypto/hd"
 )
 
 var (

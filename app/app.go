@@ -25,9 +25,9 @@ import (
 	consensusparamtypes "github.com/cosmos/cosmos-sdk/x/consensus/types"
 	crisistypes "github.com/cosmos/cosmos-sdk/x/crisis/types"
 	genutiltypes "github.com/cosmos/cosmos-sdk/x/genutil/types"
-	capabilitytypes "github.com/cosmos/ibc-go/modules/capability/types"
-	ibcexported "github.com/cosmos/ibc-go/v8/modules/core/exported"
-	srvflags "github.com/evmos/ethermint/server/flags"
+	ibcexported "github.com/cosmos/ibc-go/v10/modules/core/exported"
+	porttypes "github.com/cosmos/ibc-go/v10/modules/core/05-port/types"
+	srvflags "github.com/cosmos/evm/server/flags"
 
 	"github.com/UptickNetwork/uptick/app/ante"
 	"github.com/UptickNetwork/uptick/app/keepers"
@@ -83,15 +83,15 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/staking"
 	stakingkeeper "github.com/cosmos/cosmos-sdk/x/staking/keeper"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
-	ibctransfertypes "github.com/cosmos/ibc-go/v8/modules/apps/transfer/types"
-	ibc "github.com/cosmos/ibc-go/v8/modules/core"
-	ibckeeper "github.com/cosmos/ibc-go/v8/modules/core/keeper"
-	ibctm "github.com/cosmos/ibc-go/v8/modules/light-clients/07-tendermint"
-	ethermint "github.com/evmos/ethermint/types"
-	"github.com/evmos/ethermint/x/evm"
-	evmtypes "github.com/evmos/ethermint/x/evm/types"
-	"github.com/evmos/ethermint/x/feemarket"
-	feemarkettypes "github.com/evmos/ethermint/x/feemarket/types"
+	ibctransfertypes "github.com/cosmos/ibc-go/v10/modules/apps/transfer/types"
+	ibc "github.com/cosmos/ibc-go/v10/modules/core"
+	ibckeeper "github.com/cosmos/ibc-go/v10/modules/core/keeper"
+	ibctm "github.com/cosmos/ibc-go/v10/modules/light-clients/07-tendermint"
+	upticktypes "github.com/UptickNetwork/uptick/types"
+	"github.com/cosmos/evm/x/vm"
+	evmtypes "github.com/cosmos/evm/x/vm/types"
+	"github.com/cosmos/evm/x/feemarket"
+	feemarkettypes "github.com/cosmos/evm/x/feemarket/types"
 
 	"github.com/CosmWasm/wasmd/x/wasm"
 	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
@@ -112,15 +112,13 @@ import (
 	tmjson "github.com/cometbft/cometbft/libs/json"
 	tmos "github.com/cometbft/cometbft/libs/os"
 	dbm "github.com/cosmos/cosmos-db"
-	"github.com/cosmos/ibc-go/modules/capability"
-	capabilitykeeper "github.com/cosmos/ibc-go/modules/capability/keeper"
 
 	erc721 "github.com/UptickNetwork/evm-nft-convert"
 	erc721types "github.com/UptickNetwork/evm-nft-convert/types"
 	cw721 "github.com/UptickNetwork/wasm-nft-convert"
 	cw721types "github.com/UptickNetwork/wasm-nft-convert/types"
-	ica "github.com/cosmos/ibc-go/v8/modules/apps/27-interchain-accounts"
-	icatypes "github.com/cosmos/ibc-go/v8/modules/apps/27-interchain-accounts/types"
+	ica "github.com/cosmos/ibc-go/v10/modules/apps/27-interchain-accounts"
+	icatypes "github.com/cosmos/ibc-go/v10/modules/apps/27-interchain-accounts/types"
 )
 
 func init() {
@@ -132,7 +130,7 @@ func init() {
 	DefaultNodeHome = filepath.Join(userHomeDir, ".uptickd")
 
 	// manually update the power reduction by replacing micro (u) -> atto (a) uptick
-	sdk.DefaultPowerReduction = ethermint.PowerReduction
+	sdk.DefaultPowerReduction = upticktypes.PowerReduction
 }
 
 const (
@@ -309,7 +307,6 @@ func NewUptick(
 			app.AccountKeeper,
 			app.GetSubspace(banktypes.ModuleName),
 		),
-		capability.NewAppModule(appCodec, *app.CapabilityKeeper, false),
 		crisis.NewAppModule(app.CrisisKeeper, skipGenesisInvariants, app.GetSubspace(crisistypes.ModuleName)),
 		gov.NewAppModule(appCodec, app.GovKeeper, app.AccountKeeper, app.BankKeeper, app.GetSubspace(govtypes.ModuleName)),
 		mint.NewAppModule(appCodec, app.MintKeeper, app.AccountKeeper, nil, app.GetSubspace(minttypes.ModuleName)),
@@ -391,10 +388,8 @@ func NewUptick(
 	// CanWithdrawInvariant invariant.
 	// NOTE: upgrade module must go first to handle software upgrades.
 	// NOTE: staking module is required if HistoricalEntries param > 0.
-	// NOTE: capability module's beginblocker must come before any modules using capabilities (e.g. IBC)
 	app.mm.SetOrderBeginBlockers(
 
-		capabilitytypes.ModuleName,
 		// Note: epochs' begin should be "real" start of epochs, we keep epochs beginblock at the beginning
 		feemarkettypes.ModuleName,
 		evmtypes.ModuleName,
@@ -437,7 +432,6 @@ func NewUptick(
 		// no-op modules
 		ibcexported.ModuleName,
 		ibctransfertypes.ModuleName,
-		capabilitytypes.ModuleName,
 		authtypes.ModuleName,
 		banktypes.ModuleName,
 		distrtypes.ModuleName,
@@ -462,12 +456,8 @@ func NewUptick(
 
 	// NOTE: The genutils module must occur after staking so that pools are
 	// properly initialized with tokens from genesis accounts.
-	// NOTE: Capability module must occur first so that it can initialize any capabilities
-	// so that other modules that want to create or claim capabilities afterwards in InitChain
-	// can do so safely.
 	app.mm.SetOrderInitGenesis(
 		// SDK modules
-		capabilitytypes.ModuleName,
 		authtypes.ModuleName,
 		banktypes.ModuleName,
 		distrtypes.ModuleName,
@@ -505,7 +495,6 @@ func NewUptick(
 
 	app.mm.SetOrderExportGenesis(
 		// SDK modules
-		capabilitytypes.ModuleName,
 		authtypes.ModuleName,
 		banktypes.ModuleName,
 		distrtypes.ModuleName,
@@ -550,7 +539,6 @@ func NewUptick(
 	app.sm = module.NewSimulationManager(
 		auth.NewAppModule(appCodec, app.AccountKeeper, nil, app.GetSubspace(authtypes.ModuleName)),
 		bank.NewAppModule(appCodec, app.BankKeeper, app.AccountKeeper, app.GetSubspace(banktypes.ModuleName)),
-		capability.NewAppModule(appCodec, *app.CapabilityKeeper, false),
 		gov.NewAppModule(appCodec, app.GovKeeper, app.AccountKeeper, app.BankKeeper, app.GetSubspace(govtypes.ModuleName)),
 		mint.NewAppModule(appCodec, app.MintKeeper, app.AccountKeeper, nil, app.GetSubspace(minttypes.ModuleName)),
 		staking.NewAppModule(appCodec, app.StakingKeeper, app.AccountKeeper, app.BankKeeper, app.GetSubspace(stakingtypes.ModuleName)),
@@ -624,12 +612,10 @@ func NewUptick(
 		if err := app.LoadLatestVersion(); err != nil {
 			tmos.Exit(err.Error())
 		}
-
-		// Initialize and seal the capability keeper
-		app.CapabilityKeeper.Seal()
 	}
+}
 
-	// Finally start the tpsCounter.
+// Finally start the tpsCounter.
 	app.tpsCounter = newTPSCounter(logger)
 	go func() {
 		// Unfortunately golangci-lint is so pedantic
@@ -790,8 +776,8 @@ func (app *Uptick) GetIBCKeeper() *ibckeeper.Keeper {
 }
 
 // GetScopedIBCKeeper implements the TestingApp interface.
-func (app *Uptick) GetScopedIBCKeeper() capabilitykeeper.ScopedKeeper {
-	return app.ScopedIBCKeeper
+func (app *Uptick) GetScopedIBCKeeper() porttypes.ScopedKeeper {
+	return app.IBCKeeper.ScopedKeeper
 }
 
 // GetTxConfig implements the TestingApp interface.
@@ -816,7 +802,6 @@ func (app *Uptick) BlockedModuleAccountAddrs() map[string]bool {
 	modAccAddrs := app.ModuleAccountAddrs()
 
 	// remove module accounts that are ALLOWED to received funds
-	// delete(modAccAddrs, authtypes.NewModuleAddress(grouptypes.ModuleName).String())
 	delete(modAccAddrs, authtypes.NewModuleAddress(govtypes.ModuleName).String())
 
 	return modAccAddrs

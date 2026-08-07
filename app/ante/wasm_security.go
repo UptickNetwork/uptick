@@ -9,8 +9,9 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/cosmos/cosmos-sdk/x/authz"
-	ethante "github.com/evmos/ethermint/app/ante"
-	evmtypes "github.com/evmos/ethermint/x/evm/types"
+	ethante "github.com/cosmos/evm/ante"
+	anteinterfaces "github.com/cosmos/evm/ante/interfaces"
+	evmtypes "github.com/cosmos/evm/x/vm/types"
 )
 
 const (
@@ -19,19 +20,19 @@ const (
 	MaxWasmDispatchMsgCount = 10
 
 	// EvmMsgTypeURL is the type URL for EVM messages
-	EvmMsgTypeURL = "/ethermint.evm.v1.MsgEthereumTx"
+	EvmMsgTypeURL = "/upticktypes.evm.v1.MsgEthereumTx"
 )
 
 // WasmSecurityDecorator checks for security issues in CosmWasm messages
 // and prevents bypassing AnteHandler gas checks via CosmWasm DispatchMsg
 type WasmSecurityDecorator struct {
 	cdc            codec.BinaryCodec
-	evmKeeper      ethante.EVMKeeper
+	evmKeeper      anteinterfaces.EVMKeeper
 	maxTxGasWanted uint64
 }
 
 // NewWasmSecurityDecorator creates a new WasmSecurityDecorator
-func NewWasmSecurityDecorator(cdc codec.BinaryCodec, evmKeeper ethante.EVMKeeper, maxTxGasWanted uint64) WasmSecurityDecorator {
+func NewWasmSecurityDecorator(cdc codec.BinaryCodec, evmKeeper anteinterfaces.EVMKeeper, maxTxGasWanted uint64) WasmSecurityDecorator {
 	return WasmSecurityDecorator{
 		cdc:            cdc,
 		evmKeeper:      evmKeeper,

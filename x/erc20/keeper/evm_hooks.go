@@ -4,7 +4,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/core"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
-	evmtypes "github.com/evmos/ethermint/x/evm/types"
+	evmtypes "github.com/cosmos/evm/x/vm/types"
 )
 
 // Hooks wrapper struct for erc20 keeper

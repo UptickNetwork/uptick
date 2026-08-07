@@ -1,3 +1,9 @@
+//go:build ignore
+// +build ignore
+
+// TODO: cosmos/evm v0.6.1 does not have testutil/network package.
+// Need to adapt to cosmos/evm's test infrastructure.
+
 package testing
 
 import (
@@ -12,8 +18,8 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/evmos/ethermint/server/config"
-	"github.com/evmos/ethermint/testutil/network"
+	"github.com/cosmos/evm/server/config"
+	"github.com/cosmos/evm/testutil/network"
 
 	"github.com/UptickNetwork/uptick/x/erc20/types"
 )

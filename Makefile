@@ -358,11 +358,6 @@ else
 	go test -mod=readonly $(ARGS)  $(EXTRA_ARGS) $(TEST_PACKAGES)
 endif
 
-test-import:
-	@go test ./tests/importer -v --vet=off --run=TestImportBlocks --datadir tmp \
-	--blockchain blockchain
-	rm -rf tests/importer/tmp
-
 test-rpc:
 	./scripts/integration-test-all.sh -t "rpc" -q 1 -z 1 -s 2 -m "rpc" -r "true"
 

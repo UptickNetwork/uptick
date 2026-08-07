@@ -1,3 +1,9 @@
+//go:build ignore
+// +build ignore
+
+// TODO: cosmos/evm v0.6.1 does not have a "tests" importable package.
+// Need to find the equivalent test helper in cosmos/evm.
+
 package keeper_test
 
  import (
@@ -9,7 +15,7 @@ package keeper_test
 	"github.com/ethereum/go-ethereum/common"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 
-	"github.com/evmos/ethermint/tests"
+	"github.com/cosmos/evm/tests"
 
 	"github.com/UptickNetwork/uptick/contracts"
 	"github.com/UptickNetwork/uptick/x/erc20/types"

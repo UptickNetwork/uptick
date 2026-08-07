@@ -5,7 +5,7 @@ import (
 
 	erc721Types "github.com/UptickNetwork/evm-nft-convert/types"
 	nfttransfertypes "github.com/bianjieai/nft-transfer/types"
-	channeltypes "github.com/cosmos/ibc-go/v8/modules/core/04-channel/types"
+	channeltypes "github.com/cosmos/ibc-go/v10/modules/core/04-channel/types"
 	"github.com/stretchr/testify/require"
 )
 

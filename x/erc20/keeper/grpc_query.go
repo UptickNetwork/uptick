@@ -10,7 +10,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/query"
 
-	ethermint "github.com/evmos/ethermint/types"
+	upticktypes "github.com/UptickNetwork/uptick/types"
 
 	"github.com/UptickNetwork/uptick/x/erc20/types"
 )
@@ -55,7 +55,7 @@ func (k Keeper) TokenPair(c context.Context, req *types.QueryTokenPairRequest) (
 
 	// check if the token is a hex address, if not, check if it is a valid SDK
 	// denom
-	if err := ethermint.ValidateAddress(req.Token); err != nil {
+	if err := upticktypes.ValidateAddress(req.Token); err != nil {
 		if err := sdk.ValidateDenom(req.Token); err != nil {
 			return nil, status.Errorf(
 				codes.InvalidArgument,

@@ -6,13 +6,14 @@ import (
 
 	sdkerrors "cosmossdk.io/errors"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 
 	"github.com/cosmos/cosmos-sdk/x/gov/types/v1beta1"
-	ibctransfertypes "github.com/cosmos/ibc-go/v8/modules/apps/transfer/types"
+	ibctransfertypes "github.com/cosmos/ibc-go/v10/modules/apps/transfer/types"
 
 	"github.com/ethereum/go-ethereum/common"
-	ethermint "github.com/evmos/ethermint/types"
+	upticktypes "github.com/UptickNetwork/uptick/types"
 )
 
 // constants
@@ -77,8 +78,8 @@ func (rtbp *RegisterCoinProposal) ValidateBasic() error {
 		return err
 	}
 
-	if err := ibctransfertypes.ValidateIBCDenom(rtbp.Metadata.Base); err != nil {
-		return err
+	if !isValidIBCDenom(rtbp.Metadata.Base) {
+		return sdkerrors.Wrap(errortypes.ErrInvalidRequest, "metadata base must be an IBC denom")
 	}
 
 	return v1beta1.ValidateAbstract(rtbp)
@@ -93,7 +94,27 @@ func ValidateErc20Denom(denom string) error {
 		return fmt.Errorf("invalid denom. %s denomination should be prefixed with the format 'erc20/", denom)
 	}
 
-	return ethermint.ValidateAddress(denomSplit[1])
+	return upticktypes.ValidateAddress(denomSplit[1])
+}
+
+// isValidIBCDenom checks if a denom is a valid IBC denom (ibc/{hash}).
+// This replaces ibctransfertypes.ValidateIBCDenom which was removed in ibc-go v10.
+func isValidIBCDenom(denom string) bool {
+	denomSplit := strings.SplitN(denom, "/", 2)
+	if len(denomSplit) != 2 || denomSplit[0] != "ibc" {
+		return false
+	}
+	// IBC denom hash must be a valid SHA256 hash (64 hex chars)
+	hash := denomSplit[1]
+	if len(hash) != 64 {
+		return false
+	}
+	for _, c := range hash {
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+			return false
+		}
+	}
+	return true
 }
 
 // NewRegisterERC20Proposal returns new instance of RegisterERC20Proposal
@@ -115,7 +136,7 @@ func (*RegisterERC20Proposal) ProposalType() string {
 
 // ValidateBasic performs a stateless check of the proposal fields
 func (rtbp *RegisterERC20Proposal) ValidateBasic() error {
-	if err := ethermint.ValidateAddress(rtbp.Erc20Address); err != nil {
+	if err := upticktypes.ValidateAddress(rtbp.Erc20Address); err != nil {
 		return sdkerrors.Wrap(err, "ERC20 address")
 	}
 	return v1beta1.ValidateAbstract(rtbp)
@@ -142,7 +163,7 @@ func (*ToggleTokenRelayProposal) ProposalType() string {
 func (etrp *ToggleTokenRelayProposal) ValidateBasic() error {
 	// check if the token is a hex address, if not, check if it is a valid SDK
 	// denom
-	if err := ethermint.ValidateAddress(etrp.Token); err != nil {
+	if err := upticktypes.ValidateAddress(etrp.Token); err != nil {
 		if err := sdk.ValidateDenom(etrp.Token); err != nil {
 			return err
 		}
@@ -171,11 +192,11 @@ func (*UpdateTokenPairERC20Proposal) ProposalType() string {
 
 // ValidateBasic performs a stateless check of the proposal fields
 func (p *UpdateTokenPairERC20Proposal) ValidateBasic() error {
-	if err := ethermint.ValidateAddress(p.Erc20Address); err != nil {
+	if err := upticktypes.ValidateAddress(p.Erc20Address); err != nil {
 		return sdkerrors.Wrap(err, "ERC20 address")
 	}
 
-	if err := ethermint.ValidateAddress(p.NewErc20Address); err != nil {
+	if err := upticktypes.ValidateAddress(p.NewErc20Address); err != nil {
 		return sdkerrors.Wrap(err, "new ERC20 address")
 	}
 

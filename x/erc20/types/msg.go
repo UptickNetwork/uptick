@@ -6,7 +6,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
-	ibctransfertypes "github.com/cosmos/ibc-go/v8/modules/apps/transfer/types"
+	ibctransfertypes "github.com/cosmos/ibc-go/v10/modules/apps/transfer/types"
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -40,8 +40,8 @@ func (msg MsgConvertCoin) Type() string { return TypeMsgConvertCoin }
 // ValidateBasic runs stateless checks on the message
 func (msg MsgConvertCoin) ValidateBasic() error {
 	if err := ValidateErc20Denom(msg.Coin.Denom); err != nil {
-		if err := ibctransfertypes.ValidateIBCDenom(msg.Coin.Denom); err != nil {
-			return err
+		if !isValidIBCDenom(msg.Coin.Denom) {
+			return sdkerrors.Wrap(errortypes.ErrInvalidCoins, "coin denom must be an IBC denom or ERC20 denom")
 		}
 	}
 

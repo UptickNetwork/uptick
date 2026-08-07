@@ -8,8 +8,8 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/x/auth/tx"
 	"github.com/cosmos/gogoproto/proto"
-	enccodec "github.com/evmos/ethermint/encoding/codec"
-	evmtypes "github.com/evmos/ethermint/x/evm/types"
+	enccodec "github.com/cosmos/evm/encoding/codec"
+	evmtypes "github.com/cosmos/evm/x/vm/types"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 

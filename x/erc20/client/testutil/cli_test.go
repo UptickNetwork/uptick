@@ -1,5 +1,8 @@
-//go:build norace
-// +build norace
+//go:build ignore
+// +build ignore
+
+// TODO: cosmos/evm v0.6.1 does not have testutil/network package.
+// Need to adapt to cosmos/evm's test infrastructure (testutil/integration/evm/network).
 
 package testutil
 
@@ -14,7 +17,7 @@ import (
 
 	clitestutil "github.com/cosmos/cosmos-sdk/testutil/cli"
 
-	"github.com/evmos/ethermint/testutil/network"
+	"github.com/cosmos/evm/testutil/network"
 
 	upticknetwork "github.com/UptickNetwork/uptick/testutil/network"
 	"github.com/UptickNetwork/uptick/x/erc20/client/cli"

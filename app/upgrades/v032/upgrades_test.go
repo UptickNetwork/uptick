@@ -6,10 +6,10 @@ import (
 	"cosmossdk.io/math"
 	ibcnfttransfertypes "github.com/bianjieai/nft-transfer/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
-	icatypes "github.com/cosmos/ibc-go/v8/modules/apps/27-interchain-accounts/types"
+	icatypes "github.com/cosmos/ibc-go/v10/modules/apps/27-interchain-accounts/types"
 	"github.com/stretchr/testify/require"
 
-	evmtypes "github.com/evmos/ethermint/x/evm/types"
+	evmtypes "github.com/cosmos/evm/x/vm/types"
 )
 
 func TestApplyEVMForkParams(t *testing.T) {

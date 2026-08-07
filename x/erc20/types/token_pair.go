@@ -6,7 +6,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	"github.com/ethereum/go-ethereum/common"
-	ethermint "github.com/evmos/ethermint/types"
+	upticktypes "github.com/UptickNetwork/uptick/types"
 )
 
 // NewTokenPair returns an instance of TokenPair
@@ -36,7 +36,7 @@ func (tp TokenPair) Validate() error {
 		return err
 	}
 
-	if err := ethermint.ValidateAddress(tp.Erc20Address); err != nil {
+	if err := upticktypes.ValidateAddress(tp.Erc20Address); err != nil {
 		return err
 	}
 

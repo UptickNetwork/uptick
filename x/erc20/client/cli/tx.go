@@ -4,8 +4,8 @@ import (
 	"cosmossdk.io/math"
 	"fmt"
 	ibcnfttransfertypes "github.com/bianjieai/nft-transfer/types"
-	clienttypes "github.com/cosmos/ibc-go/v8/modules/core/02-client/types"
-	channelutils "github.com/cosmos/ibc-go/v8/modules/core/04-channel/client/utils"
+	clienttypes "github.com/cosmos/ibc-go/v10/modules/core/02-client/types"
+	channelutils "github.com/cosmos/ibc-go/v10/modules/core/04-channel/client/utils"
 	"github.com/spf13/cobra"
 
 	"github.com/cosmos/cosmos-sdk/client"
@@ -18,7 +18,7 @@ import (
 	govv1beta1 "github.com/cosmos/cosmos-sdk/x/gov/types/v1beta1"
 
 	"github.com/ethereum/go-ethereum/common"
-	ethermint "github.com/evmos/ethermint/types"
+	upticktypes "github.com/UptickNetwork/uptick/types"
 
 	"github.com/UptickNetwork/uptick/x/erc20/types"
 
@@ -65,7 +65,7 @@ func NewConvertCoinCmd() *cobra.Command {
 
 			if len(args) == 2 {
 				receiver = args[1]
-				if err := ethermint.ValidateAddress(receiver); err != nil {
+				if err := upticktypes.ValidateAddress(receiver); err != nil {
 					return fmt.Errorf("invalid receiver hex address %w", err)
 				}
 			} else {
@@ -103,7 +103,7 @@ func NewConvertERC20Cmd() *cobra.Command {
 			}
 
 			contract := args[0]
-			if err := ethermint.ValidateAddress(contract); err != nil {
+			if err := upticktypes.ValidateAddress(contract); err != nil {
 				return fmt.Errorf("invalid ERC20 contract address %w", err)
 			}
 
@@ -458,7 +458,7 @@ func NewTransferERC20Cmd() *cobra.Command {
 			//evmSender := common.BytesToAddress(cliCtx.GetFromAddress().Bytes())
 			sender := cliCtx.GetFromAddress().String()
 			evmContractAddress := args[0]
-			if err := ethermint.ValidateAddress(evmContractAddress); err != nil {
+			if err := upticktypes.ValidateAddress(evmContractAddress); err != nil {
 				return fmt.Errorf("invalid erc20 contract address %w", err)
 			}
 

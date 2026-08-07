@@ -35,7 +35,38 @@ Ref: https://keepachangelog.com/en/1.0.0/
 
 # Changelog
 
-## Unreleased
+## v0.3.3 - 2023-12-12
+
+### Bug Fixes
+
+- Harden erc20 IBC outbound refund authorization: require `MsgTransferERC20` provenance instead of user-controlled memo substrings (`v0.3.3` upgrade).
+- Fix erc20 IBC error-ack rollback: record transfer provenance using the ICS-20 packet denomination path (not the bank `ibc/HASH` denom) so ERC20 supply is restored when the transfer fails.
+
+## v0.3.4 - 2026-08-03
+
+### Security
+
+- (erc20) Validate `EnableEVMHook` requires `EnableErc20` in params to prevent EVM hook without ERC20 token registry.
+- (erc20) Add `SetIBCKeeper` double-call protection to prevent silent keeper overwrite.
+- (erc20) Add `DenomUnits` boundary check in `RegisterCoin` to prevent index-out-of-range panic.
+- (erc20) Fix `IsDenomRegistered` using `Name` instead of `Base` — broken duplicate registration guard.
+- (erc20) Validate `receiver` address in `OnRecvPacket` — prevent token delivery to zero address.
+- (erc20) Wrap `refundPacketToken` with `CacheContext` for atomic ERC20 mint + coin sweep + burn.
+- (evmIBC) Replace `strings.Contains` with `strings.HasPrefix` in ClassID prefix validation.
+- (erc20) Add `OnTimeoutPacket` in IBCMiddleware to clean up provenance on timeout.
+- (collection) Fix `ValidateGenesis` checking `Name` instead of `Id`.
+- (collection) Add `ValidateTokenURI` in `MsgTransferNFT` for consistency with mint/edit messages.
+- (app) Add `ValidateTokenURI` decoration in `WasmSecurityDecorator`.
+
+### Improvements
+
+- (erc20) Replace `MustUnmarshal` with `Unmarshal` + error handling in token pair iteration and migration.
+- (erc20) Restore `verifyMetadata` validation in `RegisterCoin` for IBC metadata consistency.
+- (erc20/evmIBC) Remove debug `fmt.Printf` and commented-out debug code from production paths.
+
+### API Breaking
+
+- (evmIBC) IBC middleware now properly handles `OutboundConvertClassId` with provenance tracking.
 
 ## [v0.2.0] - 2022-05-09
 
