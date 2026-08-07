@@ -9,7 +9,6 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/cosmos/cosmos-sdk/x/authz"
-	ethante "github.com/cosmos/evm/ante"
 	anteinterfaces "github.com/cosmos/evm/ante/interfaces"
 	evmtypes "github.com/cosmos/evm/x/vm/types"
 )

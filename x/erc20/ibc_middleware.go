@@ -13,7 +13,7 @@ import (
 	"github.com/cosmos/ibc-go/v10/modules/core/exported"
 )
 
-var _ porttypes.Middleware = &IBCMiddleware{}
+var _ porttypes.IBCModule = &IBCMiddleware{}
 
 // IBCMiddleware implements the ICS26 callbacks for the transfer middleware given
 // the claim keeper and the underlying application.
@@ -34,11 +34,12 @@ func NewIBCMiddleware(k keeper.Keeper, app porttypes.IBCModule) IBCMiddleware {
 // If fees are not enabled, this callback will default to the ibc-core packet callback.
 func (im IBCMiddleware) OnRecvPacket(
 	ctx sdk.Context,
+	channelVersion string,
 	packet channeltypes.Packet,
 	relayer sdk.AccAddress,
 ) exported.Acknowledgement {
 
-	ack := im.Module.OnRecvPacket(ctx, packet, relayer)
+	ack := im.Module.OnRecvPacket(ctx, channelVersion, packet, relayer)
 
 	// return if the acknowledgement is an error ACK
 	if !ack.Success() {
@@ -82,6 +83,7 @@ func (im IBCMiddleware) GetAppVersion(
 // IBC transfer provenance records on packet timeout to prevent storage leaks.
 func (im IBCMiddleware) OnTimeoutPacket(
 	ctx sdk.Context,
+	channelVersion string,
 	packet channeltypes.Packet,
 	relayer sdk.AccAddress,
 ) error {
@@ -92,13 +94,14 @@ func (im IBCMiddleware) OnTimeoutPacket(
 		// On timeout, no ACK is ever received, so we clean up here.
 		_ = im.keeper.ConsumeIBCTransferProvenance(ctx, packet, data)
 	}
-	return im.Module.OnTimeoutPacket(ctx, packet, relayer)
+	return im.Module.OnTimeoutPacket(ctx, channelVersion, packet, relayer)
 }
 
 // OnAcknowledgementPacket implements the IBCModule interface
 // If fees are not enabled, this callback will default to the ibc-core packet callback.
 func (im IBCMiddleware) OnAcknowledgementPacket(
 	ctx sdk.Context,
+	channelVersion string,
 	packet channeltypes.Packet,
 	acknowledgement []byte,
 	relayer sdk.AccAddress,
@@ -121,7 +124,7 @@ func (im IBCMiddleware) OnAcknowledgementPacket(
 	// On error ack it refunds the Cosmos coins to the sender.
 	// The ERC20 handler below will then mint the ERC20 representation
 	// and sweep those Cosmos coins to prevent a double refund.
-	if err := im.Module.OnAcknowledgementPacket(ctx, packet, acknowledgement, relayer); err != nil {
+	if err := im.Module.OnAcknowledgementPacket(ctx, channelVersion, packet, acknowledgement, relayer); err != nil {
 		return err
 	}
 

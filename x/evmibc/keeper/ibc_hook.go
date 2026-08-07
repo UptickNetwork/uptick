@@ -2,7 +2,6 @@ package keeper
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	sdkerrors "cosmossdk.io/errors"

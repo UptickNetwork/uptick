@@ -8,6 +8,7 @@ import (
 	v031 "github.com/UptickNetwork/uptick/app/upgrades/v031"
 	v032 "github.com/UptickNetwork/uptick/app/upgrades/v032"
 	v033 "github.com/UptickNetwork/uptick/app/upgrades/v033"
+	v034 "github.com/UptickNetwork/uptick/app/upgrades/v034"
 )
 
 var (
@@ -15,7 +16,8 @@ var (
 		Register(v030.Upgrade).
 		Register(v031.Upgrade).
 		Register(v032.Upgrade).
-		Register(v033.Upgrade)
+		Register(v033.Upgrade).
+		Register(v034.Upgrade)
 )
 
 // RegisterUpgradePlans register a handler of upgrade plan

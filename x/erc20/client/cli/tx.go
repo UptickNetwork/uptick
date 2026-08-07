@@ -5,7 +5,6 @@ import (
 	"fmt"
 	ibcnfttransfertypes "github.com/bianjieai/nft-transfer/types"
 	clienttypes "github.com/cosmos/ibc-go/v10/modules/core/02-client/types"
-	channelutils "github.com/cosmos/ibc-go/v10/modules/core/04-channel/client/utils"
 	"github.com/spf13/cobra"
 
 	"github.com/cosmos/cosmos-sdk/client"
@@ -22,7 +21,6 @@ import (
 
 	"github.com/UptickNetwork/uptick/x/erc20/types"
 
-	"time"
 )
 
 // NewTxCmd returns a root CLI command handler for certain modules/erc20 transaction commands.

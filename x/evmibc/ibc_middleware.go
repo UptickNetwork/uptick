@@ -124,6 +124,7 @@ func PackageToModuleAccount(packet channeltypes.Packet) (channeltypes.Packet, st
 // If fees are not enabled, this callback will default to the ibc-core packet callback.
 func (im IBCMiddleware) OnAcknowledgementPacket(
 	ctx sdk.Context,
+	channelVersion string,
 	packet channeltypes.Packet,
 	acknowledgement []byte,
 	relayer sdk.AccAddress,
@@ -161,7 +162,7 @@ func (im IBCMiddleware) OnAcknowledgementPacket(
 		return err
 	}
 
-	return im.Module.OnAcknowledgementPacket(ctx, packet, acknowledgement, relayer)
+	return im.Module.OnAcknowledgementPacket(ctx, channelVersion, packet, acknowledgement, relayer)
 }
 
 func (im IBCMiddleware) SendPacket(
@@ -193,6 +194,7 @@ func (im IBCMiddleware) GetAppVersion(
 // OnTimeoutPacket implements the IBCModule interface
 func (im IBCMiddleware) OnTimeoutPacket(
 	ctx sdk.Context,
+	channelVersion string,
 	packet channeltypes.Packet,
 	relayer sdk.AccAddress,
 ) error {
