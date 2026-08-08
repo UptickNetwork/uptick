@@ -3,6 +3,43 @@
 ## 概览
 本文档记录了 uptick 项目从 ethermint → cosmos/evm v0.6.1 迁移的阶段一实施过程。
 
+## 关键决策：ethermint → cosmos/evm + cosmos/go-ethereum
+
+### 为什么可以完全废弃 UptickNetwork/ethermint
+
+| 功能 | UptickNetwork/ethermint | cosmos/go-ethereum v1.16.2 | 结论 |
+|------|:---:|:---:|------|
+| EIP-7702 SetCodeTx | ❌ 不支持 | ✅ 原生支持 | cosmos/go-ethereum 更优 |
+| Shanghai | ✅ ShanghaiBlock | ✅ ShanghaiTime | 已迁移到 Time-based |
+| Dencun (Cancun) | ✅ CancunBlock | ✅ CancunTime + BlobSchedule | 已迁移 |
+| Prague | ✅ PragueBlock | ✅ PragueTime + EIP-7702 | 已迁移 |
+| go-ethereum 版本 | v1.10.17 (2022) | v1.16.2 (2025) | 差距 6 个大版本 |
+| 维护方 | Uptick 自行 fork | Cosmos 团队维护 | 无需自维护 |
+
+### v034 升级处理器中的 ChainConfig 迁移
+
+旧方式（ethermint v032 升级）：
+```go
+evmParams.ChainConfig.ShanghaiBlock = &zero  // 基于区块高度
+evmParams.ChainConfig.CancunBlock = &zero
+evmParams.ChainConfig.PragueBlock = &zero
+```
+
+新方式（cosmos/evm v0.6.1 v034 升级）：
+```go
+chainConfig.ShanghaiTime = &zero  // 基于时间戳（以太坊标准）
+chainConfig.CancunTime = &zero
+chainConfig.PragueTime = &zero    // 启用 EIP-7702 SetCodeTx
+evmtypes.SetChainConfig(chainConfig)  // 全局变量设置
+```
+
+### EIP-7702 SetCodeTx 激活机制
+
+- EIP-7702 在 `PragueTime` 被设置时自动激活
+- 交易类型 `0x04` (SetCodeTx)
+- 允许 EOA 账户委托到智能合约代码（账户抽象）
+- `cosmos/go-ethereum v1.16.2` 原生包含，无需自定义实现
+
 ---
 
 ## 已完成的任务
