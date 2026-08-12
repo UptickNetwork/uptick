@@ -2,24 +2,12 @@ package keeper_test
 
 import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 
 	"github.com/UptickNetwork/uptick/x/erc20/types"
 )
 
 func (suite *KeeperTestSuite) TestMintingEnabled() {
-	coinMeta := banktypes.Metadata{
-		Name:    "test",
-		Symbol:  "TST",
-		Base:    "utest",
-		Display: "test",
-		DenomUnits: []*banktypes.DenomUnit{
-			{Denom: "utest", Exponent: 0},
-			{Denom: "test", Exponent: 18},
-		},
-	}
-
-	pair := suite.setupRegisterCoin(coinMeta)
+	_, pair := suite.setupRegisterCoin()
 	suite.Require().NotNil(pair)
 	suite.Require().True(pair.Enabled)
 

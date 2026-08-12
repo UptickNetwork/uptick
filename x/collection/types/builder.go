@@ -65,7 +65,7 @@ func (cb ClassBuilder) BuildMetadata(class nft.Class) (string, error) {
 
 	metadata, ok := message.(*DenomMetadata)
 	if !ok {
-		return "", errors.New("unsupport classMetadata")
+		return "", errors.New("unsupported class metadata: expected DenomMetadata")
 	}
 
 	kvals := make(map[string]interface{})
@@ -271,7 +271,7 @@ func (tb TokenBuilder) BuildMetadata(token nft.NFT) (string, error) {
 
 	nftMetadata, ok := message.(*NFTMetadata)
 	if !ok {
-		return "", errors.New("unsupport classMetadata")
+		return "", errors.New("unsupported nft metadata: expected NFTMetadata")
 	}
 	kvals := make(map[string]interface{})
 	if len(nftMetadata.Data) > 0 {

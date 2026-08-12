@@ -5,6 +5,7 @@ import (
 	porttypes "github.com/cosmos/ibc-go/v10/modules/core/05-port/types"
 
 	"cosmossdk.io/log"
+	"cosmossdk.io/math"
 	storetypes "cosmossdk.io/store/types"
 
 	"github.com/cosmos/cosmos-sdk/codec"
@@ -14,6 +15,8 @@ import (
 	"github.com/UptickNetwork/uptick/x/erc20/types"
 	ibctransferkeeper "github.com/cosmos/ibc-go/v10/modules/apps/transfer/keeper"
 
+	evmerc20types "github.com/cosmos/evm/x/erc20/types"
+	"github.com/cosmos/evm/x/vm/statedb"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/vm"
 )
@@ -82,6 +85,12 @@ func (k *Keeper) SetIBCKeeper(ibcKeeper ibctransferkeeper.Keeper) {
 	k.ibcKeeper = ibcKeeper
 }
 
+// SetEVMKeeper sets the EVM keeper to the erc20 keeper.
+// Used to break the circular dependency between the EVM and erc20 keepers.
+func (k *Keeper) SetEVMKeeper(ek types.EVMKeeper) {
+	k.evmKeeper = ek
+}
+
 // GetERC20PrecompileInstance implements the cosmos/evm Erc20Keeper interface.
 // It returns the ERC20 precompile contract for the given token pair address.
 // Since Uptick uses its own erc20 implementation (not cosmos/evm's), this is a stub
@@ -90,4 +99,32 @@ func (k Keeper) GetERC20PrecompileInstance(ctx sdk.Context, address common.Addre
 	// TODO: implement proper precompile instance lookup
 	// For now, return not found — this allows the EVM keeper to compile
 	return nil, false, nil
+}
+
+// The following methods implement the cosmos/evm precompiles/common.ERC20Keeper
+// interface so that Uptick's erc20 keeper can be wired into the EVM precompiles
+// (bank/ics20). Uptick uses its own erc20 module, so these return safe defaults.
+
+// GetCoinAddress returns the ERC20 contract address mapped to a coin denom.
+func (k Keeper) GetCoinAddress(ctx sdk.Context, denom string) (common.Address, error) {
+	return common.Address{}, nil
+}
+
+// IsERC20Enabled returns whether the ERC20 module is enabled.
+func (k Keeper) IsERC20Enabled(ctx sdk.Context) bool {
+	return false
+}
+
+// ConvertERC20IntoCoinsForNativeToken converts an ERC20 amount into native coins.
+func (k Keeper) ConvertERC20IntoCoinsForNativeToken(
+	ctx sdk.Context,
+	stateDB *statedb.StateDB,
+	contract common.Address,
+	amount math.Int,
+	receiver sdk.AccAddress,
+	sender common.Address,
+	commit bool,
+	callFromPrecompile bool,
+) (*evmerc20types.MsgConvertERC20Response, error) {
+	return nil, fmt.Errorf("erc20 conversion not supported by Uptick's custom erc20 module")
 }

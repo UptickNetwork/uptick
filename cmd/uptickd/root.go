@@ -11,7 +11,7 @@ import (
 	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
 	"github.com/UptickNetwork/uptick/app/params"
 	uptickparams "github.com/UptickNetwork/uptick/app/params"
-	// cmdcfg "github.com/UptickNetwork/uptick/cmd/config" // TODO: fix config for cosmos/evm
+	cmdcfg "github.com/UptickNetwork/uptick/cmd/config"
 	tmcfg "github.com/cometbft/cometbft/config"
 	tmcli "github.com/cometbft/cometbft/libs/cli"
 	dbm "github.com/cosmos/cosmos-db"
@@ -42,11 +42,12 @@ import (
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	"github.com/cosmos/cosmos-sdk/x/crisis"
 	genutilcli "github.com/cosmos/cosmos-sdk/x/genutil/client/cli"
-	ethermintclient "github.com/cosmos/evm/client"
+	evmclient "github.com/cosmos/evm/client"
 	"github.com/cosmos/evm/client/debug"
+	evmconfig "github.com/cosmos/evm/config"
 	"github.com/cosmos/evm/crypto/hd"
-	ethermintserver "github.com/cosmos/evm/server"
-	servercfg "github.com/cosmos/evm/server/config"
+	evmserver "github.com/cosmos/evm/server"
+	evmtypes "github.com/cosmos/evm/x/vm/types"
 )
 
 const (
@@ -130,9 +131,9 @@ func NewRootCmd() *cobra.Command {
 		snapshot.Cmd(ac.newApp),
 	)
 
-	ethermintserver.AddCommands(
+	evmserver.AddCommands(
 		rootCmd,
-		ethermintserver.NewDefaultStartOptions(ac.newEvmApp, app.DefaultNodeHome),
+		evmserver.NewDefaultStartOptions(ac.newEvmApp, app.DefaultNodeHome),
 		ac.appExport,
 		addModuleInitFlags,
 	)
@@ -143,7 +144,7 @@ func NewRootCmd() *cobra.Command {
 		genesisCommand(tempApplication.BasicManager(), encodingConfig),
 		queryCommand(),
 		txCommand(tempApplication.BasicManager()),
-		ethermintclient.KeyCommands(app.DefaultNodeHome, false),
+		evmclient.KeyCommands(app.DefaultNodeHome, false),
 	)
 
 	autoCliOpts := enrichAutoCliOpts(tempApplication.AutoCliOpts(), initClientCtx)
@@ -246,19 +247,18 @@ func txCommand(basicManager module.BasicManager) *cobra.Command {
 // initAppConfig helps to override default appConfig template and configs.
 // return "", nil if no custom configuration is required for the application.
 func initAppConfig() (string, interface{}) {
-	// customAppTemplate, customAppConfig := config.AppConfig(cmdcfg.BaseDenom) // TODO: fix for cosmos/evm
-	customAppTemplate := ""
-	var customAppConfig interface{} = nil
+	// cosmos/evm provides the EVM/JSONRPC/TLS app.toml configuration.
+	evmChainID := evmtypes.DefaultEVMChainID
+	customAppTemplate, customAppConfig := evmconfig.InitAppConfig(cmdcfg.BaseDenom, evmChainID)
 
-	srvCfg, ok := customAppConfig.(servercfg.Config)
-	if !ok {
-		panic(fmt.Errorf("unknown app config type %T", customAppConfig))
+	// apply snapshot / fast-node settings via the concrete EVMAppConfig type.
+	if cfg, ok := customAppConfig.(evmconfig.EVMAppConfig); ok {
+		cfg.StateSync.SnapshotInterval = 1500
+		cfg.StateSync.SnapshotKeepRecent = 2
+		cfg.IAVLDisableFastNode = false
+		return customAppTemplate, cfg
 	}
-
-	srvCfg.StateSync.SnapshotInterval = 1500
-	srvCfg.StateSync.SnapshotKeepRecent = 2
-	srvCfg.IAVLDisableFastNode = false
-	return customAppTemplate, srvCfg
+	return customAppTemplate, customAppConfig
 }
 
 type appCreator struct {
@@ -270,7 +270,7 @@ func (a appCreator) newApp(logger log.Logger, db dbm.DB, traceStore io.Writer, a
 	return a.newEvmApp(logger, db, traceStore, appOpts)
 }
 
-func (a appCreator) newEvmApp(logger log.Logger, db dbm.DB, traceStore io.Writer, appOpts servertypes.AppOptions) ethermintserver.Application {
+func (a appCreator) newEvmApp(logger log.Logger, db dbm.DB, traceStore io.Writer, appOpts servertypes.AppOptions) evmserver.Application {
 
 	var wasmOpts []wasmkeeper.Option
 	if cast.ToBool(appOpts.Get("telemetry.enabled")) {

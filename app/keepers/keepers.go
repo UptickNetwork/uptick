@@ -12,18 +12,15 @@ import (
 	"github.com/CosmWasm/wasmd/x/wasm"
 	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
 	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
-	erc721keeper "github.com/UptickNetwork/evm-nft-convert/keeper"
-	erc721types "github.com/UptickNetwork/evm-nft-convert/types"
 	nftkeeper "github.com/UptickNetwork/uptick/x/collection/keeper"
 	nfttypes "github.com/UptickNetwork/uptick/x/collection/types"
-	"github.com/UptickNetwork/uptick/x/erc20"
-	erc20keeper "github.com/UptickNetwork/uptick/x/erc20/keeper"
-	erc20types "github.com/UptickNetwork/uptick/x/erc20/types"
+	cw721keeper "github.com/UptickNetwork/uptick/x/cw721/keeper"
+	cw721types "github.com/UptickNetwork/uptick/x/cw721/types"
+	erc721keeper "github.com/UptickNetwork/uptick/x/erc721/keeper"
+	erc721types "github.com/UptickNetwork/uptick/x/erc721/types"
 	"github.com/UptickNetwork/uptick/x/evmibc"
 	evmIBCKeepr "github.com/UptickNetwork/uptick/x/evmibc/keeper"
 	"github.com/UptickNetwork/uptick/x/internft"
-	cw721keeper "github.com/UptickNetwork/wasm-nft-convert/keeper"
-	cw721types "github.com/UptickNetwork/wasm-nft-convert/types"
 	nfttransfer "github.com/bianjieai/nft-transfer"
 	ibcnfttransferkeeper "github.com/bianjieai/nft-transfer/keeper"
 	ibcnfttransfertypes "github.com/bianjieai/nft-transfer/types"
@@ -58,6 +55,8 @@ import (
 	slashingtypes "github.com/cosmos/cosmos-sdk/x/slashing/types"
 	stakingkeeper "github.com/cosmos/cosmos-sdk/x/staking/keeper"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
+	cosmoserc20keeper "github.com/cosmos/evm/x/erc20/keeper"
+	cosmoserc20types "github.com/cosmos/evm/x/erc20/types"
 	ica "github.com/cosmos/ibc-go/v10/modules/apps/27-interchain-accounts"
 	icacontroller "github.com/cosmos/ibc-go/v10/modules/apps/27-interchain-accounts/controller"
 	icacontrollerkeeper "github.com/cosmos/ibc-go/v10/modules/apps/27-interchain-accounts/controller/keeper"
@@ -65,6 +64,13 @@ import (
 
 	"path/filepath"
 
+	uptickprecompiles "github.com/UptickNetwork/uptick/app/precompiles"
+	upticktypes "github.com/UptickNetwork/uptick/types"
+	srvflags "github.com/cosmos/evm/server/flags"
+	feemarketkeeper "github.com/cosmos/evm/x/feemarket/keeper"
+	feemarkettypes "github.com/cosmos/evm/x/feemarket/types"
+	evmkeeper "github.com/cosmos/evm/x/vm/keeper"
+	evmtypes "github.com/cosmos/evm/x/vm/types"
 	icahost "github.com/cosmos/ibc-go/v10/modules/apps/27-interchain-accounts/host"
 	icahostkeeper "github.com/cosmos/ibc-go/v10/modules/apps/27-interchain-accounts/host/keeper"
 	icahosttypes "github.com/cosmos/ibc-go/v10/modules/apps/27-interchain-accounts/host/types"
@@ -76,13 +82,6 @@ import (
 	porttypes "github.com/cosmos/ibc-go/v10/modules/core/05-port/types"
 	ibcexported "github.com/cosmos/ibc-go/v10/modules/core/exported"
 	ibckeeper "github.com/cosmos/ibc-go/v10/modules/core/keeper"
-	srvflags "github.com/cosmos/evm/server/flags"
-	upticktypes "github.com/UptickNetwork/uptick/types"
-	evmkeeper "github.com/cosmos/evm/x/vm/keeper"
-	evmtypes "github.com/cosmos/evm/x/vm/types"
-	precompiletypes "github.com/cosmos/evm/precompiles/types"
-	feemarketkeeper "github.com/cosmos/evm/x/feemarket/keeper"
-	feemarkettypes "github.com/cosmos/evm/x/feemarket/types"
 	"github.com/spf13/cast"
 )
 
@@ -122,11 +121,13 @@ type AppKeepers struct {
 	IBCNFTTransferKeeper  ibcnfttransferkeeper.Keeper
 	ConsensusParamsKeeper consensusparamkeeper.Keeper
 	AuthzKeeper           authzkeeper.Keeper
-	// Ethermint keepers
+	// cosmos/evm keepers
 	EvmKeeper       *evmkeeper.Keeper
 	FeeMarketKeeper feemarketkeeper.Keeper
+	// ERC20 keeper (cosmos/evm v0.6.1)
+	Erc20Keeper cosmoserc20keeper.Keeper
 	// Uptick keepers
-	Erc20Keeper  *erc20keeper.Keeper
+
 	Erc721Keeper erc721keeper.Keeper
 	Cw721Keeper  cw721keeper.Keeper
 	EVMIBCKeeper evmIBCKeepr.Keeper
@@ -140,7 +141,7 @@ type AppKeepers struct {
 	IBCNftTransferModule nfttransfer.AppModule
 }
 
-// NewUptick returns a reference to a new initialized Ethermint application.
+// NewUptick returns a reference to a new initialized Uptick application.
 func New(
 	appCodec codec.Codec,
 	bApp *baseapp.BaseApp,
@@ -185,7 +186,7 @@ func New(
 	// set the BaseApp's parameter store
 	bApp.SetParamStore(&appKeepers.ConsensusParamsKeeper.ParamsStore)
 
-	// use custom Ethermint account for contracts
+	// use BaseAccount for contracts (cosmos/evm replaces Ethermint EthAccount)
 	appKeepers.AccountKeeper = authkeeper.NewAccountKeeper(
 		appCodec,
 		runtime.NewKVStoreService(appKeepers.keys[authtypes.StoreKey]),
@@ -316,7 +317,7 @@ func New(
 		appKeepers.BankKeeper,
 	)
 
-	// Create Ethermint keepers first
+	// Create cosmos/evm keepers
 	appKeepers.FeeMarketKeeper = feemarketkeeper.NewKeeper(
 		appCodec,
 		authtypes.NewModuleAddress(govtypes.ModuleName),
@@ -324,10 +325,35 @@ func New(
 		appKeepers.tkeys[feemarkettypes.TransientKey],
 	)
 
-	// EVM Keeper - cosmos/evm v0.6.1 NewKeeper signature:
-	// (cdc, storeKey, transientKey, keys, authority, ak, bankKeeper, sk, fmk, consensusKeeper, erc20Keeper, evmChainID, tracer)
-	// Note: erc20Keeper is passed as pointer to resolve circular dependency (EVMKeeper needs Erc20Keeper, Erc20Keeper needs EVMKeeper)
-	// TransferKeeper must be initialized before EVMKeeper for precompile injection.
+	// Gov Keeper must be initialized before EVMKeeper because the EVM precompiles
+	// (DefaultStaticPrecompiles) reference it.
+	govConfig := govtypes.DefaultConfig()
+	govKeeper := govkeeper.NewKeeper(
+		appCodec,
+		runtime.NewKVStoreService(appKeepers.keys[govtypes.StoreKey]),
+		appKeepers.AccountKeeper,
+		appKeepers.BankKeeper,
+		appKeepers.StakingKeeper,
+		appKeepers.DistrKeeper,
+		bApp.MsgServiceRouter(),
+		govConfig,
+		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
+	)
+
+	// register the proposal types
+	govRouter := govv1beta1.NewRouter()
+	govRouter.AddRoute(govtypes.RouterKey, govv1beta1.ProposalHandler).
+		AddRoute(paramproposal.RouterKey, params.NewParamChangeProposalHandler(appKeepers.ParamsKeeper))
+
+	appKeepers.GovKeeper = govKeeper.SetHooks(govtypes.NewMultiGovHooks(
+		govtypes.NewMultiGovHooks(),
+	))
+
+	// Set legacy router for backwards compatibility with gov v1beta1
+	govKeeper.SetLegacyRouter(govRouter)
+
+	// cosmos/evm v0.6.1: Create EVM Keeper first (with nil ERC20 keeper — the
+	// ERC20 module is created after and wired via static precompiles).
 	evmChainID := cast.ToUint64(appOpts.Get(srvflags.EVMChainID))
 
 	appKeepers.EvmKeeper = evmkeeper.NewKeeper(
@@ -341,15 +367,46 @@ func New(
 		appKeepers.StakingKeeper,
 		appKeepers.FeeMarketKeeper,
 		&appKeepers.ConsensusParamsKeeper,
-		appKeepers.Erc20Keeper, // pointer for circular dependency resolution
+		nil, // erc20Keeper — set after ERC20 keeper is created
 		evmChainID,
 		cast.ToString(appOpts.Get(srvflags.EVMTracer)),
-	).WithStaticPrecompiles(
-		precompiletypes.DefaultStaticPrecompiles(
+	) // NOTE: WithStaticPrecompiles is called AFTER ERC20 keeper is created
+
+	// Create Transfer Keeper (no longer takes ERC20 keeper as ICS4Wrapper in v0.6.1)
+	appKeepers.IBCTransferKeeper = ibctransferkeeper.NewKeeper(
+		appCodec,
+		runtime.NewKVStoreService(appKeepers.keys[ibctransfertypes.StoreKey]),
+		appKeepers.GetSubspace(ibctransfertypes.ModuleName),
+		nil, // ICS4Wrapper — not needed when using cosmos/evm ERC20 module
+		appKeepers.IBCKeeper.ChannelKeeper,
+		bApp.MsgServiceRouter(), // MessageRouter
+		appKeepers.AccountKeeper,
+		appKeepers.BankKeeper,
+		authtypes.NewModuleAddress(ibctransfertypes.ModuleName).String(),
+	)
+
+	appKeepers.TransferModule = transfer.NewAppModule(appKeepers.IBCTransferKeeper)
+
+	// cosmos/evm v0.6.1 ERC20 Keeper — created with the now-available EVMKeeper
+	appKeepers.Erc20Keeper = cosmoserc20keeper.NewKeeper(
+		appKeepers.keys[cosmoserc20types.StoreKey],
+		appCodec,
+		authtypes.NewModuleAddress(govtypes.ModuleName), // authority
+		appKeepers.AccountKeeper,
+		appKeepers.BankKeeper,
+		appKeepers.EvmKeeper, // EVMKeeper
+		appKeepers.StakingKeeper,
+		&appKeepers.IBCTransferKeeper, // transfer keeper for IBC callbacks
+	)
+
+	// Wire static precompiles (bank, staking, distribution, ics20, etc.)
+	// Uses cosmos/evm's DefaultStaticPrecompiles with the concrete ERC20 keeper.
+	appKeepers.EvmKeeper.WithStaticPrecompiles(
+		uptickprecompiles.DefaultStaticPrecompiles(
 			*appKeepers.StakingKeeper,
 			appKeepers.DistrKeeper,
 			appKeepers.BankKeeper,
-			nil, // erc20Keeper - uptick uses custom erc20, pass nil for now
+			&appKeepers.Erc20Keeper,
 			&appKeepers.IBCTransferKeeper,
 			appKeepers.IBCKeeper.ChannelKeeper,
 			*appKeepers.GovKeeper,
@@ -358,35 +415,10 @@ func New(
 		),
 	)
 
-	// Uptick Keeper
-	appKeepers.Erc20Keeper = erc20keeper.NewKeeper(
-		appCodec,
-		appKeepers.keys[erc20types.StoreKey],
-		appKeepers.GetSubspace(erc20types.ModuleName),
-		appKeepers.AccountKeeper,
-		appKeepers.BankKeeper,
-		appKeepers.EvmKeeper,
-	)
-
-	// Create Transfer Keepers
-	appKeepers.IBCTransferKeeper = ibctransferkeeper.NewKeeper(
-		appCodec,
-		runtime.NewKVStoreService(appKeepers.keys[ibctransfertypes.StoreKey]),
-		appKeepers.GetSubspace(ibctransfertypes.ModuleName),
-		appKeepers.Erc20Keeper, // ICS4Wrapper
-		appKeepers.IBCKeeper.ChannelKeeper,
-		bApp.MsgServiceRouter(), // MessageRouter
-		appKeepers.AccountKeeper,
-		appKeepers.BankKeeper,
-		authtypes.NewModuleAddress(ibctransfertypes.ModuleName).String(),
-	)
-
-	appKeepers.Erc20Keeper.SetICS4Wrapper(appKeepers.IBCKeeper.ChannelKeeper)
-	appKeepers.Erc20Keeper.SetIBCKeeper(appKeepers.IBCTransferKeeper)
-
-	appKeepers.TransferModule = transfer.NewAppModule(appKeepers.IBCTransferKeeper)
+	// Standard IBC transfer stack (no ERC20 middleware in v0.6.1 — IBC
+	// callbacks are handled internally by the ERC20 keeper).
 	transferIBCModule := transfer.NewIBCModule(appKeepers.IBCTransferKeeper)
-	transferStack := erc20.NewIBCMiddleware(*appKeepers.Erc20Keeper, transferIBCModule)
+	transferStack := transferIBCModule
 
 	appKeepers.IBCNFTTransferKeeper = ibcnfttransferkeeper.NewKeeper(
 		appCodec,
@@ -417,7 +449,7 @@ func New(
 		appKeepers.BankKeeper,
 		appKeepers.StakingKeeper,
 		distrkeeper.NewQuerier(appKeepers.DistrKeeper),
-		appKeepers.Erc20Keeper, // ICS4Wrapper
+		appKeepers.IBCKeeper.ChannelKeeper, // ICS4Wrapper (no ERC20 IBC middleware in v0.6.1)
 		appKeepers.IBCKeeper.ChannelKeeper,
 		nil,                          // channelKeeperV2 - not used (IBC v2 channels)
 		appKeepers.IBCTransferKeeper, // ICS20TransferPortSource
@@ -434,18 +466,15 @@ func New(
 	appKeepers.Cw721Keeper = cw721keeper.NewKeeper(
 		appKeepers.keys[cw721types.StoreKey],
 		appCodec,
-		appKeepers.GetSubspace(cw721types.ModuleName),
 		appKeepers.AccountKeeper,
 		appKeepers.NFTKeeper,
 		appKeepers.WasmKeeper,
-		appKeepers.ContractKeeper,
 		appKeepers.IBCNFTTransferKeeper,
 	)
 
 	appKeepers.Erc721Keeper = erc721keeper.NewKeeper(
 		appKeepers.keys[erc721types.StoreKey],
 		appCodec,
-		appKeepers.GetSubspace(erc721types.ModuleName),
 		appKeepers.AccountKeeper,
 		appKeepers.NFTKeeper,
 		appKeepers.EvmKeeper,
@@ -474,12 +503,8 @@ func New(
 	// Set IBC Router
 	appKeepers.IBCKeeper.SetRouter(ibcRouter)
 
-	// Set EVM hooks after Erc20Keeper is initialized
-	appKeepers.EvmKeeper = appKeepers.EvmKeeper.SetHooks(
-		evmkeeper.NewMultiEvmHooks(
-			appKeepers.Erc20Keeper.Hooks(),
-		),
-	)
+	// cosmos/evm v0.6.1 ERC20 module does not use EVM hooks — IBC callbacks
+	// are handled internally via ibc_callbacks.go in the ERC20 keeper.
 
 	// create evidence keeper with router
 	appKeepers.EvidenceKeeper = evidencekeeper.NewKeeper(
@@ -490,33 +515,6 @@ func New(
 		appKeepers.AccountKeeper.AddressCodec(),
 		runtime.ProvideCometInfoService(),
 	)
-
-	govConfig := govtypes.DefaultConfig()
-	govKeeper := govkeeper.NewKeeper(
-		appCodec,
-		runtime.NewKVStoreService(appKeepers.keys[govtypes.StoreKey]),
-		appKeepers.AccountKeeper,
-		appKeepers.BankKeeper,
-		appKeepers.StakingKeeper,
-		appKeepers.DistrKeeper,
-		bApp.MsgServiceRouter(),
-		govConfig,
-		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
-	)
-
-	// register the proposal types
-
-	govRouter := govv1beta1.NewRouter()
-	govRouter.AddRoute(govtypes.RouterKey, govv1beta1.ProposalHandler).
-		AddRoute(paramproposal.RouterKey, params.NewParamChangeProposalHandler(appKeepers.ParamsKeeper)).
-		AddRoute(erc20types.RouterKey, erc20.NewErc20ProposalHandler(appKeepers.Erc20Keeper))
-
-	appKeepers.GovKeeper = govKeeper.SetHooks(govtypes.NewMultiGovHooks(
-		govtypes.NewMultiGovHooks(),
-	))
-
-	// Set legacy router for backwards compatibility with gov v1beta1
-	govKeeper.SetLegacyRouter(govRouter)
 
 	// Initialize ICA Controller keeper
 	appKeepers.ICAControllerKeeper = icacontrollerkeeper.NewKeeper(
@@ -568,19 +566,17 @@ func initParamsKeeper(
 	paramsKeeper.Subspace(ibctransfertypes.ModuleName).WithKeyTable(ibctransfertypes.ParamKeyTable())
 	paramsKeeper.Subspace(ibcexported.ModuleName).WithKeyTable(keyTable)
 
-	// ethermint subspaces
+	// cosmos/evm subspaces
 	// TODO: evmtypes.ParamKeyTable() and feemarkettypes.ParamKeyTable() removed in cosmos/evm v0.6.1
 	// paramsKeeper.Subspace(evmtypes.ModuleName).WithKeyTable(evmtypes.ParamKeyTable())
 	// paramsKeeper.Subspace(feemarkettypes.ModuleName).WithKeyTable(feemarkettypes.ParamKeyTable())
 
 	// uptick subspaces
-	paramsKeeper.Subspace(erc20types.ModuleName).WithKeyTable(erc20types.ParamKeyTable())
-	paramsKeeper.Subspace(erc721types.ModuleName).WithKeyTable(erc721types.ParamKeyTable())
 	paramsKeeper.Subspace(icahosttypes.SubModuleName).WithKeyTable(icahosttypes.ParamKeyTable())
 
 	paramsKeeper.Subspace(wasmtypes.ModuleName)
 	paramsKeeper.Subspace(ibcnfttransfertypes.ModuleName)
-	paramsKeeper.Subspace(cw721types.ModuleName).WithKeyTable(cw721types.ParamKeyTable())
+	paramsKeeper.Subspace(cw721types.ModuleName)
 
 	paramsKeeper.Subspace(icacontrollertypes.SubModuleName).WithKeyTable(icacontrollertypes.ParamKeyTable())
 

@@ -1,6 +1,5 @@
 package keeper_test
 
-
 import (
 	"fmt"
 	"math/big"
@@ -39,8 +38,7 @@ func (suite *KeeperTestSuite) TestConvertCoinNativeCoin() {
 			10,
 			func(erc20 common.Address) {
 				stateDb := suite.StateDB()
-				ok := stateDb.Suicide(erc20)
-				suite.Require().True(ok)
+				_ = stateDb.SelfDestruct(erc20)
 				suite.Require().NoError(stateDb.Commit())
 			},
 			true,
@@ -98,7 +96,7 @@ func (suite *KeeperTestSuite) TestConvertCoinNativeCoin() {
 					suite.Require().NotNil(acc)
 				}
 
-				if tc.selfdestructed || !acc.IsContract() {
+				if tc.selfdestructed || len(suite.StateDB().GetCode(erc20)) == 0 {
 					id := suite.app.Erc20Keeper.GetTokenPairID(suite.ctx, erc20.String())
 					_, found := suite.app.Erc20Keeper.GetTokenPair(suite.ctx, id)
 					suite.Require().False(found)
@@ -228,8 +226,7 @@ func (suite *KeeperTestSuite) TestConvertERC20NativeERC20() {
 			10,
 			func(erc20 common.Address) {
 				stateDb := suite.StateDB()
-				ok := stateDb.Suicide(erc20)
-				suite.Require().True(ok)
+				_ = stateDb.SelfDestruct(erc20)
 				suite.Require().NoError(stateDb.Commit())
 			},
 			contractMinterBurner,
@@ -317,7 +314,7 @@ func (suite *KeeperTestSuite) TestConvertERC20NativeERC20() {
 					suite.Require().NotNil(acc)
 				}
 
-				if tc.selfdestructed || !acc.IsContract() {
+				if tc.selfdestructed || len(suite.StateDB().GetCode(contractAddr)) == 0 {
 					id := suite.app.Erc20Keeper.GetTokenPairID(suite.ctx, contractAddr.String())
 					_, found := suite.app.Erc20Keeper.GetTokenPair(suite.ctx, id)
 					suite.Require().False(found)
@@ -386,6 +383,7 @@ func (suite *KeeperTestSuite) TestConvertCoinNativeERC20() {
 			false,
 		},
 	}
+
 	for _, tc := range testCases {
 		suite.Run(fmt.Sprintf("Case %s", tc.name), func() {
 			suite.mintFeeCollector = true
@@ -432,7 +430,7 @@ func (suite *KeeperTestSuite) TestConvertCoinNativeERC20() {
 				suite.Require().NoError(err, tc.name)
 				suite.Require().Equal(expRes, res)
 				suite.Require().Equal(sdkmath.NewInt(tc.mint-tc.convert), cosmosBalance.Amount)
-				suite.Require().Equal(big.NewInt(tc.convert), tokenBalance.(*big.Int))
+				suite.Require().Equal(big.NewInt(tc.convert), tokenBalance)
 			} else {
 				suite.Require().Error(err, tc.name)
 			}
@@ -454,10 +452,14 @@ func (suite *KeeperTestSuite) TestConvertNativeIBC() {
 				Denom:    base,
 				Exponent: 0,
 			},
+			{
+				Denom:    "ATOM channel-14",
+				Exponent: 6,
+			},
 		},
 		Name:    "ATOM channel-14",
 		Symbol:  "ibcATOM-14",
-		Display: base,
+		Display: "ATOM channel-14",
 	}
 
 	err := suite.app.BankKeeper.MintCoins(suite.ctx, minttypes.ModuleName, sdk.Coins{sdk.NewInt64Coin(base, 1)})

@@ -3,7 +3,7 @@ package evmibc
 import (
 	"testing"
 
-	erc721Types "github.com/UptickNetwork/evm-nft-convert/types"
+	erc721Types "github.com/UptickNetwork/uptick/x/erc721/types"
 	nfttransfertypes "github.com/bianjieai/nft-transfer/types"
 	channeltypes "github.com/cosmos/ibc-go/v10/modules/core/04-channel/types"
 	"github.com/stretchr/testify/require"
@@ -37,4 +37,3 @@ func TestPackageToModuleAccount_InvalidPacketData(t *testing.T) {
 	require.Equal(t, "", dstReceiver)
 	require.Equal(t, channeltypes.Packet{}, newPacket)
 }
-

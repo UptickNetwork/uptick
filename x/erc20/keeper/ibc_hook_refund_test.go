@@ -71,7 +71,7 @@ func TestH5RefundPacketTokenAtomicity(t *testing.T) {
 		Denom:    packetDenom,
 		Amount:   transferAmount.String(),
 		Sender:   cosmosSender.String(),
-		Receiver: "cosmos1receiver",
+		Receiver: sdk.AccAddress(contractAddr.Bytes()).String(),
 		Memo:     "transfer" + types.TransferERC20Memo,
 	}
 
@@ -166,7 +166,7 @@ func TestH5RefundNoProvenanceNoMint(t *testing.T) {
 		Denom:    packetDenom,
 		Amount:   transferAmount.String(),
 		Sender:   cosmosSender.String(),
-		Receiver: "cosmos1other",
+		Receiver: sdk.AccAddress(contractAddr.Bytes()).String(),
 		Memo:     "",
 	}
 
@@ -231,7 +231,7 @@ func TestH5SuccessAckClearsProvenanceNoRefund(t *testing.T) {
 		Denom:    packetDenom,
 		Amount:   transferAmount.String(),
 		Sender:   cosmosSender.String(),
-		Receiver: "cosmos1receiver",
+		Receiver: sdk.AccAddress(contractAddr.Bytes()).String(),
 		Memo:     "success" + types.TransferERC20Memo,
 	}
 
@@ -298,7 +298,7 @@ func TestH5ProvenanceReplayBlocked(t *testing.T) {
 		Denom:    packetDenom,
 		Amount:   transferAmount.String(),
 		Sender:   cosmosSender.String(),
-		Receiver: "cosmos1receiver",
+		Receiver: sdk.AccAddress(contractAddr.Bytes()).String(),
 		Memo:     "replay" + types.TransferERC20Memo,
 	}
 
@@ -375,7 +375,7 @@ func TestH5NativeCoinRefundDoesNotBurn(t *testing.T) {
 		Denom:    packetDenom,
 		Amount:   transferAmount.String(),
 		Sender:   cosmosSender.String(),
-		Receiver: "cosmos1receiver",
+		Receiver: sdk.AccAddress(s.address.Bytes()).String(),
 		Memo:     "nativecoin" + types.TransferERC20Memo,
 	}
 

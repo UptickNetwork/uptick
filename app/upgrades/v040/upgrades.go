@@ -1,4 +1,4 @@
-package v034
+package v040
 
 import (
 	"context"
@@ -12,70 +12,70 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
 
-	// cosmos/evm imports — replaces ethermint x/evm
+	// cosmos/evm imports
+	cw721types "github.com/UptickNetwork/uptick/x/cw721/types"
+	erc721types "github.com/UptickNetwork/uptick/x/erc721/types"
+	erc20types "github.com/cosmos/evm/x/erc20/types"
 	evmtypes "github.com/cosmos/evm/x/vm/types"
-
-	// Uptick erc20 module (retained custom implementation)
-	erc20types "github.com/UptickNetwork/uptick/x/erc20/types"
 )
 
-const upgradeName = "v0.3.4"
+const upgradeName = "v0.4.0"
 
-// Upgrade implements the v0.3.4 upgrade plan.
+// Upgrade implements the v0.4.0 upgrade plan.
 //
-// This upgrade migrates Uptick from ethermint (based on go-ethereum v1.10.x)
+// This upgrade migrates Uptick from legacy go-ethereum v1.10.x
 // to cosmos/evm v0.6.1 (based on cosmos/go-ethereum v1.16.2).
 //
 // =====================================================================
 // MAJOR CHANGES IN THIS UPGRADE
 // =====================================================================
 //
-// 1. EVM Module: ethermint x/evm → cosmos/evm x/vm
-//    - go-ethereum upgraded from v1.10.17 → v1.16.2
-//    - ChainConfig fields changed from Block-based to Time-based
-//      (ShanghaiBlock → ShanghaiTime, CancunBlock → CancunTime,
-//       PragueBlock → PragueTime)
-//    - EIP-7702 SetCodeTx is now natively supported by cosmos/go-ethereum
-//      (no custom implementation needed, as UptickNetwork/ethermint required)
-//    - ChainConfig is now a global variable (set during NewKeeper),
-//      not stored in Params. The upgrade handler re-initializes it.
+// 1. EVM Module: x/evm → cosmos/evm x/vm
+//   - go-ethereum upgraded from v1.10.17 → v1.16.2
+//   - ChainConfig fields changed from Block-based to Time-based
+//     (ShanghaiBlock → ShanghaiTime, CancunBlock → CancunTime,
+//     PragueBlock → PragueTime)
+//   - EIP-7702 SetCodeTx is now natively supported by cosmos/go-ethereum
+//     (no custom implementation needed)
+//   - ChainConfig is now a global variable (set during NewKeeper),
+//     not stored in Params. The upgrade handler re-initializes it.
 //
 // 2. IBC Module: ibc-go v8 → v10
-//    - capability module removed entirely
-//    - ScopedKeeper references removed from all keepers
-//    - IBCModule interface signatures changed (added channelVersion param)
-//    - SendPacket/WriteAcknowledgement no longer require chanCap
+//   - capability module removed entirely
+//   - ScopedKeeper references removed from all keepers
+//   - IBCModule interface signatures changed (added channelVersion param)
+//   - SendPacket/WriteAcknowledgement no longer require chanCap
 //
 // 3. SDK: v0.50 → v0.53
-//    - x/params module deprecated (params now authority-based)
-//    - gov v1beta1 proposals → gov v1 (for erc20 module)
-//    - runtime.KVStoreService replaces direct StoreKey in keeper constructors
+//   - x/params module deprecated (params now authority-based)
+//   - gov v1beta1 proposals → gov v1 (for erc20 module)
+//   - runtime.KVStoreService replaces direct StoreKey in keeper constructors
 //
 // 4. Wasm: wasmd v0.53 → v0.61
-//    - WasmConfig → NodeConfig
-//    - wasmvm v2 → v3
+//   - WasmConfig → NodeConfig
+//   - wasmvm v2 → v3
 //
 // 5. EVM Hardfork Activation
-//    - In v032, Shanghai/Cancun/Prague were activated via Block height = 0
-//    - In cosmos/evm v0.6.1, these are activated via Time (timestamp)
-//    - The upgrade sets all fork times to 0 (activated immediately at upgrade)
-//    - This ensures all EVM opcodes (PUSH0, BLOBHASH, etc.) are enabled
-//    - EIP-7702 SetCodeTx (type 0x04) is enabled via PragueTime
+//   - In v032, Shanghai/Cancun/Prague were activated via Block height = 0
+//   - In cosmos/evm v0.6.1, these are activated via Time (timestamp)
+//   - The upgrade sets all fork times to 0 (activated immediately at upgrade)
+//   - This ensures all EVM opcodes (PUSH0, BLOBHASH, etc.) are enabled
+//   - EIP-7702 SetCodeTx (type 0x04) is enabled via PragueTime
 //
 // 6. Capability Store Cleanup
-//    - The 'capability' module store is deleted (ibc-go v10 doesn't use it)
+//   - The 'capability' module store is deleted (ibc-go v10 doesn't use it)
 //
 // 7. erc20 Module
-//    - Uptick retains its custom x/erc20 (Provenance + TransferERC20)
-//    - Params migrated from x/params subspace to authority-based
-//    - gov v1beta1 proposals retained for backward compatibility
+//   - Uptick retains its custom x/erc20 (Provenance + TransferERC20)
+//   - Params migrated from x/params subspace to authority-based
+//   - gov v1beta1 proposals retained for backward compatibility
 //
 // =====================================================================
 // ROLLBACK NOTE
 // =====================================================================
 // This upgrade is NOT reversible. Once the capability store is deleted
 // and ChainConfig is migrated to Time-based, the chain cannot roll back
-// to ethermint. Ensure all validators have upgraded before the upgrade height.
+// to the legacy implementation. Ensure all validators have upgraded before the upgrade height.
 var Upgrade = upgrades.Upgrade{
 	UpgradeName:               upgradeName,
 	UpgradeHandlerConstructor: upgradeHandlerConstructor,
@@ -87,7 +87,7 @@ var Upgrade = upgrades.Upgrade{
 			"capability",
 		},
 		// No new stores added — cosmos/evm x/vm uses the same store key
-		// as ethermint x/evm (both use "evm" store key).
+		// (both use "evm" store key).
 		Added: []string{},
 	},
 }
@@ -105,7 +105,7 @@ func upgradeHandlerConstructor(
 			"executing upgrade plan",
 			"name", upgradeName,
 			"changes", []string{
-				"ethermint → cosmos/evm v0.6.1 (go-ethereum v1.10→v1.16)",
+				"legacy x/evm → cosmos/evm v0.6.1 (go-ethereum v1.10→v1.16)",
 				"ibc-go v8 → v10 (capability removed)",
 				"SDK v0.50 → v0.53",
 				"wasmd v0.53 → v0.61 (wasmvm v2→v3)",
@@ -117,7 +117,7 @@ func upgradeHandlerConstructor(
 
 		// Step 1: Migrate EVM ChainConfig from Block-based to Time-based
 		//
-		// In ethermint (v032 upgrade), Shanghai/Cancun/Prague were activated via:
+		// In the legacy upgrade (v032), Shanghai/Cancun/Prague were activated via:
 		//   ChainConfig.ShanghaiBlock = 0
 		//   ChainConfig.CancunBlock = 0
 		//   ChainConfig.PragueBlock = 0
@@ -127,7 +127,7 @@ func upgradeHandlerConstructor(
 		//   ChainConfig.CancunTime = 0
 		//   ChainConfig.PragueTime = 0
 		//
-		// cosmos/evm also adds new fields not in ethermint:
+		// cosmos/evm also adds new fields not in the legacy implementation:
 		//   - OsakaTime (not activated, nil)
 		//   - VerkleTime (not activated, nil)
 		//   - BlobScheduleConfig (Cancun/Prague/Osaka blob configs)
@@ -135,20 +135,45 @@ func upgradeHandlerConstructor(
 		// EIP-7702 SetCodeTx (type 0x04) is enabled when PragueTime is set.
 		// This allows EOA accounts to delegate to smart contract code,
 		// enabling account abstraction without protocol-level changes.
-		// Previously UptickNetwork/ethermint required a custom implementation;
-		// cosmos/go-ethereum v1.16.2 includes this natively.
 		if err := migrateEVMChainConfig(sdkCtx, box, logger); err != nil {
 			return nil, fmt.Errorf("migrate EVM chain config: %w", err)
 		}
 
 		// Step 2: Migrate erc20 params from x/params subspace to authority-based
 		//
-		// In SDK 0.50 + ethermint, erc20 params were stored in x/params subspace.
+		// In SDK 0.50 with legacy x/evm, erc20 params were stored in x/params subspace.
 		// In SDK 0.53 + cosmos/evm, params are stored directly in the module store
 		// and managed via gov v1 authority.
 		migrateErc20Params(sdkCtx, box, logger)
 
-		// Step 3: Run module migrations
+		// Step 3: Deprecate old OWNER_MODULE token pairs
+		//
+		// The old uptick x/erc20 module stored OWNER_MODULE pairs (module-deployed
+		// ERC20 contracts). With cosmos/evm v0.6.1, the STRv2 addressing scheme
+		// generates different ERC20 addresses, so old OWNER_MODULE pairs are no
+		// longer valid for bidirectional conversion.
+		//
+		// This step sets Enabled = false for all OWNER_MODULE pairs, preserving
+		// the historical record while preventing further conversions through them.
+		if err := deprecateOldOwnerModulePairs(sdkCtx, box, logger); err != nil {
+			return nil, fmt.Errorf("deprecate old OWNER_MODULE pairs: %w", err)
+		}
+
+		// Step 3.5: Migrate erc721 params from x/params subspace to self-contained KV store
+		//
+		// The old evm-nft-convert module stored params in x/params subspace.
+		// The new x/erc721 module stores params directly in its own KV store,
+		// following the same pattern as cosmos/evm ERC20.
+		migrateErc721Params(sdkCtx, box, logger)
+
+		// Step 3.6: Migrate cw721 params from x/params subspace to self-contained KV store
+		//
+		// The old wasm-nft-convert module stored params in x/params subspace.
+		// The new x/cw721 module stores params directly in its own KV store,
+		// following the same pattern as cosmos/evm ERC20.
+		migrateCw721Params(sdkCtx, box, logger)
+
+		// Step 4: Run module migrations
 		//
 		// This handles all SDK 0.53, ibc-go v10, and cosmos/evm module migrations
 		// that are registered in the module manager.
@@ -160,7 +185,7 @@ func upgradeHandlerConstructor(
 }
 
 // migrateEVMChainConfig migrates the EVM chain configuration from the old
-// ethermint format (Block-based) to the new cosmos/evm format (Time-based).
+// legacy format (Block-based) to the new cosmos/evm format (Time-based).
 //
 // Key changes:
 // - ShanghaiBlock → ShanghaiTime
@@ -266,7 +291,7 @@ func migrateEVMChainConfig(ctx sdk.Context, box upgrades.Toolbox, logger log.Log
 // migrateErc20Params migrates erc20 module parameters from x/params subspace
 // to the new authority-based params system.
 //
-// In SDK 0.50 + ethermint, erc20 params were stored in x/params subspace.
+// In SDK 0.50 with legacy x/evm, erc20 params were stored in x/params subspace.
 // In SDK 0.53 + cosmos/evm, params are stored directly in the erc20 module store
 // and managed via gov v1 authority (authtypes.NewModuleAddress(govtypes.ModuleName)).
 //
@@ -284,4 +309,111 @@ func migrateErc20Params(ctx sdk.Context, box upgrades.Toolbox, logger log.Logger
 
 	erc20Keeper.SetParams(ctx, params)
 	logger.Info("erc20 params migrated to authority-based system")
+}
+
+// deprecateOldOwnerModulePairs disables all existing OWNER_MODULE token pairs.
+//
+// In the legacy uptick x/erc20 module, OWNER_MODULE pairs were created for
+// Cosmos-native coins that had module-deployed ERC20 contracts. With the
+// migration to cosmos/evm v0.6.1, the STRv2 addressing scheme generates
+// different ERC20 contract addresses, making these old pairs invalid for
+// bidirectional conversion.
+//
+// What this migration does:
+// - Iterates all existing token pairs in the erc20 store
+// - For pairs with ContractOwner == OWNER_MODULE: sets Enabled = false
+// - Preserves OWNER_EXTERNAL pairs (external ERC20 → Cosmos coin mappings)
+// - Writes updated pairs back to the store
+//
+// The historical pair records are preserved so operators can audit which
+// pairs existed before the upgrade. Any future pair creation will use
+// the STRv2 scheme via CreateNewTokenPair.
+func deprecateOldOwnerModulePairs(ctx sdk.Context, box upgrades.Toolbox, logger log.Logger) error {
+	logger.Info("deprecating old OWNER_MODULE token pairs")
+
+	erc20Keeper := box.Erc20Keeper
+	allPairs := erc20Keeper.GetTokenPairs(ctx)
+
+	var deprecatedCount int
+	var skippedCount int
+	var details []string
+
+	for _, pair := range allPairs {
+		if pair.ContractOwner != erc20types.OWNER_MODULE {
+			// External ERC20 pairs are still valid under STRv2
+			skippedCount++
+			continue
+		}
+
+		// Disable the old OWNER_MODULE pair
+		pair.Enabled = false
+		erc20Keeper.SetTokenPair(ctx, pair)
+		deprecatedCount++
+
+		details = append(details,
+			fmt.Sprintf("  - denom=%s erc20=%s",
+				pair.Denom, pair.Erc20Address),
+		)
+	}
+
+	logger.Info(
+		"OWNER_MODULE pair deprecation complete",
+		"total_pairs", len(allPairs),
+		"deprecated_owner_module", deprecatedCount,
+		"preserved_external", skippedCount,
+	)
+
+	for _, d := range details {
+		logger.Debug(d)
+	}
+
+	return nil
+}
+
+// migrateErc721Params migrates erc721 module parameters from x/params subspace
+// to the new self-contained KV store (aligned with cosmos/evm ERC20 pattern).
+//
+// In the old evm-nft-convert module, params were stored in x/params subspace
+// via paramtypes.ParamSet interface. The new x/erc721 module stores params
+// directly in its own KV store (using the same store key prefix), eliminating
+// the dependency on x/params.
+//
+// Since the old params subspace is being deprecated in SDK 0.53, we use
+// default params and let operators adjust via gov proposal if needed.
+func migrateErc721Params(ctx sdk.Context, box upgrades.Toolbox, logger log.Logger) {
+	logger.Info("migrating erc721 params to self-contained KV store")
+
+	erc721Keeper := box.Erc721Keeper
+	params := erc721types.DefaultParams()
+
+	erc721Keeper.SetParams(ctx, params)
+	logger.Info(
+		"erc721 params migrated to self-contained KV store",
+		"EnableErc721", params.EnableErc721,
+		"EnableEVMHook", params.EnableEVMHook,
+	)
+}
+
+// migrateCw721Params migrates cw721 module parameters from x/params subspace
+// to the new self-contained KV store (aligned with cosmos/evm ERC20 pattern).
+//
+// In the old wasm-nft-convert module, params were stored in x/params subspace
+// via paramtypes.ParamSet interface. The new x/cw721 module stores params
+// directly in its own KV store (using the same store key prefix), eliminating
+// the dependency on x/params.
+//
+// Since the old params subspace is being deprecated in SDK 0.53, we use
+// default params and let operators adjust via gov proposal if needed.
+func migrateCw721Params(ctx sdk.Context, box upgrades.Toolbox, logger log.Logger) {
+	logger.Info("migrating cw721 params to self-contained KV store")
+
+	cw721Keeper := box.Cw721Keeper
+	params := cw721types.DefaultParams()
+
+	cw721Keeper.SetParams(ctx, params)
+	logger.Info(
+		"cw721 params migrated to self-contained KV store",
+		"EnableCw721", params.EnableCw721,
+		"EnableEVMHook", params.EnableEVMHook,
+	)
 }

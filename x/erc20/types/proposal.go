@@ -11,8 +11,8 @@ import (
 
 	"github.com/cosmos/cosmos-sdk/x/gov/types/v1beta1"
 
-	"github.com/ethereum/go-ethereum/common"
 	upticktypes "github.com/UptickNetwork/uptick/types"
+	"github.com/ethereum/go-ethereum/common"
 )
 
 // constants
@@ -32,8 +32,10 @@ var (
 )
 
 func init() {
-	v1beta1.RegisterProposalType(ProposalTypeRegisterCoin)
-	v1beta1.RegisterProposalType(ProposalTypeRegisterERC20)
+	// cosmos/evm's x/erc20/types registers "RegisterCoin" and "RegisterERC20"
+	// via its own init(); Uptick reuses those exact type strings, so we must NOT
+	// re-register them here (duplicate registration panics). We only register the
+	// proposal types that are unique to Uptick's custom erc20 module.
 	v1beta1.RegisterProposalType(ProposalTypeToggleTokenRelay)
 	v1beta1.RegisterProposalType(ProposalTypeUpdateTokenPairERC20)
 

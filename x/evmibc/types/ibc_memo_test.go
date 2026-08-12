@@ -3,8 +3,8 @@ package types
 import (
 	"testing"
 
-	erc721types "github.com/UptickNetwork/evm-nft-convert/types"
-	cw721types "github.com/UptickNetwork/wasm-nft-convert/types"
+	cw721types "github.com/UptickNetwork/uptick/x/cw721/types"
+	erc721types "github.com/UptickNetwork/uptick/x/erc721/types"
 	nfttransfertypes "github.com/bianjieai/nft-transfer/types"
 	"github.com/stretchr/testify/require"
 )

@@ -15,11 +15,11 @@ import (
 	appType "github.com/UptickNetwork/uptick/types"
 	"github.com/UptickNetwork/uptick/x/erc20/types"
 	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
+	evmtypes "github.com/cosmos/evm/x/vm/types"
 	transfertypes "github.com/cosmos/ibc-go/v10/modules/apps/transfer/types"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	evmtypes "github.com/cosmos/evm/x/vm/types"
 )
 
 var _ types.MsgServer = &Keeper{}
@@ -61,7 +61,7 @@ func (k Keeper) TransferERC20(
 	sender := common.BytesToAddress(from.Bytes())
 	pair, err := k.MintingEnabled(cctx, sender.Bytes(), receiver, msg.EvmContractAddress)
 	if err != nil {
-		return nil, sdkerrors.Wrapf(err, "failed to MintingEnabled %v", err)
+		return nil, sdkerrors.Wrap(err, "failed to MintingEnabled")
 	}
 
 	coins := sdk.Coins{sdk.Coin{Denom: pair.Denom, Amount: msg.Amount}}
@@ -78,7 +78,7 @@ func (k Keeper) TransferERC20(
 	cctxGo := sdk.WrapSDKContext(cctx)
 	resp, err := k.ibcKeeper.Transfer(cctxGo, &ibcMsg)
 	if err != nil {
-		return nil, sdkerrors.Wrapf(err, "failed to ibc Transfer%v", err)
+		return nil, sdkerrors.Wrap(err, "failed to ibc Transfer")
 	}
 
 	// Only commit the cache context (including the ERC20 conversion) after
@@ -163,12 +163,9 @@ func (k Keeper) ConvertERC20(
 	if err != nil {
 		return nil, sdkerrors.Wrapf(err, "invalid receiver address %s", msg.Receiver)
 	}
-	bech32Address, err := sdk.AccAddressFromBech32(msg.Sender)
-	if err != nil {
-		return nil, sdkerrors.Wrapf(err, "invalid sender address %s", msg.Sender)
-	}
-	sender := common.BytesToAddress(bech32Address.Bytes())
-	//sender := common.HexToAddress(from.String())
+	// msg.Sender is a 0x hex address (see MsgConvertERC20.ValidateBasic and
+	// GetSigners), so decode it as such rather than as bech32.
+	sender := common.HexToAddress(msg.Sender)
 
 	pair, err := k.MintingEnabled(ctx, sender.Bytes(), receiver, msg.ContractAddress)
 	if err != nil {
@@ -286,8 +283,12 @@ func (k Keeper) convertERC20NativeCoin(
 		return nil, err
 	}
 
-	// Burn escrowed tokens
-	_, err = k.CallEVM(ctx, erc20, types.ModuleAddress, contract, true, "burnCoins", sender, msg.Amount.BigInt())
+	// Burn the sender's own escrowed tokens. Call as the sender (EOA) using the
+	// inherited ERC20Burnable.burn(uint256), which burns _msgSender()'s own
+	// balance without requiring BURNER_ROLE. This keeps the module account from
+	// becoming the EVM `from` (which the cosmos/evm statedb rejects for module
+	// accounts), removing the need to fork cosmos/evm.
+	_, err = k.CallEVM(ctx, erc20, sender, contract, true, "burn", msg.Amount.BigInt())
 	if err != nil {
 		return nil, err
 	}

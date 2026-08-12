@@ -9,8 +9,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	sdkerrors "cosmossdk.io/errors"
-	erc721types "github.com/UptickNetwork/evm-nft-convert/types"
 	"github.com/UptickNetwork/uptick/contracts"
+	erc721types "github.com/UptickNetwork/uptick/x/erc721/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
@@ -32,8 +32,7 @@ func (k Keeper) RefundPacketToken(
 		bigTokenId := new(big.Int)
 		_, err := fmt.Sscan(emvTokenId, bigTokenId)
 		if err != nil {
-			sdkerrors.Wrapf(errortypes.ErrUnauthorized, "%s error scanning value", err)
-			return err
+			return sdkerrors.Wrapf(errortypes.ErrUnauthorized, "%s error scanning value", err)
 		}
 
 		evmReceiver := k.erc721keeper.GetEvmAddressByContractTokenId(ctx, evmContractAddress, tokenId)

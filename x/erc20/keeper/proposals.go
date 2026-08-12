@@ -78,8 +78,11 @@ func (k Keeper) DeployERC20Contract(
 		return common.Address{}, sdkerrors.Wrapf(types.ErrInternalTokenPair, "coin metadata DenomUnits must have at least 2 entries, got %d", len(coinMetadata.DenomUnits))
 	}
 	decimals := uint8(coinMetadata.DenomUnits[1].Exponent)
-	ctorArgs, err := contracts.ERC20MinterBurnerDecimalsContract.ABI.Pack(
-		"",
+	// Pack the Solidity constructor arguments via the constructor's input ABI.
+	// ABI.Pack("") does not resolve the constructor and would silently fail to
+	// encode name/symbol/decimals, leaving the deployed contract with empty
+	// metadata (decimals == 0) and breaking downstream CreateCoinMetadata.
+	ctorArgs, err := contracts.ERC20MinterBurnerDecimalsContract.ABI.Constructor.Inputs.Pack(
 		coinMetadata.Name,
 		coinMetadata.Symbol,
 		decimals,

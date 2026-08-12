@@ -2,13 +2,13 @@ package keeper
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	sdkerrors "cosmossdk.io/errors"
-	erc721types "github.com/UptickNetwork/evm-nft-convert/types"
-	erc20Types "github.com/UptickNetwork/uptick/x/erc20/types"
+	cw721Types "github.com/UptickNetwork/uptick/x/cw721/types"
+	erc721types "github.com/UptickNetwork/uptick/x/erc721/types"
 	evmibctypes "github.com/UptickNetwork/uptick/x/evmibc/types"
-	cw721Types "github.com/UptickNetwork/wasm-nft-convert/types"
 
 	"github.com/bianjieai/nft-transfer/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -26,20 +26,21 @@ func (k Keeper) OnRecvPacket(
 	convertType uint) exported.Acknowledgement {
 
 	k.Logger(ctx).Info("OnRecvPacket ", "convertType", convertType)
-	event := &erc20Types.EventIBCERC20{
-		Status:             erc20Types.STATUS_UNKNOWN,
-		Message:            "",
-		Sequence:           packet.Sequence,
-		SourceChannel:      packet.SourceChannel,
-		DestinationChannel: packet.DestinationChannel,
-	}
+	msg := ""
 	cctx, write := ctx.CacheContext()
 
 	var data types.NonFungibleTokenPacketData
 	if err := types.ModuleCdc.UnmarshalJSON(packet.GetData(), &data); err != nil {
-		event.Status = erc20Types.STATUS_FAILED
-		event.Message = err.Error()
-		_ = ctx.EventManager().EmitTypedEvent(event)
+		msg = err.Error()
+		ctx.EventManager().EmitEvent(
+			sdk.NewEvent("ibc_erc20",
+				sdk.NewAttribute("status", "1"),
+				sdk.NewAttribute("message", msg),
+				sdk.NewAttribute("sequence", fmt.Sprintf("%d", packet.Sequence)),
+				sdk.NewAttribute("source_channel", packet.SourceChannel),
+				sdk.NewAttribute("destination_channel", packet.DestinationChannel),
+			),
+		)
 		return channeltypes.NewErrorAcknowledgement(
 			sdkerrors.Wrapf(errortypes.ErrInvalidType, "cannot unmarshal NFT transfer packet data"),
 		)
@@ -63,18 +64,32 @@ func (k Keeper) OnRecvPacket(
 		err = k.ConvertNFTFromCw721(context, voucherClassID, data.TokenIds, receiver)
 	}
 	if err != nil {
-		event.Status = erc20Types.STATUS_FAILED
-		event.Message = err.Error()
+		msg = err.Error()
 		k.Logger(ctx).Error("OnRecvPacket ", "err ", err.Error())
-		_ = ctx.EventManager().EmitTypedEvent(event)
+		ctx.EventManager().EmitEvent(
+			sdk.NewEvent("ibc_erc20",
+				sdk.NewAttribute("status", "1"), // FAILED
+				sdk.NewAttribute("message", msg),
+				sdk.NewAttribute("sequence", fmt.Sprintf("%d", packet.Sequence)),
+				sdk.NewAttribute("source_channel", packet.SourceChannel),
+				sdk.NewAttribute("destination_channel", packet.DestinationChannel),
+			),
+		)
 		return channeltypes.NewErrorAcknowledgement(
 			sdkerrors.Wrapf(errortypes.ErrInvalidRequest, "failed to convert NFT: %s", err.Error()),
 		)
 	}
 
 	write()
-	event.Status = erc20Types.STATUS_SUCCESS
-	_ = ctx.EventManager().EmitTypedEvent(event)
+	ctx.EventManager().EmitEvent(
+		sdk.NewEvent("ibc_erc20",
+			sdk.NewAttribute("status", "2"), // SUCCESS
+			sdk.NewAttribute("message", msg),
+			sdk.NewAttribute("sequence", fmt.Sprintf("%d", packet.Sequence)),
+			sdk.NewAttribute("source_channel", packet.SourceChannel),
+			sdk.NewAttribute("destination_channel", packet.DestinationChannel),
+		),
+	)
 
 	k.Logger(ctx).Info("OnRecvPacket ", "finish OK")
 

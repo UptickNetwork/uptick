@@ -9,17 +9,7 @@ import (
 	"github.com/UptickNetwork/uptick/x/collection/types"
 )
 
-type msgServer struct {
-	Keeper
-}
-
 var _ types.MsgServer = Keeper{}
-
-//// NewMsgServerImpl returns an implementation of the NFT MsgServer interface
-//// for the provided Keeper.
-//func NewMsgServerImpl(keeper Keeper) types.MsgServer {
-//	return &msgServer{Keeper: keeper}
-//}
 
 // IssueDenom issue a new denom.
 func (k Keeper) IssueDenom(goCtx context.Context, msg *types.MsgIssueDenom) (*types.MsgIssueDenomResponse, error) {

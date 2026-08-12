@@ -17,7 +17,7 @@ import (
 	"github.com/UptickNetwork/uptick/x/evmibc/keeper"
 	evmibctypes "github.com/UptickNetwork/uptick/x/evmibc/types"
 
-	erc721Types "github.com/UptickNetwork/evm-nft-convert/types"
+	erc721Types "github.com/UptickNetwork/uptick/x/erc721/types"
 	clienttypes "github.com/cosmos/ibc-go/v10/modules/core/02-client/types"
 )
 
@@ -59,7 +59,7 @@ func (im IBCMiddleware) OnRecvPacket(
 	var data types.NonFungibleTokenPacketData
 	if err := types.ModuleCdc.UnmarshalJSON(packet.GetData(), &data); err != nil {
 		ackResult = channeltypes.NewErrorAcknowledgement(
-			sdkerrors.Wrapf(errortypes.ErrInvalidType, "cannot unmarshal ICS-721 nft-transfer packet data"),
+			sdkerrors.Wrap(errortypes.ErrInvalidType, "cannot unmarshal ICS-721 nft-transfer packet data"),
 		)
 		return ackResult
 	}
@@ -79,7 +79,7 @@ func (im IBCMiddleware) OnRecvPacket(
 		newPackage, dstReceiver := PackageToModuleAccount(packet)
 		if !common.IsHexAddress(dstReceiver) {
 			ackResult = channeltypes.NewErrorAcknowledgement(
-				sdkerrors.Wrapf(errortypes.ErrInvalidType, "receiver address format error"),
+				sdkerrors.Wrap(errortypes.ErrInvalidType, "receiver address format error"),
 			)
 			return ackResult
 		}
@@ -107,8 +107,8 @@ func (im IBCMiddleware) OnRecvPacket(
 }
 
 func PackageToModuleAccount(packet channeltypes.Packet) (channeltypes.Packet, string) {
-
-	//
+	// Rewrites the packet receiver to the module account address
+	// and returns the original destination receiver for later conversion.
 	var data types.NonFungibleTokenPacketData
 	if err := types.ModuleCdc.UnmarshalJSON(packet.GetData(), &data); err != nil {
 		return channeltypes.Packet{}, ""
@@ -165,6 +165,8 @@ func (im IBCMiddleware) OnAcknowledgementPacket(
 	return im.Module.OnAcknowledgementPacket(ctx, channelVersion, packet, acknowledgement, relayer)
 }
 
+// SendPacket is a no-op stub — the EVM IBC middleware intercepts on the
+// receiving side (OnRecvPacket), not the sending side.
 func (im IBCMiddleware) SendPacket(
 	ctx sdk.Context,
 	sourcePort string,
@@ -174,7 +176,8 @@ func (im IBCMiddleware) SendPacket(
 	return 0, nil
 }
 
-// WriteAcknowledgement implements the ICS4 Wrapper interface
+// WriteAcknowledgement is a no-op stub — acknowledgement writing is
+// handled by the underlying IBC module.
 func (im IBCMiddleware) WriteAcknowledgement(
 	ctx sdk.Context,
 	packet exported.PacketI,
@@ -183,6 +186,8 @@ func (im IBCMiddleware) WriteAcknowledgement(
 	return nil
 }
 
+// GetAppVersion is a no-op stub — version negotiation is not required
+// by this middleware.
 func (im IBCMiddleware) GetAppVersion(
 	ctx sdk.Context,
 	portID,

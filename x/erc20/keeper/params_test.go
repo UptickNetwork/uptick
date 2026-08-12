@@ -1,9 +1,5 @@
 package keeper_test
 
-import (
-	"github.com/UptickNetwork/uptick/x/erc20/types"
-)
-
 func (suite *KeeperTestSuite) TestGetParams() {
 	params := suite.app.Erc20Keeper.GetParams(suite.ctx)
 	suite.Require().True(params.EnableErc20)

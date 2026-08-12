@@ -2,24 +2,12 @@ package keeper_test
 
 import (
 	"github.com/cosmos/cosmos-sdk/types/query"
-	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 
 	"github.com/UptickNetwork/uptick/x/erc20/types"
 )
 
 func (suite *KeeperTestSuite) TestTokenPairs() {
-	coinMeta := banktypes.Metadata{
-		Name:    "test-query",
-		Symbol:  "TQ",
-		Base:    "utestq",
-		Display: "testq",
-		DenomUnits: []*banktypes.DenomUnit{
-			{Denom: "utestq", Exponent: 0},
-			{Denom: "testq", Exponent: 18},
-		},
-	}
-
-	_ = suite.setupRegisterCoin(coinMeta)
+	_, _ = suite.setupRegisterCoin()
 
 	// Query all token pairs
 	res, err := suite.queryClient.TokenPairs(suite.ctx, &types.QueryTokenPairsRequest{
@@ -30,18 +18,7 @@ func (suite *KeeperTestSuite) TestTokenPairs() {
 }
 
 func (suite *KeeperTestSuite) TestTokenPair() {
-	coinMeta := banktypes.Metadata{
-		Name:    "test-pair",
-		Symbol:  "TP",
-		Base:    "utestp",
-		Display: "testp",
-		DenomUnits: []*banktypes.DenomUnit{
-			{Denom: "utestp", Exponent: 0},
-			{Denom: "testp", Exponent: 18},
-		},
-	}
-
-	pair := suite.setupRegisterCoin(coinMeta)
+	_, pair := suite.setupRegisterCoin()
 
 	// Query by denom
 	res, err := suite.queryClient.TokenPair(suite.ctx, &types.QueryTokenPairRequest{

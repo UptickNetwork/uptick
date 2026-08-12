@@ -7,12 +7,14 @@ import (
 	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
 	"math/big"
 
+	"github.com/cosmos/evm/server/config"
+	"github.com/cosmos/evm/x/vm/statedb"
+	evmtypes "github.com/cosmos/evm/x/vm/types"
+	"github.com/ethe
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core"
-	ethtypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/cosmos/evm/server/config"
 	evmtypes "github.com/cosmos/evm/x/vm/types"
 
 	"github.com/UptickNetwork/uptick/contracts"
@@ -135,7 +137,8 @@ func (k Keeper) CallEVMWithData(
 		SkipFromEOACheck: !commit,
 	}
 
-	res, err := k.evmKeeper.ApplyMessage(ctx, nil, msg, evmtypes.NewNoOpTracer(), commit, false, false)
+	stateDB := statedb.New(ctx, k.evmKeeper, statedb.NewEmptyTxConfig())
+	res, err := k.evmKeeper.ApplyMessage(ctx, stateDB, msg, evmtypes.NewNoOpTracer(), commit, false, false)
 	if err != nil {
 		return nil, err
 	}
