@@ -6,25 +6,20 @@ import (
 	"cosmossdk.io/log"
 
 	"github.com/UptickNetwork/uptick/x/erc721/types"
-	ibcnfttransferkeeper "github.com/bianjieai/nft-transfer/keeper"
-	sdk "github.com/cosmos/cosmos-sdk/types"
-
-	cw721keep "github.com/UptickNetwork/uptick/x/cw721/keeper"
 	ibcnfttransfertypes "github.com/bianjieai/nft-transfer/types"
-
-	erc721keeper "github.com/UptickNetwork/uptick/x/erc721/keeper"
+	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
 // Keeper of this module maintains collections of erc721.
 type Keeper struct {
-	ibcKeeper    ibcnfttransferkeeper.Keeper
-	cw721Keeper  cw721keep.Keeper
-	erc721keeper erc721keeper.Keeper
+	ibcKeeper    ICS721Keeper
+	cw721Keeper  CW721Converter
+	erc721keeper ERC721Converter
 }
 
 // NewKeeper creates new instances of the erc721 Keeper
 func NewKeeper(
-	ik ibcnfttransferkeeper.Keeper,
+	ik ICS721Keeper,
 ) Keeper {
 
 	return Keeper{
@@ -38,12 +33,12 @@ func (k Keeper) Logger(ctx sdk.Context) log.Logger {
 }
 
 // SetCw721Keeper sets the CW721 keeper reference.
-func (k *Keeper) SetCw721Keeper(cw721keeper cw721keep.Keeper) {
+func (k *Keeper) SetCw721Keeper(cw721keeper CW721Converter) {
 	k.cw721Keeper = cw721keeper
 }
 
 // SetErc721Keeper sets the ERC721 keeper reference.
-func (k *Keeper) SetErc721Keeper(crc721keeper erc721keeper.Keeper) {
+func (k *Keeper) SetErc721Keeper(crc721keeper ERC721Converter) {
 	k.erc721keeper = crc721keeper
 }
 

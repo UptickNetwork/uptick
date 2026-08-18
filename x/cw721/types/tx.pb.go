@@ -683,10 +683,6 @@ var _Msg_serviceDesc = grpc.ServiceDesc{
 			MethodName: "TransferCW721",
 			Handler:    _Msg_TransferCW721_Handler,
 		},
-		{
-			MethodName: "UpdateParams",
-			Handler:    _Msg_UpdateParams_Handler,
-		},
 	},
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "uptick/cw721/v1/tx.proto",

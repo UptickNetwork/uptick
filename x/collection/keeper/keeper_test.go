@@ -10,7 +10,6 @@ import (
 	rootstore "cosmossdk.io/store"
 	storemetrics "cosmossdk.io/store/metrics"
 	storetypes "cosmossdk.io/store/types"
-	"cosmossdk.io/x/nft"
 	nftkeeper "cosmossdk.io/x/nft/keeper"
 
 	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
@@ -51,11 +50,8 @@ func (s *KeeperTestSuite) SetupTest() {
 	db := dbm.NewMemDB()
 	cms := rootstore.NewCommitMultiStore(db, log.NewNopLogger(), storemetrics.NewNoOpMetrics())
 
-	// Create store service for the nft module store key
-	nftStoreKey := storetypes.NewKVStoreKey(nft.StoreKey)
-	cms.MountStoreWithDB(nftStoreKey, storetypes.StoreTypeIAVL, db)
-
-	// Create collection store key
+	// Collection keeper embeds the cosmos nft keeper on the same store
+	// (see NewKeeper). Mount only the collection key.
 	colStoreKey := storetypes.NewKVStoreKey(types.StoreKey)
 	cms.MountStoreWithDB(colStoreKey, storetypes.StoreTypeIAVL, db)
 

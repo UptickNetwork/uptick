@@ -37,16 +37,16 @@ func TestSetErc721Keeper(t *testing.T) {
 func TestGetVoucherClassID(t *testing.T) {
 	k := NewKeeper(ibcnfttransferkeeper.Keeper{})
 
-	voucherClassID := k.GetVoucherClassID("transfer", "channel-0", "class-1")
+	voucherClassID := k.GetVoucherClassID(nfttransfertypes.PortID, "channel-0", "class-1")
 	require.NotEmpty(t, voucherClassID)
 	require.Contains(t, voucherClassID, "ibc/")
 
 	// Same params produce same result
-	voucherClassID2 := k.GetVoucherClassID("transfer", "channel-0", "class-1")
+	voucherClassID2 := k.GetVoucherClassID(nfttransfertypes.PortID, "channel-0", "class-1")
 	require.Equal(t, voucherClassID, voucherClassID2)
 
 	// Different channel produces different result
-	differentChannel := k.GetVoucherClassID("transfer", "channel-1", "class-1")
+	differentChannel := k.GetVoucherClassID(nfttransfertypes.PortID, "channel-1", "class-1")
 	require.NotEqual(t, voucherClassID, differentChannel)
 }
 
@@ -61,14 +61,14 @@ func TestGetVoucherClassID_Deterministic(t *testing.T) {
 	k1 := NewKeeper(ik)
 	k2 := NewKeeper(ik)
 
-	result1 := k1.GetVoucherClassID("transfer", "channel-0", "class-1")
-	result2 := k2.GetVoucherClassID("transfer", "channel-0", "class-1")
+	result1 := k1.GetVoucherClassID(nfttransfertypes.PortID, "channel-0", "class-1")
+	result2 := k2.GetVoucherClassID(nfttransfertypes.PortID, "channel-0", "class-1")
 	require.Equal(t, result1, result2)
 }
 
 func TestGetRefundClassId(t *testing.T) {
 	k := NewKeeper(ibcnfttransferkeeper.Keeper{})
-	packet := channeltypes.Packet{SourcePort: "nft-transfer", SourceChannel: "channel-0"}
+	packet := channeltypes.Packet{SourcePort: nfttransfertypes.PortID, SourceChannel: "channel-0"}
 
 	t.Run("native class", func(t *testing.T) {
 		got, err := k.getRefundClassId(packet, nfttransfertypes.NonFungibleTokenPacketData{ClassId: "kitty"})
@@ -78,7 +78,7 @@ func TestGetRefundClassId(t *testing.T) {
 
 	t.Run("matching prefix", func(t *testing.T) {
 		got, err := k.getRefundClassId(packet, nfttransfertypes.NonFungibleTokenPacketData{
-			ClassId: "nft-transfer/channel-0/kitty",
+			ClassId: nfttransfertypes.PortID + "/channel-0/kitty",
 		})
 		require.NoError(t, err)
 		require.Contains(t, got, "ibc/")
@@ -86,7 +86,7 @@ func TestGetRefundClassId(t *testing.T) {
 
 	t.Run("prefix mismatch", func(t *testing.T) {
 		_, err := k.getRefundClassId(packet, nfttransfertypes.NonFungibleTokenPacketData{
-			ClassId: "nft-transfer/channel-1/kitty",
+			ClassId: nfttransfertypes.PortID + "/channel-1/kitty",
 		})
 		require.Error(t, err)
 	})

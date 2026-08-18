@@ -1,7 +1,10 @@
 package types
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -35,13 +38,29 @@ func ParseEIP155ChainID(chainID string) (uint64, error) {
 	return id, nil
 }
 
-// ResolveEVMChainID picks the EIP-155 chain id from app.toml when it is a
-// real configured value, otherwise parses it from the Cosmos chain-id.
-func ResolveEVMChainID(appOpts servertypes.AppOptions, cosmosChainID string) uint64 {
-	configured := cast.ToUint64(appOpts.Get(srvflags.EVMChainID))
-	if configured != 0 && configured != evmtypes.DefaultEVMChainID {
-		return configured
+// ChainIDFromGenesisFile reads the Cosmos chain-id from $home/config/genesis.json.
+func ChainIDFromGenesisFile(homePath string) string {
+	if homePath == "" {
+		return ""
 	}
+	bz, err := os.ReadFile(filepath.Join(homePath, "config", "genesis.json"))
+	if err != nil {
+		return ""
+	}
+	var genesis struct {
+		ChainID string `json:"chain_id"`
+	}
+	if err := json.Unmarshal(bz, &genesis); err != nil {
+		return ""
+	}
+	return genesis.ChainID
+}
+
+// ResolveEVMChainID derives the EIP-155 chain id from the Cosmos chain-id
+// ({name}_{eip155}-{revision}). app.toml / --evm.evm-chain-id is only used when
+// no parseable Cosmos chain-id is available. The cosmos/evm default 262144 is
+// treated as unset so NewRootCmd's temporary app does not lock start.
+func ResolveEVMChainID(appOpts servertypes.AppOptions, cosmosChainID string) uint64 {
 	if cosmosChainID == "" {
 		cosmosChainID = cast.ToString(appOpts.Get(flags.FlagChainID))
 	}
@@ -50,8 +69,9 @@ func ResolveEVMChainID(appOpts servertypes.AppOptions, cosmosChainID string) uin
 			return parsed
 		}
 	}
-	if configured == evmtypes.DefaultEVMChainID {
-		return MainnetEVMChainID
+	configured := cast.ToUint64(appOpts.Get(srvflags.EVMChainID))
+	if configured != 0 && configured != evmtypes.DefaultEVMChainID {
+		return configured
 	}
-	return MainnetEVMChainID
+	return evmtypes.DefaultEVMChainID
 }

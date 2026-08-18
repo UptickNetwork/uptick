@@ -759,10 +759,6 @@ var _Msg_serviceDesc = grpc.ServiceDesc{
 			MethodName: "TransferERC721",
 			Handler:    _Msg_TransferERC721_Handler,
 		},
-		{
-			MethodName: "UpdateParams",
-			Handler:    _Msg_UpdateParams_Handler,
-		},
 	},
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "uptick/erc721/v1/tx.proto",

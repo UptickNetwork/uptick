@@ -38,18 +38,11 @@ func ValidateAddress(addr string) error {
 	return nil
 }
 
-// IsValidChainID checks if the chain ID follows the EIP-155 format: <chain>-<id>-<seq>.
+// IsValidChainID reports whether chainID is a Cosmos EIP-155 id of the form
+// {name}_{eip155}-{revision}, e.g. uptick_117-1.
 func IsValidChainID(chainID string) bool {
-	if len(chainID) == 0 {
-		return false
-	}
-	dashCount := 0
-	for _, c := range chainID {
-		if c == '-' {
-			dashCount++
-		}
-	}
-	return dashCount >= 2
+	_, err := ParseEIP155ChainID(chainID)
+	return err == nil
 }
 
 // EthAccount wraps BaseAccount with a CodeHash for EVM compatibility.

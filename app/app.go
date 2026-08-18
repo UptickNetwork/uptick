@@ -21,6 +21,7 @@ import (
 	"cosmossdk.io/core/appmodule"
 	evidencetypes "cosmossdk.io/x/evidence/types"
 	"cosmossdk.io/x/feegrant"
+	cosmosnft "cosmossdk.io/x/nft"
 	ibcnfttransfertypes "github.com/bianjieai/nft-transfer/types"
 	sigtypes "github.com/cosmos/cosmos-sdk/types/tx/signing"
 	authcodec "github.com/cosmos/cosmos-sdk/x/auth/codec"
@@ -182,7 +183,8 @@ var (
 
 		cw721types.ModuleName: nil,
 
-		nfttypes.ModuleName:            nil,
+		cosmosnft.ModuleName:           nil, // cosmossdk.io/x/nft module account required by collection keeper
+		nfttypes.ModuleName:            nil, // x/collection
 		wasmtypes.ModuleName:           {authtypes.Burner},
 		icatypes.ModuleName:            nil,
 		feemarkettypes.ModuleName:      nil,

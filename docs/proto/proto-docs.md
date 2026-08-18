@@ -264,7 +264,7 @@ QueryNFTsOfOwnerResponse is the response type for the Query/Owner RPC method
 
 
 ## QuerySupplyRequest
-QuerySupplyRequest is the request type for the Query/HTLC RPC method
+QuerySupplyRequest is the request type for the Query/Supply RPC method
 
 
 | Field | Type | Label | Description |
@@ -462,7 +462,7 @@ Msg defines the nft Msg service.
 | ----------- | ------------ | ------------- | ------------|
 | IssueDenom | MsgIssueDenom | MsgIssueDenomResponse | IssueDenom defines a method for issue a denom. |
 | MintNFT | MsgMintNFT | MsgMintNFTResponse | MintNFT defines a method for mint a new nft |
-| EditNFT | MsgEditNFT | MsgEditNFTResponse | RefundHTLC defines a method for editing a nft. |
+| EditNFT | MsgEditNFT | MsgEditNFTResponse | EditNFT defines a method for editing a nft. |
 | TransferNFT | MsgTransferNFT | MsgTransferNFTResponse | TransferNFT defines a method for transferring a nft. |
 | BurnNFT | MsgBurnNFT | MsgBurnNFTResponse | BurnNFT defines a method for burning a nft. |
 | TransferDenom | MsgTransferDenom | MsgTransferDenomResponse | TransferDenom defines a method for transferring a denom. |
@@ -694,10 +694,10 @@ nft.
 | ----- | ---- | ----- | ----------- |
 | contract_address | string |  | CW721 token contract address registered in a token pair |
 | token_ids | string | repeated | tokenID to convert |
-| receiver | string |  | bech32 address to receive native Cosmos coins |
+| receiver | string |  | bech32 address to receive native Cosmos NFTs |
 | sender | string |  | sender hex address from the owner of the given CW721 tokens |
-| class_id | string |  | nft classID to cnvert to CW721 |
-| nft_ids | string | repeated | nftID to cnvert to CW721 |
+| class_id | string |  | nft classID to convert to CW721 |
+| nft_ids | string | repeated | nftID to convert to CW721 |
 
 
 
@@ -712,8 +712,8 @@ MsgConvertCW721Response returns no fields
 | token_ids | string | repeated | tokenID to convert |
 | receiver | string |  | bech32 address to receive native Cosmos coins |
 | sender | string |  | sender hex address from the owner of the given CW721 tokens |
-| class_id | string |  | nft classID to cnvert to CW721 |
-| nft_ids | string | repeated | nftID to cnvert to CW721 |
+| class_id | string |  | nft classID to convert to CW721 |
+| nft_ids | string | repeated | nftID to convert to CW721 |
 
 
 
@@ -724,10 +724,10 @@ MsgConvertNFT defines a Msg to convert a native Cosmos nft to a CW721 token
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| class_id | string |  | nft classID to cnvert to CW721 |
-| nft_ids | string | repeated | nftID to cnvert to CW721 |
+| class_id | string |  | nft classID to convert to CW721 |
+| nft_ids | string | repeated | nftID to convert to CW721 |
 | receiver | string |  | recipient hex address to receive CW721 token |
-| sender | string |  | cosmos bech32 address from the owner of the given Cosmos coins |
+| sender | string |  | cosmos bech32 address from the owner of the given Cosmos NFTs |
 | contract_address | string |  | CW721 token contract address registered in a token pair |
 | token_ids | string | repeated | CW721 token id registered in a token pair |
 
@@ -791,78 +791,32 @@ contract that is registered on the token mapping. |
 
 
 
-# uptick/erc20/v1/erc20.proto
-
-
-
-
-## RegisterCoinProposal
-RegisterCoinProposal is a gov Content type to register a token pair
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| title | string |  | title of the proposal |
-| description | string |  | proposal description |
-| metadata | cosmos.bank.v1beta1.Metadata |  | token pair of Cosmos native denom and ERC20 token address |
-
-
-
-
-## RegisterERC20Proposal
-RegisterCoinProposal is a gov Content type to register a token pair
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| title | string |  | title of the proposal |
-| description | string |  | proposal description |
-| erc20address | string |  | contract address of ERC20 token |
-
-
-
-
-## ToggleTokenRelayProposal
-ToggleTokenRelayProposal is a gov Content type to toggle
-the internal relaying of a token pair.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| title | string |  | title of the proposal |
-| description | string |  | proposal description |
-| token | string |  | token identifier can be either the hex contract address of the ERC20 or the
-Cosmos base denomination |
+# uptick/erc721/v1/erc721.proto
 
 
 
 
 ## TokenPair
-TokenPair defines an instance that records pairing consisting of a Cosmos
-native Coin and an ERC20 token address.
+TokenPair defines an instance that records a pairing consisting of a native
+Cosmos Coin and an ERC721 token address.
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| erc20_address | string |  | address of ERC20 contract token |
-| denom | string |  | cosmos base denomination to be mapped to |
-| enabled | bool |  | shows token mapping enable status |
-| contract_owner | Owner |  | ERC20 owner address ENUM (0 invalid, 1 ModuleAccount, 2 external address) |
+| erc721_address | string |  | address of ERC721 contract token |
+| class_id | string |  | cosmos nft class ID to be mapped to |
 
 
 
 
-## UpdateTokenPairERC20Proposal
-UpdateTokenPairERC20Proposal is a gov Content type to update a token pair's
-ERC20 contract address.
+## UIDPair
+defines the unique id of nft asset
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| title | string |  | title of the proposal |
-| description | string |  | proposal description |
-| erc20_address | string |  | contract address of ERC20 token |
-| new_erc20_address | string |  | new address of ERC20 token contract |
+| erc721_did | string |  | address of ERC721 contract token + tokenId |
+| class_did | string |  | cosmos nft class ID to be mapped to + nftId |
 
 
 
@@ -870,13 +824,13 @@ ERC20 contract address.
 
 
 ## Owner
-Owner enumerates the ownership of a ERC20 contract.
+Owner enumerates the ownership of a ERC721 contract.
 
 | Name | Number | Description |
 | ---- | ------ | ----------- |
 | OWNER_UNSPECIFIED | 0 | OWNER_UNSPECIFIED defines an invalid/undefined owner. |
-| OWNER_MODULE | 1 | OWNER_MODULE erc20 is owned by the erc20 module account. |
-| OWNER_EXTERNAL | 2 | EXTERNAL erc20 is owned by an external account. |
+| OWNER_MODULE | 1 | OWNER_MODULE erc721 is owned by the erc721 module account. |
+| OWNER_EXTERNAL | 2 | EXTERNAL erc721 is owned by an external account. |
 
 
 
@@ -886,7 +840,7 @@ Owner enumerates the ownership of a ERC20 contract.
 
 
 
-# uptick/erc20/v1/genesis.proto
+# uptick/erc721/v1/genesis.proto
 
 
 
@@ -904,14 +858,14 @@ GenesisState defines the module's genesis state.
 
 
 ## Params
-Params defines the erc20 module params
+Params defines the erc721 module params
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| enable_erc20 | bool |  | parameter to enable the intrarelaying of Cosmos coins <--> ERC20 tokens. |
-| enable_evm_hook | bool |  | parameter to enable the EVM hook to convert an ERC20 token to a Cosmos
-Coin by transferring the Tokens through a MsgEthereumTx to the
+| enable_erc721 | bool |  | parameter to enable the conversion of Cosmos nft <--> ERC721 tokens. |
+| enable_evm_hook | bool |  | parameter to enable the EVM hook that converts an ERC721 token to a Cosmos
+NFT by transferring the Tokens through a MsgEthereumTx to the
 ModuleAddress Ethereum address. |
 
 
@@ -925,7 +879,33 @@ ModuleAddress Ethereum address. |
 
 
 
-# uptick/erc20/v1/query.proto
+# uptick/erc721/v1/query.proto
+
+
+
+
+## QueryEvmAddressRequest
+QueryTokenPairRequest is the request type for the Query/TokenPair RPC method.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| port | string |  | token identifier can be either the hex contract address of the ERC721 or
+the Cosmos nft classID |
+| channel | string |  |  |
+| class_id | string |  |  |
+
+
+
+
+## QueryEvmAddressResponse
+QueryEvmAddressResponse is the response type for the Query/Params RPC
+method.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| token_pair | TokenPair |  |  |
 
 
 
@@ -954,8 +934,8 @@ QueryTokenPairRequest is the request type for the Query/TokenPair RPC method.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| token | string |  | token identifier can be either the hex contract address of the ERC20 or the
-Cosmos base denomination |
+| token | string |  | token identifier can be either the hex contract address of the ERC721 or
+the Cosmos nft classID |
 
 
 
@@ -1004,87 +984,103 @@ method.
 
 
 ## Query
-Query defines the gRPC querier service.
+Query defines the gRPC queried service.
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
-| TokenPairs | QueryTokenPairsRequest | QueryTokenPairsResponse | Retrieves registered token pairs |
-| TokenPair | QueryTokenPairRequest | QueryTokenPairResponse | Retrieves a registered token pair |
-| Params | QueryParamsRequest | QueryParamsResponse | Params retrieves the erc20 module params |
+| TokenPairs | QueryTokenPairsRequest | QueryTokenPairsResponse | TokenPairs retrieves registered token pairs |
+| TokenPair | QueryTokenPairRequest | QueryTokenPairResponse | TokenPair retrieves a registered token pair |
+| EvmContract | QueryEvmAddressRequest | QueryEvmAddressResponse | EvmContract retrieves a registered evm contract |
+| Params | QueryParamsRequest | QueryParamsResponse | Params retrieves the erc721 module params |
 
 
 
 
-# uptick/erc20/v1/tx.proto
+# uptick/erc721/v1/tx.proto
 
 
 
 
-## MsgConvertCoin
-MsgConvertCoin defines a Msg to convert a Cosmos Coin to a ERC20 token
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| coin | cosmos.base.v1beta1.Coin |  | Cosmos coin which denomination is registered on erc20 bridge.
-The coin amount defines the total ERC20 tokens to convert. |
-| receiver | string |  | recipient hex address to receive ERC20 token |
-| sender | string |  | cosmos bech32 address from the owner of the given ERC20 tokens |
-
-
-
-
-## MsgConvertCoinResponse
-MsgConvertCoinResponse returns no fields
-
-
-
-
-## MsgConvertERC20
-MsgConvertERC20 defines a Msg to convert an ERC20 token to a Cosmos SDK coin.
+## MsgConvertERC721
+MsgConvertERC721 defines a Msg to convert a ERC721 token to a native Cosmos
+nft.
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| contract_address | string |  | ERC20 token contract address registered on erc20 bridge |
-| amount | string |  | amount of ERC20 tokens to mint |
-| receiver | string |  | bech32 address to receive SDK coins. |
-| sender | string |  | sender hex address from the owner of the given ERC20 tokens |
+| evm_contract_address | string |  | ERC721 token contract address registered in a token pair |
+| evm_token_ids | string | repeated | tokenID to convert |
+| cosmos_receiver | string |  | bech32 address to receive native Cosmos coins |
+| cosmos_sender | string |  | sender bech32 address from the owner of the given ERC721 tokens |
+| class_id | string |  | nft classID to cnvert to ERC721 |
+| cosmos_token_ids | string | repeated | nftID to cnvert to ERC721 |
 
 
 
 
-## MsgConvertERC20Response
-MsgConvertERC20Response returns no fields
-
-
-
-
-## MsgTransferERC20
-MsgTransferERC20 defines a message to transfer ERC20 tokens between chains via IBC
-It contains information about the token contract, amount, source and destination of the transfer,
-timeout parameters and optional memo
+## MsgConvertERC721Response
+MsgConvertERC721Response returns no fields
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| evm_contract_address | string |  |  |
-| amount | string |  | tokenID to convert |
+| evm_contract_address | string |  | ERC721 token contract address registered in a token pair |
+| evm_token_ids | string | repeated | tokenID to convert |
+| cosmos_receiver | string |  | bech32 address to receive native Cosmos coins |
+| evm_sender | string |  | sender hex address from the owner of the given ERC721 tokens |
+| class_id | string |  | nft classID to cnvert to ERC721 |
+| cosmos_token_ids | string | repeated | nftID to cnvert to ERC721 |
+
+
+
+
+## MsgConvertNFT
+MsgConvertNFT defines a Msg to convert a native Cosmos nft to a ERC721 token
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| class_id | string |  | nft classID to cnvert to ERC721 |
+| cosmos_token_ids | string | repeated | nftID to cnvert to ERC721 |
+| evm_receiver | string |  | recipient hex address to receive ERC721 token |
+| cosmos_sender | string |  | cosmos bech32 address from the owner of the given Cosmos coins |
+| evm_contract_address | string |  | ERC721 token contract address registered in a token pair |
+| evm_token_ids | string | repeated | ERC721 token id registered in a token pair |
+
+
+
+
+## MsgConvertNFTResponse
+MsgConvertNFTResponse returns no fields
+
+
+
+
+## MsgTransferERC721
+MsgTransferERC721 defines a message for transferring erc721 tokens through IBC
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| evm_contract_address | string |  | evm_contract_address is the ERC721 token contract address |
+| evm_token_ids | string | repeated | tokenID to convert |
 | source_port | string |  | the port on which the packet will be sent |
 | source_channel | string |  | the channel by which the packet will be sent |
+| class_id | string |  | the class_id of tokens to be transferred |
+| cosmos_token_ids | string | repeated | the non fungible tokens to be transferred |
 | cosmos_sender | string |  | the sender address |
 | cosmos_receiver | string |  | the recipient address on the destination chain |
-| timeout_height | ibc.core.client.v1.Height |  | Timeout height relative to the current block height.
-The timeout is disabled when set to 0. |
-| timeout_timestamp | uint64 |  | Timeout timestamp in absolute nanoseconds since unix epoch.
-The timeout is disabled when set to 0. |
-| memo | string |  | optional memo |
+| timeout_height | ibc.core.client.v1.Height |  | timeout_height is the timeout height relative to the current block height
+The timeout is disabled when set to 0 |
+| timeout_timestamp | uint64 |  | timeout_timestamp is the timeout timestamp in absolute nanoseconds since unix epoch
+The timeout is disabled when set to 0 |
+| memo | string |  | memo is an optional memo field |
 
 
 
 
-## MsgTransferERC20Response
-MsgTransferERC20Response defines the response type for TransferERC20 RPC
+## MsgTransferERC721Response
+MsgTransferERC721Response defines the response type for Transfer erc721 RPC
 
 
 
@@ -1096,15 +1092,15 @@ MsgTransferERC20Response defines the response type for TransferERC20 RPC
 
 
 ## Msg
-Msg defines the erc20 Msg service.
+Msg defines the erc721 Msg service.
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
-| ConvertCoin | MsgConvertCoin | MsgConvertCoinResponse | ConvertCoin mints a ERC20 representation of the SDK Coin denom that is
-registered on the token mapping. |
-| ConvertERC20 | MsgConvertERC20 | MsgConvertERC20Response | ConvertERC20 mints a Cosmos coin representation of the ERC20 token contract
+| ConvertNFT | MsgConvertNFT | MsgConvertNFTResponse | ConvertNFT mints a ERC721 representation of the native Cosmos nft
 that is registered on the token mapping. |
-| TransferERC20 | MsgTransferERC20 | MsgTransferERC20Response | TransferERC20 defines a method to transfer ERC20 tokens between chains via IBC |
+| ConvertERC721 | MsgConvertERC721 | MsgConvertERC721Response | ConvertERC721 mints a native Cosmos coin representation of the ERC721 token
+contract that is registered on the token mapping. |
+| TransferERC721 | MsgTransferERC721 | MsgTransferERC721Response | TransferERC721 transfers a erc721 token from one chain to another chain through IBC |
 
 
 
@@ -1468,7 +1464,7 @@ QueryNFTResponse is the response type for the Query/NFT RPC method
 
 
 ## QueryNFTsRequest
-QueryNFTstRequest is the request type for the Query/NFTs RPC method
+QueryNFTsRequest is the request type for the Query/NFTs RPC method
 
 
 | Field | Type | Label | Description |

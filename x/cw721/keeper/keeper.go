@@ -11,8 +11,6 @@ import (
 
 	collectionkeeper "github.com/UptickNetwork/uptick/x/collection/keeper"
 	"github.com/UptickNetwork/uptick/x/cw721/types"
-
-	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
 )
 
 var _ types.MsgServer = &Keeper{}
@@ -23,7 +21,7 @@ type Keeper struct {
 	cdc               codec.BinaryCodec
 	accountKeeper     types.AccountKeeper
 	nftKeeper         collectionkeeper.Keeper
-	wasmKeeper        wasmkeeper.Keeper
+	wasmKeeper        types.WasmKeeper
 	ibcTransferKeeper types.IBCNFTTransferKeeper
 }
 
@@ -33,7 +31,7 @@ func NewKeeper(
 	cdc codec.BinaryCodec,
 	accountKeeper types.AccountKeeper,
 	nftKeeper collectionkeeper.Keeper,
-	wasmKeeper wasmkeeper.Keeper,
+	wasmKeeper types.WasmKeeper,
 	ibcTransferKeeper types.IBCNFTTransferKeeper,
 ) Keeper {
 	return Keeper{
@@ -61,8 +59,8 @@ func (k Keeper) GetNFTKeeper() collectionkeeper.Keeper {
 	return k.nftKeeper
 }
 
-// GetWasmKeeper returns the cosmwasm keeper
-func (k Keeper) GetWasmKeeper() wasmkeeper.Keeper {
+// GetWasmKeeper returns the CosmWasm surface used by this module.
+func (k Keeper) GetWasmKeeper() types.WasmKeeper {
 	return k.wasmKeeper
 }
 

@@ -181,7 +181,6 @@ func (k Keeper) QueryERC721Token(
 	var (
 		nameRes   types.ERC721TokenStringResponse
 		symbolRes types.ERC721TokenStringResponse
-		uriRes    types.ERC721TokenStringResponse
 	)
 
 	erc721 := contracts.ERC721UpticksContract.ABI
@@ -210,13 +209,9 @@ func (k Keeper) QueryERC721Token(
 		)
 	}
 
-	if err := erc721.UnpackIntoInterface(&symbolRes, "symbol", res.Ret); err != nil {
-		return types.ERC721TokenData{}, sdkerrors.Wrapf(
-			types.ErrABIUnpack, "failed to unpack uri: %s", err.Error(),
-		)
-	}
-
-	return types.NewERC721TokenData(nameRes.Value, symbolRes.Value, uriRes.Value), nil
+	// tokenURI requires a tokenId; this helper is a contract probe and does not
+	// take one, so URI is left empty.
+	return types.NewERC721TokenData(nameRes.Value, symbolRes.Value, ""), nil
 }
 
 // QueryERC721TokenOwner returns the owner of given tokenID

@@ -8,7 +8,6 @@ import (
 	"sync"
 
 	sdkerrors "cosmossdk.io/errors"
-	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
 	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
@@ -168,9 +167,7 @@ func (k Keeper) StoreWasmContract(
 		return 0, err
 	}
 
-	// wasmkeeper.NewDefaultPermissionKeeper()
-	wasmMsgServer := wasmkeeper.NewMsgServerImpl(&k.wasmKeeper)
-	res, err := wasmMsgServer.StoreCode(sdk.WrapSDKContext(ctx), &wasmtypes.MsgStoreCode{
+	res, err := k.wasmKeeper.StoreCode(ctx, &wasmtypes.MsgStoreCode{
 		Sender:       creator,
 		WASMByteCode: bin,
 	})
@@ -256,13 +253,12 @@ func (k Keeper) InstantiateWasmContract(
 	if err != nil {
 		return "", err
 	}
-	wasmMsgServer := wasmkeeper.NewMsgServerImpl(&k.wasmKeeper)
 	initMsg := wasmtypes.MsgInstantiateContract{
 		Sender: senderAddr, Admin: senderAddr, CodeID: codeId,
 		Label: label, Msg: wasmtypes.RawContractMessage(instantiateInfoJsonStr),
 		Funds: sdk.NewCoins(),
 	}
-	res, err := wasmMsgServer.InstantiateContract(sdk.WrapSDKContext(ctx), &initMsg)
+	res, err := k.wasmKeeper.InstantiateContract(ctx, &initMsg)
 	if err != nil {
 		return "", err
 	}
@@ -361,8 +357,7 @@ func (k Keeper) ExecWasmMsg(
 		return nil, sdkerrors.Wrapf(types.ErrABIPack, "nft class is invalid %s: %s", execMsg.Msg, err.Error())
 	}
 
-	wasmMsgServer := wasmkeeper.NewMsgServerImpl(&k.wasmKeeper)
-	return wasmMsgServer.ExecuteContract(sdk.WrapSDKContext(ctx), execMsg)
+	return k.wasmKeeper.ExecuteContract(ctx, execMsg)
 }
 
 // QueryWasmState for query (rsp *types.QuerySmartContractStateResponse, err error)
@@ -371,7 +366,7 @@ func (k Keeper) ExecWasmMsg(
 func (k Keeper) QueryWasmState(
 	ctx sdk.Context,
 	req *wasmtypes.QuerySmartContractStateRequest) (*wasmtypes.QuerySmartContractStateResponse, error) {
-	return wasmkeeper.Querier(&k.wasmKeeper).SmartContractState(ctx, req)
+	return k.wasmKeeper.SmartContractState(ctx, req)
 
 }
 

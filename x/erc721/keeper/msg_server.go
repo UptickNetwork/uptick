@@ -61,7 +61,10 @@ func (k Keeper) TransferERC721(
 	if err != nil {
 		return nil, sdkerrors.Wrap(err, "failed to ibc Transfer")
 	}
-	bech32Address, _ := sdk.AccAddressFromBech32(msg.CosmosSender)
+	bech32Address, err := sdk.AccAddressFromBech32(msg.CosmosSender)
+	if err != nil {
+		return nil, sdkerrors.Wrapf(errortypes.ErrInvalidAddress, "invalid cosmos sender: %s", err)
+	}
 	sender := common.BytesToAddress(bech32Address.Bytes())
 	// Record against ConvertERC721 results, not the original msg. CosmosTokenIds
 	// on the request is often empty; refund lookup uses the packet cosmos ids
@@ -99,9 +102,10 @@ func (k Keeper) ConvertERC721(
 	msg.ClassId = classId
 	msg.CosmosTokenIds = nftIds
 
-	// Error checked during msg validation
-	//sender := common.HexToAddress(msg.EvmSender)
-	bech32Address, _ := sdk.AccAddressFromBech32(msg.CosmosSender)
+	bech32Address, err := sdk.AccAddressFromBech32(msg.CosmosSender)
+	if err != nil {
+		return nil, sdkerrors.Wrapf(errortypes.ErrInvalidAddress, "invalid cosmos sender: %s", err)
+	}
 	sender := common.BytesToAddress(bech32Address.Bytes())
 
 	id := k.GetTokenPairID(ctx, msg.EvmContractAddress)
@@ -118,9 +122,16 @@ func (k Keeper) ConvertERC721(
 		return nil, sdkerrors.Wrap(err, "failed to GetPair")
 	}
 
-	// Remove token pair if contract is suicided
 	erc721 := common.HexToAddress(pair.Erc721Address)
 	acc := k.evmKeeper.GetAccountWithoutBalance(ctx, erc721)
+	if acc == nil || len(acc.CodeHash) == 0 {
+		k.DeleteTokenPair(ctx, pair)
+		k.Logger(ctx).Debug(
+			"deleting self destructed token pair from state",
+			"contract", pair.Erc721Address,
+		)
+		return nil, sdkerrors.Wrapf(types.ErrInternalTokenPair, "erc721 contract %s is self-destructed", pair.Erc721Address)
+	}
 
 	bigTokenId := new(big.Int)
 	_, err = fmt.Sscan(msg.EvmTokenIds[0], bigTokenId)
@@ -136,22 +147,15 @@ func (k Keeper) ConvertERC721(
 		return nil, sdkerrors.Wrapf(errortypes.ErrUnauthorized, "%s is not the owner of erc721 token %s", sender, strings.Join(msg.EvmTokenIds, ","))
 	}
 
-	if acc == nil || len(acc.CodeHash) == 0 {
-
-		k.DeleteTokenPair(ctx, pair)
-		k.Logger(ctx).Debug(
-			"deleting self destructed token pair from state",
-			"contract", pair.Erc721Address,
-		)
-		return nil, sdkerrors.Wrapf(types.ErrInternalTokenPair, "erc721 contract %s is self-destructed", pair.Erc721Address)
-	}
-
 	msgconverterc721, err := k.convertEvm2Cosmos(ctx, pair, msg, sender)
 	if err != nil {
 		return nil, sdkerrors.Wrap(err, "failed to convert EVM to cosmos")
 	}
 
-	convertAddress, _ := sdk.AccAddressFromBech32(msgconverterc721.CosmosSender)
+	convertAddress, err := sdk.AccAddressFromBech32(msgconverterc721.CosmosSender)
+	if err != nil {
+		return nil, sdkerrors.Wrapf(errortypes.ErrInvalidAddress, "invalid cosmos sender: %s", err)
+	}
 	evmSender := common.BytesToAddress(convertAddress.Bytes())
 
 	return &types.MsgConvertERC721Response{

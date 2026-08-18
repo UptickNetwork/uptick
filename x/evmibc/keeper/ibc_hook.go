@@ -78,6 +78,10 @@ func (k Keeper) OnRecvPacket(
 		err = k.ConvertNFTFromErc721(context, voucherClassID, data.TokenIds, receiver)
 	} else if convertType == 1 {
 		err = k.ConvertNFTFromCw721(context, voucherClassID, data.TokenIds, receiver)
+	} else {
+		return channeltypes.NewErrorAcknowledgement(
+			sdkerrors.Wrapf(errortypes.ErrInvalidRequest, "unknown convert type %d", convertType),
+		)
 	}
 	if err != nil {
 		msg = err.Error()

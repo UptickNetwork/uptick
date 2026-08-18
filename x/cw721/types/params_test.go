@@ -3,7 +3,6 @@ package types
 import (
 	"testing"
 
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -37,6 +36,15 @@ func TestParamsValidate_Valid(t *testing.T) {
 				EnableEVMHook: false,
 			},
 		},
+		{
+			// Convert paths only check EnableCw721; hook-on / module-off is a
+			// valid params combination used to disable conversion.
+			name: "only evm hook enabled",
+			params: Params{
+				EnableCw721:   false,
+				EnableEVMHook: true,
+			},
+		},
 	}
 
 	for _, tc := range tests {
@@ -45,16 +53,6 @@ func TestParamsValidate_Valid(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
-}
-
-func TestParamsValidate_Invalid(t *testing.T) {
-	// EVMHook enabled but Cw721 disabled is not allowed
-	params := Params{
-		EnableCw721:   false,
-		EnableEVMHook: true,
-	}
-	err := params.Validate()
-	require.NoError(t, err) // Validate() currently returns nil for all cases
 }
 
 func TestDefaultParams(t *testing.T) {
@@ -102,9 +100,4 @@ func TestParamSetPairs(t *testing.T) {
 	// Verify expected default values
 	require.True(t, params.EnableCw721)
 	require.True(t, params.EnableEVMHook)
-}
-
-// Test that sdk is importable for building contexts
-func TestParamsValidationContext(t *testing.T) {
-	_ = sdk.Context{}
 }

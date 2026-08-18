@@ -38,7 +38,7 @@ genesis:
     staking:
       params:
         bond_denom: auptick
-  chain_id: uptick_7777-1
+  chain_id: uptick_1170-1
 validators:
 - name: alice
   bonded: 100000000000000000000auptick

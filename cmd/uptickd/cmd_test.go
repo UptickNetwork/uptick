@@ -14,12 +14,18 @@ import (
 
 func TestInitCmd(t *testing.T) {
 	rootCmd := uptickd.NewRootCmd()
+	names := make([]string, 0, len(rootCmd.Commands()))
+	for _, c := range rootCmd.Commands() {
+		names = append(names, c.Name())
+	}
+	require.Contains(t, names, "testnet")
+
 	homeDir := t.TempDir()
 	rootCmd.SetArgs([]string{
 		"init",        // Test the init cmd
 		"uptick-test", // Moniker
 		fmt.Sprintf("--%s=%s", cli.FlagOverwrite, "true"), // Overwrite genesis.json, in case it already exists
-		fmt.Sprintf("--%s=%s", flags.FlagChainID, "uptick_7777-1"),
+		fmt.Sprintf("--%s=%s", flags.FlagChainID, "uptick_1170-1"),
 		fmt.Sprintf("--%s=%s", flags.FlagHome, homeDir),
 	})
 

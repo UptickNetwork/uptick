@@ -13,6 +13,7 @@ import (
 
 	"github.com/UptickNetwork/uptick/app"
 	cmdcfg "github.com/UptickNetwork/uptick/cmd/config"
+	upticktypes "github.com/UptickNetwork/uptick/types"
 	cfg "github.com/cometbft/cometbft/config"
 	"github.com/cometbft/cometbft/libs/cli"
 	"github.com/cosmos/cosmos-sdk/client"
@@ -163,6 +164,12 @@ func InitCmd(mbm module.BasicManager, defaultNodeHome string) *cobra.Command {
 
 			if err := genutil.ExportGenesisFile(appGenesis, genFile); err != nil {
 				return errors.Wrap(err, "Failed to export genesis file")
+			}
+
+			if evmID, err := upticktypes.ParseEIP155ChainID(chainID); err == nil {
+				if err := writeAppTomlEVMChainID(clientCtx.HomeDir, evmID); err != nil {
+					return errors.Wrap(err, "failed to write evm-chain-id")
+				}
 			}
 
 			toPrint := newPrintInfo(config.Moniker, chainID, nodeID, "", appState)

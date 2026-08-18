@@ -374,7 +374,15 @@ func New(
 	// cosmos/evm v0.6.1: Create EVM Keeper first with an ERC20 proxy that is
 	// filled in after the ERC20 keeper exists (there is no SetErc20Keeper).
 	erc20Proxy := &erc20KeeperProxy{}
-	evmChainID := upticktypes.ResolveEVMChainID(appOpts, cast.ToString(appOpts.Get(flags.FlagChainID)))
+	// Genesis is the source of truth for a started node. appOpts chain-id can
+	// still be leftover client.toml (e.g. ~/.uptickd chain-id=testnet) and must
+	// not override {name}_{eip155}-{revision} from this home's genesis.
+	cosmosChainID := upticktypes.ChainIDFromGenesisFile(homePath)
+	if cosmosChainID == "" {
+		cosmosChainID = cast.ToString(appOpts.Get(flags.FlagChainID))
+	}
+	evmChainID := upticktypes.ResolveEVMChainID(appOpts, cosmosChainID)
+	logger.Info("evm chain id", "cosmos_chain_id", cosmosChainID, "evm_chain_id", evmChainID, "home", homePath)
 
 	appKeepers.EvmKeeper = evmkeeper.NewKeeper(
 		appCodec,
@@ -491,7 +499,7 @@ func New(
 		appCodec,
 		appKeepers.AccountKeeper,
 		appKeepers.NFTKeeper,
-		appKeepers.WasmKeeper,
+		cw721keeper.WrapWasmKeeper(&appKeepers.WasmKeeper),
 		appKeepers.IBCNFTTransferKeeper,
 	)
 

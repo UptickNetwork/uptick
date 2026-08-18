@@ -1,6 +1,3 @@
-//go:build ignore
-// +build ignore
-
 package network
 
 import (
@@ -29,10 +26,12 @@ import (
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
 	govv1 "github.com/cosmos/cosmos-sdk/x/gov/types/v1"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
-	"github.com/cosmos/evm/server"
+	evmmempool "github.com/cosmos/evm/mempool"
+	evmserver "github.com/cosmos/evm/server"
 	evmtypes "github.com/cosmos/evm/x/vm/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"golang.org/x/sync/errgroup"
+	"google.golang.org/grpc"
 	"path/filepath"
 )
 
@@ -87,8 +86,6 @@ func startInProcess(cfg Config, val *Validator) error {
 
 		// Add the tx service in the gRPC router.
 		app.RegisterTxService(val.ClientCtx)
-
-		// Add the tendermint queries service in the gRPC router.
 		app.RegisterTendermintService(val.ClientCtx)
 		app.RegisterNodeService(val.ClientCtx, val.AppConfig.Config)
 	}
@@ -96,6 +93,22 @@ func startInProcess(cfg Config, val *Validator) error {
 	ctx := context.Background()
 	ctx, val.cancelFn = context.WithCancel(ctx)
 	val.errGroup, ctx = errgroup.WithContext(ctx)
+
+	if val.AppConfig.GRPC.Enable {
+		grpcLogger := logger.With(log.ModuleKey, "grpc-server")
+		var grpcSrv *grpc.Server
+		grpcSrv, val.ClientCtx, err = servergrpc.NewGRPCServerAndContext(val.ClientCtx, app, val.AppConfig.GRPC, grpcLogger)
+		if err != nil {
+			return err
+		}
+
+		val.errGroup.Go(func() error {
+			return servergrpc.StartGRPCServer(ctx, grpcLogger, val.AppConfig.GRPC, grpcSrv)
+		})
+
+		val.grpc = grpcSrv
+	}
+
 	if val.AppConfig.API.Enable && val.APIAddress != "" {
 		apiSrv := api.New(val.ClientCtx, logger.With("module", "api-server"), val.grpc)
 		app.RegisterAPIRoutes(apiSrv, val.AppConfig.API)
@@ -107,40 +120,31 @@ func startInProcess(cfg Config, val *Validator) error {
 		val.api = apiSrv
 	}
 
-	if val.AppConfig.GRPC.Enable {
-		grpcSrv, err := servergrpc.NewGRPCServer(val.ClientCtx, app, val.AppConfig.GRPC)
-		if err != nil {
-			return err
-		}
-
-		// Start the gRPC server in a goroutine. Note, the provided ctx will ensure
-		// that the server is gracefully shut down.
-		val.errGroup.Go(func() error {
-			return servergrpc.StartGRPCServer(ctx, logger.With(log.ModuleKey, "grpc-server"), val.AppConfig.GRPC, grpcSrv)
-		})
-
-		val.grpc = grpcSrv
-	}
-
 	if val.AppConfig.JSONRPC.Enable && val.AppConfig.JSONRPC.Address != "" {
 		if val.Ctx == nil || val.Ctx.Viper == nil {
 			return fmt.Errorf("validator %s context is nil", val.Moniker)
 		}
 
-		tmEndpoint := "/websocket"
-		tmRPCAddr := fmt.Sprintf("tcp://%s", val.AppConfig.GRPC.Address)
-
-		//val.jsonrpc, val.jsonrpcDone, err = server.StartJSONRPC(val.Ctx, val.ClientCtx, tmRPCAddr, tmEndpoint, *val.AppConfig)
-		val.jsonrpc, val.jsonrpcDone, err = server.StartJSONRPC(val.Ctx, val.ClientCtx, tmRPCAddr, tmEndpoint, val.AppConfig, nil)
-		if err != nil {
-			return err
+		evmApp, ok := val.app.(evmserver.Application)
+		if !ok {
+			return fmt.Errorf("application does not implement cosmos/evm server.Application")
 		}
 
-		address := fmt.Sprintf("http://%s", val.AppConfig.JSONRPC.Address)
+		mempool, _ := evmApp.GetMempool().(*evmmempool.ExperimentalEVMMempool)
+		if mempool == nil {
+			logger.Info("skipping JSON-RPC server: EVM mempool is not configured")
+		} else {
+			jsonrpcSrv, err := evmserver.StartJSONRPC(ctx, val.Ctx, val.ClientCtx, val.errGroup, val.AppConfig, nil, evmApp, mempool)
+			if err != nil {
+				return err
+			}
+			val.jsonrpc = jsonrpcSrv
 
-		val.JSONRPCClient, err = ethclient.Dial(address)
-		if err != nil {
-			return fmt.Errorf("failed to dial JSON-RPC at %s: %w", val.AppConfig.JSONRPC.Address, err)
+			address := fmt.Sprintf("http://%s", val.AppConfig.JSONRPC.Address)
+			val.JSONRPCClient, err = ethclient.Dial(address)
+			if err != nil {
+				return fmt.Errorf("failed to dial JSON-RPC at %s: %w", val.AppConfig.JSONRPC.Address, err)
+			}
 		}
 	}
 
@@ -196,7 +200,8 @@ func initGenFiles(cfg Config, genAccounts []authtypes.GenesisAccount, genBalance
 
 	// set the balances in the genesis state
 	var bankGenState banktypes.GenesisState
-	bankGenState.Balances = genBalances
+	cfg.Codec.MustUnmarshalJSON(cfg.GenesisState[banktypes.ModuleName], &bankGenState)
+	bankGenState.Balances = append(bankGenState.Balances, genBalances...)
 	cfg.GenesisState[banktypes.ModuleName] = cfg.Codec.MustMarshalJSON(&bankGenState)
 
 	var stakingGenState stakingtypes.GenesisState
@@ -220,6 +225,8 @@ func initGenFiles(cfg Config, genAccounts []authtypes.GenesisAccount, genBalance
 
 	var evmGenState evmtypes.GenesisState
 	cfg.Codec.MustUnmarshalJSON(cfg.GenesisState[evmtypes.ModuleName], &evmGenState)
+	evmGenState.Params.EvmDenom = cfg.BondDenom
+	cfg.GenesisState[evmtypes.ModuleName] = cfg.Codec.MustMarshalJSON(&evmGenState)
 
 	appGenStateJSON, err := json.MarshalIndent(cfg.GenesisState, "", "  ")
 	if err != nil {

@@ -103,7 +103,11 @@ func NewRootCmd() *cobra.Command {
 			customAppTemplate, customAppConfig := initAppConfig()
 			customTMConfig := initTendermintConfig()
 
-			return server.InterceptConfigsPreRunHandler(cmd, customAppTemplate, customAppConfig, customTMConfig)
+			if err := server.InterceptConfigsPreRunHandler(cmd, customAppTemplate, customAppConfig, customTMConfig); err != nil {
+				return err
+			}
+			applyEVMChainID(cmd)
+			return nil
 		},
 		SilenceUsage: true,
 	}
@@ -121,7 +125,7 @@ func NewRootCmd() *cobra.Command {
 		genutilcli.ValidateGenesisCmd(tempApplication.BasicManager()),
 		AddGenesisAccountCmd(app.DefaultNodeHome),
 		tmcli.NewCompletionCmd(rootCmd, true),
-		// NewTestnetCmd excluded (testnet.go build-constrained)
+		NewTestnetCmd(tempApplication.BasicManager(), banktypes.GenesisBalancesIterator{}),
 		AddIbcCaclulateCommand(debug.Cmd()),
 		debug.Cmd(),
 		confixcmd.ConfigCommand(),

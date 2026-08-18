@@ -10,6 +10,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	ibcnfttransferkeeper "github.com/bianjieai/nft-transfer/keeper"
+	ibcnfttransfertypes "github.com/bianjieai/nft-transfer/types"
 	clienttypes "github.com/cosmos/ibc-go/v10/modules/core/02-client/types"
 	ibcexported "github.com/cosmos/ibc-go/v10/modules/core/exported"
 	"github.com/stretchr/testify/require"
@@ -65,7 +66,7 @@ func TestSetICS4Wrapper_PanicsIfAlreadySet(t *testing.T) {
 func TestGetVoucherClassID_ValidInput(t *testing.T) {
 	k := setupBasicKeeper(t)
 
-	voucherClassID := k.GetVoucherClassID("transfer", "channel-0", "class-1")
+	voucherClassID := k.GetVoucherClassID(ibcnfttransfertypes.PortID, "channel-0", "class-1")
 	require.NotEmpty(t, voucherClassID)
 	require.Contains(t, voucherClassID, "ibc/")
 }
@@ -73,39 +74,39 @@ func TestGetVoucherClassID_ValidInput(t *testing.T) {
 func TestGetVoucherClassID_Deterministic(t *testing.T) {
 	k := setupBasicKeeper(t)
 
-	result1 := k.GetVoucherClassID("transfer", "channel-0", "class-1")
-	result2 := k.GetVoucherClassID("transfer", "channel-0", "class-1")
+	result1 := k.GetVoucherClassID(ibcnfttransfertypes.PortID, "channel-0", "class-1")
+	result2 := k.GetVoucherClassID(ibcnfttransfertypes.PortID, "channel-0", "class-1")
 	require.Equal(t, result1, result2)
 }
 
 func TestGetVoucherClassID_DifferentChannels(t *testing.T) {
 	k := setupBasicKeeper(t)
 
-	a := k.GetVoucherClassID("transfer", "channel-0", "class-1")
-	b := k.GetVoucherClassID("transfer", "channel-1", "class-1")
+	a := k.GetVoucherClassID(ibcnfttransfertypes.PortID, "channel-0", "class-1")
+	b := k.GetVoucherClassID(ibcnfttransfertypes.PortID, "channel-1", "class-1")
 	require.NotEqual(t, a, b)
 }
 
 func TestGetVoucherClassID_DifferentPorts(t *testing.T) {
 	k := setupBasicKeeper(t)
 
-	a := k.GetVoucherClassID("transfer", "channel-0", "class-1")
-	b := k.GetVoucherClassID("ics721-1", "channel-0", "class-1")
+	a := k.GetVoucherClassID(ibcnfttransfertypes.PortID, "channel-0", "class-1")
+	b := k.GetVoucherClassID("transfer", "channel-0", "class-1")
 	require.NotEqual(t, a, b)
 }
 
 func TestGetVoucherClassID_DifferentClassIDs(t *testing.T) {
 	k := setupBasicKeeper(t)
 
-	a := k.GetVoucherClassID("transfer", "channel-0", "class-1")
-	b := k.GetVoucherClassID("transfer", "channel-0", "class-2")
+	a := k.GetVoucherClassID(ibcnfttransfertypes.PortID, "channel-0", "class-1")
+	b := k.GetVoucherClassID(ibcnfttransfertypes.PortID, "channel-0", "class-2")
 	require.NotEqual(t, a, b)
 }
 
 func TestGetVoucherClassID_EmptyChannel(t *testing.T) {
 	k := setupBasicKeeper(t)
 
-	result := k.GetVoucherClassID("transfer", "", "class-empty")
+	result := k.GetVoucherClassID(ibcnfttransfertypes.PortID, "", "class-empty")
 	require.NotEmpty(t, result)
 }
 
