@@ -162,7 +162,7 @@ func (k Keeper) QueryERC721DataByTokenID(
 
 	//uptick bug fix: 11/07 get from tokenUri
 	erc721 := contracts.ERC721UpticksContract.ABI
-	res, err := k.CallEVM(ctx, erc721, types.ModuleAddress, contract, true, queryFuncName, tokenID)
+	res, err := k.CallEVM(ctx, erc721, types.ModuleAddress, contract, false, queryFuncName, tokenID)
 	if err != nil {
 		return nil, err
 	}

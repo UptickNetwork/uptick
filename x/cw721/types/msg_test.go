@@ -8,42 +8,110 @@ import (
 )
 
 func TestMsgConvertNFT_ValidateBasic(t *testing.T) {
+	validAddr := "cosmos1qypqxpq9qcrsszg2pvxq6rs0zqg3yyc5lzv7xu"
 	tests := []struct {
-		name    string
-		sender  string
-		classID string
-		nftIDs  []string
-		wantErr bool
+		name     string
+		sender   string
+		receiver string
+		contract string
+		classID  string
+		nftIDs   []string
+		tokenIDs []string
+		wantErr  bool
 	}{
 		{
-			name:    "valid",
-			sender:  "cosmos1qypqxpq9qcrsszg2pvxq6rs0zqg3yyc5lzv7xu",
-			classID: "class-1",
-			nftIDs:  []string{"nft-1"},
-			wantErr: false,
+			name:     "valid",
+			sender:   validAddr,
+			receiver: validAddr,
+			classID:  "class-1",
+			nftIDs:   []string{"nft-1"},
+			wantErr:  false,
 		},
 		{
-			name:    "empty sender",
-			sender:  "",
-			classID: "class-1",
-			nftIDs:  []string{"nft-1"},
-			wantErr: true,
+			name:     "empty sender",
+			sender:   "",
+			receiver: validAddr,
+			classID:  "class-1",
+			nftIDs:   []string{"nft-1"},
+			wantErr:  true,
 		},
 		{
-			name:    "invalid sender",
-			sender:  "invalid-address",
-			classID: "class-1",
-			nftIDs:  []string{"nft-1"},
-			wantErr: true,
+			name:     "invalid sender",
+			sender:   "invalid-address",
+			receiver: validAddr,
+			classID:  "class-1",
+			nftIDs:   []string{"nft-1"},
+			wantErr:  true,
+		},
+		{
+			name:     "empty receiver",
+			sender:   validAddr,
+			receiver: "",
+			classID:  "class-1",
+			nftIDs:   []string{"nft-1"},
+			wantErr:  true,
+		},
+		{
+			name:     "invalid receiver",
+			sender:   validAddr,
+			receiver: "invalid-address",
+			classID:  "class-1",
+			nftIDs:   []string{"nft-1"},
+			wantErr:  true,
+		},
+		{
+			name:     "invalid contract",
+			sender:   validAddr,
+			receiver: validAddr,
+			contract: "0x1234567890123456789012345678901234567890",
+			classID:  "class-1",
+			nftIDs:   []string{"nft-1"},
+			wantErr:  true,
+		},
+		{
+			name:     "empty class id",
+			sender:   validAddr,
+			receiver: validAddr,
+			classID:  "",
+			nftIDs:   []string{"nft-1"},
+			wantErr:  true,
+		},
+		{
+			name:     "empty nft ids",
+			sender:   validAddr,
+			receiver: validAddr,
+			classID:  "class-1",
+			nftIDs:   nil,
+			wantErr:  true,
+		},
+		{
+			name:     "blank nft id",
+			sender:   validAddr,
+			receiver: validAddr,
+			classID:  "class-1",
+			nftIDs:   []string{""},
+			wantErr:  true,
+		},
+		{
+			name:     "blank token id",
+			sender:   validAddr,
+			receiver: validAddr,
+			classID:  "class-1",
+			nftIDs:   []string{"nft-1"},
+			tokenIDs: []string{""},
+			wantErr:  true,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			msg := MsgConvertNFT{
-				Sender:  tc.sender,
-				ClassId: tc.classID,
-				NftIds:  tc.nftIDs,
+				Sender:          tc.sender,
+				Receiver:        tc.receiver,
+				ContractAddress: tc.contract,
+				ClassId:         tc.classID,
+				NftIds:          tc.nftIDs,
+				TokenIds:        tc.tokenIDs,
 			}
 			err := msg.ValidateBasic()
 			if tc.wantErr {
@@ -84,32 +152,85 @@ func TestMsgConvertNFT_GetSignBytes(t *testing.T) {
 }
 
 func TestMsgConvertCW721_ValidateBasic(t *testing.T) {
+	validAddr := "cosmos1qypqxpq9qcrsszg2pvxq6rs0zqg3yyc5lzv7xu"
 	tests := []struct {
 		name     string
 		sender   string
 		receiver string
 		contract string
+		tokenIDs []string
 		wantErr  bool
 	}{
 		{
 			name:     "valid",
-			sender:   "cosmos1qypqxpq9qcrsszg2pvxq6rs0zqg3yyc5lzv7xu",
-			receiver: "cosmos1qypqxpq9qcrsszg2pvxq6rs0zqg3yyc5lzv7xu",
-			contract: "0x1234567890123456789012345678901234567890",
+			sender:   validAddr,
+			receiver: validAddr,
+			contract: validAddr,
+			tokenIDs: []string{"1"},
 			wantErr:  false,
 		},
 		{
 			name:     "empty receiver",
-			sender:   "cosmos1qypqxpq9qcrsszg2pvxq6rs0zqg3yyc5lzv7xu",
+			sender:   validAddr,
 			receiver: "",
-			contract: "0x1234567890123456789012345678901234567890",
+			contract: validAddr,
+			tokenIDs: []string{"1"},
 			wantErr:  true,
 		},
 		{
 			name:     "invalid receiver",
-			sender:   "cosmos1qypqxpq9qcrsszg2pvxq6rs0zqg3yyc5lzv7xu",
+			sender:   validAddr,
 			receiver: "not-a-valid-address",
+			contract: validAddr,
+			tokenIDs: []string{"1"},
+			wantErr:  true,
+		},
+		{
+			name:     "empty sender",
+			sender:   "",
+			receiver: validAddr,
+			contract: validAddr,
+			tokenIDs: []string{"1"},
+			wantErr:  true,
+		},
+		{
+			name:     "invalid sender",
+			sender:   "invalid-address",
+			receiver: validAddr,
+			contract: validAddr,
+			tokenIDs: []string{"1"},
+			wantErr:  true,
+		},
+		{
+			name:     "empty contract",
+			sender:   validAddr,
+			receiver: validAddr,
+			contract: "",
+			tokenIDs: []string{"1"},
+			wantErr:  true,
+		},
+		{
+			name:     "empty token ids",
+			sender:   validAddr,
+			receiver: validAddr,
+			contract: validAddr,
+			tokenIDs: nil,
+			wantErr:  true,
+		},
+		{
+			name:     "blank token id",
+			sender:   validAddr,
+			receiver: validAddr,
+			contract: validAddr,
+			tokenIDs: []string{""},
+			wantErr:  true,
+		},
+		{
+			name:     "invalid contract",
+			sender:   validAddr,
+			receiver: validAddr,
 			contract: "0x1234567890123456789012345678901234567890",
+			tokenIDs: []string{"1"},
 			wantErr:  true,
 		},
 	}
@@ -120,7 +241,7 @@ func TestMsgConvertCW721_ValidateBasic(t *testing.T) {
 				Sender:          tc.sender,
 				Receiver:        tc.receiver,
 				ContractAddress: tc.contract,
-				TokenIds:        []string{"1"},
+				TokenIds:        tc.tokenIDs,
 			}
 			err := msg.ValidateBasic()
 			if tc.wantErr {
@@ -163,38 +284,119 @@ func TestMsgConvertCW721_GetSignBytes(t *testing.T) {
 
 func TestMsgTransferCW721_ValidateBasic(t *testing.T) {
 	validSender := "cosmos1qypqxpq9qcrsszg2pvxq6rs0zqg3yyc5lzv7xu"
+	validReceiver := "cosmos1qypqxpq9qcrsszg2pvxq6rs0zqg3yyc5lzv7xu"
+	validContract := "cosmos1qypqxpq9qcrsszg2pvxq6rs0zqg3yyc5lzv7xu"
 
 	tests := []struct {
-		name         string
-		cwSender     string
-		contractAddr string
-		sourcePort   string
-		sourceChan   string
-		wantErr      bool
+		name           string
+		cwSender       string
+		cosmosReceiver string
+		contractAddr   string
+		cwTokenIds     []string
+		sourcePort     string
+		sourceChan     string
+		timeoutHeight  ibctypes.Height
+		timeoutTime    uint64
+		wantErr        bool
 	}{
 		{
-			name:         "valid",
-			cwSender:     validSender,
-			contractAddr: "0xabcdef0000000000000000000000000000abcdef",
-			sourcePort:   "transfer",
-			sourceChan:   "channel-0",
-			wantErr:      false,
+			name:           "valid",
+			cwSender:       validSender,
+			cosmosReceiver: validReceiver,
+			contractAddr:   validContract,
+			cwTokenIds:     []string{"1"},
+			sourcePort:     "transfer",
+			sourceChan:     "channel-0",
+			timeoutHeight:  ibctypes.Height{RevisionNumber: 1, RevisionHeight: 100},
+			wantErr:        false,
 		},
 		{
-			name:         "empty sender",
-			cwSender:     "",
-			contractAddr: "0xabcdef0000000000000000000000000000abcdef",
-			sourcePort:   "transfer",
-			sourceChan:   "channel-0",
-			wantErr:      true,
+			name:           "empty sender",
+			cwSender:       "",
+			cosmosReceiver: validReceiver,
+			contractAddr:   validContract,
+			cwTokenIds:     []string{"1"},
+			sourcePort:     "transfer",
+			sourceChan:     "channel-0",
+			timeoutHeight:  ibctypes.Height{RevisionNumber: 1, RevisionHeight: 100},
+			wantErr:        true,
 		},
 		{
-			name:         "invalid sender",
-			cwSender:     "bad-address",
-			contractAddr: "0xabcdef0000000000000000000000000000abcdef",
-			sourcePort:   "transfer",
-			sourceChan:   "channel-0",
-			wantErr:      true,
+			name:           "invalid sender",
+			cwSender:       "bad-address",
+			cosmosReceiver: validReceiver,
+			contractAddr:   validContract,
+			cwTokenIds:     []string{"1"},
+			sourcePort:     "transfer",
+			sourceChan:     "channel-0",
+			timeoutHeight:  ibctypes.Height{RevisionNumber: 1, RevisionHeight: 100},
+			wantErr:        true,
+		},
+		{
+			name:           "empty receiver",
+			cwSender:       validSender,
+			cosmosReceiver: "",
+			contractAddr:   validContract,
+			cwTokenIds:     []string{"1"},
+			sourcePort:     "transfer",
+			sourceChan:     "channel-0",
+			timeoutHeight:  ibctypes.Height{RevisionNumber: 1, RevisionHeight: 100},
+			wantErr:        true,
+		},
+		{
+			name:           "invalid contract",
+			cwSender:       validSender,
+			cosmosReceiver: validReceiver,
+			contractAddr:   "0xabcdef0000000000000000000000000000abcdef",
+			cwTokenIds:     []string{"1"},
+			sourcePort:     "transfer",
+			sourceChan:     "channel-0",
+			timeoutHeight:  ibctypes.Height{RevisionNumber: 1, RevisionHeight: 100},
+			wantErr:        true,
+		},
+		{
+			name:           "empty cw token ids",
+			cwSender:       validSender,
+			cosmosReceiver: validReceiver,
+			contractAddr:   validContract,
+			cwTokenIds:     nil,
+			sourcePort:     "transfer",
+			sourceChan:     "channel-0",
+			timeoutHeight:  ibctypes.Height{RevisionNumber: 1, RevisionHeight: 100},
+			wantErr:        true,
+		},
+		{
+			name:           "empty source port",
+			cwSender:       validSender,
+			cosmosReceiver: validReceiver,
+			contractAddr:   validContract,
+			cwTokenIds:     []string{"1"},
+			sourcePort:     "",
+			sourceChan:     "channel-0",
+			timeoutHeight:  ibctypes.Height{RevisionNumber: 1, RevisionHeight: 100},
+			wantErr:        true,
+		},
+		{
+			name:           "empty source channel",
+			cwSender:       validSender,
+			cosmosReceiver: validReceiver,
+			contractAddr:   validContract,
+			cwTokenIds:     []string{"1"},
+			sourcePort:     "transfer",
+			sourceChan:     "",
+			timeoutHeight:  ibctypes.Height{RevisionNumber: 1, RevisionHeight: 100},
+			wantErr:        true,
+		},
+		{
+			name:           "both timeouts zero",
+			cwSender:       validSender,
+			cosmosReceiver: validReceiver,
+			contractAddr:   validContract,
+			cwTokenIds:     []string{"1"},
+			sourcePort:     "transfer",
+			sourceChan:     "channel-0",
+			timeoutHeight:  ibctypes.Height{},
+			wantErr:        true,
 		},
 	}
 
@@ -202,10 +404,13 @@ func TestMsgTransferCW721_ValidateBasic(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			msg := MsgTransferCW721{
 				CwSender:          tc.cwSender,
+				CosmosReceiver:    tc.cosmosReceiver,
 				CwContractAddress: tc.contractAddr,
+				CwTokenIds:        tc.cwTokenIds,
 				SourcePort:        tc.sourcePort,
 				SourceChannel:     tc.sourceChan,
-				TimeoutHeight:     ibctypes.Height{},
+				TimeoutHeight:     tc.timeoutHeight,
+				TimeoutTimestamp:  tc.timeoutTime,
 			}
 			err := msg.ValidateBasic()
 			if tc.wantErr {

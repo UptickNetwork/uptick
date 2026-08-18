@@ -2,10 +2,7 @@ package keeper
 
 import (
 	"encoding/json"
-	"io/ioutil"
-	"net/http"
 	"strconv"
-	"sync"
 
 	sdkerrors "cosmossdk.io/errors"
 	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
@@ -110,72 +107,6 @@ func (k Keeper) QueryCW721AllNftInfo(
 		return allContractInfoResultJson, nil
 	}
 
-}
-
-type StoreCache struct {
-	sync.Mutex
-	contracts map[string][]byte
-}
-
-var contractsCache = StoreCache{contracts: make(map[string][]byte)}
-
-func getContractBytes(contract string) ([]byte, error) {
-	contractsCache.Lock()
-	bz, found := contractsCache.contracts[contract]
-	contractsCache.Unlock()
-	if found {
-		return bz, nil
-	}
-	contractsCache.Lock()
-	defer contractsCache.Unlock()
-
-	var err error
-	bz, err = getBytesFromUrl(contract)
-	if err != nil {
-		return nil, err
-	}
-
-	contractsCache.contracts[contract] = bz
-	return bz, nil
-}
-
-func getBytesFromUrl(url string) ([]byte, error) {
-
-	response, err := http.Get(url)
-	if err != nil {
-		return nil, err
-	}
-	defer response.Body.Close()
-
-	bz, err := ioutil.ReadAll(response.Body)
-	// bz, err := ioutil.ReadFile("/Users/xuxinlai/my/mul/gon/v2/ics721-setup/cw721_base.wasm")
-	return bz, err
-
-}
-
-// StoreWasmContract creates and deploys an CW721 contract on the EVM with the
-// cw721 module account as owner.
-func (k Keeper) StoreWasmContract(
-	ctx sdk.Context,
-	contractFile string,
-	creator string,
-) (uint64, error) {
-
-	bin, err := getContractBytes(contractFile)
-	if err != nil {
-		k.Logger(ctx).Error("getContractBytes ", "err :", err)
-		return 0, err
-	}
-
-	res, err := k.wasmKeeper.StoreCode(ctx, &wasmtypes.MsgStoreCode{
-		Sender:       creator,
-		WASMByteCode: bin,
-	})
-	if err != nil {
-		k.Logger(ctx).Error("StoreCode ", "err :", err)
-		return 0, err
-	}
-	return res.CodeID, nil
 }
 
 type InstantiateInfo struct {

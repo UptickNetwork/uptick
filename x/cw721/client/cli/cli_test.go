@@ -98,28 +98,30 @@ func firstMsg[T sdk.Msg](t *testing.T, clientCtx client.Context, out []byte) T {
 func TestConvertNFTCmd_GenerateOnly(t *testing.T) {
 	clientCtx, addr := newCLIClient(t)
 	receiver := addr.String()
+	contract := addr.String()
 	out, err := clitestutil.ExecTestCLICmd(clientCtx, NewConvertNFTCmd(), generateOnlyArgs("alice",
-		"class-1", "nft-1", "uptick1contract", "1", receiver,
+		"class-1", "nft-1", contract, "1", receiver,
 	))
 	require.NoError(t, err)
 
 	msg := firstMsg[*types.MsgConvertNFT](t, clientCtx, out.Bytes())
 	require.Equal(t, "class-1", msg.ClassId)
 	require.Equal(t, []string{"nft-1"}, msg.NftIds)
-	require.Equal(t, "uptick1contract", msg.ContractAddress)
+	require.Equal(t, contract, msg.ContractAddress)
 	require.Equal(t, receiver, msg.Receiver)
 	require.Equal(t, addr.String(), msg.Sender)
 }
 
 func TestConvertCW721Cmd_GenerateOnly(t *testing.T) {
 	clientCtx, addr := newCLIClient(t)
+	contract := addr.String()
 	out, err := clitestutil.ExecTestCLICmd(clientCtx, NewConvertCW721Cmd(), generateOnlyArgs("alice",
-		"uptick1contract", "1", "class-1", "nft-1",
+		contract, "1", "class-1", "nft-1",
 	))
 	require.NoError(t, err)
 
 	msg := firstMsg[*types.MsgConvertCW721](t, clientCtx, out.Bytes())
-	require.Equal(t, "uptick1contract", msg.ContractAddress)
+	require.Equal(t, contract, msg.ContractAddress)
 	require.Equal(t, []string{"1"}, msg.TokenIds)
 	require.Equal(t, "class-1", msg.ClassId)
 	require.Equal(t, addr.String(), msg.Sender)
@@ -128,10 +130,12 @@ func TestConvertCW721Cmd_GenerateOnly(t *testing.T) {
 
 func TestTransferCW721Cmd_GenerateOnly(t *testing.T) {
 	clientCtx, addr := newCLIClient(t)
+	cwContract := addr.String()
+	cosmosReceiver := addr.String()
 	out, err := clitestutil.ExecTestCLICmd(clientCtx, NewTransferCW721Cmd(), generateOnlyArgs("alice",
-		"uptick1contract", "1",
+		cwContract, "1",
 		"nonfungibletokentransfer", "channel-0",
-		"uptick1dest", "class-1", "nft-1",
+		cosmosReceiver, "class-1", "nft-1",
 		fmt.Sprintf("--%s=true", flagAbsoluteTimeouts),
 		fmt.Sprintf("--%s=1-100", flagPacketTimeoutHeight),
 		fmt.Sprintf("--%s=1", flagPacketTimeoutTimestamp),
@@ -142,7 +146,7 @@ func TestTransferCW721Cmd_GenerateOnly(t *testing.T) {
 	msg := firstMsg[*types.MsgTransferCW721](t, clientCtx, out.Bytes())
 	require.Equal(t, "nonfungibletokentransfer", msg.SourcePort)
 	require.Equal(t, "channel-0", msg.SourceChannel)
-	require.Equal(t, "uptick1dest", msg.CosmosReceiver)
+	require.Equal(t, cosmosReceiver, msg.CosmosReceiver)
 	require.Equal(t, addr.String(), msg.CwSender)
 	require.Equal(t, `{"convert_to":"cw721"}`, msg.Memo)
 }

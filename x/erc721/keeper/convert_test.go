@@ -2,6 +2,7 @@ package keeper
 
 import (
 	"context"
+	"math/big"
 	"testing"
 
 	coreaddress "cosmossdk.io/core/address"
@@ -171,6 +172,17 @@ func TestRefundPacketToken_MissingPair(t *testing.T) {
 	require.ErrorIs(t, err, types.ErrTokenPairNotFound)
 }
 
+func TestQueryERC721DataByTokenID_DoesNotCommit(t *testing.T) {
+	k, ctx, _ := setupConvertKeeper(t)
+	evm := k.evmKeeper.(*fakeEVMKeeper)
+	contract := common.HexToAddress("0x1111111111111111111111111111111111111111")
+
+	_, _ = k.QueryERC721DataByTokenID("tokenURI", ctx, contract, big.NewInt(1))
+
+	require.Equal(t, 1, evm.applyCalls)
+	require.False(t, evm.lastCommit)
+}
+
 func bytes20(fill byte) []byte {
 	b := make([]byte, 20)
 	for i := range b {
@@ -201,7 +213,9 @@ func (b *convertBankKeeper) SpendableCoins(_ context.Context, _ sdk.AccAddress) 
 }
 
 type fakeEVMKeeper struct {
-	accounts map[common.Address]*statedb.Account
+	accounts   map[common.Address]*statedb.Account
+	lastCommit bool
+	applyCalls int
 }
 
 func (f *fakeEVMKeeper) GetParams(_ sdk.Context) evmtypes.Params { return evmtypes.Params{} }
@@ -222,10 +236,12 @@ func (f *fakeEVMKeeper) ApplyMessage(
 	_ *statedb.StateDB,
 	_ core.Message,
 	_ *tracing.Hooks,
-	_ bool,
+	commit bool,
 	_ bool,
 	_ bool,
 ) (*evmtypes.MsgEthereumTxResponse, error) {
+	f.lastCommit = commit
+	f.applyCalls++
 	return &evmtypes.MsgEthereumTxResponse{}, nil
 }
 

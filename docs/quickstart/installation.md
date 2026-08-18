@@ -8,13 +8,13 @@ Build and install the Uptick binaries from source or using Docker. {synopsis}
 
 ## Pre-requisites
 
-- [Install Go 1.17.5+](https://golang.org/dl/) {prereq}
+- [Install Go 1.24+](https://golang.org/dl/) {prereq}
 - [Install jq](https://stedolan.github.io/jq/download/) {prereq}
 
 ## Install Go
 
 ::: warning
-Uptick is built using [Go](https://golang.org/dl/) version `1.17.5+`
+Uptick is built using [Go](https://golang.org/dl/) version `1.24+`
 :::
 
 ```bash
