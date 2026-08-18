@@ -570,6 +570,8 @@ type MsgServer interface {
 	ConvertCW721(context.Context, *MsgConvertCW721) (*MsgConvertCW721Response, error)
 	// TransferCW721 transfers a CW721 token from one chain to another chain through IBC
 	TransferCW721(context.Context, *MsgTransferCW721) (*MsgTransferCW721Response, error)
+	// UpdateParams defines a governance operation for updating the module parameters.
+	UpdateParams(context.Context, *MsgUpdateParams) (*MsgUpdateParamsResponse, error)
 }
 
 // UnimplementedMsgServer can be embedded to have forward compatible implementations.
@@ -584,6 +586,9 @@ func (*UnimplementedMsgServer) ConvertCW721(ctx context.Context, req *MsgConvert
 }
 func (*UnimplementedMsgServer) TransferCW721(ctx context.Context, req *MsgTransferCW721) (*MsgTransferCW721Response, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method TransferCW721 not implemented")
+}
+func (*UnimplementedMsgServer) UpdateParams(ctx context.Context, req *MsgUpdateParams) (*MsgUpdateParamsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateParams not implemented")
 }
 
 func RegisterMsgServer(s grpc1.Server, srv MsgServer) {
@@ -644,6 +649,24 @@ func _Msg_TransferCW721_Handler(srv interface{}, ctx context.Context, dec func(i
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Msg_UpdateParams_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MsgUpdateParams)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MsgServer).UpdateParams(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/uptick.cw721.v1.Msg/UpdateParams",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MsgServer).UpdateParams(ctx, req.(*MsgUpdateParams))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 var _Msg_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "uptick.cw721.v1.Msg",
 	HandlerType: (*MsgServer)(nil),
@@ -659,6 +682,10 @@ var _Msg_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "TransferCW721",
 			Handler:    _Msg_TransferCW721_Handler,
+		},
+		{
+			MethodName: "UpdateParams",
+			Handler:    _Msg_UpdateParams_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

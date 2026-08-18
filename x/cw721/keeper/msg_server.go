@@ -43,7 +43,7 @@ func (k Keeper) TransferCW721(
 		SourcePort:       msg.SourcePort,
 		SourceChannel:    msg.SourceChannel,
 		ClassId:          resMsg.ClassId,
-		TokenIds:         resMsg.TokenIds,
+		TokenIds:         resMsg.NftIds,
 		Sender:           types.AccModuleAddress.String(),
 		Receiver:         msg.CosmosReceiver,
 		TimeoutHeight:    msg.TimeoutHeight,
@@ -74,6 +74,9 @@ func (k Keeper) ConvertCW721(
 ) {
 
 	ctx := sdk.UnwrapSDKContext(goCtx)
+	if !k.GetEnableCw721(ctx) {
+		return nil, types.ErrCW721Disabled
+	}
 
 	//classId, nftId
 	classId, nftIds, err := k.GetClassIDAndNFTID(ctx, msg)
@@ -194,6 +197,10 @@ func (k Keeper) ConvertNFT(
 ) {
 
 	ctx := sdk.UnwrapSDKContext(goCtx)
+	if !k.GetEnableCw721(ctx) {
+		return nil, types.ErrCW721Disabled
+	}
+
 	//classId, nftIDs
 	contractAddress, tokenIds, err := k.GetContractAddressAndTokenIds(ctx, msg)
 	if err != nil {
@@ -267,26 +274,27 @@ func (k Keeper) convertCosmos2Wasm(
 			return nil, err
 		}
 
-		//	does token id exist
-		// owner, err := k.QueryCW721TokenOwner(ctx, common.HexToAddress(msg.ContractAddress), bigTokenIds[i])
-		nftInfo, err := k.QueryCW721AllNftInfo(ctx, msg.ContractAddress, tokenId)
-
-		if err != nil {
-
-			// mint
+		// Use the module's own NFT pair state to decide mint vs transfer,
+		// matching x/erc721. Querying the contract would treat a missing
+		// token as mint even when the pair already tracks an escrowed NFT.
+		nftPair := k.GetNFTPairByContractTokenID(ctx, msg.ContractAddress, tokenId)
+		if len(nftPair) == 0 {
 			_, err := k.MintCw721(ctx, msg.ContractAddress, tokenId, msg.Receiver, reqInfo.GetURI())
 			if err != nil {
 				return nil, err
 			}
-
-		} else if nftInfo.Access.Owner == types.AccModuleAddress.String() {
-			// transfer
-			_, err := k.TransferCw721(ctx, msg.ContractAddress, tokenId, msg.Receiver, types.AccModuleAddress.String())
+		} else {
+			nftInfo, err := k.QueryCW721AllNftInfo(ctx, msg.ContractAddress, tokenId)
 			if err != nil {
 				return nil, err
 			}
-		} else {
-			return nil, sdkerrors.Wrapf(errortypes.ErrUnauthorized, "%s is not the owner of cw721 token %s", types.ModuleAddress, msg.TokenIds)
+			if nftInfo.Access.Owner != types.AccModuleAddress.String() {
+				return nil, sdkerrors.Wrapf(errortypes.ErrUnauthorized, "%s is not the owner of cw721 token %s", types.AccModuleAddress, tokenId)
+			}
+			_, err = k.TransferCw721(ctx, msg.ContractAddress, tokenId, msg.Receiver, types.AccModuleAddress.String())
+			if err != nil {
+				return nil, err
+			}
 		}
 
 	}
@@ -322,12 +330,21 @@ func (k Keeper) RefundPacketToken(
 	for _, tokenId := range data.TokenIds {
 
 		uNftID := types.CreateNFTUID(data.ClassId, tokenId)
+		pairUID := k.GetTokenUIDPairByNFTUID(ctx, uNftID)
+		if len(pairUID) == 0 {
+			return sdkerrors.Wrapf(types.ErrTokenPairNotFound, "missing CW721 pair for class %s token %s", data.ClassId, tokenId)
+		}
 
-		cwTokenId, cwContractAddress := types.GetNFTFromUID(string(k.GetTokenUIDPairByNFTUID(ctx, uNftID)))
-		// Use cwTokenId (not the native tokenId) for the receiver lookup
+		cwTokenId, cwContractAddress := types.GetNFTFromUID(string(pairUID))
+		if cwTokenId == "" || cwContractAddress == "" {
+			return sdkerrors.Wrapf(types.ErrInternalTokenPair, "invalid CW721 uid for class %s token %s", data.ClassId, tokenId)
+		}
 		cwReceiver := k.GetCwAddressByContractTokenId(ctx, cwContractAddress, cwTokenId)
+		if len(cwReceiver) == 0 {
+			return sdkerrors.Wrapf(errortypes.ErrInvalidAddress, "missing CW721 refund receiver for contract %s token %s", cwContractAddress, cwTokenId)
+		}
 
-		_, err := k.TransferCw721(ctx, cwContractAddress, cwTokenId, string(cwReceiver), data.Sender)
+		_, err := k.TransferCw721(ctx, cwContractAddress, cwTokenId, string(cwReceiver), types.AccModuleAddress.String())
 		if err != nil {
 			return err
 		}
@@ -339,7 +356,7 @@ func (k Keeper) RefundPacketToken(
 		burnMsg := nftTypes.MsgBurnNFT{
 			Id:      tokenId,
 			DenomId: data.ClassId,
-			Sender:  data.Sender,
+			Sender:  types.AccModuleAddress.String(),
 		}
 		if _, err = k.nftKeeper.BurnNFT(ctx, &burnMsg); err != nil {
 			return err

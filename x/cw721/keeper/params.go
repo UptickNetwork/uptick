@@ -17,6 +17,11 @@ func (k Keeper) GetParams(ctx sdk.Context) (params types.Params) {
 
 	bz := store.Get(key)
 	_ = k.cdc.Unmarshal(bz, &params)
+	if params.WasmCodeId == 0 {
+		if id, err := k.GetWasmCodeID(ctx); err == nil {
+			params.WasmCodeId = id
+		}
+	}
 	return params
 }
 
@@ -30,6 +35,9 @@ func (k Keeper) SetParams(ctx sdk.Context, params types.Params) error {
 	}
 
 	store.Set(types.KeyPrefixParams, bz)
+	if params.WasmCodeId != 0 {
+		k.SetWasmCode(ctx, types.ModuleName, params.WasmCodeId)
+	}
 	return nil
 }
 

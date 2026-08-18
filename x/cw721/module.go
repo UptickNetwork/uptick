@@ -121,7 +121,9 @@ func (am AppModule) RegisterServices(cfg module.Configurator) {
 	types.RegisterMsgServer(cfg.MsgServer(), am.keeper)
 	types.RegisterQueryServer(cfg.QueryServer(), am.keeper)
 
-	_ = keeper.NewMigrator(am.keeper)
+	if err := cfg.RegisterMigration(types.ModuleName, 1, keeper.NewMigrator(am.keeper).Migrate1to2); err != nil {
+		panic(fmt.Sprintf("failed to register %s 1→2 migration: %s", types.ModuleName, err))
+	}
 }
 
 func (am AppModule) BeginBlock(_ sdk.Context) {}

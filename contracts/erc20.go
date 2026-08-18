@@ -6,6 +6,7 @@ import (
 
 	evmtypes "github.com/cosmos/evm/x/vm/types"
 
+	"github.com/ethereum/go-ethereum/common"
 
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 )

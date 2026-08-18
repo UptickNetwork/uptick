@@ -14,10 +14,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/UptickNetwork/uptick/ibc"
+	cw721Types "github.com/UptickNetwork/uptick/x/cw721/types"
+	erc721Types "github.com/UptickNetwork/uptick/x/erc721/types"
 	"github.com/UptickNetwork/uptick/x/evmibc/keeper"
 	evmibctypes "github.com/UptickNetwork/uptick/x/evmibc/types"
 
-	erc721Types "github.com/UptickNetwork/uptick/x/erc721/types"
 	clienttypes "github.com/cosmos/ibc-go/v10/modules/core/02-client/types"
 )
 
@@ -32,13 +33,15 @@ const maxMemoLength = 1024
 type IBCMiddleware struct {
 	*ibc.Module
 	keeper keeper.Keeper
+	ics4   porttypes.ICS4Wrapper
 }
 
 // NewIBCMiddleware creates a new IBCMiddleware given the keeper and underlying application
-func NewIBCMiddleware(k keeper.Keeper, app porttypes.IBCModule) IBCMiddleware {
+func NewIBCMiddleware(k keeper.Keeper, app porttypes.IBCModule, ics4 porttypes.ICS4Wrapper) IBCMiddleware {
 	return IBCMiddleware{
 		Module: ibc.NewModule(app),
 		keeper: k,
+		ics4:   ics4,
 	}
 }
 
@@ -76,45 +79,65 @@ func (im IBCMiddleware) OnRecvPacket(
 
 	if strings.ToLower(packageMemo.ConvertTo) == convertERC721 {
 
-		newPackage, dstReceiver := PackageToModuleAccount(packet)
-		if !common.IsHexAddress(dstReceiver) {
+		newPackage, dstReceiver := PackageToModuleAccount(packet, erc721Types.AccModuleAddress)
+		if !common.IsHexAddress(dstReceiver) || common.HexToAddress(dstReceiver) == (common.Address{}) {
 			ackResult = channeltypes.NewErrorAcknowledgement(
 				sdkerrors.Wrap(errortypes.ErrInvalidType, "receiver address format error"),
 			)
 			return ackResult
 		}
-		ack := im.Module.OnRecvPacket(ctx, channelVersion, newPackage, relayer)
-		// return if the acknowledgement is an error ACK
-		if !ack.Success() {
-			return ack
-		}
-		return im.keeper.OnRecvPacket(ctx, newPackage, dstReceiver, 0)
+		return im.recvAndConvert(ctx, channelVersion, newPackage, relayer, dstReceiver, 0)
 
 	} else if strings.ToLower(packageMemo.ConvertTo) == convertCW721 {
 
-		newPackage, dstReceiver := PackageToModuleAccount(packet)
-		ack := im.Module.OnRecvPacket(ctx, channelVersion, newPackage, relayer)
-		// return if the acknowledgement is an error ACK
-		if !ack.Success() {
-			return ack
+		newPackage, dstReceiver := PackageToModuleAccount(packet, cw721Types.AccModuleAddress)
+		if _, err := sdk.AccAddressFromBech32(dstReceiver); err != nil {
+			ackResult = channeltypes.NewErrorAcknowledgement(
+				sdkerrors.Wrap(errortypes.ErrInvalidType, "receiver address format error"),
+			)
+			return ackResult
 		}
-		// im.keeper.
-		return im.keeper.OnRecvPacket(ctx, newPackage, dstReceiver, 1)
+		return im.recvAndConvert(ctx, channelVersion, newPackage, relayer, dstReceiver, 1)
 	} else {
 		return im.Module.OnRecvPacket(ctx, channelVersion, packet, relayer)
 	}
 
 }
 
-func PackageToModuleAccount(packet channeltypes.Packet) (channeltypes.Packet, string) {
-	// Rewrites the packet receiver to the module account address
+// recvAndConvert runs nft-transfer mint and ERC721/CW721 conversion on one
+// cache context. write() is called only if both succeed, so a convert failure
+// rolls back the voucher mint instead of leaving it on the module account
+// while returning an error ACK (which would also refund on the source chain).
+func (im IBCMiddleware) recvAndConvert(
+	ctx sdk.Context,
+	channelVersion string,
+	packet channeltypes.Packet,
+	relayer sdk.AccAddress,
+	dstReceiver string,
+	convertType uint,
+) exported.Acknowledgement {
+	cctx, write := ctx.CacheContext()
+	ack := im.Module.OnRecvPacket(cctx, channelVersion, packet, relayer)
+	if !ack.Success() {
+		return ack
+	}
+	convertAck := im.keeper.OnRecvPacket(cctx, packet, dstReceiver, convertType)
+	if !convertAck.Success() {
+		return convertAck
+	}
+	write()
+	return convertAck
+}
+
+func PackageToModuleAccount(packet channeltypes.Packet, moduleAddr sdk.AccAddress) (channeltypes.Packet, string) {
+	// Rewrites the packet receiver to the conversion module account
 	// and returns the original destination receiver for later conversion.
 	var data types.NonFungibleTokenPacketData
 	if err := types.ModuleCdc.UnmarshalJSON(packet.GetData(), &data); err != nil {
 		return channeltypes.Packet{}, ""
 	}
 	dstReceiver := data.Receiver
-	data.Receiver = erc721Types.AccModuleAddress.String()
+	data.Receiver = moduleAddr.String()
 	packet.Data = types.ModuleCdc.MustMarshalJSON(&data)
 
 	return packet, dstReceiver
@@ -154,7 +177,6 @@ func (im IBCMiddleware) OnAcknowledgementPacket(
 			return err
 		}
 		commit()
-		ctx.EventManager().EmitEvents(cctx.EventManager().Events())
 		return nil
 	}
 
@@ -173,27 +195,32 @@ func (im IBCMiddleware) SendPacket(
 	sourceChannel string,
 	timeoutHeight clienttypes.Height,
 	timeoutTimestamp uint64, data []byte) (sequence uint64, err error) {
-	return 0, nil
+	if im.ics4 == nil {
+		return 0, sdkerrors.Wrap(errortypes.ErrLogic, "ics4 wrapper is not set")
+	}
+	return im.ics4.SendPacket(ctx, sourcePort, sourceChannel, timeoutHeight, timeoutTimestamp, data)
 }
 
-// WriteAcknowledgement is a no-op stub — acknowledgement writing is
-// handled by the underlying IBC module.
 func (im IBCMiddleware) WriteAcknowledgement(
 	ctx sdk.Context,
 	packet exported.PacketI,
 	ack exported.Acknowledgement,
 ) error {
-	return nil
+	if im.ics4 == nil {
+		return sdkerrors.Wrap(errortypes.ErrLogic, "ics4 wrapper is not set")
+	}
+	return im.ics4.WriteAcknowledgement(ctx, packet, ack)
 }
 
-// GetAppVersion is a no-op stub — version negotiation is not required
-// by this middleware.
 func (im IBCMiddleware) GetAppVersion(
 	ctx sdk.Context,
 	portID,
 	channelID string,
 ) (string, bool) {
-	return "", false
+	if im.ics4 == nil {
+		return "", false
+	}
+	return im.ics4.GetAppVersion(ctx, portID, channelID)
 }
 
 // OnTimeoutPacket implements the IBCModule interface
@@ -210,11 +237,13 @@ func (im IBCMiddleware) OnTimeoutPacket(
 
 	// For convert packets the keeper handles both ERC721/CW721 and NFT sides.
 	// Skip the nft-transfer module to prevent double refund.
-	// For non-convert packets delegate to the nft-transfer module directly.
+	// Cache the convert refund so a later NFT-side failure rolls back the ERC721/CW721 refund.
 	if evmibctypes.IsOutboundConvertPacket(data) {
-		if err := im.keeper.OnTimeoutPacket(ctx, packet, data); err != nil {
+		cctx, commit := ctx.CacheContext()
+		if err := im.keeper.OnTimeoutPacket(cctx, packet, data); err != nil {
 			return err
 		}
+		commit()
 	} else {
 		if err := im.Module.OnTimeoutPacket(ctx, channelVersion, packet, relayer); err != nil {
 			return err

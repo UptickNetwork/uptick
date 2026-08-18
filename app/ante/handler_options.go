@@ -1,39 +1,50 @@
 package ante
 
 import (
-	sdkerrors "cosmossdk.io/errors"
-	storetypes "cosmossdk.io/store/types"
-	txsigning "cosmossdk.io/x/tx/signing"
+	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
+	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/cosmos/cosmos-sdk/types/tx/signing"
 	"github.com/cosmos/cosmos-sdk/x/auth/ante"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
-	ibckeeper "github.com/cosmos/ibc-go/v10/modules/core/keeper"
+	sdkvesting "github.com/cosmos/cosmos-sdk/x/auth/vesting/types"
 	evmante "github.com/cosmos/evm/ante"
+	cosmosante "github.com/cosmos/evm/ante/cosmos"
+	evmevm "github.com/cosmos/evm/ante/evm"
 	anteinterfaces "github.com/cosmos/evm/ante/interfaces"
+	antetypes "github.com/cosmos/evm/ante/types"
 	evmtypes "github.com/cosmos/evm/x/vm/types"
+	ibcante "github.com/cosmos/ibc-go/v10/modules/core/ante"
+	ibckeeper "github.com/cosmos/ibc-go/v10/modules/core/keeper"
+
+	corestoretypes "cosmossdk.io/core/store"
+	sdkerrors "cosmossdk.io/errors"
+	storetypes "cosmossdk.io/store/types"
+	txsigning "cosmossdk.io/x/tx/signing"
 )
 
 // HandlerOptions defines the list of module keepers required to run the Uptick
 // AnteHandler decorators. It wraps cosmos/evm's HandlerOptions and adds
 // Uptick-specific fields.
 type HandlerOptions struct {
-	AccountKeeper          anteinterfaces.AccountKeeper
-	BankKeeper             anteinterfaces.BankKeeper
-	IBCKeeper              *ibckeeper.Keeper
-	FeeMarketKeeper        anteinterfaces.FeeMarketKeeper
-	EvmKeeper              anteinterfaces.EVMKeeper
-	FeegrantKeeper         ante.FeegrantKeeper
-	SignModeHandler        *txsigning.HandlerMap
-	SigGasConsumer         func(meter storetypes.GasMeter, sig signing.SignatureV2, params authtypes.Params) error
-	TxCounterStoreKey      storetypes.StoreKey
-	Cdc                    codec.BinaryCodec
-	MaxTxGasWanted         uint64
-	TxFeeChecker           ante.TxFeeChecker
-	DisabledAuthzMsgs      []string
+	AccountKeeper           anteinterfaces.AccountKeeper
+	BankKeeper              anteinterfaces.BankKeeper
+	IBCKeeper               *ibckeeper.Keeper
+	FeeMarketKeeper         anteinterfaces.FeeMarketKeeper
+	EvmKeeper               anteinterfaces.EVMKeeper
+	FeegrantKeeper          ante.FeegrantKeeper
+	SignModeHandler         *txsigning.HandlerMap
+	SigGasConsumer          func(meter storetypes.GasMeter, sig signing.SignatureV2, params authtypes.Params) error
+	Cdc                     codec.BinaryCodec
+	MaxTxGasWanted          uint64
+	TxFeeChecker            ante.TxFeeChecker
+	DisabledAuthzMsgs       []string
 	MaxWasmDispatchMsgCount uint64
+	WasmKeeper              *wasmkeeper.Keeper
+	WasmNodeConfig          *wasmtypes.NodeConfig
+	TXCounterStoreService   corestoretypes.KVStoreService
 }
 
 // Validate checks if the keepers are defined
@@ -70,7 +81,18 @@ func (options HandlerOptions) toEvmHandlerOptions() evmante.HandlerOptions {
 		SigGasConsumer:         options.SigGasConsumer,
 		MaxTxGasWanted:         options.MaxTxGasWanted,
 		DynamicFeeChecker:      true,
+		ExtensionOptionChecker: antetypes.HasDynamicFeeExtensionOption,
 		PendingTxListener:      nil,
+	}
+}
+
+func (options HandlerOptions) disabledAuthzMsgs() []string {
+	if len(options.DisabledAuthzMsgs) > 0 {
+		return options.DisabledAuthzMsgs
+	}
+	return []string{
+		sdk.MsgTypeURL(&evmtypes.MsgEthereumTx{}),
+		sdk.MsgTypeURL(&sdkvesting.MsgCreateVestingAccount{}),
 	}
 }
 
@@ -80,11 +102,76 @@ func newEthAnteHandler(options HandlerOptions) sdk.AnteHandler {
 	return evmante.NewAnteHandler(options.toEvmHandlerOptions())
 }
 
-// newCosmosAnteHandler creates the default ante handler for Cosmos transactions
-// with Uptick-specific WasmSecurityDecorator and ValidatorCommissionDecorator added
+// anteHandlerDecorator adapts an sdk.AnteHandler so it can sit in a decorator chain.
+// The inner handler is treated as a single step; its returned context is passed to next.
+type anteHandlerDecorator struct {
+	handler sdk.AnteHandler
+}
+
+func (d anteHandlerDecorator) AnteHandle(ctx sdk.Context, tx sdk.Tx, simulate bool, next sdk.AnteHandler) (sdk.Context, error) {
+	newCtx, err := d.handler(ctx, tx, simulate)
+	if err != nil {
+		return newCtx, err
+	}
+	return next(newCtx, tx, simulate)
+}
+
+// newCosmosAnteHandler creates the default ante handler for Cosmos transactions.
+// Wasm CountTX / GasRegister / TxContracts run before SetUpContext.
+// LimitSimulationGas runs immediately after SetUpContext so the simulation gas
+// meter is not overwritten. AuthzLimiter uses DisabledAuthzMsgs from app.go.
 func newCosmosAnteHandler(options HandlerOptions) sdk.AnteHandler {
-	evmOpts := options.toEvmHandlerOptions()
-	return evmante.NewAnteHandler(evmOpts)
+	return func(ctx sdk.Context, tx sdk.Tx, simulate bool) (sdk.Context, error) {
+		feemarketParams := options.FeeMarketKeeper.GetParams(ctx)
+		txFeeChecker := evmevm.NewDynamicFeeChecker(&feemarketParams)
+
+		var simGasLimit *storetypes.Gas
+		if options.WasmNodeConfig != nil {
+			simGasLimit = options.WasmNodeConfig.SimulationGasLimit
+		}
+
+		maxDispatch := options.MaxWasmDispatchMsgCount
+		if maxDispatch == 0 {
+			maxDispatch = MaxWasmDispatchMsgCount
+		}
+
+		decorators := []sdk.AnteDecorator{
+			NewWasmSecurityDecorator(options.Cdc, options.EvmKeeper, options.MaxTxGasWanted, maxDispatch),
+			NewValidatorCommissionDecorator(options.Cdc),
+		}
+		if options.TXCounterStoreService != nil {
+			decorators = append(decorators, wasmkeeper.NewCountTXDecorator(options.TXCounterStoreService))
+		}
+		if options.WasmKeeper != nil {
+			decorators = append(decorators, wasmkeeper.NewGasRegisterDecorator(options.WasmKeeper.GetGasRegister()))
+		}
+
+		extChecker := antetypes.HasDynamicFeeExtensionOption
+
+		decorators = append(decorators,
+			wasmkeeper.NewTxContractsDecorator(),
+			cosmosante.NewRejectMessagesDecorator(),
+			cosmosante.NewAuthzLimiterDecorator(options.disabledAuthzMsgs()...),
+			ante.NewSetUpContextDecorator(),
+			wasmkeeper.NewLimitSimulationGasDecorator(simGasLimit),
+			ante.NewExtensionOptionsDecorator(extChecker),
+			ante.NewValidateBasicDecorator(),
+			ante.NewTxTimeoutHeightDecorator(),
+			ante.NewValidateMemoDecorator(options.AccountKeeper),
+			cosmosante.NewMinGasPriceDecorator(&feemarketParams),
+			ante.NewConsumeGasForTxSizeDecorator(options.AccountKeeper),
+			ante.NewDeductFeeDecorator(options.AccountKeeper, options.BankKeeper, options.FeegrantKeeper, txFeeChecker),
+			ante.NewSetPubKeyDecorator(options.AccountKeeper),
+			ante.NewValidateSigCountDecorator(options.AccountKeeper),
+			ante.NewSigGasConsumeDecorator(options.AccountKeeper, options.SigGasConsumer),
+			ante.NewSigVerificationDecorator(options.AccountKeeper, options.SignModeHandler),
+			ante.NewIncrementSequenceDecorator(options.AccountKeeper),
+			ibcante.NewRedundantRelayDecorator(options.IBCKeeper),
+			evmevm.NewGasWantedDecorator(options.EvmKeeper, options.FeeMarketKeeper, &feemarketParams),
+		)
+
+		return sdk.ChainAnteDecorators(decorators...)(ctx, tx, simulate)
+	}
 }
 
 // newCosmosAnteHandlerEip712 creates the ante handler for transactions signed with EIP712

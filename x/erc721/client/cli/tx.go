@@ -14,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/UptickNetwork/uptick/x/erc721/types"
-	ibcnfttransfertypes "github.com/bianjieai/nft-transfer/types"
 	clienttypes "github.com/cosmos/ibc-go/v10/modules/core/02-client/types"
 )
 
@@ -284,8 +283,8 @@ func NewTransferERC721Cmd() *cobra.Command {
 			return tx.GenerateOrBroadcastTxCLI(cliCtx, cmd.Flags(), msg)
 		},
 	}
-	cmd.Flags().String(flagPacketTimeoutHeight, ibcnfttransfertypes.DefaultRelativePacketTimeoutHeight, "Packet timeout block height. The timeout is disabled when set to 0-0.")
-	cmd.Flags().Uint64(flagPacketTimeoutTimestamp, ibcnfttransfertypes.DefaultRelativePacketTimeoutTimestamp, "Packet timeout timestamp in nanoseconds from now. Default is 10 minutes. The timeout is disabled when set to 0.")
+	cmd.Flags().String(flagPacketTimeoutHeight, "0-0", "Absolute packet timeout block height (revision-height). Relative timeouts are not supported after ibc-go v10. The timeout is disabled when set to 0-0.")
+	cmd.Flags().Uint64(flagPacketTimeoutTimestamp, 0, "Absolute packet timeout timestamp in nanoseconds since unix epoch. Relative timeouts are not supported after ibc-go v10. The timeout is disabled when set to 0.")
 	cmd.Flags().String(flagPacketMemo, "", "Packet memo. Default is empty")
 	cmd.Flags().Bool(flagAbsoluteTimeouts, false, "Timeout flags are used as absolute timeouts.")
 	flags.AddTxFlagsToCmd(cmd)

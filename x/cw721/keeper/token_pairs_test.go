@@ -205,3 +205,33 @@ func TestGetPair_Found(t *testing.T) {
 	require.Equal(t, tp.Cw721Address, got.Cw721Address)
 	require.Equal(t, tp.ClassId, got.ClassId)
 }
+
+func TestCW721Map_Delete(t *testing.T) {
+	k, ctx := setupKeeper(t)
+
+	addr := "uptick1cw721contract"
+	id := []byte("pair-id")
+	k.SetCW721Map(ctx, addr, id)
+	require.Equal(t, id, k.GetCW721Map(ctx, addr))
+
+	k.DeleteCW721Map(ctx, addr)
+	require.Empty(t, k.GetCW721Map(ctx, addr))
+	require.False(t, k.IsCW721Registered(ctx, addr))
+}
+
+func TestGetWasmCodeID(t *testing.T) {
+	k, ctx := setupKeeper(t)
+
+	_, err := k.GetWasmCodeID(ctx)
+	require.ErrorIs(t, err, cw721types.ErrCW721CodeNotFound)
+
+	k.SetWasmCode(ctx, cw721types.ModuleName, 7)
+	codeID, err := k.GetWasmCodeID(ctx)
+	require.NoError(t, err)
+	require.Equal(t, uint64(7), codeID)
+
+	k.SetWasmCode(ctx, cw721types.AccModuleAddress.String(), 9)
+	codeID, err = k.GetWasmCodeID(ctx)
+	require.NoError(t, err)
+	require.Equal(t, uint64(9), codeID)
+}

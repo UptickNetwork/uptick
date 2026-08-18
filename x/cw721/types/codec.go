@@ -22,6 +22,7 @@ func RegisterInterfaces(registry codectypes.InterfaceRegistry) {
 		&MsgConvertNFT{},
 		&MsgConvertCW721{},
 		&MsgTransferCW721{},
+		&MsgUpdateParams{},
 	)
 	registry.RegisterImplementations(
 		(*gov.Content)(nil),
@@ -36,4 +37,5 @@ func RegisterLegacyAminoCodec(cdc *codec.LegacyAmino) {
 	cdc.RegisterConcrete(&MsgConvertNFT{}, "cw721/ConvertNFT", nil)
 	cdc.RegisterConcrete(&MsgConvertCW721{}, "cw721/ConvertCW721", nil)
 	cdc.RegisterConcrete(&MsgTransferCW721{}, "cw721/TransferCW721", nil)
+	cdc.RegisterConcrete(&MsgUpdateParams{}, "cw721/UpdateParams", nil)
 }

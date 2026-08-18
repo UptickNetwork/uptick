@@ -24,7 +24,12 @@ func SupplyInvariant(k Keeper) sdk.Invariant {
 
 		collections, err := k.GetCollections(ctx)
 		if err != nil {
-			panic(err)
+			count++
+			msg += fmt.Sprintf("failed to get collections: %s\n", err.Error())
+			return sdk.FormatInvariant(
+				types.ModuleName, "supply",
+				fmt.Sprintf("%d NFT supply invariants found\n%s", count, msg),
+			), true
 		}
 
 		for _, collection := range collections {
@@ -43,11 +48,13 @@ func SupplyInvariant(k Keeper) sdk.Invariant {
 				)
 			}
 		}
-		broken := count != 0
+		if count != 0 {
+			return sdk.FormatInvariant(
+				types.ModuleName, "supply",
+				fmt.Sprintf("%d NFT supply invariants found\n%s", count, msg),
+			), true
+		}
 
-		return sdk.FormatInvariant(
-			types.ModuleName, "supply",
-			fmt.Sprintf("%d NFT supply invariants found\n%s", count, msg),
-		), broken
+		return "", false
 	}
 }

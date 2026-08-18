@@ -33,7 +33,7 @@ func (k Keeper) OnRecvPacket(
 	if err := types.ModuleCdc.UnmarshalJSON(packet.GetData(), &data); err != nil {
 		msg = err.Error()
 		ctx.EventManager().EmitEvent(
-			sdk.NewEvent("ibc_erc20",
+			sdk.NewEvent("ibc_nft_convert",
 				sdk.NewAttribute("status", "1"),
 				sdk.NewAttribute("message", msg),
 				sdk.NewAttribute("sequence", fmt.Sprintf("%d", packet.Sequence)),
@@ -51,7 +51,23 @@ func (k Keeper) OnRecvPacket(
 	if types.IsAwayFromOrigin(packet.GetSourcePort(), packet.GetSourceChannel(), data.ClassId) {
 		voucherClassID = k.GetVoucherClassID(packet.GetDestPort(), packet.GetDestChannel(), data.ClassId)
 	} else {
-		voucherClassID, _ = types.RemoveClassPrefix(packet.GetSourcePort(), packet.GetSourceChannel(), data.ClassId)
+		classID, err := types.RemoveClassPrefix(packet.GetSourcePort(), packet.GetSourceChannel(), data.ClassId)
+		if err != nil {
+			msg = err.Error()
+			ctx.EventManager().EmitEvent(
+				sdk.NewEvent("ibc_nft_convert",
+					sdk.NewAttribute("status", "1"),
+					sdk.NewAttribute("message", msg),
+					sdk.NewAttribute("sequence", fmt.Sprintf("%d", packet.Sequence)),
+					sdk.NewAttribute("source_channel", packet.SourceChannel),
+					sdk.NewAttribute("destination_channel", packet.DestinationChannel),
+				),
+			)
+			return channeltypes.NewErrorAcknowledgement(
+				sdkerrors.Wrapf(errortypes.ErrInvalidRequest, "invalid class id prefix: %s", err.Error()),
+			)
+		}
+		voucherClassID = classID
 	}
 
 	k.Logger(ctx).Info("OnRecvPacket ", "voucherClassID", voucherClassID)
@@ -67,7 +83,7 @@ func (k Keeper) OnRecvPacket(
 		msg = err.Error()
 		k.Logger(ctx).Error("OnRecvPacket ", "err ", err.Error())
 		ctx.EventManager().EmitEvent(
-			sdk.NewEvent("ibc_erc20",
+			sdk.NewEvent("ibc_nft_convert",
 				sdk.NewAttribute("status", "1"), // FAILED
 				sdk.NewAttribute("message", msg),
 				sdk.NewAttribute("sequence", fmt.Sprintf("%d", packet.Sequence)),
@@ -82,7 +98,7 @@ func (k Keeper) OnRecvPacket(
 
 	write()
 	ctx.EventManager().EmitEvent(
-		sdk.NewEvent("ibc_erc20",
+		sdk.NewEvent("ibc_nft_convert",
 			sdk.NewAttribute("status", "2"), // SUCCESS
 			sdk.NewAttribute("message", msg),
 			sdk.NewAttribute("sequence", fmt.Sprintf("%d", packet.Sequence)),
@@ -120,7 +136,7 @@ func (k Keeper) ConvertNFTFromCw721(context context.Context, voucherClassID stri
 		ClassId:         voucherClassID,
 		NftIds:          tokenIds,
 		Receiver:        receiver,
-		Sender:          erc721types.AccModuleAddress.String(),
+		Sender:          cw721Types.AccModuleAddress.String(),
 		ContractAddress: "",
 		TokenIds:        nil,
 	}
@@ -142,8 +158,12 @@ func (k Keeper) OnAcknowledgementPacket(ctx sdk.Context, packet channeltypes.Pac
 	case *channeltypes.Acknowledgement_Error:
 		switch evmibctypes.OutboundConvertKind(data) {
 		case evmibctypes.ConvertKindERC721:
-			data.ClassId = k.getRefundClassId(packet, data)
-			if err := k.RefundPacketToken(ctx, data); err != nil {
+			classID, err := k.getRefundClassId(packet, data)
+			if err != nil {
+				return err
+			}
+			data.ClassId = classID
+			if err := k.erc721keeper.RefundPacketToken(ctx, data); err != nil {
 				return err
 			}
 			// Redirect the NFT refund to the module address so the sender
@@ -152,13 +172,17 @@ func (k Keeper) OnAcknowledgementPacket(ctx sdk.Context, packet channeltypes.Pac
 			nftData.Sender = erc721types.AccModuleAddress.String()
 			return k.ibcKeeper.OnAcknowledgementPacket(ctx, packet, nftData, ack)
 		case evmibctypes.ConvertKindCW721:
-			data.ClassId = k.getRefundClassId(packet, data)
-			if err := k.cw721Keeper.RefundPacketToken(ctx, data); err != nil {
+			classID, err := k.getRefundClassId(packet, data)
+			if err != nil {
 				return err
 			}
+			data.ClassId = classID
 			nftData := data
 			nftData.Sender = cw721Types.AccModuleAddress.String()
-			return k.ibcKeeper.OnAcknowledgementPacket(ctx, packet, nftData, ack)
+			if err := k.ibcKeeper.OnAcknowledgementPacket(ctx, packet, nftData, ack); err != nil {
+				return err
+			}
+			return k.cw721Keeper.RefundPacketToken(ctx, data)
 		}
 	default:
 		// the acknowledgement succeeded on the receiving chain so nothing
@@ -173,8 +197,12 @@ func (k Keeper) OnTimeoutPacket(ctx sdk.Context, packet channeltypes.Packet, dat
 
 	switch evmibctypes.OutboundConvertKind(data) {
 	case evmibctypes.ConvertKindERC721:
-		data.ClassId = k.getRefundClassId(packet, data)
-		if err := k.RefundPacketToken(ctx, data); err != nil {
+		classID, err := k.getRefundClassId(packet, data)
+		if err != nil {
+			return err
+		}
+		data.ClassId = classID
+		if err := k.erc721keeper.RefundPacketToken(ctx, data); err != nil {
 			return err
 		}
 		// Redirect the NFT refund to the module address so the sender
@@ -183,33 +211,29 @@ func (k Keeper) OnTimeoutPacket(ctx sdk.Context, packet channeltypes.Packet, dat
 		nftData.Sender = erc721types.AccModuleAddress.String()
 		return k.ibcKeeper.OnTimeoutPacket(ctx, packet, nftData)
 	case evmibctypes.ConvertKindCW721:
-		data.ClassId = k.getRefundClassId(packet, data)
-		if err := k.cw721Keeper.RefundPacketToken(ctx, data); err != nil {
+		classID, err := k.getRefundClassId(packet, data)
+		if err != nil {
 			return err
 		}
+		data.ClassId = classID
 		nftData := data
 		nftData.Sender = cw721Types.AccModuleAddress.String()
-		return k.ibcKeeper.OnTimeoutPacket(ctx, packet, nftData)
+		if err := k.ibcKeeper.OnTimeoutPacket(ctx, packet, nftData); err != nil {
+			return err
+		}
+		return k.cw721Keeper.RefundPacketToken(ctx, data)
 	}
 	return nil
 }
 
-func (k Keeper) getRefundClassId(packet channeltypes.Packet, data types.NonFungibleTokenPacketData) string {
-	var voucherClassID string
-
-	if strings.HasPrefix(data.ClassId, "nft-transfer/") {
-		orgClass, err := types.RemoveClassPrefix(packet.GetSourcePort(), packet.GetSourceChannel(), data.ClassId)
-		if err != nil {
-			// If prefix removal fails, fall back to the original class ID
-			// to prevent a nil/empty class ID from propagating.
-			voucherClassID = data.ClassId
-		} else {
-			voucherClassID = k.GetVoucherClassID(packet.GetSourcePort(), packet.GetSourceChannel(), orgClass)
-		}
-
-	} else {
-		voucherClassID = data.ClassId
+func (k Keeper) getRefundClassId(packet channeltypes.Packet, data types.NonFungibleTokenPacketData) (string, error) {
+	if !strings.HasPrefix(data.ClassId, packet.GetSourcePort()+"/") {
+		return data.ClassId, nil
 	}
 
-	return voucherClassID
+	orgClass, err := types.RemoveClassPrefix(packet.GetSourcePort(), packet.GetSourceChannel(), data.ClassId)
+	if err != nil {
+		return "", err
+	}
+	return k.GetVoucherClassID(packet.GetSourcePort(), packet.GetSourceChannel(), orgClass), nil
 }

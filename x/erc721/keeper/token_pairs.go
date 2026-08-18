@@ -118,7 +118,7 @@ func (k Keeper) IsERC721Registered(ctx sdk.Context, erc721 common.Address) bool 
 	//Compatible with older versions
 	val := store.Has([]byte(strings.ToLower(erc721.String())))
 	if !val {
-		store.Has(erc721.Bytes())
+		val = store.Has(erc721.Bytes())
 	}
 	return val
 }
@@ -231,4 +231,36 @@ func (k Keeper) DeleteEvmAddressByContractTokenId(ctx sdk.Context, evmContractAd
 	contractAndTokenId := evmContractAddress + evmTokenId
 	store := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixEvmAddressByContractTokenId)
 	store.Delete([]byte(contractAndTokenId))
+}
+
+// SetEvmRefundReceiver records the original ERC721 owner for IBC timeout/error
+// refunds. Keys use a lowercased contract address plus both cosmos and EVM
+// token ids so lookup matches packet TokenIds and the NFT-UID mapping.
+func (k Keeper) SetEvmRefundReceiver(ctx sdk.Context, evmContractAddress string, cosmosTokenIds, evmTokenIds []string, evmAddress string) {
+	contract := strings.ToLower(evmContractAddress)
+	seen := make(map[string]struct{}, len(cosmosTokenIds)+len(evmTokenIds))
+	for _, ids := range [][]string{cosmosTokenIds, evmTokenIds} {
+		for _, id := range ids {
+			if id == "" {
+				continue
+			}
+			if _, ok := seen[id]; ok {
+				continue
+			}
+			seen[id] = struct{}{}
+			k.SetEvmAddressByContractTokenId(ctx, contract, id, evmAddress)
+		}
+	}
+}
+
+// GetEvmRefundReceiver looks up the original ERC721 owner recorded at IBC send.
+func (k Keeper) GetEvmRefundReceiver(ctx sdk.Context, evmContractAddress, cosmosTokenId, evmTokenId string) []byte {
+	contract := strings.ToLower(evmContractAddress)
+	if addr := k.GetEvmAddressByContractTokenId(ctx, contract, cosmosTokenId); len(addr) > 0 {
+		return addr
+	}
+	if evmTokenId == "" || evmTokenId == cosmosTokenId {
+		return nil
+	}
+	return k.GetEvmAddressByContractTokenId(ctx, contract, evmTokenId)
 }

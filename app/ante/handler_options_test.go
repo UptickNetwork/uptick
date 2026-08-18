@@ -3,10 +3,7 @@ package ante
 import (
 	"testing"
 
-	wasmTypes "github.com/CosmWasm/wasmd/x/wasm/types"
-	sdk "github.com/cosmos/cosmos-sdk/types"
-	txsigning "github.com/cosmos/cosmos-sdk/types/tx/signing"
-	ethante "github.com/cosmos/evm/ante"
+	txsigning "cosmossdk.io/x/tx/signing"
 	anteinterfaces "github.com/cosmos/evm/ante/interfaces"
 	evmtypes "github.com/cosmos/evm/x/vm/types"
 	"github.com/stretchr/testify/require"
@@ -32,7 +29,6 @@ func TestHandlerOptionsValidate(t *testing.T) {
 			SignModeHandler: &txsigning.HandlerMap{},
 			FeeMarketKeeper: &stubFeeMarketKeeper{},
 			EvmKeeper:       &stubEvmKeeper{},
-			WasmConfig:      wasmTypes.DefaultWasmConfig(),
 		}
 	}
 
@@ -70,12 +66,6 @@ func TestHandlerOptionsValidate(t *testing.T) {
 		opts.EvmKeeper = nil
 		require.ErrorContains(t, opts.Validate(), "evm keeper")
 	})
-
-	t.Run("nil WasmConfig (zero value) passes", func(t *testing.T) {
-		opts := validOptions()
-		opts.WasmConfig = wasmTypes.WasmConfig{}
-		require.NoError(t, opts.Validate())
-	})
 }
 
 func TestNewAnteHandler(t *testing.T) {
@@ -85,11 +75,17 @@ func TestNewAnteHandler(t *testing.T) {
 		SignModeHandler: &txsigning.HandlerMap{},
 		FeeMarketKeeper: &stubFeeMarketKeeper{},
 		EvmKeeper:       &stubEvmKeeper{},
-		WasmConfig:      wasmTypes.DefaultWasmConfig(),
 	}
 
 	t.Run("returns non-nil handler", func(t *testing.T) {
 		handler := NewAnteHandler(opts)
 		require.NotNil(t, handler)
+	})
+
+	t.Run("wasm fields optional at construction", func(t *testing.T) {
+		opts.WasmKeeper = nil
+		opts.WasmNodeConfig = nil
+		opts.TXCounterStoreService = nil
+		require.NotNil(t, NewAnteHandler(opts))
 	})
 }

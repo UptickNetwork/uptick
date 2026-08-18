@@ -5,7 +5,6 @@ import (
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
-	upticktypes "github.com/UptickNetwork/uptick/types"
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -34,5 +33,8 @@ func (tp TokenPair) Validate() error {
 	if err := sdk.ValidateDenom(tp.ClassId); err != nil {
 		return err
 	}
-	return upticktypes.ValidateAddress(tp.Cw721Address)
+	if _, err := sdk.AccAddressFromBech32(tp.Cw721Address); err != nil {
+		return err
+	}
+	return nil
 }

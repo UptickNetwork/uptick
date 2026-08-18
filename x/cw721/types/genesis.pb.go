@@ -86,6 +86,8 @@ type Params struct {
 	// NFT by transferring the Tokens through a MsgEthereumTx to the
 	// ModuleAddress Ethereum address.
 	EnableEVMHook bool `protobuf:"varint,2,opt,name=enable_evm_hook,json=enableEvmHook,proto3" json:"enable_evm_hook,omitempty"`
+	// wasm_code_id is the stored CW721 wasm code used for auto-instantiate.
+	WasmCodeId uint64 `protobuf:"varint,3,opt,name=wasm_code_id,json=wasmCodeId,proto3" json:"wasm_code_id,omitempty"`
 }
 
 func (m *Params) Reset()         { *m = Params{} }
@@ -233,6 +235,11 @@ func (m *Params) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.WasmCodeId != 0 {
+		i = encodeVarintGenesis(dAtA, i, uint64(m.WasmCodeId))
+		i--
+		dAtA[i] = 0x18
+	}
 	if m.EnableEVMHook {
 		i--
 		if m.EnableEVMHook {
@@ -295,6 +302,9 @@ func (m *Params) Size() (n int) {
 	}
 	if m.EnableEVMHook {
 		n += 2
+	}
+	if m.WasmCodeId != 0 {
+		n += 1 + sovGenesis(uint64(m.WasmCodeId))
 	}
 	return n
 }
@@ -491,6 +501,25 @@ func (m *Params) Unmarshal(dAtA []byte) error {
 				}
 			}
 			m.EnableEVMHook = bool(v != 0)
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field WasmCodeId", wireType)
+			}
+			m.WasmCodeId = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.WasmCodeId |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenesis(dAtA[iNdEx:])

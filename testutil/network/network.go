@@ -54,8 +54,8 @@ import (
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	"github.com/cosmos/evm/crypto/hd"
 
-	"github.com/cosmos/evm/server/config"
 	upticktypes "github.com/UptickNetwork/uptick/types"
+	"github.com/cosmos/evm/server/config"
 	evmtypes "github.com/cosmos/evm/x/vm/types"
 
 	pruningtypes "cosmossdk.io/store/pruning/types"

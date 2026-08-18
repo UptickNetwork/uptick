@@ -29,9 +29,9 @@ import (
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
 	govv1 "github.com/cosmos/cosmos-sdk/x/gov/types/v1"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/cosmos/evm/server"
 	evmtypes "github.com/cosmos/evm/x/vm/types"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"golang.org/x/sync/errgroup"
 	"path/filepath"
 )

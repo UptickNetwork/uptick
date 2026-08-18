@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	cw721types "github.com/UptickNetwork/uptick/x/cw721/types"
+	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
 func TestGetNftData_AllEmpty(t *testing.T) {
@@ -54,10 +55,10 @@ func TestGetNftData_NftType1_ClassId(t *testing.T) {
 }
 
 func TestGetNftData_NftType2_TokenId(t *testing.T) {
-	// nftType 2: tokenId → token ID from NFT ID
+	// nftType 2: tokenId → token ID from NFT ID (strip uptick prefix)
 	result, err := getNftData("", "uptick-1234", "", 2)
 	require.NoError(t, err)
-	require.Contains(t, result, "0x")
+	require.Equal(t, "1234", result)
 }
 
 func TestGetNftData_NftType3_ContractAddress(t *testing.T) {
@@ -115,4 +116,37 @@ func TestGetNftDataErrorByType(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGetContractAddressAndTokenIds_ProvidedContract(t *testing.T) {
+	k, ctx := setupKeeper(t)
+	contract := sdk.AccAddress([]byte("cw721contractaddrxx")).String()
+
+	_, _, err := k.GetContractAddressAndTokenIds(ctx, &cw721types.MsgConvertNFT{
+		ClassId:         "class-1",
+		NftIds:          []string{"nft-1"},
+		ContractAddress: contract,
+	})
+	require.ErrorIs(t, err, cw721types.ErrContractAddressNotCorrect)
+}
+
+func TestGetContractAddressAndTokenIds_InvalidContract(t *testing.T) {
+	k, ctx := setupKeeper(t)
+
+	_, _, err := k.GetContractAddressAndTokenIds(ctx, &cw721types.MsgConvertNFT{
+		ClassId:         "class-1",
+		NftIds:          []string{"nft-1"},
+		ContractAddress: "not-bech32",
+	})
+	require.ErrorIs(t, err, cw721types.ErrContractAddressNotCorrect)
+}
+
+func TestGetContractAddressAndTokenIds_MissingCode(t *testing.T) {
+	k, ctx := setupKeeper(t)
+
+	_, _, err := k.GetContractAddressAndTokenIds(ctx, &cw721types.MsgConvertNFT{
+		ClassId: "class-1",
+		NftIds:  []string{"nft-1"},
+	})
+	require.ErrorIs(t, err, cw721types.ErrCW721CodeNotFound)
 }

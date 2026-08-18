@@ -21,10 +21,21 @@ func RegisterInterfaces(registry codectypes.InterfaceRegistry) {
 		(*sdk.Msg)(nil),
 		&MsgConvertNFT{},
 		&MsgConvertERC721{},
+		&MsgTransferERC721{},
+		&MsgUpdateParams{},
 	)
 	registry.RegisterImplementations(
 		(*gov.Content)(nil),
 	)
 
 	msgservice.RegisterMsgServiceDesc(registry, &_Msg_serviceDesc)
+}
+
+// RegisterLegacyAminoCodec registers the necessary x/erc721 interfaces and concrete types
+// on the provided LegacyAmino codec. These types are used for Amino JSON serialization.
+func RegisterLegacyAminoCodec(cdc *codec.LegacyAmino) {
+	cdc.RegisterConcrete(&MsgConvertNFT{}, "erc721/ConvertNFT", nil)
+	cdc.RegisterConcrete(&MsgConvertERC721{}, "erc721/ConvertERC721", nil)
+	cdc.RegisterConcrete(&MsgTransferERC721{}, "erc721/TransferERC721", nil)
+	cdc.RegisterConcrete(&MsgUpdateParams{}, "erc721/UpdateParams", nil)
 }

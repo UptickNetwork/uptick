@@ -204,8 +204,9 @@ func TestCreateNFTIDFromTokenID(t *testing.T) {
 }
 
 func TestCreateTokenIDFromNFTID(t *testing.T) {
-	tokenID := CreateTokenIDFromNFTID("uptick-616263313233")
-	require.Contains(t, tokenID, "0x")
+	require.Equal(t, "abc123", CreateTokenIDFromNFTID(CreateNFTIDFromTokenID("abc123")))
+	require.Equal(t, "1234", CreateTokenIDFromNFTID("uptick-1234"))
+	require.Equal(t, "cool-nft", CreateTokenIDFromNFTID("cool-nft"))
 }
 
 func TestRemoveAddress0x(t *testing.T) {

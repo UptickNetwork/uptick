@@ -1,53 +1,51 @@
 package main
 
 import (
-	"cosmossdk.io/client/v2/autocli"
-	"cosmossdk.io/log"
-	// TODO: rosetta disabled - cosmossdk.io/tools/rosetta v0.2.1 is incompatible with SDK 0.53
-	// (sdk.NewIntFromUint64 was removed). Re-enable after forking and fixing rosetta.
-	// rosettaCmd "cosmossdk.io/tools/rosetta/cmd"
 	"errors"
 	"fmt"
+	"io"
+	"os"
+
+	"cosmossdk.io/client/v2/autocli"
+	"cosmossdk.io/log"
+	confixcmd "cosmossdk.io/tools/confix/cmd"
+	"github.com/CosmWasm/wasmd/x/wasm"
 	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
+	"github.com/UptickNetwork/uptick/app"
 	"github.com/UptickNetwork/uptick/app/params"
 	uptickparams "github.com/UptickNetwork/uptick/app/params"
 	cmdcfg "github.com/UptickNetwork/uptick/cmd/config"
+	upticktypes "github.com/UptickNetwork/uptick/types"
 	tmcfg "github.com/cometbft/cometbft/config"
 	tmcli "github.com/cometbft/cometbft/libs/cli"
 	dbm "github.com/cosmos/cosmos-db"
+	"github.com/cosmos/cosmos-sdk/client"
+	"github.com/cosmos/cosmos-sdk/client/config"
+	"github.com/cosmos/cosmos-sdk/client/flags"
 	"github.com/cosmos/cosmos-sdk/client/pruning"
 	"github.com/cosmos/cosmos-sdk/client/rpc"
 	"github.com/cosmos/cosmos-sdk/client/snapshot"
 	addresscodec "github.com/cosmos/cosmos-sdk/codec/address"
+	"github.com/cosmos/cosmos-sdk/server"
+	servertypes "github.com/cosmos/cosmos-sdk/server/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
 	authcmd "github.com/cosmos/cosmos-sdk/x/auth/client/cli"
-	genutiltypes "github.com/cosmos/cosmos-sdk/x/genutil/types"
-	srvflags "github.com/cosmos/evm/server/flags"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/spf13/cast"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
-	"io"
-	"os"
-
-	confixcmd "cosmossdk.io/tools/confix/cmd"
-	"github.com/UptickNetwork/uptick/app"
-	"github.com/cosmos/cosmos-sdk/client"
-	"github.com/cosmos/cosmos-sdk/client/config"
-	"github.com/cosmos/cosmos-sdk/client/flags"
-	"github.com/cosmos/cosmos-sdk/server"
-	servertypes "github.com/cosmos/cosmos-sdk/server/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	"github.com/cosmos/cosmos-sdk/x/crisis"
 	genutilcli "github.com/cosmos/cosmos-sdk/x/genutil/client/cli"
+	genutiltypes "github.com/cosmos/cosmos-sdk/x/genutil/types"
 	evmclient "github.com/cosmos/evm/client"
 	"github.com/cosmos/evm/client/debug"
 	evmconfig "github.com/cosmos/evm/config"
 	"github.com/cosmos/evm/crypto/hd"
 	evmserver "github.com/cosmos/evm/server"
-	evmtypes "github.com/cosmos/evm/x/vm/types"
+	srvflags "github.com/cosmos/evm/server/flags"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/spf13/cast"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 const (
@@ -188,6 +186,27 @@ func genesisCommand(basicManager module.BasicManager, encodingConfig params.Enco
 
 func addModuleInitFlags(startCmd *cobra.Command) {
 	crisis.AddModuleInitFlags(startCmd)
+	wasm.AddModuleInitFlags(startCmd)
+	// wasmd flags default to 3M query gas / 100 MiB cache. Those defaults win
+	// over app.toml via viper, which would starve CW721 metadata queries.
+	cfg := cmdcfg.DefaultWasmNodeConfig()
+	queryGas := fmt.Sprintf("%d", cfg.SmartQueryGasLimit)
+	if f := startCmd.Flags().Lookup("wasm.query_gas_limit"); f != nil {
+		f.DefValue = queryGas
+		_ = f.Value.Set(queryGas)
+	}
+	cacheSize := fmt.Sprintf("%d", cfg.MemoryCacheSize)
+	if f := startCmd.Flags().Lookup("wasm.memory_cache_size"); f != nil {
+		f.DefValue = cacheSize
+		_ = f.Value.Set(cacheSize)
+	}
+	if cfg.SimulationGasLimit != nil {
+		simGas := fmt.Sprintf("%d", *cfg.SimulationGasLimit)
+		if f := startCmd.Flags().Lookup("wasm.simulation_gas_limit"); f != nil {
+			f.DefValue = simGas
+			_ = f.Value.Set(simGas)
+		}
+	}
 }
 
 func queryCommand() *cobra.Command {
@@ -248,8 +267,9 @@ func txCommand(basicManager module.BasicManager) *cobra.Command {
 // return "", nil if no custom configuration is required for the application.
 func initAppConfig() (string, interface{}) {
 	// cosmos/evm provides the EVM/JSONRPC/TLS app.toml configuration.
-	evmChainID := evmtypes.DefaultEVMChainID
+	evmChainID := upticktypes.MainnetEVMChainID
 	customAppTemplate, customAppConfig := evmconfig.InitAppConfig(cmdcfg.BaseDenom, evmChainID)
+	customAppTemplate += cmdcfg.WasmConfigTemplate()
 
 	// apply snapshot / fast-node settings via the concrete EVMAppConfig type.
 	if cfg, ok := customAppConfig.(evmconfig.EVMAppConfig); ok {

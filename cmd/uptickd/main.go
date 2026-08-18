@@ -12,7 +12,7 @@ import (
 
 func main() {
 	setupConfig()
-	//cmdcfg.RegisterDenoms()
+	cmdcfg.RegisterDenoms()
 
 	rootCmd := NewRootCmd()
 

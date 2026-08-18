@@ -21,6 +21,9 @@ func DefaultGenesisState() *GenesisState {
 // error for any failed validation criteria.
 func ValidateGenesis(data GenesisState) error {
 	for _, c := range data.Collections {
+		if c.Denom.Id == "" {
+			return sdkerrors.Wrap(errortypes.ErrInvalidRequest, "collection denom id is empty")
+		}
 		if err := ValidateDenomID(c.Denom.Id); err != nil {
 			return err
 		}

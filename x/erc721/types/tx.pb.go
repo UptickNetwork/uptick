@@ -646,6 +646,8 @@ type MsgServer interface {
 	ConvertERC721(context.Context, *MsgConvertERC721) (*MsgConvertERC721Response, error)
 	// TransferERC721 transfers a erc721 token from one chain to another chain through IBC
 	TransferERC721(context.Context, *MsgTransferERC721) (*MsgTransferERC721Response, error)
+	// UpdateParams defines a governance operation for updating the module parameters.
+	UpdateParams(context.Context, *MsgUpdateParams) (*MsgUpdateParamsResponse, error)
 }
 
 // UnimplementedMsgServer can be embedded to have forward compatible implementations.
@@ -660,6 +662,9 @@ func (*UnimplementedMsgServer) ConvertERC721(ctx context.Context, req *MsgConver
 }
 func (*UnimplementedMsgServer) TransferERC721(ctx context.Context, req *MsgTransferERC721) (*MsgTransferERC721Response, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method TransferERC721 not implemented")
+}
+func (*UnimplementedMsgServer) UpdateParams(ctx context.Context, req *MsgUpdateParams) (*MsgUpdateParamsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateParams not implemented")
 }
 
 func RegisterMsgServer(s grpc1.Server, srv MsgServer) {
@@ -720,6 +725,24 @@ func _Msg_TransferERC721_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Msg_UpdateParams_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MsgUpdateParams)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MsgServer).UpdateParams(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/uptick.erc721.v1.Msg/UpdateParams",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MsgServer).UpdateParams(ctx, req.(*MsgUpdateParams))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 var _Msg_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "uptick.erc721.v1.Msg",
 	HandlerType: (*MsgServer)(nil),
@@ -735,6 +758,10 @@ var _Msg_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "TransferERC721",
 			Handler:    _Msg_TransferERC721_Handler,
+		},
+		{
+			MethodName: "UpdateParams",
+			Handler:    _Msg_UpdateParams_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

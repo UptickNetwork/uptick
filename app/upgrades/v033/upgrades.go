@@ -12,10 +12,10 @@ import (
 
 const upgradeName = "v0.3.3"
 
-// Upgrade activates the erc20 IBC outbound refund security fix: refunds on
-// error acknowledgements require MsgTransferERC20 provenance instead of
-// user-controlled memo substrings. Provenance uses a new prefix in the
-// existing erc20 KVStore; no additional module store is required.
+// Upgrade is a historical no-op kept for replay compatibility. It originally
+// activated an erc20 IBC outbound refund security fix; that self-developed
+// erc20 module (and MsgTransferERC20) was removed in v0.4.0 in favor of
+// cosmos/evm's x/erc20, so this handler now only runs module migrations.
 var Upgrade = upgrades.Upgrade{
 	UpgradeName:               upgradeName,
 	UpgradeHandlerConstructor: upgradeHandlerConstructor,

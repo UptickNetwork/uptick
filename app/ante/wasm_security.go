@@ -1,6 +1,7 @@
 package ante
 
 import (
+	"encoding/json"
 	"fmt"
 
 	sdkerrors "cosmossdk.io/errors"
@@ -19,7 +20,7 @@ const (
 	MaxWasmDispatchMsgCount = 10
 
 	// EvmMsgTypeURL is the type URL for EVM messages
-	EvmMsgTypeURL = "/upticktypes.evm.v1.MsgEthereumTx"
+	EvmMsgTypeURL = "/cosmos.evm.vm.v1.MsgEthereumTx"
 )
 
 // WasmSecurityDecorator checks for security issues in CosmWasm messages
@@ -28,14 +29,19 @@ type WasmSecurityDecorator struct {
 	cdc            codec.BinaryCodec
 	evmKeeper      anteinterfaces.EVMKeeper
 	maxTxGasWanted uint64
+	maxDispatch    uint64
 }
 
 // NewWasmSecurityDecorator creates a new WasmSecurityDecorator
-func NewWasmSecurityDecorator(cdc codec.BinaryCodec, evmKeeper anteinterfaces.EVMKeeper, maxTxGasWanted uint64) WasmSecurityDecorator {
+func NewWasmSecurityDecorator(cdc codec.BinaryCodec, evmKeeper anteinterfaces.EVMKeeper, maxTxGasWanted, maxDispatch uint64) WasmSecurityDecorator {
+	if maxDispatch == 0 {
+		maxDispatch = MaxWasmDispatchMsgCount
+	}
 	return WasmSecurityDecorator{
 		cdc:            cdc,
 		evmKeeper:      evmKeeper,
 		maxTxGasWanted: maxTxGasWanted,
+		maxDispatch:    maxDispatch,
 	}
 }
 
@@ -91,6 +97,13 @@ func (wsd WasmSecurityDecorator) validateWasmExecuteContract(ctx sdk.Context, ms
 			errortypes.ErrInvalidRequest,
 			"wasm execute contract message too large: %d bytes",
 			len(msg.Msg),
+		)
+	}
+	if n := countWasmDispatchMsgs(json.RawMessage(msg.Msg)); n > int(wsd.maxDispatch) {
+		return sdkerrors.Wrapf(
+			errortypes.ErrInvalidRequest,
+			"wasm dispatch message count %d exceeds maximum %d",
+			n, wsd.maxDispatch,
 		)
 	}
 
@@ -193,7 +206,7 @@ func (wsd WasmSecurityDecorator) ExtractMessagesFromTx(ctx sdk.Context, tx sdk.T
 		msgQueue = msgQueue[1:]
 
 		// Avoid processing the same message multiple times
-		msgKey := fmt.Sprintf("%s:%s", sdk.MsgTypeURL(msg), msg.String())
+		msgKey := fmt.Sprintf("%s:%p", sdk.MsgTypeURL(msg), msg)
 		if processed[msgKey] {
 			continue
 		}
@@ -212,4 +225,35 @@ func (wsd WasmSecurityDecorator) ExtractMessagesFromTx(ctx sdk.Context, tx sdk.T
 	}
 
 	return allMsgs, nil
+}
+
+func countWasmDispatchMsgs(raw json.RawMessage) int {
+	var v interface{}
+	if err := json.Unmarshal(raw, &v); err != nil {
+		return 0
+	}
+	return countCosmosMsgs(v)
+}
+
+func countCosmosMsgs(v interface{}) int {
+	switch x := v.(type) {
+	case map[string]interface{}:
+		n := 0
+		for k, child := range x {
+			switch k {
+			case "wasm", "bank", "staking", "stargate", "ibc", "gov", "distribution":
+				n++
+			}
+			n += countCosmosMsgs(child)
+		}
+		return n
+	case []interface{}:
+		n := 0
+		for _, child := range x {
+			n += countCosmosMsgs(child)
+		}
+		return n
+	default:
+		return 0
+	}
 }

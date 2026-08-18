@@ -3,10 +3,12 @@ package contracts
 import (
 	_ "embed" // embed compiled smart contract
 	"encoding/json"
+
+	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/UptickNetwork/uptick/x/erc721/types"
 
 	evmtypes "github.com/cosmos/evm/x/vm/types"
-	
 )
 
 var (

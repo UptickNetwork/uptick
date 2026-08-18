@@ -6,6 +6,7 @@ import (
 	errorsmod "cosmossdk.io/errors"
 	"cosmossdk.io/log"
 	store "cosmossdk.io/store"
+	"cosmossdk.io/store/prefix"
 	storetypes "cosmossdk.io/store/types"
 	"github.com/UptickNetwork/uptick/x/erc721/types"
 	tmproto "github.com/cometbft/cometbft/proto/tendermint/types"
@@ -75,4 +76,38 @@ func TestKeeperGetPair(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, pair, got)
 	})
+}
+
+func TestIsERC721Registered_LegacyBytesKey(t *testing.T) {
+	t.Parallel()
+
+	k, ctx := setupKeeperContext(t)
+	addr := common.HexToAddress("0x3333333333333333333333333333333333333333")
+	store := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixTokenPairByERC721)
+	store.Set(addr.Bytes(), []byte("legacy-id"))
+
+	require.True(t, k.IsERC721Registered(ctx, addr))
+}
+
+func TestEvmRefundReceiver(t *testing.T) {
+	t.Parallel()
+
+	k, ctx := setupKeeperContext(t)
+	owner := "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	mixedContract := "0xBbBbBbBbBbBbBbBbBbBbBbBbBbBbBbBbBbBbBbBb"
+	cosmosID := "nft-1"
+	evmID := "42"
+
+	k.SetEvmRefundReceiver(ctx, mixedContract, []string{cosmosID}, []string{evmID}, owner)
+
+	got := k.GetEvmRefundReceiver(ctx, mixedContract, cosmosID, evmID)
+	require.Equal(t, []byte(owner), got)
+
+	got = k.GetEvmRefundReceiver(ctx, mixedContract, cosmosID, "unused")
+	require.Equal(t, []byte(owner), got)
+
+	got = k.GetEvmRefundReceiver(ctx, mixedContract, "missing", evmID)
+	require.Equal(t, []byte(owner), got)
+
+	require.Empty(t, k.GetEvmRefundReceiver(ctx, mixedContract, "missing", "missing"))
 }

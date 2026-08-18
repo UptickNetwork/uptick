@@ -7,9 +7,9 @@ import (
 	"github.com/cosmos/cosmos-sdk/codec/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/x/auth/tx"
-	"github.com/cosmos/gogoproto/proto"
 	enccodec "github.com/cosmos/evm/encoding/codec"
 	evmtypes "github.com/cosmos/evm/x/vm/types"
+	"github.com/cosmos/gogoproto/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 

@@ -63,9 +63,10 @@ func (k Keeper) TransferERC721(
 	}
 	bech32Address, _ := sdk.AccAddressFromBech32(msg.CosmosSender)
 	sender := common.BytesToAddress(bech32Address.Bytes())
-	for _, evmTokenId := range msg.CosmosTokenIds {
-		k.SetEvmAddressByContractTokenId(ctx, msg.EvmContractAddress, evmTokenId, sender.Hex())
-	}
+	// Record against ConvertERC721 results, not the original msg. CosmosTokenIds
+	// on the request is often empty; refund lookup uses the packet cosmos ids
+	// and the mapped EVM token id, plus a lowercased contract address.
+	k.SetEvmRefundReceiver(ctx, resMsg.EvmContractAddress, resMsg.CosmosTokenIds, resMsg.EvmTokenIds, sender.Hex())
 
 	return &types.MsgTransferERC721Response{}, nil
 
@@ -80,6 +81,16 @@ func (k Keeper) ConvertERC721(
 	*types.MsgConvertERC721Response, error,
 ) {
 	ctx := sdk.UnwrapSDKContext(goCtx)
+	if !k.GetEnableErc721(ctx) {
+		return nil, types.ErrERC721Disabled
+	}
+
+	// Normalize the EVM contract address to lowercase so token-pair and
+	// NFT-pair records are always keyed consistently. GetNFTPairByContractTokenID
+	// builds a case-sensitive key (tokenID + "," + address); convertCosmos2Evm
+	// lowercases before lookup, so the reverse direction must store lowercase too.
+	msg.EvmContractAddress = strings.ToLower(msg.EvmContractAddress)
+
 	//classId, nftId
 	classId, nftIds, err := k.GetClassIDAndNFTID(ctx, msg)
 	if err != nil {
@@ -132,8 +143,7 @@ func (k Keeper) ConvertERC721(
 			"deleting self destructed token pair from state",
 			"contract", pair.Erc721Address,
 		)
-		// NOTE: return nil error to persist the changes from the deletion
-		return nil, nil
+		return nil, sdkerrors.Wrapf(types.ErrInternalTokenPair, "erc721 contract %s is self-destructed", pair.Erc721Address)
 	}
 
 	msgconverterc721, err := k.convertEvm2Cosmos(ctx, pair, msg, sender)
@@ -165,6 +175,9 @@ func (k Keeper) ConvertNFT(
 ) {
 
 	ctx := sdk.UnwrapSDKContext(goCtx)
+	if !k.GetEnableErc721(ctx) {
+		return nil, types.ErrERC721Disabled
+	}
 
 	//classId, nftIDs
 	contractAddress, tokenIds, err := k.GetContractAddressAndTokenIds(ctx, msg)
@@ -199,8 +212,7 @@ func (k Keeper) ConvertNFT(
 			"deleting selfdestructed token pair from state",
 			"contract", pair.Erc721Address,
 		)
-		// NOTE: return nil error to persist the changes from the deletion
-		return nil, nil
+		return nil, sdkerrors.Wrapf(types.ErrInternalTokenPair, "erc721 contract %s is self-destructed", pair.Erc721Address)
 	}
 	return k.convertCosmos2Evm(ctx, pair, msg, receiver) // case 2.2
 }
@@ -256,10 +268,13 @@ func (k Keeper) convertCosmos2Evm(
 			return nil, err
 		}
 
-		//	does token id exist
-		owner, err := k.QueryERC721TokenOwner(ctx, common.HexToAddress(msg.EvmContractAddress), bigTokenIds[i])
-		if err != nil {
-
+		//	does token id exist. Use the module's own tracked NFT pair state to
+		//	decide between mint and transfer instead of trusting the (potentially
+		//	attacker-controlled) ERC721 contract's ownerOf, which could be
+		//	spoofed to forge ownership.
+		nftPair := k.GetNFTPairByContractTokenID(ctx, msg.EvmContractAddress, tokenId)
+		if len(nftPair) == 0 {
+			// token not previously converted -> mint a new ERC721 token
 			_, err = k.CallEVM(
 				ctx, erc721, types.ModuleAddress, contract, true,
 				"mintEnhance", receiver, bigTokenIds[i], reqInfo.GetName(), reqInfo.GetURI(), reqInfo.GetData(), reqInfo.GetURIHash())
@@ -272,16 +287,21 @@ func (k Keeper) convertCosmos2Evm(
 					return nil, err
 				}
 			}
-		} else if owner == types.ModuleAddress {
-			// transfer
+		} else {
+			// token previously converted and escrowed by the module -> transfer
+			owner, err := k.QueryERC721TokenOwner(ctx, common.HexToAddress(msg.EvmContractAddress), bigTokenIds[i])
+			if err != nil {
+				return nil, sdkerrors.Wrap(err, "failed to query erc721 token owner")
+			}
+			if owner != types.ModuleAddress {
+				return nil, sdkerrors.Wrapf(errortypes.ErrUnauthorized, "%s is not the owner of erc721 token %s", types.ModuleAddress, msg.EvmTokenIds)
+			}
 			_, err = k.CallEVM(
 				ctx, erc721, types.ModuleAddress, contract, true,
 				"safeTransferFrom", types.ModuleAddress, receiver, bigTokenIds[i])
 			if err != nil {
 				return nil, err
 			}
-		} else {
-			return nil, sdkerrors.Wrapf(errortypes.ErrUnauthorized, "%s is not the owner of erc721 token %s", types.ModuleAddress, msg.EvmTokenIds)
 		}
 
 		// Mint tokens and send to receiver
@@ -432,7 +452,14 @@ func (k Keeper) RefundPacketToken(
 	for _, tokenId := range data.TokenIds {
 
 		uNftID := types.CreateNFTUID(data.ClassId, tokenId)
-		emvTokenId, evmContractAddress := types.GetNFTFromUID(string(k.GetTokenUIDPairByNFTUID(ctx, uNftID)))
+		pairUID := k.GetTokenUIDPairByNFTUID(ctx, uNftID)
+		if len(pairUID) == 0 {
+			return sdkerrors.Wrapf(types.ErrTokenPairNotFound, "missing ERC721 pair for class %s token %s", data.ClassId, tokenId)
+		}
+		emvTokenId, evmContractAddress := types.GetNFTFromUID(string(pairUID))
+		if emvTokenId == "" || evmContractAddress == "" {
+			return sdkerrors.Wrapf(types.ErrInternalTokenPair, "invalid ERC721 uid for class %s token %s", data.ClassId, tokenId)
+		}
 
 		bigTokenId := new(big.Int)
 		_, err := fmt.Sscan(emvTokenId, bigTokenId)
@@ -451,7 +478,10 @@ func (k Keeper) RefundPacketToken(
 			continue
 		}
 
-		evmReceiver := k.GetEvmAddressByContractTokenId(ctx, evmContractAddress, tokenId)
+		evmReceiver := k.GetEvmRefundReceiver(ctx, evmContractAddress, tokenId, emvTokenId)
+		if len(evmReceiver) == 0 {
+			return sdkerrors.Wrapf(errortypes.ErrInvalidAddress, "missing ERC721 refund receiver for contract %s token %s", evmContractAddress, tokenId)
+		}
 		receiver := common.HexToAddress(string(evmReceiver))
 
 		_, err = k.CallEVM(
@@ -461,7 +491,11 @@ func (k Keeper) RefundPacketToken(
 			return err
 		}
 
-		k.DeleteEvmAddressByContractTokenId(ctx, evmContractAddress, tokenId)
+		refundContract := strings.ToLower(evmContractAddress)
+		k.DeleteEvmAddressByContractTokenId(ctx, refundContract, tokenId)
+		if emvTokenId != tokenId {
+			k.DeleteEvmAddressByContractTokenId(ctx, refundContract, emvTokenId)
+		}
 		k.DeleteNFTPairByNFTID(ctx, data.ClassId, tokenId)
 		k.DeleteNFTPairByTokenID(ctx, evmContractAddress, emvTokenId)
 

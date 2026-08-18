@@ -41,10 +41,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
+	upticktypes "github.com/UptickNetwork/uptick/types"
 	"github.com/cosmos/evm/crypto/hd"
 	"github.com/cosmos/evm/server/config"
 	srvflags "github.com/cosmos/evm/server/flags"
-	upticktypes "github.com/UptickNetwork/uptick/types"
 	evmtypes "github.com/cosmos/evm/x/vm/types"
 
 	cmdcfg "github.com/UptickNetwork/uptick/cmd/config"

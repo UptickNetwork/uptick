@@ -4,10 +4,8 @@ import (
 	upgradetypes "cosmossdk.io/x/upgrade/types"
 
 	"github.com/UptickNetwork/uptick/app/upgrades"
-	// v030-v032 excluded: SDK 0.50 API incompatibilities (historical upgrades)
-	// v030 "github.com/UptickNetwork/uptick/app/upgrades/v030"
-	// v031 "github.com/UptickNetwork/uptick/app/upgrades/v031"
-	// v032 "github.com/UptickNetwork/uptick/app/upgrades/v032"
+	// v030-v032 were removed: they were build-ignored historical upgrades with
+	// SDK 0.50 API incompatibilities and stale ethermint fork fields.
 	v033 "github.com/UptickNetwork/uptick/app/upgrades/v033"
 	v040 "github.com/UptickNetwork/uptick/app/upgrades/v040"
 )

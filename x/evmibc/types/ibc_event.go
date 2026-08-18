@@ -1,8 +1,8 @@
 package types
 
-// IBCERC20EventStatus mirrors the Status enum from the legacy ERC20 IBC events
-// (github.com/UptickNetwork/uptick/x/erc20/types). Retained as a local type
-// because the ERC20 module has been migrated to cosmos/evm v0.6.1.
+// IBCERC20Status mirrors the Status enum from the legacy (removed) uptick
+// x/erc20 IBC events. Retained as a local type because the self-developed erc20
+// module was replaced by cosmos/evm v0.6.1 in v0.4.0.
 type IBCERC20Status int32
 
 const (

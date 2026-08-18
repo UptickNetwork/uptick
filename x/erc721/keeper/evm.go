@@ -30,7 +30,7 @@ func (k Keeper) DeployERC721Contract(
 
 	class, err := k.nftKeeper.GetDenomInfo(ctx, msg.ClassId)
 	if err != nil {
-		return common.Address{}, sdkerrors.Wrapf(types.ErrABIPack, "nft class is invalid %s: %s", class.Id, err.Error())
+		return common.Address{}, sdkerrors.Wrapf(types.ErrABIPack, "nft class is invalid %s: %s", msg.ClassId, err.Error())
 	}
 
 	ctorArgs, err := contracts.ERC721UpticksContract.ABI.Pack(

@@ -29,3 +29,7 @@ func (k msgServer) ConvertCW721(goCtx context.Context, msg *types.MsgConvertCW72
 func (k msgServer) TransferCW721(goCtx context.Context, msg *types.MsgTransferCW721) (*types.MsgTransferCW721Response, error) {
 	return k.Keeper.TransferCW721(goCtx, msg)
 }
+
+func (k msgServer) UpdateParams(goCtx context.Context, msg *types.MsgUpdateParams) (*types.MsgUpdateParamsResponse, error) {
+	return k.Keeper.UpdateParams(goCtx, msg)
+}

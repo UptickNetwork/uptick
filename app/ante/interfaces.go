@@ -4,8 +4,8 @@ import (
 	"math/big"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/ethereum/go-ethereum/params"
 	evmtypes "github.com/cosmos/evm/x/vm/types"
+	"github.com/ethereum/go-ethereum/params"
 )
 
 // EvmKeeper defines the expected keeper interface used on the AnteHandler

@@ -6,7 +6,6 @@ import (
 
 	"cosmossdk.io/store/prefix"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/UptickNetwork/uptick/x/cw721/types"
 )
@@ -94,9 +93,9 @@ func (k Keeper) GetClassMap(ctx sdk.Context, classID string) []byte {
 }
 
 // DeleteCW721Map deletes the token pair id for the given address
-func (k Keeper) DeleteCW721Map(ctx sdk.Context, cw721 common.Address) {
+func (k Keeper) DeleteCW721Map(ctx sdk.Context, cw721 string) {
 	store := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixTokenPairByCW721)
-	store.Delete(cw721.Bytes())
+	store.Delete([]byte(cw721))
 }
 
 // SetClassMap sets the token pair id for the classID

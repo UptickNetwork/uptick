@@ -4,6 +4,7 @@ import (
 	sdkerrors "cosmossdk.io/errors"
 	"github.com/UptickNetwork/uptick/x/erc721/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/ethereum/go-ethereum/common"
 )
 
 // GetParams returns the total set of erc721 parameters.
@@ -22,6 +23,11 @@ func (k Keeper) SetParams(ctx sdk.Context, params types.Params) {
 	store := ctx.KVStore(k.storeKey)
 	bz := k.cdc.MustMarshal(&params)
 	store.Set(types.KeyPrefixParams, bz)
+}
+
+// GetEnableErc721 returns whether ERC721 conversion is enabled.
+func (k Keeper) GetEnableErc721(ctx sdk.Context) bool {
+	return k.GetParams(ctx).EnableErc721
 }
 
 // GetClassIDAndNFTID sets the erc721 parameters to the param space.
@@ -72,14 +78,20 @@ func (k Keeper) GetContractAddressAndTokenIds(ctx sdk.Context, msg *types.MsgCon
 
 	pair, err := k.GetPair(ctx, msg.ClassId)
 	if err != nil {
-		msg.EvmTokenIds, _ = getNftDatas(msg.EvmTokenIds, msg.CosmosTokenIds, nil, 2)
-
-		erc721ContractAddress, err := k.DeployERC721Contract(ctx, msg)
-		if err == nil {
-			EvmContractAddress = erc721ContractAddress.String()
+		msg.EvmTokenIds, err = getNftDatas(msg.EvmTokenIds, msg.CosmosTokenIds, nil, 2)
+		if err != nil {
+			return "", nil, err
 		}
 
-		return EvmContractAddress, msg.EvmTokenIds, nil
+		erc721ContractAddress, err := k.DeployERC721Contract(ctx, msg)
+		if err != nil {
+			return "", nil, err
+		}
+		if erc721ContractAddress == (common.Address{}) {
+			return "", nil, sdkerrors.Wrap(types.ErrInternalTokenPair, "deployed erc721 contract address is empty")
+		}
+
+		return erc721ContractAddress.String(), msg.EvmTokenIds, nil
 
 	} else {
 

@@ -6,7 +6,7 @@ require (
 	cosmossdk.io/simapp v0.0.0-20240118210941-3897926e722e
 	cosmossdk.io/tools/confix v0.1.2
 	github.com/CosmWasm/wasmd v0.61.14
-	github.com/bianjieai/nft-transfer v1.2.0-ibc-v10
+	github.com/bianjieai/nft-transfer v1.3.0-ibc-v10
 	github.com/btcsuite/btcd v0.24.2 // indirect
 	github.com/btcsuite/btcd/btcutil v1.1.6 // indirect
 	github.com/cometbft/cometbft v0.38.21
@@ -60,7 +60,7 @@ require (
 	cosmossdk.io/x/tx v0.14.0
 	cosmossdk.io/x/upgrade v0.2.0
 	github.com/cosmos/gogoproto v1.7.2
-	github.com/gogo/protobuf v1.3.2
+	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.1
 	github.com/spf13/pflag v1.0.10
 )
@@ -68,8 +68,6 @@ require (
 require (
 	cosmossdk.io/x/nft v0.2.0
 	github.com/cosmos/cosmos-db v1.1.3
-	github.com/cosmos/ibc-go/modules/capability v1.0.1
-	github.com/onsi/ginkgo/v2 v2.23.4
 )
 
 require (
@@ -103,7 +101,6 @@ require (
 	github.com/cockroachdb/tokenbucket v0.0.0-20230807174530-cc333fc44b06 // indirect
 	github.com/consensys/gnark-crypto v0.18.0 // indirect
 	github.com/cosmos/gogogateway v1.2.0 // indirect
-	github.com/cosmos/ibc-go/v8 v8.7.0 // indirect
 	github.com/cosmos/ics23/go v0.11.0 // indirect
 	github.com/crate-crypto/go-eth-kzg v1.3.0 // indirect
 	github.com/crate-crypto/go-ipa v0.0.0-20240724233137-53bbb0ceb27a // indirect
@@ -124,13 +121,11 @@ require (
 	github.com/go-jose/go-jose/v4 v4.1.3 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
-	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/gofrs/flock v0.12.1 // indirect
 	github.com/gogo/googleapis v1.4.1 // indirect
 	github.com/google/flatbuffers v24.3.25+incompatible // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
-	github.com/google/pprof v0.0.0-20250403155104-27863c87afa6 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.6 // indirect
 	github.com/hashicorp/go-hclog v1.6.3 // indirect
@@ -179,7 +174,6 @@ require (
 	go.opentelemetry.io/otel/sdk v1.40.0 // indirect
 	go.opentelemetry.io/otel/sdk/metric v1.40.0 // indirect
 	go.opentelemetry.io/otel/trace v1.40.0 // indirect
-	go.uber.org/automaxprocs v1.6.0 // indirect
 	go.uber.org/mock v0.6.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
@@ -187,7 +181,6 @@ require (
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/arch v0.17.0 // indirect
 	golang.org/x/time v0.12.0 // indirect
-	golang.org/x/tools v0.41.0 // indirect
 	google.golang.org/genproto v0.0.0-20250603155806-513f23925822 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260114163908-3f89685c29c3 // indirect
 	gotest.tools/v3 v3.5.2 // indirect
@@ -293,12 +286,8 @@ require (
 )
 
 replace (
-	// use cosmos fork of keyring
 	github.com/99designs/keyring => github.com/cosmos/keyring v1.2.0
-	// sub-repos - upgraded to cosmos/evm + ibc-go v10 locally
-	// nft-transfer fork - upgraded to ibc-go v10 locally
-	github.com/bianjieai/nft-transfer => ../nft-transfer-fork
-	// use cosmos fork of go-ethereum (required by cosmos/evm)
+	github.com/bianjieai/nft-transfer => github.com/UptickNetwork/nft-transfer v1.3.0-ibc-v10
 	github.com/ethereum/go-ethereum => github.com/cosmos/go-ethereum v1.16.2-cosmos-1
 	github.com/gin-gonic/gin => github.com/gin-gonic/gin v1.9.1
 	github.com/syndtr/goleveldb => github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7

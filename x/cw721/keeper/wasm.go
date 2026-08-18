@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
+	"strconv"
 	"sync"
 
 	sdkerrors "cosmossdk.io/errors"
-	"cosmossdk.io/math"
 	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
 	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -187,6 +187,55 @@ type InstantiateInfo struct {
 	Minter string `json:"minter"`
 }
 
+// GetWasmCodeID returns the stored CW721 wasm code ID used for auto-instantiate.
+// It looks up the module account first, then the module name as a fallback key.
+func (k Keeper) GetWasmCodeID(ctx sdk.Context) (uint64, error) {
+	for _, key := range []string{types.AccModuleAddress.String(), types.ModuleName} {
+		bz := k.GetWasmCode(ctx, key)
+		if len(bz) == 0 {
+			continue
+		}
+		codeID, err := strconv.ParseUint(string(bz), 10, 64)
+		if err != nil {
+			return 0, sdkerrors.Wrapf(types.ErrCW721CodeNotFound, "invalid wasm code id: %s", err.Error())
+		}
+		if codeID == 0 {
+			continue
+		}
+		return codeID, nil
+	}
+	return 0, types.ErrCW721CodeNotFound
+}
+
+// DeployCW721Contract instantiates a CW721 contract with the cw721 module
+// account as admin and minter, using a previously stored wasm code ID.
+func (k Keeper) DeployCW721Contract(
+	ctx sdk.Context,
+	msg *types.MsgConvertNFT,
+) (string, error) {
+	codeID, err := k.GetWasmCodeID(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	class, err := k.nftKeeper.GetDenomInfo(ctx, msg.ClassId)
+	if err != nil {
+		return "", sdkerrors.Wrapf(types.ErrClassNotExist, "nft class is invalid %s: %s", msg.ClassId, err.Error())
+	}
+
+	name := class.Name
+	if name == "" {
+		name = class.Id
+	}
+	symbol := class.Symbol
+	if symbol == "" {
+		symbol = class.Id
+	}
+
+	moduleAddr := types.AccModuleAddress.String()
+	return k.InstantiateWasmContract(ctx, moduleAddr, codeID, class.Id, name, symbol, moduleAddr)
+}
+
 // InstantiateWasmContract creates and deploys an CW721 contract on the EVM with the
 // cw721 module account as owner.
 func (k Keeper) InstantiateWasmContract(
@@ -231,45 +280,35 @@ type MintInfoData struct {
 	TokenUri string `json:"token_uri"`
 }
 
-// MintCw721 the contract and get the result
+// MintCw721 mints a CW721 token. The execute sender is the module minter;
+// owner is the recipient of the newly minted token.
 func (k Keeper) MintCw721(
 	ctx sdk.Context,
 	contractAddress string,
 	tokenId string,
-	sender string,
+	owner string,
 	tokenUri string,
 ) (*wasmtypes.MsgExecuteContractResponse, error) {
 
-	var mintInfoData MintInfoData
-	var mintInfo MintInfo
-
-	mintInfoData.TokenId = tokenId
-	mintInfoData.Owner = sender
-	mintInfoData.TokenUri = tokenUri
-
-	mintInfo.Mint = mintInfoData
+	mintInfo := MintInfo{
+		Mint: MintInfoData{
+			TokenId:  tokenId,
+			Owner:    owner,
+			TokenUri: tokenUri,
+		},
+	}
 	mintJsonStr, err := json.Marshal(mintInfo)
 	if err != nil {
 		return nil, err
-	} else {
-
-		// Execute the contract
-		funds := sdk.NewCoins(sdk.NewCoin("uptick", math.ZeroInt()))
-		// msgBytes := wasmtypes.RawContractMessage(`{"mint":{"token_id":"abc126","owner":"uptick100s3yp8l3atuuvx98jmftttxzy4ee5mg2n79fx","token_uri":"http://test.com"}}`)
-		execMsg := wasmtypes.MsgExecuteContract{
-			Sender:   sender,
-			Contract: contractAddress,
-			Msg:      wasmtypes.RawContractMessage(mintJsonStr),
-			Funds:    funds,
-		}
-		_, err := k.ExecWasmMsg(ctx, &execMsg)
-		if err != nil {
-			return nil, err
-		} else {
-			return nil, nil
-		}
 	}
 
+	execMsg := wasmtypes.MsgExecuteContract{
+		Sender:   types.AccModuleAddress.String(),
+		Contract: contractAddress,
+		Msg:      wasmtypes.RawContractMessage(mintJsonStr),
+		Funds:    sdk.NewCoins(),
+	}
+	return k.ExecWasmMsg(ctx, &execMsg)
 }
 
 // TransferNftInfo
@@ -302,25 +341,15 @@ func (k Keeper) TransferCw721(
 	transferJsonStr, err := json.Marshal(transferNftInfo)
 	if err != nil {
 		return nil, err
-	} else {
-
-		// Execute the contract
-		funds := sdk.NewCoins(sdk.NewCoin("uptick", math.ZeroInt()))
-		execMsg := wasmtypes.MsgExecuteContract{
-			Sender:   sender,
-			Contract: contractAddress,
-			Msg:      wasmtypes.RawContractMessage(transferJsonStr),
-			Funds:    funds,
-		}
-
-		_, err := k.ExecWasmMsg(ctx, &execMsg)
-		if err != nil {
-			return nil, err
-		} else {
-			return nil, nil
-		}
 	}
 
+	execMsg := wasmtypes.MsgExecuteContract{
+		Sender:   sender,
+		Contract: contractAddress,
+		Msg:      wasmtypes.RawContractMessage(transferJsonStr),
+		Funds:    sdk.NewCoins(),
+	}
+	return k.ExecWasmMsg(ctx, &execMsg)
 }
 
 // ExecWasmMsg exec the contract and get the result

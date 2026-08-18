@@ -1,7 +1,6 @@
 package types
 
 import (
-	"encoding/hex"
 	"fmt"
 	"regexp"
 	"strings"
@@ -111,11 +110,17 @@ func CreateNFTIDFromTokenID(id string) string {
 	return fmt.Sprintf("%s%s", DefaultPrefix, removeAddress0x(id))
 }
 
-// CreateTokenIDFromNFTID create classId from cw721 address
+// CreateTokenIDFromNFTID reverses CreateNFTIDFromTokenID.
+// CW721 token IDs are strings, so native Cosmos NFT IDs are used as-is.
 func CreateTokenIDFromNFTID(nftID string) string {
-
-	ret := strings.Replace(nftID, DefaultPrefix+"-", "", 1)
-	return "0x" + hex.EncodeToString([]byte(ret))
+	hyphenPrefix := DefaultPrefix + "-"
+	if strings.HasPrefix(nftID, hyphenPrefix) {
+		return strings.TrimPrefix(nftID, hyphenPrefix)
+	}
+	if strings.HasPrefix(nftID, DefaultPrefix) {
+		return strings.TrimPrefix(nftID, DefaultPrefix)
+	}
+	return nftID
 }
 
 func CreateTokenUID(contractAddress string, tokenID string) string {

@@ -3,6 +3,8 @@ package ante
 import (
 	"testing"
 
+	"cosmossdk.io/math"
+	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	govv1 "github.com/cosmos/cosmos-sdk/x/gov/types/v1"
@@ -22,18 +24,18 @@ func TestValidatorCommissionDecoratorValidateMsg(t *testing.T) {
 	t.Run("staking CreateValidator", func(t *testing.T) {
 		msg, err := stakingtypes.NewMsgCreateValidator(
 			"cosmosvaloper1validator",
-			sdk.ValAddress([]byte("val")),
-			sdk.ZeroDec(),
+			ed25519.GenPrivKey().PubKey(),
+			sdk.NewCoin("stake", math.NewInt(1000)),
 			stakingtypes.Description{Moniker: "test"},
-			stakingtypes.NewCommissionRates(sdk.ZeroDec(), sdk.ZeroDec(), sdk.ZeroDec()),
-			sdk.NewInt(1),
+			stakingtypes.NewCommissionRates(math.LegacyZeroDec(), math.LegacyZeroDec(), math.LegacyZeroDec()),
+			math.NewInt(1),
 		)
 		require.NoError(t, err)
 		require.True(t, dec.involvesStakingMsg(msg))
 	})
 
 	t.Run("non-staking msg returns false", func(t *testing.T) {
-		msg := banktypes.NewMsgSend("cosmos1addr", "cosmos1recipient", sdk.NewCoins(sdk.NewInt64Coin("stake", 1000)))
+		msg := banktypes.NewMsgSend(sdk.AccAddress([]byte("from")), sdk.AccAddress([]byte("to")), sdk.NewCoins(sdk.NewInt64Coin("stake", 1000)))
 		require.False(t, dec.involvesStakingMsg(msg))
 	})
 

@@ -1,10 +1,11 @@
 package keeper
 
 import (
+	"strings"
+
 	sdkerrors "cosmossdk.io/errors"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/UptickNetwork/uptick/x/cw721/types"
 )
@@ -16,6 +17,21 @@ func (k Keeper) RegisterNFT(ctx sdk.Context, msg *types.MsgConvertNFT) (*types.T
 	if k.IsClassRegistered(ctx, msg.ClassId) {
 		return nil, sdkerrors.Wrapf(
 			types.ErrTokenPairAlreadyExists, "class ID already registered: %s", msg.ClassId,
+		)
+	}
+
+	// Validate the CW721 contract address. CW721 contracts are CosmWasm
+	// contracts, so the address must be a valid bech32 account address (not a
+	// 0x hex address); it is passed directly to the wasm querier/executor below.
+	if _, err := sdk.AccAddressFromBech32(msg.ContractAddress); err != nil {
+		return nil, sdkerrors.Wrapf(
+			types.ErrInternalTokenPair, "invalid CW721 contract address: %s", msg.ContractAddress,
+		)
+	}
+
+	if len(strings.TrimSpace(msg.ClassId)) == 0 {
+		return nil, sdkerrors.Wrapf(
+			types.ErrInternalTokenPair, "class ID must not be empty: %s", msg.ClassId,
 		)
 	}
 
@@ -54,25 +70,14 @@ func (k Keeper) RegisterCW721(ctx sdk.Context, msg *types.MsgConvertCW721) (*typ
 // CreateNFTClass generates the metadata to represent the CW721 token .
 func (k Keeper) CreateNFTClass(ctx sdk.Context, msg *types.MsgConvertCW721) error {
 
-	contract := common.HexToAddress(msg.ContractAddress)
-
 	cw721Data, err := k.QueryCW721(ctx, msg.ContractAddress)
 	if err != nil {
 		return err
 	}
 
-	classEnhance, err := k.QueryClassEnhance(ctx, contract)
-	// TODO need to add enchance case
-	if err == nil {
-		// normal logic
-		classEnhance.Uri = ""
-		classEnhance.Data = ""
-		classEnhance.Schema = ""
-		classEnhance.UriHash = ""
-		classEnhance.Description = ""
-		classEnhance.UpdateRestricted = false
-		classEnhance.MintRestricted = false
-	}
+	// QueryClassEnhance is not implemented for CosmWasm contracts yet;
+	// keep empty enhance fields rather than treating success as a wipe.
+	classEnhance := types.ClassEnhance{}
 
 	if k.IsClassRegistered(ctx, msg.ClassId) {
 		return sdkerrors.Wrapf(types.ErrInternalTokenPair, "nft class already registered: %s", msg.ClassId)

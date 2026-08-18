@@ -1,6 +1,8 @@
 package keeper
 
 import (
+	"strings"
+
 	sdkerrors "cosmossdk.io/errors"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
@@ -52,10 +54,23 @@ func (k Keeper) GetContractAddressAndTokenIds(ctx sdk.Context, msg *types.MsgCon
 
 	pair, err := k.GetPair(ctx, msg.ClassId)
 	if err != nil {
-		// When the pair doesn't exist yet, use the provided contract address
-		// and generate token IDs from NFT IDs.
-		msg.TokenIds, _ = getNftDatas(msg.TokenIds, msg.NftIds, nil, 2)
-		return msg.ContractAddress, msg.TokenIds, nil
+		// No registered pair: generate token IDs, then use the provided
+		// contract or instantiate a new CW721 (module as minter).
+		msg.TokenIds, err = getNftDatas(msg.TokenIds, msg.NftIds, nil, 2)
+		if err != nil {
+			return "", nil, err
+		}
+		if strings.TrimSpace(msg.ContractAddress) != "" {
+			return "", nil, sdkerrors.Wrapf(
+				types.ErrContractAddressNotCorrect,
+				"unregistered class %s cannot bind to a caller-supplied contract", msg.ClassId,
+			)
+		}
+		contractAddress, err := k.DeployCW721Contract(ctx, msg)
+		if err != nil {
+			return "", nil, err
+		}
+		return contractAddress, msg.TokenIds, nil
 	}
 
 	var (

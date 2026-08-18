@@ -1,17 +1,24 @@
 package keeper
 
 import (
+	"context"
 	"testing"
 
+	coreaddress "cosmossdk.io/core/address"
 	"cosmossdk.io/core/store"
 	"cosmossdk.io/log"
+	rootstore "cosmossdk.io/store"
+	storemetrics "cosmossdk.io/store/metrics"
 	storetypes "cosmossdk.io/store/types"
 	"cosmossdk.io/x/nft"
 	nftkeeper "cosmossdk.io/x/nft/keeper"
 
+	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	"github.com/cosmos/cosmos-sdk/codec"
 	codecAddress "github.com/cosmos/cosmos-sdk/codec/address"
+	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 
 	dbm "github.com/cosmos/cosmos-db"
 
@@ -37,12 +44,12 @@ func TestKeeperTestSuite(t *testing.T) {
 }
 
 func (s *KeeperTestSuite) SetupTest() {
-	s.cdc = codec.NewProtoCodec(nil)
+	s.cdc = codec.NewProtoCodec(codectypes.NewInterfaceRegistry())
 	types.RegisterInterfaces(s.cdc.InterfaceRegistry())
 
 	// Create in-memory database and commit store
 	db := dbm.NewMemDB()
-	cms := storetypes.NewCommitMultiStore(db, log.NewNopLogger(), nil)
+	cms := rootstore.NewCommitMultiStore(db, log.NewNopLogger(), storemetrics.NewNoOpMetrics())
 
 	// Create store service for the nft module store key
 	nftStoreKey := storetypes.NewKVStoreKey(nft.StoreKey)
@@ -54,7 +61,7 @@ func (s *KeeperTestSuite) SetupTest() {
 
 	_ = cms.LoadLatestVersion()
 
-	s.storeSvc = &testKVStoreService{store: cms.GetKVStore(colStoreKey)}
+	s.storeSvc = &testKVStoreService{store: kvStoreAdapter{inner: cms.GetKVStore(colStoreKey)}}
 
 	// Create nft keeper dependencies
 	ac := codecAddress.NewBech32Codec("cosmos")
@@ -74,7 +81,7 @@ func (s *KeeperTestSuite) SetupTest() {
 		nk:           s.nftKpr,
 	}
 
-	s.ctx = sdk.NewContext(cms, sdk.Header{}, false, log.NewNopLogger())
+	s.ctx = sdk.NewContext(cms, cmtproto.Header{}, false, log.NewNopLogger())
 }
 
 // ============================================================================
@@ -89,20 +96,20 @@ func (s *KeeperTestSuite) TestSaveAndGetDenomInfo() {
 			Schema:  "schema-uri",
 			Creator: "cosmos1creator",
 		}
-		s.keeper.SaveDenom(s.ctx, denom)
+		s.keeper.SaveDenom(s.ctx, denom.Id, denom.Name, denom.Schema, "", sdk.AccAddress([]byte(denom.Creator)), false, false, "", "", "", "")
 
 		retrieved, err := s.keeper.GetDenomInfo(s.ctx, "denom1")
 		s.Require().NoError(err)
 		s.Require().Equal(denom.Id, retrieved.Id)
 		s.Require().Equal(denom.Name, retrieved.Name)
 		s.Require().Equal(denom.Schema, retrieved.Schema)
-		s.Require().Equal(denom.Creator, retrieved.Creator)
+		s.Require().Equal(sdk.AccAddress([]byte(denom.Creator)).String(), retrieved.Creator)
 	})
 
 	s.Run("get non-existent denom returns error", func() {
 		_, err := s.keeper.GetDenomInfo(s.ctx, "nonexistent")
 		s.Require().Error(err)
-		s.Require().ErrorContains(err, "not found")
+		s.Require().ErrorContains(err, "not exists")
 	})
 }
 
@@ -114,7 +121,7 @@ func (s *KeeperTestSuite) TestHasDenom() {
 			Schema:  "schema",
 			Creator: "cosmos1creator",
 		}
-		s.keeper.SaveDenom(s.ctx, denom)
+		s.keeper.SaveDenom(s.ctx, denom.Id, denom.Name, denom.Schema, "", sdk.AccAddress([]byte(denom.Creator)), false, false, "", "", "", "")
 
 		s.Require().True(s.keeper.HasDenom(s.ctx, "denom2"))
 	})
@@ -132,11 +139,11 @@ func (s *KeeperTestSuite) TestSaveDenomDuplicate() {
 		Creator: "cosmos1creator",
 	}
 	// First save succeeds
-	err := s.keeper.SaveDenom(s.ctx, denom)
+	err := s.keeper.SaveDenom(s.ctx, denom.Id, denom.Name, denom.Schema, "", sdk.AccAddress([]byte(denom.Creator)), false, false, "", "", "", "")
 	s.Require().NoError(err)
 
 	// Second save fails due to duplicate
-	err = s.keeper.SaveDenom(s.ctx, denom)
+	err = s.keeper.SaveDenom(s.ctx, denom.Id, denom.Name, denom.Schema, "", sdk.AccAddress([]byte(denom.Creator)), false, false, "", "", "", "")
 	s.Require().Error(err)
 	s.Require().ErrorContains(err, "already exists")
 }
@@ -170,16 +177,16 @@ func (s *KeeperTestSuite) TestSupplyInvariant() {
 
 func TestDenomHelpers(t *testing.T) {
 	t.Run("NewDenom creates valid denom", func(t *testing.T) {
-		d := types.NewDenom("myid", "MyName", "schema-abc", "cosmos1creator")
+		d := types.Denom{Id: "myid", Name: "MyName", Schema: "schema-abc", Creator: "cosmos1creator"}
 		require.Equal(t, "myid", d.Id)
 		require.Equal(t, "MyName", d.Name)
 		require.Equal(t, "schema-abc", d.Schema)
 		require.Equal(t, "cosmos1creator", d.Creator)
 	})
 
-	t.Run("Denom String returns ID", func(t *testing.T) {
-		d := types.NewDenom("abc", "Name", "schema", "cosmos1creator")
-		require.Equal(t, "abc", d.String())
+	t.Run("Denom String contains ID", func(t *testing.T) {
+		d := types.Denom{Id: "abc", Name: "Name", Schema: "schema", Creator: "cosmos1creator"}
+		require.Contains(t, d.String(), "abc")
 	})
 }
 
@@ -187,13 +194,35 @@ func TestDenomHelpers(t *testing.T) {
 // Test mocks
 // ============================================================================
 
-// testKVStoreService is a minimal KVStoreService implementation for testing
-type testKVStoreService struct {
-	store storetypes.KVStore
+// kvStoreAdapter adapts the cosmos-sdk/store KVStore (legacy Delete/Set
+// signatures) to the cosmossdk.io/core/store.KVStore interface expected by the
+// KVStoreService.
+type kvStoreAdapter struct {
+	inner storetypes.KVStore
 }
 
-func (s *testKVStoreService) OpenKVStore(ctx sdk.Context) storetypes.KVStore {
-	return ctx.KVStore(ctx.MultiStore().GetStoreKey("collection"))
+func (a kvStoreAdapter) Get(key []byte) ([]byte, error) {
+	return a.inner.Get(key), nil
+}
+func (a kvStoreAdapter) Has(key []byte) (bool, error) {
+	return a.inner.Has(key), nil
+}
+func (a kvStoreAdapter) Iterator(start, end []byte) (store.Iterator, error) {
+	return a.inner.Iterator(start, end), nil
+}
+func (a kvStoreAdapter) ReverseIterator(start, end []byte) (store.Iterator, error) {
+	return a.inner.ReverseIterator(start, end), nil
+}
+func (a kvStoreAdapter) Set(key, value []byte) error { a.inner.Set(key, value); return nil }
+func (a kvStoreAdapter) Delete(key []byte) error     { a.inner.Delete(key); return nil }
+
+// testKVStoreService is a minimal KVStoreService implementation for testing
+type testKVStoreService struct {
+	store store.KVStore
+}
+
+func (s *testKVStoreService) OpenKVStore(_ context.Context) store.KVStore {
+	return s.store
 }
 
 var _ store.KVStoreService = (*testKVStoreService)(nil)
@@ -201,18 +230,22 @@ var _ store.KVStoreService = (*testKVStoreService)(nil)
 // testAccountKeeper implements nft.AccountKeeper for testing
 type testAccountKeeper struct{}
 
-func (a *testAccountKeeper) GetAccount(_ sdk.Context, _ sdk.AccAddress) sdk.AccountI {
+func (a *testAccountKeeper) GetAccount(_ context.Context, _ sdk.AccAddress) sdk.AccountI {
 	return nil
 }
-func (a *testAccountKeeper) SetAccount(_ sdk.Context, _ sdk.AccAddress) {}
-func (a *testAccountKeeper) GetModuleAccount(_ sdk.Context, _ string) sdk.ModuleAccountI {
+func (a *testAccountKeeper) SetAccount(_ context.Context, _ sdk.AccAddress) {}
+func (a *testAccountKeeper) GetModuleAccount(_ context.Context, _ string) sdk.ModuleAccountI {
 	return nil
 }
-func (a *testAccountKeeper) GetModuleAddress(_ string) sdk.AccAddress { return nil }
+func (a *testAccountKeeper) GetModuleAddress(moduleName string) sdk.AccAddress {
+	return authtypes.NewModuleAddress(moduleName)
+}
+func (a *testAccountKeeper) AddressCodec() coreaddress.Codec {
+	return codecAddress.NewBech32Codec("uptick")
+}
 func (a *testAccountKeeper) GetSequence(_ sdk.Context, _ sdk.AccAddress) (uint64, error) {
 	return 0, nil
 }
-func (a *testAccountKeeper) GetParams(_ sdk.Context) sdk.Params                       { return sdk.Params{} }
 func (a *testAccountKeeper) HasAccount(_ sdk.Context, _ sdk.AccAddress) bool          { return true }
 func (a *testAccountKeeper) IterateAccounts(_ sdk.Context, _ func(sdk.AccountI) bool) {}
 
@@ -225,8 +258,8 @@ func (b *testBankKeeper) SendCoinsFromModuleToAccount(_ sdk.Context, _ string, _
 func (b *testBankKeeper) SendCoinsFromAccountToModule(_ sdk.Context, _ sdk.AccAddress, _ string, _ sdk.Coins) error {
 	return nil
 }
-func (b *testBankKeeper) SpendableCoins(_ sdk.Context, _ sdk.AccAddress) sdk.Coins { return nil }
-func (b *testBankKeeper) BlockedAddr(_ sdk.AccAddress) bool                        { return false }
+func (b *testBankKeeper) SpendableCoins(_ context.Context, _ sdk.AccAddress) sdk.Coins { return nil }
+func (b *testBankKeeper) BlockedAddr(_ sdk.AccAddress) bool                            { return false }
 func (b *testBankKeeper) GetBalance(_ sdk.Context, _ sdk.AccAddress, _ string) sdk.Coin {
 	return sdk.Coin{}
 }

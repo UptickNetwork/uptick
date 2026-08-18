@@ -32,19 +32,24 @@ func Migrate(ctx sdk.Context,
 	}
 
 	var (
-		denomNum int64
-		tokenNum int64
+		denomNum        int64
+		tokenNum        int64
+		skippedDenomNum int64
+		skippedTokenNum int64
 	)
 	for ; iterator.Valid(); iterator.Next() {
 		var denom types.Denom
 		if err := cdc.Unmarshal(iterator.Value(), &denom); err != nil {
 			logger.Error("failed to unmarshal denom during v2 migration", "error", err.Error())
+			skippedDenomNum++
 			continue
 		}
 
 		creator, err := sdk.AccAddressFromBech32(denom.Creator)
 		if err != nil {
-			return err
+			logger.Error("skipping denom with invalid creator during v2 migration", "denom", denom.Id, "error", err.Error())
+			skippedDenomNum++
+			continue
 		}
 
 		if err := saveDenom(ctx, denom.Id,
@@ -67,17 +72,20 @@ func Migrate(ctx sdk.Context,
 		store.Delete(KeyDenomName(denom.Name))
 		store.Delete(KeyCollection(denom.Id))
 
-		tokenInDenom, err := migrateToken(ctx, k, logger, denom.Id)
+		tokenInDenom, skippedInDenom, err := migrateToken(ctx, k, logger, denom.Id)
 		if err != nil {
 			return err
 		}
 		denomNum++
 		tokenNum += tokenInDenom
+		skippedTokenNum += skippedInDenom
 
 	}
 	logger.Info("migrate store data success",
 		"denomTotalNum", denomNum,
 		"tokenTotalNum", tokenNum,
+		"skippedDenomNum", skippedDenomNum,
+		"skippedTokenNum", skippedTokenNum,
 		"consume", time.Since(startTime).String(),
 	)
 	return nil
@@ -87,7 +95,7 @@ func migrateToken(
 	k keeper,
 	logger log.Logger,
 	denomID string,
-) (int64, error) {
+) (migrated int64, skipped int64, err error) {
 	var iterator storetypes.Iterator
 	defer func() {
 		if iterator != nil {
@@ -96,18 +104,20 @@ func migrateToken(
 	}()
 
 	store := runtime.KVStoreAdapter(k.storeService.OpenKVStore(ctx))
-	total := int64(0)
 	iterator = storetypes.KVStorePrefixIterator(store, KeyNFT(denomID, ""))
 	for ; iterator.Valid(); iterator.Next() {
 		var baseNFT types.BaseNFT
 		if err := k.cdc.Unmarshal(iterator.Value(), &baseNFT); err != nil {
 			logger.Error("failed to unmarshal NFT during v2 migration", "error", err.Error())
+			skipped++
 			continue
 		}
 
 		owner, err := sdk.AccAddressFromBech32(baseNFT.Owner)
 		if err != nil {
-			return 0, err
+			logger.Error("skipping NFT with invalid owner during v2 migration", "denomID", denomID, "token", baseNFT.Id, "error", err.Error())
+			skipped++
+			continue
 		}
 
 		if err := k.saveNFT(ctx, denomID,
@@ -118,14 +128,14 @@ func migrateToken(
 			baseNFT.Data,
 			owner,
 		); err != nil {
-			return 0, err
+			return 0, skipped, err
 		}
 
 		// delete old keys only after new data is successfully saved
 		store.Delete(KeyNFT(denomID, baseNFT.Id))
 		store.Delete(KeyOwner(owner, denomID, baseNFT.Id))
-		total++
+		migrated++
 	}
-	logger.Info("migrate nft success", "denomID", denomID, "nftNum", total)
-	return total, nil
+	logger.Info("migrate nft success", "denomID", denomID, "nftNum", migrated, "skippedNftNum", skipped)
+	return migrated, skipped, nil
 }

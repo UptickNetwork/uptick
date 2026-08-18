@@ -3,7 +3,7 @@ package uptick.evm_ibc.v1;
 
 import "gogoproto/gogo.proto";
 
-option go_package = "github.com/UptickNetwork/uptick/x/evmIBC/types";
+option go_package = "github.com/UptickNetwork/uptick/x/evmibc/types";
 
 // TokenPair defines an instance that records a pairing consisting of a native
 // Cosmos Coin and an ERC721 token address.

@@ -102,3 +102,27 @@ func TestSetParams_Override(t *testing.T) {
 	require.True(t, got.EnableCw721)
 	require.True(t, got.EnableEVMHook)
 }
+
+func TestConvertNFT_Disabled(t *testing.T) {
+	k, ctx := setupKeeper(t)
+	require.NoError(t, k.SetParams(ctx, cw721types.NewParams(false, true)))
+
+	_, err := k.ConvertNFT(ctx, &cw721types.MsgConvertNFT{
+		ClassId: "class-1",
+		NftIds:  []string{"nft-1"},
+		Sender:  "cosmos1sender",
+	})
+	require.ErrorIs(t, err, cw721types.ErrCW721Disabled)
+}
+
+func TestConvertCW721_Disabled(t *testing.T) {
+	k, ctx := setupKeeper(t)
+	require.NoError(t, k.SetParams(ctx, cw721types.NewParams(false, true)))
+
+	_, err := k.ConvertCW721(ctx, &cw721types.MsgConvertCW721{
+		ContractAddress: "cosmos1contract",
+		TokenIds:        []string{"1"},
+		Sender:          "cosmos1sender",
+	})
+	require.ErrorIs(t, err, cw721types.ErrCW721Disabled)
+}

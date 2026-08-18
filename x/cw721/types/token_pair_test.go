@@ -3,6 +3,7 @@ package types
 import (
 	"testing"
 
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 )
@@ -36,14 +37,9 @@ func TestTokenPairGetCW721Contract(t *testing.T) {
 }
 
 func TestTokenPairValidate_Valid(t *testing.T) {
-	addr1 := "0x1234567890123456789012345678901234567890"
+	addr1 := sdk.AccAddress([]byte("cw721contractaddrxx")).String()
 	tp1 := NewTokenPair(addr1, "class001")
 	err := tp1.Validate()
-	require.NoError(t, err)
-
-	addr2 := "0xABCDEF0000000000000000000000000000ABCDEF"
-	tp2 := NewTokenPair(addr2, "mynft")
-	err = tp2.Validate()
 	require.NoError(t, err)
 }
 
