@@ -725,12 +725,29 @@ func (app *Uptick) configureEVMMempool(appOpts servertypes.AppOptions, logger lo
 	// Read operator-configurable mempool knobs from the cosmos/evm app.toml
 	// ([evm] section), falling back to genesis/consensus values where relevant.
 	cosmosPoolMaxTx := evmconfig.GetCosmosPoolMaxTx(appOpts, logger)
+	// 关键修复：cosmos-sdk 的 mempool.DefaultMaxTx = -1，未传 --mempool.max-txs 时
+	// GetCosmosPoolMaxTx 返回 -1 → PriorityNonceMempool.Insert 走 `MaxTx < 0` 分支
+	// 直接 return nil（不插入），导致升级后/未配置的链上 Cosmos 交易静默丢失、
+	// 区块永远为空（num_txs=0）。这里把非正值归一为 5000，与主链约定一致。
+	if cosmosPoolMaxTx <= 0 {
+		logger.Warn(
+			"cosmos pool max tx is non-positive, defaulting to 5000",
+			"got", cosmosPoolMaxTx,
+		)
+		cosmosPoolMaxTx = 5000
+	}
 
 	mempoolConfig := &evmmempool.EVMMempoolConfig{
 		AnteHandler:      app.AnteHandler(),
 		LegacyPoolConfig: evmconfig.GetLegacyPoolConfig(appOpts, logger),
-		BlockGasLimit:    evmconfig.GetBlockGasLimit(appOpts, logger),
-		MinTip:           evmconfig.GetMinTip(appOpts, logger),
+		// 不用 evmconfig.GetBlockGasLimit：它从 genesis.json 的 SDK AppGenesis
+		// ConsensusParams 读取，而 v0.3.3 的 genesis 只写 cometbft 的 `consensus`
+		// 字段（无 `consensus_params`），SDK v0.53 解析后 ConsensusParams 为 nil，
+		// 该函数返回 0 → EVM mempool 把每笔 Cosmos tx 都判为超限丢弃（num_txs=0，
+		// 升级后链上无法打包任何 Cosmos 交易）。区块 gas 上限由 consensus 层校验，
+		// 这里用 MaxUint64（不预过滤）与 uptick 的 max_gas=-1 语义一致。
+		BlockGasLimit: ^uint64(0),
+		MinTip:        evmconfig.GetMinTip(appOpts, logger),
 		// 关键修复：禁用默认的 promote 广播，避免死锁。
 		//
 		// cosmos/evm 的 ExperimentalEVMMempool.Insert 持有 m.mtx 后调用
