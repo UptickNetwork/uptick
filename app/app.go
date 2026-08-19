@@ -713,6 +713,11 @@ func (app *Uptick) SetClientCtx(clientCtx client.Context) {
 	app.clientCtx = clientCtx
 }
 
+const (
+	defaultCosmosPoolMaxTx  = 5000
+	defaultEVMBlockGasLimit = ^uint64(0)
+)
+
 // configureEVMMempool sets up the cosmos/evm experimental EVM mempool and the
 // related ABCI handlers. Required for the EVM JSON-RPC server to function.
 // Modeled on cosmos/evm's evmd.ConfigureEVMMempool.
@@ -731,10 +736,20 @@ func (app *Uptick) configureEVMMempool(appOpts servertypes.AppOptions, logger lo
 	// 区块永远为空（num_txs=0）。这里把非正值归一为 5000，与主链约定一致。
 	if cosmosPoolMaxTx <= 0 {
 		logger.Warn(
-			"cosmos pool max tx is non-positive, defaulting to 5000",
+			"cosmos pool max tx is non-positive, defaulting to configured fallback",
 			"got", cosmosPoolMaxTx,
+			"fallback", defaultCosmosPoolMaxTx,
 		)
-		cosmosPoolMaxTx = 5000
+		cosmosPoolMaxTx = defaultCosmosPoolMaxTx
+	}
+
+	blockGasLimit := evmconfig.GetBlockGasLimit(appOpts, logger)
+	if blockGasLimit == 0 {
+		logger.Warn(
+			"evm mempool block gas limit is zero, using unlimited fallback",
+			"fallback", defaultEVMBlockGasLimit,
+		)
+		blockGasLimit = defaultEVMBlockGasLimit
 	}
 
 	mempoolConfig := &evmmempool.EVMMempoolConfig{
@@ -746,7 +761,7 @@ func (app *Uptick) configureEVMMempool(appOpts servertypes.AppOptions, logger lo
 		// 该函数返回 0 → EVM mempool 把每笔 Cosmos tx 都判为超限丢弃（num_txs=0，
 		// 升级后链上无法打包任何 Cosmos 交易）。区块 gas 上限由 consensus 层校验，
 		// 这里用 MaxUint64（不预过滤）与 uptick 的 max_gas=-1 语义一致。
-		BlockGasLimit: ^uint64(0),
+		BlockGasLimit: blockGasLimit,
 		MinTip:        evmconfig.GetMinTip(appOpts, logger),
 		// 关键修复：禁用默认的 promote 广播，避免死锁。
 		//

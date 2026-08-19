@@ -14,6 +14,7 @@ import (
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
+	paramstypes "github.com/cosmos/cosmos-sdk/x/params/types"
 	"github.com/stretchr/testify/require"
 
 	"github.com/UptickNetwork/uptick/app/upgrades"
@@ -73,4 +74,48 @@ func TestMigrateLegacyEVMAccounts(t *testing.T) {
 	require.Equal(t, addr.String(), baseAccount.Address)
 	require.Equal(t, uint64(7), baseAccount.AccountNumber)
 	require.Equal(t, uint64(3), baseAccount.Sequence)
+}
+
+func TestDecodeLegacyBoolRaw(t *testing.T) {
+	logger := log.NewNopLogger()
+	ctx := sdk.Context{}
+	box := upgrades.Toolbox{}
+
+	require.True(t, decodeLegacyBoolRaw(ctx, box, logger, "erc20", "EnableErc20", false, []byte("true")))
+	require.False(t, decodeLegacyBoolRaw(ctx, box, logger, "erc20", "EnableErc20", false, []byte("false")))
+	require.False(t, decodeLegacyBoolRaw(ctx, box, logger, "erc20", "EnableErc20", false, []byte("not-a-bool")))
+}
+
+func TestReadLegacyBoolParamRaw(t *testing.T) {
+	db := dbm.NewMemDB()
+	cms := rootstore.NewCommitMultiStore(db, log.NewNopLogger(), storemetrics.NewNoOpMetrics())
+	paramsKey := storetypes.NewKVStoreKey(paramstypes.StoreKey)
+	cms.MountStoreWithDB(paramsKey, storetypes.StoreTypeIAVL, db)
+	require.NoError(t, cms.LoadLatestVersion())
+
+	ctx := sdk.NewContext(cms, cmtproto.Header{}, false, log.NewNopLogger())
+	ctx.KVStore(paramsKey).Set([]byte("erc20/EnableErc20"), []byte("false"))
+
+	require.False(t, readLegacyBoolParamRaw(ctx, paramsKey, "erc20", "EnableErc20", true, log.NewNopLogger()))
+	require.True(t, readLegacyBoolParamRaw(ctx, paramsKey, "erc20", "Missing", true, log.NewNopLogger()))
+}
+
+func TestDeleteLegacyParamsSubspace(t *testing.T) {
+	db := dbm.NewMemDB()
+	cms := rootstore.NewCommitMultiStore(db, log.NewNopLogger(), storemetrics.NewNoOpMetrics())
+	paramsKey := storetypes.NewKVStoreKey(paramstypes.StoreKey)
+	cms.MountStoreWithDB(paramsKey, storetypes.StoreTypeIAVL, db)
+	require.NoError(t, cms.LoadLatestVersion())
+
+	ctx := sdk.NewContext(cms, cmtproto.Header{}, false, log.NewNopLogger())
+	store := ctx.KVStore(paramsKey)
+	store.Set([]byte("erc20/EnableErc20"), []byte("true"))
+	store.Set([]byte("erc721/EnableErc721"), []byte("true"))
+	store.Set([]byte("other/Keep"), []byte("true"))
+
+	deleteLegacyParamsSubspace(ctx, paramsKey, log.NewNopLogger(), "erc20", "erc721")
+
+	require.Nil(t, store.Get([]byte("erc20/EnableErc20")))
+	require.Nil(t, store.Get([]byte("erc721/EnableErc721")))
+	require.NotNil(t, store.Get([]byte("other/Keep")))
 }

@@ -18,13 +18,14 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
+	paramstypes "github.com/cosmos/cosmos-sdk/x/params/types"
 
 	// cosmos/evm imports
-	evmsecp256k1 "github.com/cosmos/evm/crypto/ethsecp256k1"
 	upticktypes "github.com/UptickNetwork/uptick/types"
 	cw721types "github.com/UptickNetwork/uptick/x/cw721/types"
 	erc721types "github.com/UptickNetwork/uptick/x/erc721/types"
 	ibcnfttransfertypes "github.com/bianjieai/nft-transfer/types"
+	evmsecp256k1 "github.com/cosmos/evm/crypto/ethsecp256k1"
 	erc20types "github.com/cosmos/evm/x/erc20/types"
 	evmkeeper "github.com/cosmos/evm/x/vm/keeper"
 	evmtypes "github.com/cosmos/evm/x/vm/types"
@@ -247,6 +248,18 @@ func upgradeHandlerConstructor(
 		// keys, so the bound port must equal ModuleName.
 		migrateNFTTransferPort(sdkCtx, box, logger)
 
+		// Step 3.8: Remove legacy x/params subspaces for modules that have
+		// migrated to self-contained/authority-based params.
+		deleteLegacyParamsSubspace(
+			sdkCtx,
+			box.GetKVStoreKey(paramstypes.StoreKey),
+			logger,
+			evmtypes.ModuleName,
+			erc20types.ModuleName,
+			erc721types.ModuleName,
+			cw721types.ModuleName,
+		)
+
 		// Step 4: Run module migrations
 		//
 		// This handles all SDK 0.53, ibc-go v10, and cosmos/evm module migrations
@@ -384,26 +397,48 @@ func getLegacyBoolParam(
 	key string,
 	fallback bool,
 ) bool {
-	// In SDK v0.53 the legacy x/params subspaces are no longer registered for
-	// modules that moved to authority-based params (e.g. cosmos/evm x/erc20),
-	// so GetSubspace may return a zero Subspace with a nil store key. Guard
-	// against that by checking the subspace actually exists.
 	subspace, ok := box.ParamsKeeper.GetSubspace(moduleName)
-	if !ok {
-		logger.Info(
-			"legacy params subspace not found, using default value",
-			"module", moduleName,
-			"key", key,
-			"fallback", fallback,
-		)
+	if ok {
+		if raw := subspace.GetRaw(ctx, []byte(key)); len(raw) > 0 {
+			return decodeLegacyBoolRaw(ctx, box, logger, moduleName, key, fallback, raw)
+		}
+	}
+
+	storeKey := box.GetKVStoreKey(paramstypes.StoreKey)
+	if storeKey == nil {
 		return fallback
 	}
 
-	raw := subspace.GetRaw(ctx, []byte(key))
+	return readLegacyBoolParamRaw(ctx, storeKey, moduleName, key, fallback, logger)
+}
+
+func readLegacyBoolParamRaw(
+	ctx sdk.Context,
+	storeKey *storetypes.KVStoreKey,
+	moduleName string,
+	key string,
+	fallback bool,
+	logger log.Logger,
+) bool {
+	rawKey := append([]byte(moduleName), '/')
+	rawKey = append(rawKey, []byte(key)...)
+	raw := ctx.KVStore(storeKey).Get(rawKey)
 	if len(raw) == 0 {
 		return fallback
 	}
 
+	return decodeLegacyBoolRaw(ctx, upgrades.Toolbox{}, logger, moduleName, key, fallback, raw)
+}
+
+func decodeLegacyBoolRaw(
+	_ sdk.Context,
+	_ upgrades.Toolbox,
+	logger log.Logger,
+	moduleName string,
+	key string,
+	fallback bool,
+	raw []byte,
+) bool {
 	var value bool
 	if err := json.Unmarshal(raw, &value); err != nil {
 		logger.Error(
@@ -784,4 +819,38 @@ func migrateNFTTransferPort(ctx sdk.Context, box upgrades.Toolbox, logger log.Lo
 	}
 	box.IBCNFTTransferKeeper.SetPort(ctx, want)
 	logger.Info("ICS-721 port migrated for ibc-go v10 router", "from", current, "to", want)
+}
+
+// deleteLegacyParamsSubspace removes raw legacy x/params entries for modules
+// that no longer use the x/params module. The values have already been migrated
+// into each module's self-contained store, so this only removes dead state.
+func deleteLegacyParamsSubspace(
+	ctx sdk.Context,
+	storeKey *storetypes.KVStoreKey,
+	logger log.Logger,
+	moduleNames ...string,
+) {
+	if storeKey == nil {
+		logger.Error("params store key is nil, skipping legacy param cleanup")
+		return
+	}
+
+	store := ctx.KVStore(storeKey)
+	for _, moduleName := range moduleNames {
+		prefixKey := append([]byte(moduleName), '/')
+		iterator := storetypes.KVStorePrefixIterator(store, prefixKey)
+
+		deleted := 0
+		for ; iterator.Valid(); iterator.Next() {
+			store.Delete(iterator.Key())
+			deleted++
+		}
+		iterator.Close()
+
+		logger.Info(
+			"legacy params subspace removed",
+			"module", moduleName,
+			"deleted", deleted,
+		)
+	}
 }
