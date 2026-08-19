@@ -103,9 +103,10 @@ func GetCmdIssueDenom() *cobra.Command {
 				return err
 			}
 			optionsContent, err := ioutil.ReadFile(schema)
-			if err == nil {
-				schema = string(optionsContent)
+			if err != nil {
+				return err
 			}
+			schema = string(optionsContent)
 
 			msg := types.NewMsgIssueDenom(
 				args[0],

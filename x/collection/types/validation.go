@@ -2,10 +2,12 @@ package types
 
 import (
 	"fmt"
+	"net/url"
 	"regexp"
 	"strings"
 
 	sdkerrors "cosmossdk.io/errors"
+	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
 )
 
 const (
@@ -64,7 +66,17 @@ func ValidateTokenID(tokenID string) error {
 // ValidateTokenURI verify that the tokenURI is legal
 func ValidateTokenURI(tokenURI string) error {
 	if len(tokenURI) > MaxTokenURILen {
-		return sdkerrors.Wrapf(ErrInvalidTokenURI, "the length of nft uri(%s) only accepts value [0, %d]", tokenURI, MaxTokenURILen)
+		return sdkerrors.Wrapf(errortypes.ErrInvalidRequest, "token URI too long; max %d", MaxTokenURILen)
+	}
+	if strings.ContainsAny(tokenURI, "\n\r\t") {
+		return sdkerrors.Wrap(errortypes.ErrInvalidRequest, "token URI contains control characters")
+	}
+	u, err := url.Parse(tokenURI)
+	if err != nil {
+		return sdkerrors.Wrap(errortypes.ErrInvalidRequest, "invalid token URI")
+	}
+	if u.Scheme != "" && u.Scheme != "http" && u.Scheme != "https" && u.Scheme != "ipfs" {
+		return sdkerrors.Wrap(errortypes.ErrInvalidRequest, "token URI must use http(s) or ipfs scheme")
 	}
 	return nil
 }

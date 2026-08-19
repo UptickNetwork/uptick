@@ -116,6 +116,12 @@ func (k Keeper) SetClassMap(ctx sdk.Context, classID string, id []byte) {
 	store.Set([]byte(classID), id)
 }
 
+// DeleteClassMap deletes the token pair id for the given class.
+func (k Keeper) DeleteClassMap(ctx sdk.Context, classID string) {
+	store := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixTokenPairByClass)
+	store.Delete([]byte(classID))
+}
+
 // IsTokenPairRegistered - check if registered token tokenPair is registered
 func (k Keeper) IsTokenPairRegistered(ctx sdk.Context, id []byte) bool {
 	store := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixTokenPair)

@@ -141,6 +141,8 @@ func (k Keeper) ConvertERC721(
 	acc := k.evmKeeper.GetAccountWithoutBalance(ctx, erc721)
 	if acc == nil || len(acc.CodeHash) == 0 {
 		k.DeleteTokenPair(ctx, pair)
+		k.DeleteERC721Map(ctx, erc721)
+		k.DeleteClassMap(ctx, pair.ClassId)
 		k.Logger(ctx).Debug(
 			"deleting self destructed token pair from state",
 			"contract", pair.Erc721Address,
@@ -161,24 +163,24 @@ func (k Keeper) ConvertERC721(
 		return nil, sdkerrors.Wrapf(errortypes.ErrUnauthorized, "%s is not the owner of erc721 token %s", sender, strings.Join(msg.EvmTokenIds, ","))
 	}
 
-	msgconverterc721, err := k.convertEvm2Cosmos(ctx, pair, msg, sender)
+	convertedERC721, err := k.convertEvm2Cosmos(ctx, pair, msg, sender)
 	if err != nil {
 		return nil, sdkerrors.Wrap(err, "failed to convert EVM to cosmos")
 	}
 
-	convertAddress, err := sdk.AccAddressFromBech32(msgconverterc721.CosmosSender)
+	convertAddress, err := sdk.AccAddressFromBech32(convertedERC721.CosmosSender)
 	if err != nil {
 		return nil, sdkerrors.Wrapf(errortypes.ErrInvalidAddress, "invalid cosmos sender: %s", err)
 	}
 	evmSender := common.BytesToAddress(convertAddress.Bytes())
 
 	return &types.MsgConvertERC721Response{
-		EvmContractAddress: msgconverterc721.EvmContractAddress,
-		EvmTokenIds:        msgconverterc721.EvmTokenIds,
-		CosmosReceiver:     msgconverterc721.CosmosReceiver,
+		EvmContractAddress: convertedERC721.EvmContractAddress,
+		EvmTokenIds:        convertedERC721.EvmTokenIds,
+		CosmosReceiver:     convertedERC721.CosmosReceiver,
 		EvmSender:          evmSender.Hex(),
-		ClassId:            msgconverterc721.ClassId,
-		CosmosTokenIds:     msgconverterc721.CosmosTokenIds,
+		ClassId:            convertedERC721.ClassId,
+		CosmosTokenIds:     convertedERC721.CosmosTokenIds,
 	}, nil
 
 }
@@ -226,6 +228,8 @@ func (k Keeper) ConvertNFT(
 
 	if acc == nil || len(acc.CodeHash) == 0 {
 		k.DeleteTokenPair(ctx, pair)
+		k.DeleteERC721Map(ctx, erc721)
+		k.DeleteClassMap(ctx, pair.ClassId)
 		k.Logger(ctx).Debug(
 			"deleting selfdestructed token pair from state",
 			"contract", pair.Erc721Address,
@@ -317,7 +321,7 @@ func (k Keeper) convertCosmos2Evm(
 				return nil, sdkerrors.Wrap(err, "failed to query erc721 token owner")
 			}
 			if owner != types.ModuleAddress {
-				return nil, sdkerrors.Wrapf(errortypes.ErrUnauthorized, "%s is not the owner of erc721 token %s", types.ModuleAddress, msg.EvmTokenIds)
+				return nil, sdkerrors.Wrapf(errortypes.ErrUnauthorized, "%s is not the owner of erc721 token %s", types.ModuleAddress, tokenId)
 			}
 			_, err = k.CallEVM(
 				ctx, erc721, types.ModuleAddress, contract, true,
@@ -325,11 +329,6 @@ func (k Keeper) convertCosmos2Evm(
 			if err != nil {
 				return nil, err
 			}
-		}
-
-		// Mint tokens and send to receiver
-		if err != nil {
-			return nil, err
 		}
 
 	}
@@ -404,12 +403,6 @@ func (k Keeper) convertEvm2Cosmos(
 		)
 		if err != nil {
 			return nil, sdkerrors.Wrapf(errortypes.ErrUnauthorized, "%s error safeTransferFrom ", err)
-		}
-
-		// query erc721 token
-		_, err = k.QueryERC721Token(ctx, contract)
-		if err != nil {
-			return nil, sdkerrors.Wrap(err, "error QueryERC721Token")
 		}
 
 		nftId := string(k.GetNFTPairByContractTokenID(ctx, msg.EvmContractAddress, tokenId))
@@ -509,7 +502,9 @@ func (k Keeper) RefundPacketToken(
 		if err != nil {
 			return err
 		}
-		if owner != types.ModuleAddress {
+		shouldRefundERC721 := owner == types.ModuleAddress
+		var receiver common.Address
+		if !shouldRefundERC721 {
 			ctx.EventManager().EmitEvent(
 				sdk.NewEvent(
 					types.EventTypeRefundPacketTokenSkip,
@@ -520,20 +515,19 @@ func (k Keeper) RefundPacketToken(
 					sdk.NewAttribute("reason", "owner_is_not_module_account"),
 				),
 			)
-			continue
-		}
+		} else {
+			evmReceiver := k.GetEvmRefundReceiver(ctx, evmContractAddress, tokenId, emvTokenId)
+			if len(evmReceiver) == 0 {
+				return sdkerrors.Wrapf(errortypes.ErrInvalidAddress, "missing ERC721 refund receiver for contract %s token %s", evmContractAddress, tokenId)
+			}
+			receiver = common.HexToAddress(string(evmReceiver))
 
-		evmReceiver := k.GetEvmRefundReceiver(ctx, evmContractAddress, tokenId, emvTokenId)
-		if len(evmReceiver) == 0 {
-			return sdkerrors.Wrapf(errortypes.ErrInvalidAddress, "missing ERC721 refund receiver for contract %s token %s", evmContractAddress, tokenId)
-		}
-		receiver := common.HexToAddress(string(evmReceiver))
-
-		_, err = k.CallEVM(
-			ctx, erc721, types.ModuleAddress, contract, true,
-			"safeTransferFrom", types.ModuleAddress, receiver, bigTokenId)
-		if err != nil {
-			return err
+			_, err = k.CallEVM(
+				ctx, erc721, types.ModuleAddress, contract, true,
+				"safeTransferFrom", types.ModuleAddress, receiver, bigTokenId)
+			if err != nil {
+				return err
+			}
 		}
 
 		refundContract := strings.ToLower(evmContractAddress)
@@ -553,9 +547,11 @@ func (k Keeper) RefundPacketToken(
 			return err
 		}
 
-		refundedTokenIds = append(refundedTokenIds, tokenId)
-		refundedContract = evmContractAddress
-		refundedReceiver = receiver
+		if shouldRefundERC721 {
+			refundedTokenIds = append(refundedTokenIds, tokenId)
+			refundedContract = evmContractAddress
+			refundedReceiver = receiver
+		}
 	}
 
 	if len(refundedTokenIds) > 0 {

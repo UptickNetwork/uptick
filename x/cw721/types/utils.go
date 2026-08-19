@@ -16,14 +16,17 @@ const (
 	reDnmString = `^[^A-Za-z]|[^a-zA-Z0-9/-]`
 )
 
+var (
+	reLeadingNumbersRegexp = regexp.MustCompile(reLeadingNumbers)
+	reDnmStringRegexp      = regexp.MustCompile(reDnmString)
+)
+
 func removeLeadingNumbers(str string) string {
-	re := regexp.MustCompile(reLeadingNumbers)
-	return re.ReplaceAllString(str, "")
+	return reLeadingNumbersRegexp.ReplaceAllString(str, "")
 }
 
 func removeSpecialChars(str string) string {
-	re := regexp.MustCompile(reDnmString)
-	return re.ReplaceAllString(str, "")
+	return reDnmStringRegexp.ReplaceAllString(str, "")
 }
 
 // recursively remove every invalid prefix

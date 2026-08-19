@@ -88,6 +88,33 @@ func TestCreateNFTIDFromTokenID(t *testing.T) {
 	require.Equal(t, "uptick00aa", id)
 }
 
+func TestCreateTokenIDFromNFTID_Base10Uint256(t *testing.T) {
+	t.Parallel()
+
+	for _, nftID := range []string{
+		"nft1",
+		"uptick-nft1",
+		strings.Repeat("a", 128),
+	} {
+		tokenID := CreateTokenIDFromNFTID(nftID)
+		require.NotEmpty(t, tokenID)
+		require.NoError(t, ValidateEVMTokenID(tokenID))
+		require.NotContains(t, tokenID, "0x")
+	}
+}
+
+func TestCreateTokenIDFromNFTID_Deterministic(t *testing.T) {
+	t.Parallel()
+
+	require.Equal(t, CreateTokenIDFromNFTID("nft1"), CreateTokenIDFromNFTID("nft1"))
+}
+
+func TestCreateTokenIDFromNFTID_DifferentInputs(t *testing.T) {
+	t.Parallel()
+
+	require.NotEqual(t, CreateTokenIDFromNFTID("nft1"), CreateTokenIDFromNFTID("nft2"))
+}
+
 func TestCreateTokenUIDAndNFTUID(t *testing.T) {
 	t.Parallel()
 	require.Equal(t, "tid,caddr", CreateTokenUID("caddr", "tid"))

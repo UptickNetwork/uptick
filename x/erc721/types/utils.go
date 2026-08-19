@@ -1,6 +1,7 @@
 package types
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"math/big"
 	"regexp"
@@ -19,14 +20,17 @@ const (
 	reDnmString = `^[^A-Za-z]|[^a-zA-Z0-9/-]`
 )
 
+var (
+	reLeadingNumbersRegexp = regexp.MustCompile(reLeadingNumbers)
+	reDnmStringRegexp      = regexp.MustCompile(reDnmString)
+)
+
 func removeLeadingNumbers(str string) string {
-	re := regexp.MustCompile(reLeadingNumbers)
-	return re.ReplaceAllString(str, "")
+	return reLeadingNumbersRegexp.ReplaceAllString(str, "")
 }
 
 func removeSpecialChars(str string) string {
-	re := regexp.MustCompile(reDnmString)
-	return re.ReplaceAllString(str, "")
+	return reDnmStringRegexp.ReplaceAllString(str, "")
 }
 
 // recursively remove every invalid prefix
@@ -113,14 +117,15 @@ func CreateNFTIDFromTokenID(id string) string {
 	return fmt.Sprintf("%s%s", DefaultPrefix, removeAddress0x(id))
 }
 
-// CreateTokenIDFromNFTID derives a base-10 ERC721 token ID (uint256) from a
-// Cosmos NFT id. The NFT id bytes are interpreted as a big integer so the
-// resulting token ID is a decimal string, matching the base-10 validation
-// enforced by ValidateEVMTokenID (see security fix cb44f80).
+// CreateTokenIDFromNFTID derives a base-10 ERC721 token ID from a Cosmos NFT
+// id. The stripped NFT id is first hashed with SHA-256 and then interpreted as
+// a big integer, guaranteeing a uint256-compatible decimal token ID regardless
+// of the original NFT id length.
 func CreateTokenIDFromNFTID(nftID string) string {
 
 	ret := strings.Replace(nftID, DefaultPrefix+"-", "", 1)
-	return new(big.Int).SetBytes([]byte(ret)).String()
+	digest := sha256.Sum256([]byte(ret))
+	return new(big.Int).SetBytes(digest[:]).String()
 }
 
 func CreateTokenUID(contractAddress string, tokenID string) string {

@@ -2,15 +2,21 @@ package v040
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"cosmossdk.io/log"
 	"cosmossdk.io/math"
+	"cosmossdk.io/store/prefix"
 	storetypes "cosmossdk.io/store/types"
 	upgradetypes "cosmossdk.io/x/upgrade/types"
 	"github.com/UptickNetwork/uptick/app/upgrades"
+	"github.com/UptickNetwork/uptick/app/upgrades/v040/legacy"
+	"github.com/cosmos/cosmos-sdk/codec"
+	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 
 	// cosmos/evm imports
 	upticktypes "github.com/UptickNetwork/uptick/types"
@@ -18,6 +24,7 @@ import (
 	erc721types "github.com/UptickNetwork/uptick/x/erc721/types"
 	ibcnfttransfertypes "github.com/bianjieai/nft-transfer/types"
 	erc20types "github.com/cosmos/evm/x/erc20/types"
+	evmkeeper "github.com/cosmos/evm/x/vm/keeper"
 	evmtypes "github.com/cosmos/evm/x/vm/types"
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -166,6 +173,19 @@ func upgradeHandlerConstructor(
 		// the module store; without it the first PreBlock panics on RegisterDenom.
 		if err := migrateEVMParams(sdkCtx, box, logger); err != nil {
 			return nil, fmt.Errorf("migrate EVM params: %w", err)
+		}
+
+		// Step 1.6: Migrate legacy Ethermint EthAccount records to standard
+		// BaseAccount. This must happen before module migrations so auth can
+		// decode every account with the v0.4.0 codec.
+		if err := migrateLegacyEVMAccounts(
+			sdkCtx,
+			box.GetKVStoreKey(authtypes.StoreKey),
+			box.AppCodec,
+			box.EvmKeeper,
+			logger,
+		); err != nil {
+			return nil, fmt.Errorf("migrate legacy EVM accounts: %w", err)
 		}
 
 		// Step 2: Migrate erc20 params from x/params subspace to authority-based
@@ -347,6 +367,94 @@ func migrateEVMChainConfig(ctx sdk.Context, box upgrades.Toolbox, logger log.Log
 // It also persists EvmCoinInfo (base-denom metadata) into the module store;
 // without it the x/vm PreBlock calls sdk.RegisterDenom("") and panics on the
 // first block after the upgrade.
+func newLegacyAccountCodec() codec.Codec {
+	interfaceRegistry := codectypes.NewInterfaceRegistry()
+	authtypes.RegisterInterfaces(interfaceRegistry)
+	legacy.RegisterInterfaces(interfaceRegistry)
+	return codec.NewProtoCodec(interfaceRegistry)
+}
+
+func getLegacyBoolParam(
+	ctx sdk.Context,
+	box upgrades.Toolbox,
+	logger log.Logger,
+	moduleName string,
+	key string,
+	fallback bool,
+) bool {
+	raw := box.GetSubspace(moduleName).GetRaw(ctx, []byte(key))
+	if len(raw) == 0 {
+		return fallback
+	}
+
+	var value bool
+	if err := json.Unmarshal(raw, &value); err != nil {
+		logger.Error(
+			"failed to decode legacy bool param",
+			"module", moduleName,
+			"key", key,
+			"error", err,
+		)
+		return fallback
+	}
+	return value
+}
+
+// migrateLegacyEVMAccounts rewrites Ethermint v0.3.x EthAccount records into
+// standard SDK BaseAccount records. cosmos/evm v0.6.1 no longer uses the
+// EthAccount type, so leaving the legacy protobuf Any values in the auth store
+// would make accounts unreadable after the upgrade.
+func migrateLegacyEVMAccounts(
+	ctx sdk.Context,
+	storeKey *storetypes.KVStoreKey,
+	appCodec codec.Codec,
+	evmKeeper *evmkeeper.Keeper,
+	logger log.Logger,
+) error {
+	if storeKey == nil {
+		return fmt.Errorf("auth store key not found")
+	}
+
+	store := prefix.NewStore(ctx.KVStore(storeKey), []byte(authtypes.AddressStoreKeyPrefix))
+	iterator := store.Iterator(nil, nil)
+	defer iterator.Close()
+
+	migrationCdc := newLegacyAccountCodec()
+	migrated := 0
+
+	for ; iterator.Valid(); iterator.Next() {
+		accountBytes := iterator.Value()
+		var accountI sdk.AccountI
+		if err := migrationCdc.UnmarshalInterface(accountBytes, &accountI); err != nil {
+			return fmt.Errorf("decode auth account %x: %w", iterator.Key(), err)
+		}
+
+		legacyAccount, ok := accountI.(*legacy.EthAccount)
+		if !ok {
+			continue
+		}
+		if legacyAccount.BaseAccount == nil {
+			return fmt.Errorf("legacy EthAccount %x has nil BaseAccount", iterator.Key())
+		}
+
+		if legacyAccount.CodeHash != "" && evmKeeper != nil {
+			codeHash := common.HexToHash(legacyAccount.CodeHash)
+			evmKeeper.SetCodeHash(ctx, iterator.Key(), codeHash.Bytes())
+		}
+
+		newBytes, err := appCodec.MarshalInterface(legacyAccount.BaseAccount)
+		if err != nil {
+			return fmt.Errorf("marshal migrated BaseAccount %x: %w", iterator.Key(), err)
+		}
+
+		store.Set(iterator.Key(), newBytes)
+		migrated++
+	}
+
+	logger.Info("legacy EVM accounts migrated to BaseAccount", "migrated", migrated)
+	return nil
+}
+
 func migrateEVMParams(ctx sdk.Context, box upgrades.Toolbox, logger log.Logger) error {
 	logger.Info("migrating EVM params and initializing coin info")
 
@@ -407,6 +515,14 @@ func migrateErc20Params(ctx sdk.Context, box upgrades.Toolbox, logger log.Logger
 	erc20Keeper := box.Erc20Keeper
 	params := erc20types.DefaultParams()
 	params.PermissionlessRegistration = false
+	params.EnableErc20 = getLegacyBoolParam(
+		ctx,
+		box,
+		logger,
+		erc20types.ModuleName,
+		string(erc20types.ParamStoreKeyEnableErc20),
+		params.EnableErc20,
+	)
 
 	if err := erc20Keeper.SetParams(ctx, params); err != nil {
 		return fmt.Errorf("set erc20 params: %w", err)
@@ -539,6 +655,22 @@ func migrateErc721Params(ctx sdk.Context, box upgrades.Toolbox, logger log.Logge
 
 	erc721Keeper := box.Erc721Keeper
 	params := erc721types.DefaultParams()
+	params.EnableErc721 = getLegacyBoolParam(
+		ctx,
+		box,
+		logger,
+		erc721types.ModuleName,
+		"EnableErc721",
+		params.EnableErc721,
+	)
+	params.EnableEVMHook = getLegacyBoolParam(
+		ctx,
+		box,
+		logger,
+		erc721types.ModuleName,
+		"EnableEVMHook",
+		params.EnableEVMHook,
+	)
 
 	if err := erc721Keeper.SetParams(ctx, params); err != nil {
 		return err
@@ -575,6 +707,22 @@ func migrateCw721Params(ctx sdk.Context, box upgrades.Toolbox, logger log.Logger
 
 	cw721Keeper := box.Cw721Keeper
 	params := cw721types.DefaultParams()
+	params.EnableCw721 = getLegacyBoolParam(
+		ctx,
+		box,
+		logger,
+		cw721types.ModuleName,
+		"EnableCw721",
+		params.EnableCw721,
+	)
+	params.EnableEVMHook = getLegacyBoolParam(
+		ctx,
+		box,
+		logger,
+		cw721types.ModuleName,
+		"EnableEVMHook",
+		params.EnableEVMHook,
+	)
 
 	if err := cw721Keeper.SetParams(ctx, params); err != nil {
 		return err

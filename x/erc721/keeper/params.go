@@ -4,6 +4,7 @@ import (
 	sdkerrors "cosmossdk.io/errors"
 	"github.com/UptickNetwork/uptick/x/erc721/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -51,7 +52,14 @@ func (k Keeper) GetClassIDAndNFTID(ctx sdk.Context, msg *types.MsgConvertERC721)
 	for i, tokenId := range msg.EvmTokenIds {
 
 		uTokenId := types.CreateTokenUID(msg.EvmContractAddress, tokenId)
-		savedNftId, savedClassId := types.GetNFTFromUID(string(k.GetNFTUIDPairByTokenUID(ctx, uTokenId)))
+		savedPair := k.GetNFTUIDPairByTokenUID(ctx, uTokenId)
+		var savedNftId, savedClassId string
+		if len(savedPair) > 0 {
+			savedNftId, savedClassId = types.GetNFTFromUID(string(savedPair))
+			if savedNftId == "" || savedClassId == "" {
+				return "", nil, sdkerrors.Wrapf(errortypes.ErrInvalidRequest, "invalid ERC721 NFT UID pair for token %s", uTokenId)
+			}
+		}
 
 		nftOrg = ""
 		if len(msg.CosmosTokenIds) > i {

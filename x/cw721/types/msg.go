@@ -66,7 +66,10 @@ func (msg *MsgConvertNFT) GetSignBytes() []byte {
 // GetSigners defines whose signature is required
 func (msg MsgConvertNFT) GetSigners() []sdk.AccAddress {
 
-	addr := sdk.MustAccAddressFromBech32(msg.Sender)
+	addr, err := sdk.AccAddressFromBech32(msg.Sender)
+	if err != nil {
+		return nil
+	}
 	return []sdk.AccAddress{addr}
 }
 
@@ -105,7 +108,10 @@ func (msg *MsgConvertCW721) GetSignBytes() []byte {
 
 // GetSigners defines whose signature is required
 func (msg MsgConvertCW721) GetSigners() []sdk.AccAddress {
-	addr := sdk.MustAccAddressFromBech32(msg.Sender)
+	addr, err := sdk.AccAddressFromBech32(msg.Sender)
+	if err != nil {
+		return nil
+	}
 	return []sdk.AccAddress{addr}
 }
 
@@ -161,6 +167,9 @@ func (msg *MsgTransferCW721) GetSignBytes() []byte {
 
 // GetSigners defines whose signature is required
 func (msg MsgTransferCW721) GetSigners() []sdk.AccAddress {
-	addr := sdk.MustAccAddressFromBech32(msg.CwSender)
+	addr, err := sdk.AccAddressFromBech32(msg.CwSender)
+	if err != nil {
+		return nil
+	}
 	return []sdk.AccAddress{addr}
 }
