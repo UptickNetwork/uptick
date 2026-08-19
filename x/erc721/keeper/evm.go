@@ -14,12 +14,53 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/cosmos/evm/server/config"
+	"github.com/cosmos/evm/x/vm/statedb"
 	evmtypes "github.com/cosmos/evm/x/vm/types"
 
 	sdkerrors "cosmossdk.io/errors"
 	"github.com/UptickNetwork/uptick/x/erc721/contracts"
 	"github.com/UptickNetwork/uptick/x/erc721/types"
 )
+
+// erc721StateDBKeeper wraps the EVM keeper's StateDB storage interface so that
+// the erc721 module account can be updated as an EVM sender without triggering
+// cosmos/evm's module-account balance guard. ERC721 contract deployments and
+// conversion calls always use a zero native value, so only the module account
+// nonce needs to be persisted.
+type erc721StateDBKeeper struct {
+	statedb.Keeper
+	accountKeeper types.AccountKeeper
+}
+
+// SetAccount delegates non-module accounts to the EVM keeper. For the erc721
+// module account it updates only the sequence and leaves the bank balance
+// untouched, avoiding the SetBalanceWithLocked module-account restriction.
+func (w erc721StateDBKeeper) SetAccount(ctx sdk.Context, addr common.Address, account statedb.Account) error {
+	if addr != types.ModuleAddress {
+		return w.Keeper.SetAccount(ctx, addr, account)
+	}
+
+	acct := w.accountKeeper.GetAccount(ctx, addr.Bytes())
+	if acct == nil {
+		return sdkerrors.Wrap(errortypes.ErrUnknownAddress, "erc721 module account not found")
+	}
+
+	if !evmtypes.IsEmptyCodeHash(account.CodeHash) {
+		return sdkerrors.Wrap(errortypes.ErrUnauthorized, "erc721 module account cannot be assigned contract code")
+	}
+
+	current := w.Keeper.GetAccount(ctx, addr)
+	if current == nil || current.Balance == nil || account.Balance == nil || current.Balance.Cmp(account.Balance) != 0 {
+		return sdkerrors.Wrap(errortypes.ErrUnauthorized, "erc721 module account balance cannot be updated")
+	}
+
+	if err := acct.SetSequence(account.Nonce); err != nil {
+		return err
+	}
+
+	w.accountKeeper.SetAccount(ctx, acct)
+	return nil
+}
 
 // DeployERC721Contract creates and deploys an ERC721 contract on the EVM with the
 // erc20 module account as owner.
@@ -312,7 +353,16 @@ func (k Keeper) CallEVMWithData(
 		SkipNonceChecks: !commit,
 	}
 
-	res, err := k.evmKeeper.ApplyMessage(ctx, nil, msg, evmtypes.NewNoOpTracer(), commit, false, false)
+	stateDB := statedb.New(
+		ctx,
+		erc721StateDBKeeper{
+			Keeper:        k.evmKeeper,
+			accountKeeper: k.accountKeeper,
+		},
+		statedb.NewEmptyTxConfig(),
+	)
+
+	res, err := k.evmKeeper.ApplyMessage(ctx, stateDB, msg, evmtypes.NewNoOpTracer(), commit, false, false)
 	if err != nil {
 		return nil, err
 	}

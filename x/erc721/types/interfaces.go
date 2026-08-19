@@ -18,6 +18,8 @@ import (
 type AccountKeeper interface {
 	GetModuleAddress(moduleName string) sdk.AccAddress
 	GetSequence(context.Context, sdk.AccAddress) (uint64, error)
+	GetAccount(context.Context, sdk.AccAddress) sdk.AccountI
+	SetAccount(context.Context, sdk.AccountI)
 }
 
 // NFTKeeper defines the expected interface needed to retrieve account balances.
@@ -39,8 +41,10 @@ type NFTKeeper interface {
 
 // EVMKeeper defines the expected EVM keeper interface used on erc721
 type EVMKeeper interface {
+	statedb.Keeper
+
 	GetParams(ctx sdk.Context) evmtypes.Params
 	GetAccountWithoutBalance(ctx sdk.Context, addr common.Address) *statedb.Account
 	EstimateGas(c context.Context, req *evmtypes.EthCallRequest) (*evmtypes.EstimateGasResponse, error)
-	ApplyMessage(ctx sdk.Context, statedb *statedb.StateDB, msg core.Message, tracer *tracing.Hooks, commit bool, simulate bool, refund bool) (*evmtypes.MsgEthereumTxResponse, error)
+	ApplyMessage(ctx sdk.Context, stateDB *statedb.StateDB, msg core.Message, tracer *tracing.Hooks, commit bool, callFromPrecompile bool, internal bool) (*evmtypes.MsgEthereumTxResponse, error)
 }

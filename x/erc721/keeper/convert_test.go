@@ -23,6 +23,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/tracing"
+	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 
 	collectionkeeper "github.com/UptickNetwork/uptick/x/collection/keeper"
@@ -183,6 +184,47 @@ func TestQueryERC721DataByTokenID_DoesNotCommit(t *testing.T) {
 	require.False(t, evm.lastCommit)
 }
 
+func TestCallEVMWithData_UsesNonNilStateDB(t *testing.T) {
+	k, ctx, _ := setupConvertKeeper(t)
+	evm := k.evmKeeper.(*fakeEVMKeeper)
+	contract := common.HexToAddress("0x1111111111111111111111111111111111111111")
+
+	_, err := k.CallEVMWithData(ctx, types.ModuleAddress, &contract, []byte{0x01}, false)
+	require.NoError(t, err)
+	require.Equal(t, 1, evm.applyCalls)
+	require.NotNil(t, evm.lastStateDB)
+}
+
+func TestERC721StateDBKeeper_ModuleAccountSkipsBalanceWrite(t *testing.T) {
+	base := authtypes.NewBaseAccountWithAddress(types.AccModuleAddress)
+	ak := &moduleAccountKeeper{account: base}
+	db := &moduleStateDBKeeper{
+		current: statedb.NewAccount(7, new(uint256.Int), big.NewInt(0), evmtypes.EmptyCodeHash),
+	}
+	wrapper := erc721StateDBKeeper{
+		Keeper:        db,
+		accountKeeper: ak,
+	}
+
+	err := wrapper.SetAccount(sdk.Context{}, types.ModuleAddress, statedb.Account{
+		Nonce:    8,
+		Balance:  new(uint256.Int),
+		CodeHash: evmtypes.EmptyCodeHash,
+	})
+	require.NoError(t, err)
+	require.True(t, ak.setCalled)
+	require.Equal(t, uint64(8), ak.account.GetSequence())
+	require.Zero(t, db.nonModuleSetCalls)
+
+	err = wrapper.SetAccount(sdk.Context{}, common.HexToAddress("0x2222222222222222222222222222222222222222"), statedb.Account{
+		Nonce:    1,
+		Balance:  new(uint256.Int),
+		CodeHash: evmtypes.EmptyCodeHash,
+	})
+	require.NoError(t, err)
+	require.Equal(t, 1, db.nonModuleSetCalls)
+}
+
 func bytes20(fill byte) []byte {
 	b := make([]byte, 20)
 	for i := range b {
@@ -196,6 +238,7 @@ type convertAccountKeeper struct{}
 func (a *convertAccountKeeper) GetAccount(_ context.Context, _ sdk.AccAddress) sdk.AccountI {
 	return nil
 }
+func (a *convertAccountKeeper) SetAccount(_ context.Context, _ sdk.AccountI) {}
 func (a *convertAccountKeeper) GetModuleAddress(moduleName string) sdk.AccAddress {
 	return authtypes.NewModuleAddress(moduleName)
 }
@@ -213,9 +256,12 @@ func (b *convertBankKeeper) SpendableCoins(_ context.Context, _ sdk.AccAddress) 
 }
 
 type fakeEVMKeeper struct {
-	accounts   map[common.Address]*statedb.Account
-	lastCommit bool
-	applyCalls int
+	stateDBKeeperStub
+
+	accounts    map[common.Address]*statedb.Account
+	lastCommit  bool
+	lastStateDB *statedb.StateDB
+	applyCalls  int
 }
 
 func (f *fakeEVMKeeper) GetParams(_ sdk.Context) evmtypes.Params { return evmtypes.Params{} }
@@ -233,7 +279,7 @@ func (f *fakeEVMKeeper) EstimateGas(_ context.Context, _ *evmtypes.EthCallReques
 
 func (f *fakeEVMKeeper) ApplyMessage(
 	_ sdk.Context,
-	_ *statedb.StateDB,
+	stateDB *statedb.StateDB,
 	_ core.Message,
 	_ *tracing.Hooks,
 	commit bool,
@@ -241,8 +287,87 @@ func (f *fakeEVMKeeper) ApplyMessage(
 	_ bool,
 ) (*evmtypes.MsgEthereumTxResponse, error) {
 	f.lastCommit = commit
+	f.lastStateDB = stateDB
 	f.applyCalls++
 	return &evmtypes.MsgEthereumTxResponse{}, nil
+}
+
+type stateDBKeeperStub struct{}
+
+func (stateDBKeeperStub) GetAccount(sdk.Context, common.Address) *statedb.Account {
+	return nil
+}
+
+func (stateDBKeeperStub) GetState(sdk.Context, common.Address, common.Hash) common.Hash {
+	return common.Hash{}
+}
+
+func (stateDBKeeperStub) GetCode(sdk.Context, common.Hash) []byte {
+	return nil
+}
+
+func (stateDBKeeperStub) GetCodeHash(sdk.Context, common.Address) common.Hash {
+	return common.Hash{}
+}
+
+func (stateDBKeeperStub) ForEachStorage(sdk.Context, common.Address, func(common.Hash, common.Hash) bool) {
+}
+
+func (stateDBKeeperStub) SetAccount(sdk.Context, common.Address, statedb.Account) error {
+	return nil
+}
+
+func (stateDBKeeperStub) DeleteState(sdk.Context, common.Address, common.Hash) {}
+
+func (stateDBKeeperStub) SetState(sdk.Context, common.Address, common.Hash, []byte) {}
+
+func (stateDBKeeperStub) DeleteCode(sdk.Context, []byte) {}
+
+func (stateDBKeeperStub) SetCode(sdk.Context, []byte, []byte) {}
+
+func (stateDBKeeperStub) DeleteAccount(sdk.Context, common.Address) error {
+	return nil
+}
+
+func (stateDBKeeperStub) KVStoreKeys() map[string]*storetypes.KVStoreKey {
+	return nil
+}
+
+type moduleAccountKeeper struct {
+	account   sdk.AccountI
+	setCalled bool
+}
+
+func (m *moduleAccountKeeper) GetAccount(context.Context, sdk.AccAddress) sdk.AccountI {
+	return m.account
+}
+
+func (m *moduleAccountKeeper) SetAccount(_ context.Context, account sdk.AccountI) {
+	m.account = account
+	m.setCalled = true
+}
+
+func (m *moduleAccountKeeper) GetModuleAddress(moduleName string) sdk.AccAddress {
+	return authtypes.NewModuleAddress(moduleName)
+}
+
+func (m *moduleAccountKeeper) GetSequence(context.Context, sdk.AccAddress) (uint64, error) {
+	return 0, nil
+}
+
+type moduleStateDBKeeper struct {
+	stateDBKeeperStub
+	current           *statedb.Account
+	nonModuleSetCalls int
+}
+
+func (m *moduleStateDBKeeper) GetAccount(sdk.Context, common.Address) *statedb.Account {
+	return m.current
+}
+
+func (m *moduleStateDBKeeper) SetAccount(sdk.Context, common.Address, statedb.Account) error {
+	m.nonModuleSetCalls++
+	return nil
 }
 
 var _ types.EVMKeeper = (*fakeEVMKeeper)(nil)
