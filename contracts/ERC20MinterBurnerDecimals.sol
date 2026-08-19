@@ -45,11 +45,11 @@ contract ERC20MinterBurnerDecimals is
         string memory symbol,
         uint8 decimals_
     ) ERC20(name, symbol) {
-        _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
+        _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
 
-        _setupRole(MINTER_ROLE, _msgSender());
-        _setupRole(PAUSER_ROLE, _msgSender());
-        _setupRole(BURNER_ROLE, _msgSender());
+        _grantRole(MINTER_ROLE, _msgSender());
+        _grantRole(PAUSER_ROLE, _msgSender());
+        _grantRole(BURNER_ROLE, _msgSender());
         _setupDecimals(decimals_);
     }
 

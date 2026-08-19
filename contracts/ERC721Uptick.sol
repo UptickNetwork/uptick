@@ -37,6 +37,7 @@ ERC721Pausable
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     uint256 public constant MAX_BATCH_SIZE = 100;
+    event EnhanceInfoSet(uint256 indexed tokenId, string name, string uri, string uriHash);
 
     string private _baseTokenURI;
 
@@ -118,6 +119,7 @@ ERC721Pausable
             hasRole(MINTER_ROLE, _msgSender()),
             "ERC721PresetMinterPauserAutoId: must have minter role to mint"
         );
+        require(!paused(), "ERC721Pausable: token transfer while paused");
         require(bytes(uri).length <= 256, "ERC721Uptick: uri too long");
 
         // We cannot just use balanceOf to create the new tokenId because tokens
@@ -142,6 +144,7 @@ ERC721Pausable
             hasRole(MINTER_ROLE, _msgSender()),
             "ERC721PresetMinterPauserAutoId: must have minter role to mint"
         );
+        require(!paused(), "ERC721Pausable: token transfer while paused");
         require(bytes(uri).length <= 256, "ERC721Uptick: uri too long");
 
         // We cannot just use balanceOf to create the new tokenId because tokens
@@ -152,6 +155,7 @@ ERC721Pausable
         _idEnhanceInfoMap[id].data = data;
         _idEnhanceInfoMap[id].uriHash = uriHash;
         _mint(to, id);
+        emit EnhanceInfoSet(id, name, uri, uriHash);
     }
 
     /**
@@ -179,13 +183,18 @@ ERC721Pausable
             hasRole(MINTER_ROLE, _msgSender()),
             "ERC721PresetMinterPauserAutoId: must have minter role to mint"
         );
+        require(!paused(), "ERC721Pausable: token transfer while paused");
         require(ids.length <= MAX_BATCH_SIZE, "ERC721Uptick: batch too large");
+        require(ids.length > 0, "ERC721Uptick: batch cannot be empty");
 
         // We cannot just use balanceOf to create the new tokenId because tokens
         // can be burned (destroyed), so we need a separate counter.
         uint256 len = 0;
         len = ids.length;
         for(uint i = 0 ;i < len ;i ++){
+            for(uint j = i + 1; j < len; j++){
+                require(ids[i] != ids[j], "ERC721Uptick: duplicate token id in batch");
+            }
             _mint(to, ids[i]);
         }
     }
@@ -206,18 +215,24 @@ ERC721Pausable
             hasRole(MINTER_ROLE, _msgSender()),
             "ERC721PresetMinterPauserAutoId: must have minter role to mint"
         );
+        require(!paused(), "ERC721Pausable: token transfer while paused");
         require(ids.length <= MAX_BATCH_SIZE, "ERC721Uptick: batch too large");
+        require(ids.length > 0, "ERC721Uptick: batch cannot be empty");
 
         // We cannot just use balanceOf to create the new tokenId because tokens
         // can be burned (destroyed), so we need a separate counter.
         uint256 len = 0;
         len = ids.length;
         for(uint i = 0 ;i < len ;i ++){
+            for(uint j = i + 1; j < len; j++){
+                require(ids[i] != ids[j], "ERC721Uptick: duplicate token id in batch");
+            }
             _idEnhanceInfoMap[ids[i]].name = name;
             _idEnhanceInfoMap[ids[i]].uri = uri;
             _idEnhanceInfoMap[ids[i]].data = data;
             _idEnhanceInfoMap[ids[i]].uriHash = uriHash;
             _mint(to, ids[i]);
+            emit EnhanceInfoSet(ids[i], name, uri, uriHash);
         }
     }
 

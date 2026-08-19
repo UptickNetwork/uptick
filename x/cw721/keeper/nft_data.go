@@ -5,6 +5,7 @@ import (
 
 	sdkerrors "cosmossdk.io/errors"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
 
 	"github.com/UptickNetwork/uptick/x/cw721/types"
 )
@@ -22,7 +23,14 @@ func (k Keeper) GetClassIDAndNFTID(ctx sdk.Context, msg *types.MsgConvertCW721) 
 
 	for i, tokenId := range msg.TokenIds {
 		uTokenId := types.CreateTokenUID(msg.ContractAddress, tokenId)
-		savedNftId, savedClassId := types.GetNFTFromUID(string(k.GetNFTUIDPairByTokenUID(ctx, uTokenId)))
+		savedPair := k.GetNFTUIDPairByTokenUID(ctx, uTokenId)
+		var savedNftId, savedClassId string
+		if len(savedPair) > 0 {
+			savedNftId, savedClassId = types.GetNFTFromUID(string(savedPair))
+			if savedNftId == "" || savedClassId == "" {
+				return "", nil, sdkerrors.Wrapf(errortypes.ErrInvalidRequest, "invalid CW721 NFT UID pair for token %s", uTokenId)
+			}
+		}
 
 		nftOrg = ""
 		if len(msg.NftIds) > i {
@@ -82,7 +90,13 @@ func (k Keeper) GetContractAddressAndTokenIds(ctx sdk.Context, msg *types.MsgCon
 
 	for _, nftId := range msg.NftIds {
 		uNftID := types.CreateNFTUID(msg.ClassId, nftId)
-		savedTokenId, tempContractAddress = types.GetNFTFromUID(string(k.GetTokenUIDPairByNFTUID(ctx, uNftID)))
+		savedPair := k.GetTokenUIDPairByNFTUID(ctx, uNftID)
+		if len(savedPair) > 0 {
+			savedTokenId, tempContractAddress = types.GetNFTFromUID(string(savedPair))
+			if savedTokenId == "" || tempContractAddress == "" {
+				return "", nil, sdkerrors.Wrapf(errortypes.ErrInvalidRequest, "invalid CW721 token UID pair for nft %s", uNftID)
+			}
+		}
 		if tempContractAddress != "" {
 			savedContractAddress = tempContractAddress
 		}
