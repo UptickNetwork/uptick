@@ -12,6 +12,7 @@ import (
 	"github.com/CosmWasm/wasmd/x/wasm"
 	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
 	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
+	cmdcfg "github.com/UptickNetwork/uptick/cmd/config"
 	upticktypes "github.com/UptickNetwork/uptick/types"
 	nftkeeper "github.com/UptickNetwork/uptick/x/collection/keeper"
 	nfttypes "github.com/UptickNetwork/uptick/x/collection/types"
@@ -398,7 +399,12 @@ func New(
 		erc20Proxy,
 		evmChainID,
 		cast.ToString(appOpts.Get(srvflags.EVMTracer)),
-	) // NOTE: WithStaticPrecompiles is called AFTER ERC20 keeper is created
+	).WithDefaultEvmCoinInfo(evmtypes.EvmCoinInfo{
+		Denom:         cmdcfg.BaseDenom,
+		ExtendedDenom: cmdcfg.BaseDenom,
+		DisplayDenom:  cmdcfg.DisplayDenom,
+		Decimals:      upticktypes.BaseDenomUnit,
+	}) // NOTE: WithStaticPrecompiles is called AFTER ERC20 keeper is created
 
 	// Create Transfer Keeper (no longer takes ERC20 keeper as ICS4Wrapper in v0.6.1)
 	appKeepers.IBCTransferKeeper = ibctransferkeeper.NewKeeper(

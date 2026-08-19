@@ -1,7 +1,6 @@
 package types
 
 import (
-	"encoding/hex"
 	"fmt"
 	"math/big"
 	"regexp"
@@ -114,12 +113,14 @@ func CreateNFTIDFromTokenID(id string) string {
 	return fmt.Sprintf("%s%s", DefaultPrefix, removeAddress0x(id))
 }
 
-// CreateTokenIDFromNFTID create classId from erc721 address
+// CreateTokenIDFromNFTID derives a base-10 ERC721 token ID (uint256) from a
+// Cosmos NFT id. The NFT id bytes are interpreted as a big integer so the
+// resulting token ID is a decimal string, matching the base-10 validation
+// enforced by ValidateEVMTokenID (see security fix cb44f80).
 func CreateTokenIDFromNFTID(nftID string) string {
 
 	ret := strings.Replace(nftID, DefaultPrefix+"-", "", 1)
-	return "0x" + hex.EncodeToString([]byte(ret))
-	// return strings.Replace(nftID, DefaultPrefix, "", 1)
+	return new(big.Int).SetBytes([]byte(ret)).String()
 }
 
 func CreateTokenUID(contractAddress string, tokenID string) string {

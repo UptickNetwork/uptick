@@ -13,6 +13,7 @@ import (
 	evmconfig "github.com/cosmos/evm/config"
 	cosmosevmutils "github.com/cosmos/evm/utils"
 	"github.com/ethereum/go-ethereum/common"
+	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	corevm "github.com/ethereum/go-ethereum/core/vm"
 
 	"cosmossdk.io/math"
@@ -730,6 +731,21 @@ func (app *Uptick) configureEVMMempool(appOpts servertypes.AppOptions, logger lo
 		LegacyPoolConfig: evmconfig.GetLegacyPoolConfig(appOpts, logger),
 		BlockGasLimit:    evmconfig.GetBlockGasLimit(appOpts, logger),
 		MinTip:           evmconfig.GetMinTip(appOpts, logger),
+		// 关键修复：禁用默认的 promote 广播，避免死锁。
+		//
+		// cosmos/evm 的 ExperimentalEVMMempool.Insert 持有 m.mtx 后调用
+		// txPool.Add(sync=true)，其内部 requestPromoteExecutables 会阻塞在
+		// <-done 上等待异步的 runReorg 完成。runReorg 在 promote 交易后调用
+		// BroadcastTxFn；默认实现会同步执行 clientCtx.BroadcastTxSync，
+		// 该调用重新进入 CometBFT 的 CheckTx → app 侧 mempool.Insert →
+		// m.mtx.Lock()，而此时 m.mtx 正被外层的 Insert 持有并阻塞在 <-done，
+		// 形成死锁，导致整条链停在 PrepareProposal 阶段不再出块。
+		//
+		// 交易已经通过 eth_sendRawTransaction 的 CometBFT 广播进入 mempool，
+		// 无需在 promote 阶段再次广播，因此设为 no-op 即可打破死锁环。
+		BroadCastTxFn: func(txs []*ethtypes.Transaction) error {
+			return nil
+		},
 	}
 
 	evmMempool := evmmempool.NewExperimentalEVMMempool(

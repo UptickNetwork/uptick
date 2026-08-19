@@ -63,13 +63,14 @@ func NewConvertNFTCmd() *cobra.Command {
 			//	return fmt.Errorf("evm contract address can not be empty")
 			//}
 
-			//if args[3] == "" {
-			//	return fmt.Errorf("evm tokenids can not be empty")
-			//}
-			evmTokenIds := strings.Split(args[3], ",")
-			//if len(evmTokenIds) == 0 {
-			//	return fmt.Errorf("evm token ids can not be empty")
-			//}
+		// When evm token ids are omitted (first conversion / auto-deploy), leave
+		// the slice empty so the module derives them from the cosmos token ids.
+		// A bare strings.Split("", ",") would yield [""], which fails
+		// ValidateEVMTokenID in ValidateBasic.
+		var evmTokenIds []string
+		if args[3] != "" {
+			evmTokenIds = strings.Split(args[3], ",")
+		}
 
 			var evmReceiver string
 			cosmosSender := cliCtx.GetFromAddress()

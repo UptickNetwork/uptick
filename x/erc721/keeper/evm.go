@@ -1,14 +1,12 @@
 package keeper
 
 import (
-	"encoding/json"
 	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
 	"math/big"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -318,26 +316,13 @@ func (k Keeper) CallEVMWithData(
 		return nil, err
 	}
 
+	// NOTE: Do NOT use EstimateGas here. EstimateGasInternal simulates the call
+	// with the official *Keeper (not the erc721StateDBKeeper wrapper) and calls
+	// k.SetAccount directly on the module account, which trips cosmos/evm's
+	// SetBalanceWithLocked module-account guard ("not allowed to receive funds").
+	// Deployment / mint / transfer all use the module account as sender with
+	// zero value, so a fixed gas cap (DefaultGasCap) is sufficient.
 	gasCap := config.DefaultGasCap
-	if commit {
-		args, err := json.Marshal(evmtypes.TransactionArgs{
-			From: &from,
-			To:   contract,
-			Data: (*hexutil.Bytes)(&data),
-		})
-		if err != nil {
-			return nil, sdkerrors.Wrapf(errortypes.ErrJSONMarshal, "failed to marshal tx args: %s", err.Error())
-		}
-
-		gasRes, err := k.evmKeeper.EstimateGas(sdk.WrapSDKContext(ctx), &evmtypes.EthCallRequest{
-			Args:   args,
-			GasCap: config.DefaultGasCap,
-		})
-		if err != nil {
-			return nil, err
-		}
-		gasCap = gasRes.Gas
-	}
 
 	msg := core.Message{
 		From:            from,
