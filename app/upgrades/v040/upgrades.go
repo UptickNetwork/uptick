@@ -14,11 +14,13 @@ import (
 	"github.com/UptickNetwork/uptick/app/upgrades/v040/legacy"
 	"github.com/cosmos/cosmos-sdk/codec"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
+	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 
 	// cosmos/evm imports
+	evmsecp256k1 "github.com/cosmos/evm/crypto/ethsecp256k1"
 	upticktypes "github.com/UptickNetwork/uptick/types"
 	cw721types "github.com/UptickNetwork/uptick/x/cw721/types"
 	erc721types "github.com/UptickNetwork/uptick/x/erc721/types"
@@ -382,7 +384,22 @@ func getLegacyBoolParam(
 	key string,
 	fallback bool,
 ) bool {
-	raw := box.GetSubspace(moduleName).GetRaw(ctx, []byte(key))
+	// In SDK v0.53 the legacy x/params subspaces are no longer registered for
+	// modules that moved to authority-based params (e.g. cosmos/evm x/erc20),
+	// so GetSubspace may return a zero Subspace with a nil store key. Guard
+	// against that by checking the subspace actually exists.
+	subspace, ok := box.ParamsKeeper.GetSubspace(moduleName)
+	if !ok {
+		logger.Info(
+			"legacy params subspace not found, using default value",
+			"module", moduleName,
+			"key", key,
+			"fallback", fallback,
+		)
+		return fallback
+	}
+
+	raw := subspace.GetRaw(ctx, []byte(key))
 	if len(raw) == 0 {
 		return fallback
 	}
@@ -440,6 +457,27 @@ func migrateLegacyEVMAccounts(
 		if legacyAccount.CodeHash != "" && evmKeeper != nil {
 			codeHash := common.HexToHash(legacyAccount.CodeHash)
 			evmKeeper.SetCodeHash(ctx, iterator.Key(), codeHash.Bytes())
+		}
+
+		// Rewrite the legacy pubkey Any (/ethermint.crypto.v1.ethsecp256k1.PubKey)
+		// into the v0.4.0 key type (/cosmos.evm.crypto.v1.ethsecp256k1.PubKey).
+		// appCodec.MarshalInterface only re-serializes the BaseAccount and would
+		// keep the old type URL inside the pubkey Any, making the account's
+		// pubkey unreadable (and signature verification impossible) after the
+		// upgrade.
+		if legacyAccount.BaseAccount.PubKey != nil {
+			var oldPk cryptotypes.PubKey
+			if err := migrationCdc.UnpackAny(legacyAccount.BaseAccount.PubKey, &oldPk); err != nil {
+				return fmt.Errorf("decode legacy pubkey %x: %w", iterator.Key(), err)
+			}
+			if ethPk, isEth := oldPk.(*legacy.EthSecp256k1PubKey); isEth {
+				newPk := &evmsecp256k1.PubKey{Key: ethPk.Key}
+				anyPk, err := codectypes.NewAnyWithValue(newPk)
+				if err != nil {
+					return fmt.Errorf("pack migrated pubkey %x: %w", iterator.Key(), err)
+				}
+				legacyAccount.BaseAccount.PubKey = anyPk
+			}
 		}
 
 		newBytes, err := appCodec.MarshalInterface(legacyAccount.BaseAccount)
