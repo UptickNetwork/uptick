@@ -120,6 +120,9 @@ func (d anteHandlerDecorator) AnteHandle(ctx sdk.Context, tx sdk.Tx, simulate bo
 // Wasm CountTX / GasRegister / TxContracts run before SetUpContext.
 // LimitSimulationGas runs immediately after SetUpContext so the simulation gas
 // meter is not overwritten. AuthzLimiter uses DisabledAuthzMsgs from app.go.
+//
+// cosmos/evm v0.6.1's NewAuthzLimiterDecorator recursively descends into
+// authz.MsgExec (see ante/cosmos/authz.go), so nested MsgExec is not a bypass.
 func newCosmosAnteHandler(options HandlerOptions) sdk.AnteHandler {
 	return func(ctx sdk.Context, tx sdk.Tx, simulate bool) (sdk.Context, error) {
 		feemarketParams := options.FeeMarketKeeper.GetParams(ctx)

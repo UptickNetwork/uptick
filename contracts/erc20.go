@@ -20,18 +20,6 @@ var (
 
 	// ERC20MinterBurnerDecimalsAddress is the erc20 module address
 	ERC20MinterBurnerDecimalsAddress common.Address
-
-	//go:embed compiled_contracts/ERC20DirectBalanceManipulation.json
-	ERC20DirectBalanceManipulationJSON []byte // nolint: golint
-
-	// ERC20DirectBalanceManipulationContract is the malicious compiled erc20 contract
-	ERC20DirectBalanceManipulationContract evmtypes.CompiledContract
-
-	//go:embed compiled_contracts/ERC20MaliciousDelayed.json
-	ERC20MaliciousDelayedJSON []byte // nolint: golint
-
-	// ERC20MaliciousDelayedContract is the malicious compiled erc20 contract
-	ERC20MaliciousDelayedContract evmtypes.CompiledContract
 )
 
 func init() {
@@ -45,19 +33,4 @@ func init() {
 		panic("load contract failed")
 	}
 
-	if err := json.Unmarshal(ERC20DirectBalanceManipulationJSON, &ERC20DirectBalanceManipulationContract); err != nil {
-		panic(err)
-	}
-
-	if len(ERC20DirectBalanceManipulationContract.Bin) == 0 {
-		panic("load DirectBalanceManipulation contract failed")
-	}
-
-	if err := json.Unmarshal(ERC20MaliciousDelayedJSON, &ERC20MaliciousDelayedContract); err != nil {
-		panic(err)
-	}
-
-	if len(ERC20MaliciousDelayedContract.Bin) == 0 {
-		panic("load MaliciousDelayed contract failed")
-	}
 }

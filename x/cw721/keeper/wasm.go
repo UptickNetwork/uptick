@@ -49,7 +49,9 @@ func (k Keeper) QueryCW721(
 		}
 
 		var contractInfoResultJson ContractInfoData
-		json.Unmarshal(contractInfoResult.Data, &contractInfoResultJson)
+		if err := json.Unmarshal(contractInfoResult.Data, &contractInfoResultJson); err != nil {
+			return types.CW721Data{}, sdkerrors.Wrap(err, "failed to unmarshal CW721 contract info")
+		}
 
 		return types.CW721Data{
 			Name:   contractInfoResultJson.Name,
@@ -102,7 +104,9 @@ func (k Keeper) QueryCW721AllNftInfo(
 		}
 
 		var allContractInfoResultJson AllNftInfo
-		json.Unmarshal(allNftInfo.Data, &allContractInfoResultJson)
+		if err := json.Unmarshal(allNftInfo.Data, &allContractInfoResultJson); err != nil {
+			return AllNftInfo{}, sdkerrors.Wrap(err, "failed to unmarshal CW721 all_nft_info")
+		}
 
 		return allContractInfoResultJson, nil
 	}

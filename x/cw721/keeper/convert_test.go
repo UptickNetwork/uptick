@@ -118,6 +118,19 @@ func TestConvertCW721_SuccessMintsNFT(t *testing.T) {
 	require.Equal(t, "ipfs://cw", got.GetURI())
 }
 
+func TestRegisterCW721_RejectsExistingNativeClass(t *testing.T) {
+	k, ctx, owner, contract, _ := setupConvertKeeper(t)
+
+	_, err := k.RegisterCW721(ctx, &types.MsgConvertCW721{
+		ContractAddress: contract,
+		TokenIds:        []string{"1"},
+		Sender:          owner.String(),
+		Receiver:        owner.String(),
+		ClassId:         "kitty",
+	})
+	require.Error(t, err)
+}
+
 func TestConvertCW721_NotOwner(t *testing.T) {
 	k, ctx, owner, contract, wasm := setupConvertKeeper(t)
 	wasm.setOwner(contract, "1", sdk.AccAddress(bytes20(0x44)).String())

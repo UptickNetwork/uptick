@@ -40,16 +40,12 @@ func Migrate(ctx sdk.Context,
 	for ; iterator.Valid(); iterator.Next() {
 		var denom types.Denom
 		if err := cdc.Unmarshal(iterator.Value(), &denom); err != nil {
-			logger.Error("failed to unmarshal denom during v2 migration", "error", err.Error())
-			skippedDenomNum++
-			continue
+			return err
 		}
 
 		creator, err := sdk.AccAddressFromBech32(denom.Creator)
 		if err != nil {
-			logger.Error("skipping denom with invalid creator during v2 migration", "denom", denom.Id, "error", err.Error())
-			skippedDenomNum++
-			continue
+			return err
 		}
 
 		if err := saveDenom(ctx, denom.Id,
@@ -108,16 +104,12 @@ func migrateToken(
 	for ; iterator.Valid(); iterator.Next() {
 		var baseNFT types.BaseNFT
 		if err := k.cdc.Unmarshal(iterator.Value(), &baseNFT); err != nil {
-			logger.Error("failed to unmarshal NFT during v2 migration", "error", err.Error())
-			skipped++
-			continue
+			return 0, skipped, err
 		}
 
 		owner, err := sdk.AccAddressFromBech32(baseNFT.Owner)
 		if err != nil {
-			logger.Error("skipping NFT with invalid owner during v2 migration", "denomID", denomID, "token", baseNFT.Id, "error", err.Error())
-			skipped++
-			continue
+			return 0, skipped, err
 		}
 
 		if err := k.saveNFT(ctx, denomID,

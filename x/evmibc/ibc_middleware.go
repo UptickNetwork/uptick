@@ -68,6 +68,11 @@ func (im IBCMiddleware) OnRecvPacket(
 	}
 
 	if len(data.Memo) > maxMemoLength {
+		im.keeper.Logger(ctx).Debug(
+			"memo exceeds max length, skipping convert",
+			"memo_length", len(data.Memo),
+			"max_memo_length", maxMemoLength,
+		)
 		return im.Module.OnRecvPacket(ctx, channelVersion, packet, relayer)
 	}
 

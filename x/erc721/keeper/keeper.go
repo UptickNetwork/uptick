@@ -1,6 +1,7 @@
 package keeper
 
 import (
+	"cosmossdk.io/errors"
 	"cosmossdk.io/log"
 	storetypes "cosmossdk.io/store/types"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"github.com/UptickNetwork/uptick/x/erc721/types"
 	ibcnfttransferkeeper "github.com/bianjieai/nft-transfer/keeper"
 	ibcnfttransfertypes "github.com/bianjieai/nft-transfer/types"
+	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
 )
 
 // Keeper of this module maintains collections of erc721.
@@ -50,13 +52,14 @@ func (k Keeper) Logger(ctx sdk.Context) log.Logger {
 }
 
 // SetICS4Wrapper sets the ICS4 wrapper to the keeper.
-// It panics if already set
-func (k *Keeper) SetICS4Wrapper(ics4Wrapper porttypes.ICS4Wrapper) {
+// It returns an error if the wrapper has already been set.
+func (k *Keeper) SetICS4Wrapper(ics4Wrapper porttypes.ICS4Wrapper) error {
 	if k.ics4Wrapper != nil {
-		panic("ICS4 wrapper already set")
+		return errors.Wrap(errortypes.ErrInvalidRequest, "ICS4 wrapper already set")
 	}
 
 	k.ics4Wrapper = ics4Wrapper
+	return nil
 }
 
 func (k *Keeper) GetVoucherClassID(port string, channel string, classId string) string {

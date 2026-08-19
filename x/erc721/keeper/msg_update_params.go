@@ -20,6 +20,8 @@ func (k Keeper) UpdateParams(goCtx context.Context, msg *types.MsgUpdateParams) 
 		return nil, err
 	}
 	ctx := sdk.UnwrapSDKContext(goCtx)
-	k.SetParams(ctx, msg.Params)
+	if err := k.SetParams(ctx, msg.Params); err != nil {
+		return nil, err
+	}
 	return &types.MsgUpdateParamsResponse{}, nil
 }

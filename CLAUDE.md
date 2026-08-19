@@ -5,11 +5,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project Overview
 
 Uptick Network is a Cosmos SDK-based blockchain network designed for NFTs and RWAs (Real World Assets). It integrates:
-- **Cosmos SDK v0.50.14** - Core blockchain framework
-- **CometBFT v0.38.19** - Consensus engine (formerly Tendermint)
-- **IBC v8.7.0** - Inter-Blockchain Communication protocol
-- **Ethermint** - EVM integration for Ethereum compatibility
-- **CosmWasm v0.53.3** - WebAssembly smart contracts
+- **Cosmos SDK v0.53.6** - Core blockchain framework
+- **CometBFT v0.38.21** - Consensus engine (formerly Tendermint)
+- **ibc-go v10.5.0** - Inter-Blockchain Communication protocol
+- **cosmos/evm v0.6.1** - Official EVM integration for Ethereum compatibility
+- **wasmd v0.61.14 / wasmvm v3** - WebAssembly smart contracts
 
 The chain is fully interoperable with both EVM and IBC chains, supporting cross-chain NFT and token transfers.
 
@@ -113,8 +113,9 @@ make build-docs
 
 - **`x/`** - Custom Cosmos SDK modules
   - `collection/` - NFT collection management (Cosmos-native)
-  - `erc20/` - Bidirectional ERC20 ↔ Cosmos token conversion
-  - `evmIBC/` - IBC integration for EVM chains
+  - `erc721/` - Bidirectional ERC721 ↔ Cosmos NFT conversion
+  - `cw721/` - Bidirectional CW721 ↔ Cosmos NFT conversion
+  - `evmibc/` - IBC integration for EVM/CW721 NFT conversion
   - `internft/` - Internal NFT module
   - `nft/` - NFT module wrapper
 
@@ -136,11 +137,12 @@ make build-docs
 - `client/cli/` - CLI commands
 - `spec/` - Module specification and documentation
 
-**EVM Integration**: The chain uses Ethermint to run the EVM alongside the Cosmos SDK. The `erc20` module enables trustless token conversion between EVM (ERC20) and Cosmos (bank module) representations.
+**EVM Integration**: The chain uses the official `cosmos/evm` module to run the EVM alongside the Cosmos SDK. The Cosmos SDK `x/erc20` integration enables token conversion between EVM (ERC20) and Cosmos bank-module representations.
 
 **NFT Architecture**: Uptick supports multiple NFT standards:
 - Cosmos-native NFTs via the `collection` module
-- EVM NFTs (ERC721) via Ethermint
+- EVM NFTs (ERC721) via cosmos/evm
+- CosmWasm NFTs (CW721) via wasmd
 - Cross-chain NFT transfers via IBC and the `nft-transfer` module
 
 **Protobuf Code Generation**: All state types, messages, and queries are defined in `.proto` files under `proto/uptick/`. Generated Go code lives alongside the proto definitions.

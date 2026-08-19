@@ -24,7 +24,7 @@ If you follow these guidelines when reporting an issue to us, we commit to:
 
 ## Disclosure Process
 
-Tharsis uses the following disclosure process:
+Uptick Network uses the following disclosure process:
 
 1. Once a security report is received, the team works to verify the issue and confirm its severity level
    using [CVSS](https://nvd.nist.gov/vuln-metrics/cvss).
@@ -34,9 +34,9 @@ Tharsis uses the following disclosure process:
 4. We notify the community that a security release is coming, to give users time to prepare their systems for the
    update. Notifications can include forum posts, tweets, and emails to partners and validators.
 5. 24 hours following this notification, the fixes are applied publicly and new releases are issued.
-6. The team updates their Uptick and Ethermint dependencies to use these releases, and then themselves issue new
+6. The team updates Uptick and cosmos/evm dependencies to use these releases, and then themselves issue new
    releases.
-7. Once releases are available for Uptick and Ethermint we notify the community, again, through the same channels as
+7. Once releases are available for Uptick and cosmos/evm we notify the community, again, through the same channels as
    above. We also publish a Security Advisory on Github and publish a CVE (if applicable), as long as neither the
    Security Advisory nor the CVE include any information on how to exploit these vulnerabilities beyond what information
    is already available in the patch itself.
@@ -46,7 +46,7 @@ Tharsis uses the following disclosure process:
 
 This process can take some time. Every effort will be made to handle the bug in as timely a manner as possible, however
 it's important that we follow the process described above to ensure that disclosures are handled consistently and to
-keep Ethermint and its downstream dependent projects--including but not limited to Uptick--as secure as possible.
+keep cosmos/evm and its downstream dependent projects--including but not limited to Uptick--as secure as possible.
 
 ## Supported Releases
 

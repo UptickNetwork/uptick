@@ -520,7 +520,9 @@ func New(
 	appKeepers.IBCNftTransferModule = nfttransfer.NewAppModule(appKeepers.IBCNFTTransferKeeper)
 	nftTransferIBCModule := nfttransfer.NewIBCModule(appKeepers.IBCNFTTransferKeeper)
 	ercTransferStack := evmibc.NewIBCMiddleware(appKeepers.EVMIBCKeeper, nftTransferIBCModule, appKeepers.IBCKeeper.ChannelKeeper)
-	appKeepers.Erc721Keeper.SetICS4Wrapper(appKeepers.IBCKeeper.ChannelKeeper)
+	if err := appKeepers.Erc721Keeper.SetICS4Wrapper(appKeepers.IBCKeeper.ChannelKeeper); err != nil {
+		panic(err)
+	}
 
 	// create static IBC router, add transfer route, then set and seal it
 	icaControllerStack := icacontroller.NewIBCMiddleware(appKeepers.ICAControllerKeeper)

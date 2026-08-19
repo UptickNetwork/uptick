@@ -1,6 +1,8 @@
 package keeper
 
 import (
+	"strings"
+
 	sdkerrors "cosmossdk.io/errors"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
@@ -34,6 +36,18 @@ func (k Keeper) RegisterERC721(ctx sdk.Context, msg *types.MsgConvertERC721) (*t
 	if k.IsERC721Registered(ctx, contract) {
 		return nil, sdkerrors.Wrapf(types.ErrTokenPairAlreadyExists,
 			"token ERC721 contract already registered: %s", contract.String())
+	}
+
+	derivedClassID := types.CreateClassIDFromContractAddress(msg.EvmContractAddress)
+	if strings.TrimSpace(msg.ClassId) == "" {
+		msg.ClassId = derivedClassID
+	} else if msg.ClassId != derivedClassID {
+		return nil, sdkerrors.Wrapf(
+			types.ErrTokenPairNotFound,
+			"class ID %s does not match ERC721 contract derived class ID %s",
+			msg.ClassId,
+			derivedClassID,
+		)
 	}
 
 	err := k.CreateNFTClass(ctx, msg)
@@ -78,7 +92,7 @@ func (k Keeper) CreateNFTClass(ctx sdk.Context, msg *types.MsgConvertERC721) err
 
 	_, err = k.nftKeeper.GetDenomInfo(ctx, msg.ClassId)
 	if err == nil {
-		return nil
+		return sdkerrors.Wrapf(types.ErrTokenPairAlreadyExists, "native NFT class already exists: %s", msg.ClassId)
 	}
 
 	err = k.nftKeeper.SaveDenom(ctx, msg.ClassId, erc721Data.Name, classEnhance.Schema,

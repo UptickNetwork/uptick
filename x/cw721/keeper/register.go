@@ -53,6 +53,18 @@ func (k Keeper) RegisterCW721(ctx sdk.Context, msg *types.MsgConvertCW721) (*typ
 			"token CW721 contract already registered: %s", msg.ContractAddress)
 	}
 
+	derivedClassID := types.CreateClassIDFromContractAddress(msg.ContractAddress)
+	if strings.TrimSpace(msg.ClassId) == "" {
+		msg.ClassId = derivedClassID
+	} else if msg.ClassId != derivedClassID {
+		return nil, sdkerrors.Wrapf(
+			types.ErrTokenPairNotFound,
+			"class ID %s does not match CW721 contract derived class ID %s",
+			msg.ClassId,
+			derivedClassID,
+		)
+	}
+
 	err := k.CreateNFTClass(ctx, msg)
 	if err != nil {
 		return nil, sdkerrors.Wrap(err,
@@ -85,7 +97,7 @@ func (k Keeper) CreateNFTClass(ctx sdk.Context, msg *types.MsgConvertCW721) erro
 
 	_, err = k.nftKeeper.GetDenomInfo(ctx, msg.ClassId)
 	if err == nil {
-		return nil
+		return sdkerrors.Wrapf(types.ErrTokenPairAlreadyExists, "native NFT class already exists: %s", msg.ClassId)
 	}
 
 	err = k.nftKeeper.SaveDenom(ctx, msg.ClassId, cw721Data.Name, classEnhance.Schema,

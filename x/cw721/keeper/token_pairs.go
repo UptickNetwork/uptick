@@ -20,7 +20,10 @@ func (k Keeper) GetTokenPairs(ctx sdk.Context) []types.TokenPair {
 
 	for ; iterator.Valid(); iterator.Next() {
 		var tokenPair types.TokenPair
-		k.cdc.MustUnmarshal(iterator.Value(), &tokenPair)
+		if err := k.cdc.Unmarshal(iterator.Value(), &tokenPair); err != nil {
+			k.Logger(ctx).Error("failed to unmarshal cw721 token pair", "error", err)
+			continue
+		}
 
 		tokenPairs = append(tokenPairs, tokenPair)
 	}
@@ -41,7 +44,10 @@ func (k Keeper) GetTokenPair(ctx sdk.Context, id []byte) (types.TokenPair, bool)
 		return types.TokenPair{}, false
 	}
 
-	k.cdc.MustUnmarshal(bz, &tokenPair)
+	if err := k.cdc.Unmarshal(bz, &tokenPair); err != nil {
+		k.Logger(ctx).Error("failed to unmarshal cw721 token pair", "id", string(id), "error", err)
+		return types.TokenPair{}, false
+	}
 	return tokenPair, true
 }
 
@@ -49,7 +55,11 @@ func (k Keeper) GetTokenPair(ctx sdk.Context, id []byte) (types.TokenPair, bool)
 func (k Keeper) SetTokenPair(ctx sdk.Context, tokenPair types.TokenPair) {
 	store := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixTokenPair)
 	key := tokenPair.GetID()
-	bz := k.cdc.MustMarshal(&tokenPair)
+	bz, err := k.cdc.Marshal(&tokenPair)
+	if err != nil {
+		k.Logger(ctx).Error("failed to marshal cw721 token pair", "id", string(key), "error", err)
+		return
+	}
 	store.Set(key, bz)
 }
 

@@ -1,3 +1,4 @@
+# LOCAL DEV ONLY: bind RPC/WS/faucet to loopback. Do not use for public nodes.
 version: 1
 build:
   binary: uptickd
@@ -18,7 +19,7 @@ faucet:
   name: bob
   coins:
   - 10auptick
-  host: 0.0.0.0:4500
+  host: 127.0.0.1:4500
 genesis:
   app_state:
     crisis:
@@ -44,6 +45,6 @@ validators:
   bonded: 100000000000000000000auptick
   app:
     evm-rpc:
-      address: 0.0.0.0:8545
-      ws-address: 0.0.0.0:8546
+      address: 127.0.0.1:8545
+      ws-address: 127.0.0.1:8546
   home: $HOME/.uptickd

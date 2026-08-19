@@ -16,6 +16,7 @@ const (
 	EventTypeRegisterERC721        = "register_erc721"
 	EventTypeToggleTokenConversion = "toggle_token_conversion" // #nosec
 	EventTypeRefundPacketToken     = "refund_packet_token"
+	EventTypeRefundPacketTokenSkip = "refund_packet_token_skip"
 
 	AttributeKeyNFTClass      = "nft_class"
 	AttributeKeyNFTID         = "nft_ids"

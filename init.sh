@@ -1,3 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# LOCAL DEV ONLY: creates a local testnet and resets only the current user's
+# .uptickd* directories. Do not use this script against a production node.
+
+HOME_CHECK="${HOME:?HOME not set}"
 KEY="mykey"
 CHAINID="uptick_7777-1"
 MONIKER="localtestnet"
@@ -15,7 +22,7 @@ command -v jq >/dev/null 2>&1 || {
 }
 
 # remove existing daemon
-rm -rf ~/.uptickd*
+rm -rf "${HOME_CHECK}"/.uptickd*
 
 make install
 

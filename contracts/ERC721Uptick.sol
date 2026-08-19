@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // OpenZeppelin Contracts (last updated v4.5.0) (token/ERC721/presets/ERC721PresetMinterPauserAutoId.sol)
 
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
@@ -36,6 +36,7 @@ ERC721Pausable
 {
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
+    uint256 public constant MAX_BATCH_SIZE = 100;
 
     string private _baseTokenURI;
 
@@ -80,10 +81,10 @@ ERC721Pausable
     ) ERC721(name, symbol) {
         _baseTokenURI = baseTokenURI;
 
-        _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
+        _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
 
-        _setupRole(MINTER_ROLE, _msgSender());
-        _setupRole(PAUSER_ROLE, _msgSender());
+        _grantRole(MINTER_ROLE, _msgSender());
+        _grantRole(PAUSER_ROLE, _msgSender());
 
         _enhanceClassInfo.data = data;
         _enhanceClassInfo.description = description;
@@ -117,6 +118,7 @@ ERC721Pausable
             hasRole(MINTER_ROLE, _msgSender()),
             "ERC721PresetMinterPauserAutoId: must have minter role to mint"
         );
+        require(bytes(uri).length <= 256, "ERC721Uptick: uri too long");
 
         // We cannot just use balanceOf to create the new tokenId because tokens
         // can be burned (destroyed), so we need a separate counter.
@@ -140,6 +142,7 @@ ERC721Pausable
             hasRole(MINTER_ROLE, _msgSender()),
             "ERC721PresetMinterPauserAutoId: must have minter role to mint"
         );
+        require(bytes(uri).length <= 256, "ERC721Uptick: uri too long");
 
         // We cannot just use balanceOf to create the new tokenId because tokens
         // can be burned (destroyed), so we need a separate counter.
@@ -176,6 +179,7 @@ ERC721Pausable
             hasRole(MINTER_ROLE, _msgSender()),
             "ERC721PresetMinterPauserAutoId: must have minter role to mint"
         );
+        require(ids.length <= MAX_BATCH_SIZE, "ERC721Uptick: batch too large");
 
         // We cannot just use balanceOf to create the new tokenId because tokens
         // can be burned (destroyed), so we need a separate counter.
@@ -202,6 +206,7 @@ ERC721Pausable
             hasRole(MINTER_ROLE, _msgSender()),
             "ERC721PresetMinterPauserAutoId: must have minter role to mint"
         );
+        require(ids.length <= MAX_BATCH_SIZE, "ERC721Uptick: batch too large");
 
         // We cannot just use balanceOf to create the new tokenId because tokens
         // can be burned (destroyed), so we need a separate counter.
@@ -327,9 +332,10 @@ ERC721Pausable
     function _beforeTokenTransfer(
         address from,
         address to,
-        uint256 tokenId
+        uint256 firstTokenId,
+        uint256 batchSize
     ) internal virtual override(ERC721, ERC721Enumerable, ERC721Pausable) {
-        super._beforeTokenTransfer(from, to, tokenId);
+        super._beforeTokenTransfer(from, to, firstTokenId, batchSize);
     }
 
     /**

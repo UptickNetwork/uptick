@@ -28,6 +28,7 @@ func ValidateGenesis(data GenesisState) error {
 			return err
 		}
 
+		seenTokenIDs := make(map[string]struct{}, len(c.NFTs))
 		for _, nft := range c.NFTs {
 			if nft.GetOwner().Empty() {
 				return sdkerrors.Wrap(errortypes.ErrInvalidAddress, "missing owner")
@@ -36,6 +37,10 @@ func ValidateGenesis(data GenesisState) error {
 			if err := ValidateTokenID(nft.GetID()); err != nil {
 				return err
 			}
+			if _, ok := seenTokenIDs[nft.GetID()]; ok {
+				return sdkerrors.Wrapf(errortypes.ErrInvalidRequest, "duplicate token id %s in denom %s", nft.GetID(), c.Denom.Id)
+			}
+			seenTokenIDs[nft.GetID()] = struct{}{}
 
 			if err := ValidateTokenURI(nft.GetURI()); err != nil {
 				return err

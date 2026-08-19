@@ -2,14 +2,13 @@ package keeper
 
 import (
 	"context"
-	"fmt"
-	"github.com/UptickNetwork/uptick/x/erc721/contracts"
 	"math/big"
 	"strings"
 
 	ibcnfttransfertypes "github.com/bianjieai/nft-transfer/types"
 
 	"github.com/UptickNetwork/uptick/x/collection/exported"
+	"github.com/UptickNetwork/uptick/x/erc721/contracts"
 
 	"github.com/ethereum/go-ethereum/common"
 
@@ -21,6 +20,16 @@ import (
 )
 
 var _ types.MsgServer = &Keeper{}
+
+const maxERC721BatchSize = 100
+
+func parseERC721TokenID(tokenID string) (*big.Int, error) {
+	n, ok := new(big.Int).SetString(tokenID, 10)
+	if !ok || n.Sign() < 0 || n.BitLen() > 256 {
+		return nil, sdkerrors.Wrapf(errortypes.ErrInvalidRequest, "invalid ERC721 token id %q", tokenID)
+	}
+	return n, nil
+}
 
 // TransferERC721 converts ERC721 tokens into native Cosmos nft for both
 // Cosmos-native and ERC721 TokenPair Owners and transfer through IBC
@@ -101,6 +110,12 @@ func (k Keeper) ConvertERC721(
 	}
 	msg.ClassId = classId
 	msg.CosmosTokenIds = nftIds
+	if len(msg.EvmTokenIds) == 0 || len(msg.EvmTokenIds) != len(msg.CosmosTokenIds) {
+		return nil, sdkerrors.Wrapf(errortypes.ErrInvalidRequest, "evm token ids and cosmos token ids length mismatch")
+	}
+	if len(msg.EvmTokenIds) > maxERC721BatchSize {
+		return nil, sdkerrors.Wrapf(errortypes.ErrInvalidRequest, "ERC721 batch size %d exceeds maximum %d", len(msg.EvmTokenIds), maxERC721BatchSize)
+	}
 
 	bech32Address, err := sdk.AccAddressFromBech32(msg.CosmosSender)
 	if err != nil {
@@ -133,10 +148,9 @@ func (k Keeper) ConvertERC721(
 		return nil, sdkerrors.Wrapf(types.ErrInternalTokenPair, "erc721 contract %s is self-destructed", pair.Erc721Address)
 	}
 
-	bigTokenId := new(big.Int)
-	_, err = fmt.Sscan(msg.EvmTokenIds[0], bigTokenId)
+	bigTokenId, err := parseERC721TokenID(msg.EvmTokenIds[0])
 	if err != nil {
-		return nil, sdkerrors.Wrapf(errortypes.ErrUnauthorized, "%s error scanning value", err)
+		return nil, err
 	}
 
 	owner, err := k.QueryERC721TokenOwner(ctx, erc721, bigTokenId)
@@ -234,6 +248,12 @@ func (k Keeper) convertCosmos2Evm(
 ) (
 	*types.MsgConvertNFTResponse, error,
 ) {
+	if len(msg.EvmTokenIds) == 0 || len(msg.EvmTokenIds) != len(msg.CosmosTokenIds) {
+		return nil, sdkerrors.Wrapf(errortypes.ErrInvalidRequest, "evm token ids and cosmos token ids length mismatch")
+	}
+	if len(msg.EvmTokenIds) > maxERC721BatchSize {
+		return nil, sdkerrors.Wrapf(errortypes.ErrInvalidRequest, "ERC721 batch size %d exceeds maximum %d", len(msg.EvmTokenIds), maxERC721BatchSize)
+	}
 
 	var (
 		bigTokenIds []*big.Int
@@ -245,10 +265,9 @@ func (k Keeper) convertCosmos2Evm(
 	msg.EvmContractAddress = strings.ToLower(contract.String())
 
 	for i, tokenId := range msg.EvmTokenIds {
-		bigTokenId := new(big.Int)
-		_, err := fmt.Sscan(tokenId, bigTokenId)
+		bigTokenId, err := parseERC721TokenID(tokenId)
 		if err != nil {
-			return nil, sdkerrors.Wrapf(errortypes.ErrUnauthorized, "%s error scanning value", err)
+			return nil, err
 		}
 		bigTokenIds = append(bigTokenIds, bigTokenId)
 
@@ -349,21 +368,34 @@ func (k Keeper) convertEvm2Cosmos(
 ) (
 	*types.MsgConvertERC721, error,
 ) {
+	if len(msg.EvmTokenIds) == 0 || len(msg.EvmTokenIds) != len(msg.CosmosTokenIds) {
+		return nil, sdkerrors.Wrapf(errortypes.ErrInvalidRequest, "evm token ids and cosmos token ids length mismatch")
+	}
+	if len(msg.EvmTokenIds) > maxERC721BatchSize {
+		return nil, sdkerrors.Wrapf(errortypes.ErrInvalidRequest, "ERC721 batch size %d exceeds maximum %d", len(msg.EvmTokenIds), maxERC721BatchSize)
+	}
 
 	erc721 := contracts.ERC721UpticksContract.ABI
 	contract := pair.GetERC721Contract()
 
 	for i, tokenId := range msg.EvmTokenIds {
 
-		bigTokenId := new(big.Int)
-		_, err := fmt.Sscan(tokenId, bigTokenId)
+		bigTokenId, err := parseERC721TokenID(tokenId)
 		if err != nil {
-			return nil, sdkerrors.Wrapf(errortypes.ErrUnauthorized, "%s error scanning", err)
+			return nil, err
 		}
 
 		reqInfo, err := k.QueryNFTEnhance(ctx, contract, bigTokenId)
 		if err != nil {
 			return nil, sdkerrors.Wrap(err, "failed to query NFT enhance")
+		}
+
+		owner, err := k.QueryERC721TokenOwner(ctx, contract, bigTokenId)
+		if err != nil {
+			return nil, sdkerrors.Wrap(err, "failed to query ERC721 token owner")
+		}
+		if owner != sender {
+			return nil, sdkerrors.Wrapf(errortypes.ErrUnauthorized, "%s is not the owner of erc721 token %s", sender, tokenId)
 		}
 
 		_, err = k.CallEVM(
@@ -465,10 +497,9 @@ func (k Keeper) RefundPacketToken(
 			return sdkerrors.Wrapf(types.ErrInternalTokenPair, "invalid ERC721 uid for class %s token %s", data.ClassId, tokenId)
 		}
 
-		bigTokenId := new(big.Int)
-		_, err := fmt.Sscan(emvTokenId, bigTokenId)
+		bigTokenId, err := parseERC721TokenID(emvTokenId)
 		if err != nil {
-			return sdkerrors.Wrapf(errortypes.ErrUnauthorized, "%s error scanning value", err)
+			return err
 		}
 
 		contract := common.HexToAddress(evmContractAddress)
@@ -479,6 +510,16 @@ func (k Keeper) RefundPacketToken(
 			return err
 		}
 		if owner != types.ModuleAddress {
+			ctx.EventManager().EmitEvent(
+				sdk.NewEvent(
+					types.EventTypeRefundPacketTokenSkip,
+					sdk.NewAttribute(types.AttributeKeyNFTClass, data.ClassId),
+					sdk.NewAttribute(types.AttributeKeyNFTID, tokenId),
+					sdk.NewAttribute(types.AttributeKeyERC721Token, evmContractAddress),
+					sdk.NewAttribute(types.AttributeKeyERC721TokenID, emvTokenId),
+					sdk.NewAttribute("reason", "owner_is_not_module_account"),
+				),
+			)
 			continue
 		}
 
@@ -502,6 +543,15 @@ func (k Keeper) RefundPacketToken(
 		}
 		k.DeleteNFTPairByNFTID(ctx, data.ClassId, tokenId)
 		k.DeleteNFTPairByTokenID(ctx, evmContractAddress, emvTokenId)
+
+		burnMsg := nftTypes.MsgBurnNFT{
+			Id:      tokenId,
+			DenomId: data.ClassId,
+			Sender:  types.AccModuleAddress.String(),
+		}
+		if _, err = k.nftKeeper.BurnNFT(ctx, &burnMsg); err != nil {
+			return err
+		}
 
 		refundedTokenIds = append(refundedTokenIds, tokenId)
 		refundedContract = evmContractAddress

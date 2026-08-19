@@ -84,7 +84,7 @@ func setupConvertKeeper(t *testing.T) (Keeper, sdk.Context, sdk.AccAddress) {
 
 func TestConvertNFT_Disabled(t *testing.T) {
 	k, ctx, owner := setupConvertKeeper(t)
-	k.SetParams(ctx, types.NewParams(false, true))
+	require.NoError(t, k.SetParams(ctx, types.NewParams(false, true)))
 
 	_, err := k.ConvertNFT(ctx, &types.MsgConvertNFT{
 		ClassId:            "kitty",
@@ -99,7 +99,7 @@ func TestConvertNFT_Disabled(t *testing.T) {
 
 func TestConvertERC721_Disabled(t *testing.T) {
 	k, ctx, owner := setupConvertKeeper(t)
-	k.SetParams(ctx, types.NewParams(false, true))
+	require.NoError(t, k.SetParams(ctx, types.NewParams(false, true)))
 
 	_, err := k.ConvertERC721(ctx, &types.MsgConvertERC721{
 		ClassId:            "kitty",
@@ -125,6 +125,19 @@ func TestConvertNFT_SelfDestructedPair(t *testing.T) {
 		EvmReceiver:        "0x2222222222222222222222222222222222222222",
 	})
 	require.ErrorIs(t, err, types.ErrInternalTokenPair)
+}
+
+func TestRegisterERC721_RejectsExistingNativeClass(t *testing.T) {
+	k, ctx, owner := setupConvertKeeper(t)
+
+	_, err := k.RegisterERC721(ctx, &types.MsgConvertERC721{
+		EvmContractAddress: "0x9999999999999999999999999999999999999999",
+		EvmTokenIds:        []string{"1"},
+		CosmosSender:       owner.String(),
+		CosmosReceiver:     owner.String(),
+		ClassId:            "kitty",
+	})
+	require.Error(t, err)
 }
 
 func TestConvertERC721_SelfDestructedPair(t *testing.T) {

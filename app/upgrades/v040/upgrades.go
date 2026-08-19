@@ -205,14 +205,18 @@ func upgradeHandlerConstructor(
 		// The old evm-nft-convert module stored params in x/params subspace.
 		// The new x/erc721 module stores params directly in its own KV store,
 		// following the same pattern as cosmos/evm ERC20.
-		migrateErc721Params(sdkCtx, box, logger)
+		if err := migrateErc721Params(sdkCtx, box, logger); err != nil {
+			return nil, fmt.Errorf("migrate erc721 params: %w", err)
+		}
 
 		// Step 3.6: Migrate cw721 params from x/params subspace to self-contained KV store
 		//
 		// The old wasm-nft-convert module stored params in x/params subspace.
 		// The new x/cw721 module stores params directly in its own KV store,
 		// following the same pattern as cosmos/evm ERC20.
-		migrateCw721Params(sdkCtx, box, logger)
+		if err := migrateCw721Params(sdkCtx, box, logger); err != nil {
+			return nil, fmt.Errorf("migrate cw721 params: %w", err)
+		}
 
 		// Step 3.7: Align ICS-721 port with ibc-go v10's alphanumeric router key.
 		//
@@ -521,7 +525,7 @@ func deleteLegacyIBCTransferProvenance(ctx sdk.Context, box upgrades.Toolbox, lo
 //
 // Since the old params subspace is being deprecated in SDK 0.53, we use
 // default params and let operators adjust via gov proposal if needed.
-func migrateErc721Params(ctx sdk.Context, box upgrades.Toolbox, logger log.Logger) {
+func migrateErc721Params(ctx sdk.Context, box upgrades.Toolbox, logger log.Logger) error {
 	logger.Info("migrating erc721 params to self-contained KV store")
 
 	storeKey := box.GetKVStoreKey(erc721types.StoreKey)
@@ -529,19 +533,22 @@ func migrateErc721Params(ctx sdk.Context, box upgrades.Toolbox, logger log.Logge
 		store := ctx.KVStore(storeKey)
 		if store.Has(erc721types.KeyPrefixParams) {
 			logger.Info("erc721 params already present, skipping overwrite")
-			return
+			return nil
 		}
 	}
 
 	erc721Keeper := box.Erc721Keeper
 	params := erc721types.DefaultParams()
 
-	erc721Keeper.SetParams(ctx, params)
+	if err := erc721Keeper.SetParams(ctx, params); err != nil {
+		return err
+	}
 	logger.Info(
 		"erc721 params migrated to self-contained KV store",
 		"EnableErc721", params.EnableErc721,
 		"EnableEVMHook", params.EnableEVMHook,
 	)
+	return nil
 }
 
 // migrateCw721Params migrates cw721 module parameters from x/params subspace
@@ -554,7 +561,7 @@ func migrateErc721Params(ctx sdk.Context, box upgrades.Toolbox, logger log.Logge
 //
 // Since the old params subspace is being deprecated in SDK 0.53, we use
 // default params and let operators adjust via gov proposal if needed.
-func migrateCw721Params(ctx sdk.Context, box upgrades.Toolbox, logger log.Logger) {
+func migrateCw721Params(ctx sdk.Context, box upgrades.Toolbox, logger log.Logger) error {
 	logger.Info("migrating cw721 params to self-contained KV store")
 
 	storeKey := box.GetKVStoreKey(cw721types.StoreKey)
@@ -562,19 +569,22 @@ func migrateCw721Params(ctx sdk.Context, box upgrades.Toolbox, logger log.Logger
 		store := ctx.KVStore(storeKey)
 		if store.Has(cw721types.KeyPrefixParams) {
 			logger.Info("cw721 params already present, skipping overwrite")
-			return
+			return nil
 		}
 	}
 
 	cw721Keeper := box.Cw721Keeper
 	params := cw721types.DefaultParams()
 
-	_ = cw721Keeper.SetParams(ctx, params)
+	if err := cw721Keeper.SetParams(ctx, params); err != nil {
+		return err
+	}
 	logger.Info(
 		"cw721 params migrated to self-contained KV store",
 		"EnableCw721", params.EnableCw721,
 		"EnableEVMHook", params.EnableEVMHook,
 	)
+	return nil
 }
 
 // migrateNFTTransferPort rewrites the ICS-721 bound port from the legacy

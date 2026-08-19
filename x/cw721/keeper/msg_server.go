@@ -15,6 +15,8 @@ import (
 
 var _ types.MsgServer = &Keeper{}
 
+const maxCW721BatchSize = 100
+
 // TransferCW721 converts CW721 tokens into native Cosmos nft for both
 // Cosmos-native and CW721 TokenPair Owners and transfer through IBC
 func (k Keeper) TransferCW721(
@@ -85,6 +87,12 @@ func (k Keeper) ConvertCW721(
 	}
 	msg.ClassId = classId
 	msg.NftIds = nftIds
+	if len(msg.TokenIds) == 0 || len(msg.TokenIds) != len(msg.NftIds) {
+		return nil, sdkerrors.Wrapf(errortypes.ErrInvalidRequest, "CW721 token ids and NFT ids length mismatch")
+	}
+	if len(msg.TokenIds) > maxCW721BatchSize {
+		return nil, sdkerrors.Wrapf(errortypes.ErrInvalidRequest, "CW721 batch size %d exceeds maximum %d", len(msg.TokenIds), maxCW721BatchSize)
+	}
 
 	// Error checked during msg validation
 	// sender := common.HexToAddress(msg.Sender)
@@ -129,7 +137,7 @@ func (k Keeper) convertWasm2Cosmos(
 			return nil, err
 		}
 
-		if allNftInfo.Access.Owner != msg.Sender {
+		if strings.TrimSpace(allNftInfo.Access.Owner) == "" || allNftInfo.Access.Owner != msg.Sender {
 			return nil, sdkerrors.Wrapf(errortypes.ErrUnauthorized, "%s is not the owner of cw721 token %s", msg.Sender, strings.Join(msg.TokenIds, ","))
 		}
 
@@ -167,7 +175,7 @@ func (k Keeper) convertWasm2Cosmos(
 				DenomId:   msg.ClassId,
 				Id:        msg.NftIds[i],
 				Name:      nftInfo.GetName(),
-				URI:       allNftInfo.Info.TokenUri,
+				URI:       nftInfo.GetURI(),
 				Data:      nftInfo.GetData(),
 				UriHash:   nftInfo.GetURIHash(),
 				Sender:    types.AccModuleAddress.String(),
@@ -224,20 +232,6 @@ func (k Keeper) ConvertNFT(
 		return nil, err
 	}
 
-	ctx.EventManager().EmitEvents(
-		sdk.Events{
-			sdk.NewEvent(
-				types.EventTypeConvertNFT,
-				sdk.NewAttribute(sdk.AttributeKeySender, msg.Sender),
-				sdk.NewAttribute(types.AttributeKeyReceiver, msg.Receiver),
-				sdk.NewAttribute(types.AttributeKeyNFTClass, msg.ClassId),
-				sdk.NewAttribute(types.AttributeKeyNFTID, strings.Join(msg.NftIds, ",")),
-				sdk.NewAttribute(types.AttributeKeyCW721Token, msg.ContractAddress),
-				sdk.NewAttribute(types.AttributeKeyCW721TokenID, strings.Join(msg.TokenIds, ",")),
-			),
-		},
-	)
-
 	return k.convertCosmos2Wasm(ctx, msg) //
 }
 
@@ -252,6 +246,12 @@ func (k Keeper) convertCosmos2Wasm(
 ) (
 	*types.MsgConvertNFTResponse, error,
 ) {
+	if len(msg.TokenIds) == 0 || len(msg.TokenIds) != len(msg.NftIds) {
+		return nil, sdkerrors.Wrapf(errortypes.ErrInvalidRequest, "CW721 token ids and NFT ids length mismatch")
+	}
+	if len(msg.TokenIds) > maxCW721BatchSize {
+		return nil, sdkerrors.Wrapf(errortypes.ErrInvalidRequest, "CW721 batch size %d exceeds maximum %d", len(msg.TokenIds), maxCW721BatchSize)
+	}
 
 	for i, tokenId := range msg.TokenIds {
 
@@ -284,14 +284,7 @@ func (k Keeper) convertCosmos2Wasm(
 				return nil, err
 			}
 		} else {
-			nftInfo, err := k.QueryCW721AllNftInfo(ctx, msg.ContractAddress, tokenId)
-			if err != nil {
-				return nil, err
-			}
-			if nftInfo.Access.Owner != types.AccModuleAddress.String() {
-				return nil, sdkerrors.Wrapf(errortypes.ErrUnauthorized, "%s is not the owner of cw721 token %s", types.AccModuleAddress, tokenId)
-			}
-			_, err = k.TransferCw721(ctx, msg.ContractAddress, tokenId, msg.Receiver, types.AccModuleAddress.String())
+			_, err := k.TransferCw721(ctx, msg.ContractAddress, tokenId, msg.Receiver, types.AccModuleAddress.String())
 			if err != nil {
 				return nil, err
 			}

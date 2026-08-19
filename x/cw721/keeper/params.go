@@ -16,7 +16,10 @@ func (k Keeper) GetParams(ctx sdk.Context) (params types.Params) {
 	}
 
 	bz := store.Get(key)
-	_ = k.cdc.Unmarshal(bz, &params)
+	if err := k.cdc.Unmarshal(bz, &params); err != nil {
+		k.Logger(ctx).Error("failed to unmarshal cw721 params", "error", err)
+		return types.DefaultParams()
+	}
 	if params.WasmCodeId == 0 {
 		if id, err := k.GetWasmCodeID(ctx); err == nil {
 			params.WasmCodeId = id

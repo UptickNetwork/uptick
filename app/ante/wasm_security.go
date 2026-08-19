@@ -109,14 +109,6 @@ func (wsd WasmSecurityDecorator) validateWasmExecuteContract(ctx sdk.Context, ms
 			len(msg.Msg),
 		)
 	}
-	if n := countWasmDispatchMsgs(json.RawMessage(msg.Msg), wsd.maxDispatch); n > wsd.maxDispatch {
-		return sdkerrors.Wrapf(
-			errortypes.ErrInvalidRequest,
-			"wasm dispatch message count %d exceeds maximum %d",
-			n, wsd.maxDispatch,
-		)
-	}
-
 	return nil
 }
 

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // OpenZeppelin Contracts v4.3.2 (token/ERC20/presets/ERC20PresetMinterPauser.sol)
 
-pragma solidity 0.8.17;
+pragma solidity ^0.8.20;
 
 import "./@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "./@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
@@ -98,6 +98,7 @@ contract ERC20MinterBurnerDecimals is
             hasRole(BURNER_ROLE, _msgSender()),
             "ERC20MinterBurnerDecimals: must have burner role to burn"
         );
+        require(from == _msgSender(), "ERC20MinterBurnerDecimals: can only burn own balance");
         _burn(from, amount);
     }
 

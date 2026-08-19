@@ -41,12 +41,10 @@ func TestSetICS4Wrapper_FirstCall(t *testing.T) {
 	k := NewKeeper(sk, cdc, ak, nk, ek, ik)
 
 	// First call should succeed
-	require.NotPanics(t, func() {
-		k.SetICS4Wrapper(nil)
-	})
+	require.NoError(t, k.SetICS4Wrapper(nil))
 }
 
-func TestSetICS4Wrapper_PanicsIfAlreadySet(t *testing.T) {
+func TestSetICS4Wrapper_ReturnsErrorIfAlreadySet(t *testing.T) {
 	var sk storetypes.StoreKey = nil
 	var cdc codec.BinaryCodec = nil
 	var ak types.AccountKeeper = nil
@@ -58,9 +56,7 @@ func TestSetICS4Wrapper_PanicsIfAlreadySet(t *testing.T) {
 	// Pre-set to non-nil
 	k.ics4Wrapper = &mockICS4Wrapper{}
 
-	require.Panics(t, func() {
-		k.SetICS4Wrapper(nil)
-	})
+	require.Error(t, k.SetICS4Wrapper(nil))
 }
 
 func TestGetVoucherClassID_ValidInput(t *testing.T) {

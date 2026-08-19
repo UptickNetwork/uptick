@@ -162,7 +162,7 @@ func (k Keeper) QueryClassEnhance(
 
 	ret, err := erc721.Unpack("getClassEnhanceInfo", res.Ret)
 	if err != nil {
-		k.Logger(ctx).Error("QueryClassEnhance resRet", "error", err.Error())
+		return types.ClassEnhance{}, sdkerrors.Wrapf(types.ErrABIUnpack, "failed to unpack getClassEnhanceInfo: %s", err.Error())
 	}
 
 	if len(ret) != 7 {
@@ -186,7 +186,7 @@ func (k Keeper) QueryNFTEnhance(
 	if err != nil {
 		retTokenUri, err := k.QueryERC721DataByTokenID("tokenURI", ctx, contract, tokenID)
 		if err != nil {
-			return types.NFTEnhance{}, nil
+			return types.NFTEnhance{}, err
 		} else {
 			return types.NewNFTEnhance("", retTokenUri[0].(string), "", ""), nil
 		}

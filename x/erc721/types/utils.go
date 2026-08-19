@@ -3,9 +3,12 @@ package types
 import (
 	"encoding/hex"
 	"fmt"
+	"math/big"
 	"regexp"
 	"strings"
 
+	sdkerrors "cosmossdk.io/errors"
+	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 )
 
@@ -138,4 +141,15 @@ func GetNFTFromUID(uid string) (string, string) {
 	} else {
 		return uidArray[0], uidArray[1]
 	}
+}
+
+// ValidateEVMTokenID ensures an ERC721 token ID is a base-10 uint256 string.
+// fmt.Sscan historically accepted hexadecimal token IDs, which could create
+// duplicate NFT-pair keys for the same numerical token ID.
+func ValidateEVMTokenID(tokenID string) error {
+	n, ok := new(big.Int).SetString(tokenID, 10)
+	if !ok || n.Sign() < 0 || n.BitLen() > 256 {
+		return sdkerrors.Wrapf(errortypes.ErrInvalidRequest, "invalid ERC721 token id %q", tokenID)
+	}
+	return nil
 }

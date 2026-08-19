@@ -289,6 +289,7 @@ replace (
 	github.com/99designs/keyring => github.com/cosmos/keyring v1.2.0
 	github.com/bianjieai/nft-transfer => github.com/UptickNetwork/nft-transfer v1.3.0-ibc-v10
 	github.com/ethereum/go-ethereum => github.com/cosmos/go-ethereum v1.16.2-cosmos-1
+	// Pinned to v1.9.1 to resolve CVE-2023-29401; revisit when a newer compatible release is available.
 	github.com/gin-gonic/gin => github.com/gin-gonic/gin v1.9.1
 	github.com/syndtr/goleveldb => github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
 )
