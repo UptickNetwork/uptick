@@ -58,11 +58,8 @@ linters-settings:
     locale: US
   nolintlint:
     allow-unused: false
-    allow-leading-space: true
     require-explanation: false
     require-specific: false
-  gofumpt:
-    lang-version: "1.17"
   gomodguard:
     blocked:
       versions: # List of blocked module version constraints

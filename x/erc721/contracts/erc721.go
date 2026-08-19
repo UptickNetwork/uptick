@@ -13,7 +13,7 @@ import (
 
 var (
 	//go:embed compiled_contracts/ERC721Uptick.json
-	ERC721UptickJSON []byte // nolint: golint
+	ERC721UptickJSON []byte //nolint:revive,stylecheck
 
 	// ERC721UpticksContract is the compiled erc721 contract
 	ERC721UpticksContract evmtypes.CompiledContract

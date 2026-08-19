@@ -53,7 +53,7 @@ func (k Keeper) IssueDenom(goCtx context.Context, msg *types.MsgIssueDenom) (*ty
 	return &types.MsgIssueDenomResponse{}, nil
 }
 
-// nolint: dupl
+//nolint:dupl
 func (k Keeper) MintNFT(goCtx context.Context, msg *types.MsgMintNFT) (*types.MsgMintNFTResponse, error) {
 	recipient, err := sdk.AccAddressFromBech32(msg.Recipient)
 	if err != nil {
