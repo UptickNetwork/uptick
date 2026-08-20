@@ -4,6 +4,7 @@ import (
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	govv1beta1 "github.com/cosmos/cosmos-sdk/x/gov/types/v1beta1"
 )
 
@@ -19,6 +20,16 @@ import (
 func RegisterInterfaces(registry codectypes.InterfaceRegistry) {
 	registry.RegisterImplementations(
 		(*sdk.AccountI)(nil),
+		&EthAccount{},
+	)
+	// Genesis bootstrap compatibility: a v0.3.3-era genesis (or a fresh chain
+	// initialized from a pre-upgrade export) still contains EthAccount records.
+	// InitGenesis unpacks accounts against authtypes.GenesisAccount, which is a
+	// distinct interface from sdk.AccountI, so the legacy account must be
+	// registered for both interfaces to allow a v0.4.0 node to start from such
+	// a genesis and produce the same app hash as the chain it is joining.
+	registry.RegisterImplementations(
+		(*authtypes.GenesisAccount)(nil),
 		&EthAccount{},
 	)
 	registry.RegisterImplementations(
