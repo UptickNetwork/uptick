@@ -2,6 +2,7 @@ package params
 
 import (
 	"cosmossdk.io/x/tx/signing"
+	legacy "github.com/UptickNetwork/uptick/app/upgrades/v040/legacy"
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/codec/address"
 	"github.com/cosmos/cosmos-sdk/codec/types"
@@ -39,6 +40,10 @@ func MakeEncodingConfig() EncodingConfig {
 	// Register the evm types
 	enccodec.RegisterLegacyAminoCodec(amino)
 	enccodec.RegisterInterfaces(interfaceRegistry)
+
+	// Register v0.3.3 legacy account/pubkey/erc20-proposal types so runtime
+	// state export and queries can decode records carried over by the upgrade.
+	legacy.RegisterInterfaces(interfaceRegistry)
 
 	return EncodingConfig{
 		InterfaceRegistry: interfaceRegistry,
