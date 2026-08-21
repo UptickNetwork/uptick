@@ -175,7 +175,7 @@ Get the web3 client version.
 #### Result
 
 ```json
- {"jsonrpc":"2.0","id":1,"result":"Uptick/0.1.3+/linux/go1.17"}
+ {"jsonrpc":"2.0","id":1,"result":"Uptick/0.1.3+/linux/go1.25.8"}
 ```
 
 #### Client Examples
