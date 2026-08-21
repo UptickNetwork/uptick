@@ -548,6 +548,9 @@ release-dry-run:
 		--rm \
 		--privileged \
 		-e CGO_ENABLED=1 \
+		-e GOMODCACHE=/go/pkg/mod \
+		-e GOPROXY="`go env GOPROXY`" \
+		-e GOSUMDB="`go env GOSUMDB`" \
 		-v /var/run/docker.sock:/var/run/docker.sock \
 		-v `pwd`:/go/src/$(PACKAGE_NAME) \
 		-v ${GOPATH}/pkg:/go/pkg \
@@ -564,6 +567,9 @@ release:
 		--rm \
 		--privileged \
 		-e CGO_ENABLED=1 \
+		-e GOMODCACHE=/go/pkg/mod \
+		-e GOPROXY="`go env GOPROXY`" \
+		-e GOSUMDB="`go env GOSUMDB`" \
 		--env-file .release-env \
 		-v /var/run/docker.sock:/var/run/docker.sock \
 		-v `pwd`:/go/src/$(PACKAGE_NAME) \

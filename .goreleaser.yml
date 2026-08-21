@@ -1,9 +1,5 @@
 version: 2
 
-before:
-  hooks:
-  - go mod download
-
 builds:
   - id: "uptickd-darwin"
     main: ./cmd/uptickd
@@ -65,29 +61,11 @@ builds:
       - -tags=cgo
     ldflags:
       - -s -w -X github.com/cosmos/cosmos-sdk/version.Name=uptick -X github.com/cosmos/cosmos-sdk/version.AppName=uptickd -X github.com/cosmos/cosmos-sdk/version.Version={{.Version}} -X github.com/cosmos/cosmos-sdk/version.Commit={{.Commit}}
-  - id: "uptickd-windows"
-    main: ./cmd/uptickd
-    binary: bin/uptickd
-    env:
-      - CGO_ENABLED=1
-      - CC=x86_64-w64-mingw32-gcc
-      - CXX=x86_64-w64-mingw32-g++
-    goos:
-      - windows
-    goarch:
-      - amd64
-    flags:
-      - -tags=cgo
-      - -buildmode=exe
-    ldflags:
-      - -s -w -X github.com/cosmos/cosmos-sdk/version.Name=uptick -X github.com/cosmos/cosmos-sdk/version.AppName=uptickd -X github.com/cosmos/cosmos-sdk/version.Version={{.Version}} -X github.com/cosmos/cosmos-sdk/version.Commit={{.Commit}}
-
 archives:
 - name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
   ids:
   - uptickd-darwin
   - uptickd-darwin-arm64
-  - uptickd-windows
   - uptickd-linux
   - uptickd-linux-arm64
   

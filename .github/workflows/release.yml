@@ -17,8 +17,8 @@ jobs:
           fetch-depth: 0
 
       # Run goreleaser inside the goreleaser-cross image so the cgo cross
-      # compilers required by .goreleaser.yml (osxcross, mingw, aarch64 gcc)
-      # are available for darwin/windows/linux-arm64 builds.
+      # compilers required by .goreleaser.yml (osxcross, aarch64 gcc) are
+      # available for darwin/linux/linux-arm64 builds.
       - name: Release
         run: |
           docker run --rm --privileged \
