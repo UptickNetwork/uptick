@@ -1,0 +1,34 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  goreleaser:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Run goreleaser inside the goreleaser-cross image so the cgo cross
+      # compilers required by .goreleaser.yml (osxcross, aarch64 gcc) are
+      # available for darwin/linux/linux-arm64 builds.
+      - name: Release
+        run: |
+          docker run --rm --privileged \
+            -e CGO_ENABLED=1 \
+            -e GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}" \
+            -e GIT_CONFIG_COUNT=1 \
+            -e GIT_CONFIG_KEY_0=safe.directory \
+            -e GIT_CONFIG_VALUE_0=/go/src/github.com/UptickNetwork/uptick \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$GITHUB_WORKSPACE":/go/src/github.com/UptickNetwork/uptick \
+            -w /go/src/github.com/UptickNetwork/uptick \
+            ghcr.io/goreleaser/goreleaser-cross:v1.25.8 \
+            release --clean

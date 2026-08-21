@@ -179,9 +179,9 @@ moniker="NODE_NAME"
 ```bash
 SNAP_RPC1="https://uptick-testnet-rpc.brocha.in:443"
 SNAP_RPC="https://peer0.testnet.uptick.network:36657"
-CHAIN_ID="uptick_7000-2"
+CHAIN_ID="origin_1170-3"
 PEER="f97a75fb69d3a5fe893dca7c8d238ccc0bd66a8f@uptick-seed.p2p.brocha.in:30554,eecdfb17919e59f36e5ae6cec2c98eeeac05c0f2@peer0.testnet.uptick.network:26656"
-wget -O $HOME/genesis.json https://raw.githubusercontent.com/UptickNetwork/uptick-testnet/main/uptick_7000-2/genesis.json
+wget -O $HOME/genesis.json https://raw.githubusercontent.com/UptickNetwork/uptick-testnet/main/origin_1170-3/config/genesis.json
 ```
 
 

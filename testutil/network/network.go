@@ -25,7 +25,6 @@ import (
 	tmclient "github.com/cometbft/cometbft/rpc/client"
 	dbm "github.com/cosmos/cosmos-db"
 	"github.com/cosmos/cosmos-sdk/client/flags"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -49,15 +48,13 @@ import (
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	"github.com/cosmos/cosmos-sdk/x/genutil"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
-	"github.com/evmos/ethermint/crypto/hd"
-
-	"github.com/evmos/ethermint/server/config"
-	ethermint "github.com/evmos/ethermint/types"
-	evmtypes "github.com/evmos/ethermint/x/evm/types"
+	evmconfig "github.com/cosmos/evm/config"
+	"github.com/cosmos/evm/crypto/hd"
+	"github.com/cosmos/evm/server/config"
 
 	pruningtypes "cosmossdk.io/store/pruning/types"
 	"github.com/UptickNetwork/uptick/app"
-	evmostypes "github.com/UptickNetwork/uptick/types"
+	upticktypes "github.com/UptickNetwork/uptick/types"
 )
 
 // package-wide network lock to only allow one test network at a time
@@ -80,25 +77,25 @@ type Config struct {
 	InterfaceRegistry codectypes.InterfaceRegistry
 	TxConfig          client.TxConfig
 	AccountRetriever  client.AccountRetriever
-	AppConstructor    AppConstructor          // the ABCI application constructor
-	GenesisState      evmostypes.GenesisState // custom gensis state to provide
-	TimeoutCommit     time.Duration           // the consensus commitment timeout
-	AccountTokens     math.Int                // the amount of unique validator tokens (e.g. 1000node0)
-	StakingTokens     math.Int                // the amount of tokens each validator has available to stake
-	BondedTokens      math.Int                // the amount of tokens each validator stakes
-	NumValidators     int                     // the total number of validators to create and bond
-	ChainID           string                  // the network chain-id
-	BondDenom         string                  // the staking bond denomination
-	MinGasPrices      string                  // the minimum gas prices each validator will accept
-	PruningStrategy   string                  // the pruning strategy each validator will have
-	SigningAlgo       string                  // signing algorithm for keys
-	RPCAddress        string                  // RPC listen address (including port)
-	JSONRPCAddress    string                  // JSON-RPC listen address (including port)
-	APIAddress        string                  // REST API listen address (including port)
-	GRPCAddress       string                  // GRPC server listen address (including port)
-	EnableTMLogging   bool                    // enable Tendermint logging to STDOUT
-	CleanupDir        bool                    // remove base temporary directory during cleanup
-	PrintMnemonic     bool                    // print the mnemonic of first validator as log output for testing
+	AppConstructor    AppConstructor           // the ABCI application constructor
+	GenesisState      upticktypes.GenesisState // custom gensis state to provide
+	TimeoutCommit     time.Duration            // the consensus commitment timeout
+	AccountTokens     math.Int                 // the amount of unique validator tokens (e.g. 1000node0)
+	StakingTokens     math.Int                 // the amount of tokens each validator has available to stake
+	BondedTokens      math.Int                 // the amount of tokens each validator stakes
+	NumValidators     int                      // the total number of validators to create and bond
+	ChainID           string                   // the network chain-id
+	BondDenom         string                   // the staking bond denomination
+	MinGasPrices      string                   // the minimum gas prices each validator will accept
+	PruningStrategy   string                   // the pruning strategy each validator will have
+	SigningAlgo       string                   // signing algorithm for keys
+	RPCAddress        string                   // RPC listen address (including port)
+	JSONRPCAddress    string                   // JSON-RPC listen address (including port)
+	APIAddress        string                   // REST API listen address (including port)
+	GRPCAddress       string                   // GRPC server listen address (including port)
+	EnableTMLogging   bool                     // enable Tendermint logging to STDOUT
+	CleanupDir        bool                     // remove base temporary directory during cleanup
+	PrintMnemonic     bool                     // print the mnemonic of first validator as log output for testing
 }
 
 // DefaultConfig returns a sane default configuration suitable for nearly all
@@ -106,9 +103,8 @@ type Config struct {
 func DefaultConfig() Config {
 	chainID := fmt.Sprintf("uptick_%d-1", tmrand.Int63n(9999999999999)+1)
 	initAppOptions := viper.New()
-	tempDir := tempDir()
-	initAppOptions.Set(flags.FlagHome, tempDir)
-	app := app.NewUptick(
+	initAppOptions.Set(flags.FlagHome, tempDir())
+	seedApp := app.NewUptick(
 		log.NewNopLogger(),
 		dbm.NewMemDB(),
 		nil,
@@ -119,21 +115,21 @@ func DefaultConfig() Config {
 	)
 
 	return Config{
-		Codec:             app.AppCodec(),
-		TxConfig:          app.GetTxConfig(),
-		LegacyAmino:       app.LegacyAmino(),
-		InterfaceRegistry: app.InterfaceRegistry(),
+		Codec:             seedApp.AppCodec(),
+		TxConfig:          seedApp.GetTxConfig(),
+		LegacyAmino:       seedApp.LegacyAmino(),
+		InterfaceRegistry: seedApp.InterfaceRegistry(),
 		AccountRetriever:  authtypes.AccountRetriever{},
-		AppConstructor:    NewAppConstructor(chainID),
-		GenesisState:      app.DefaultGenesis(),
+		AppConstructor:    NewAppConstructor(chainID, seedApp),
+		GenesisState:      seedApp.DefaultGenesis(),
 		TimeoutCommit:     2 * time.Second,
 		ChainID:           chainID,
-		NumValidators:     4,
-		BondDenom:         ethermint.AttoPhoton,
-		MinGasPrices:      fmt.Sprintf("0.000006%s", ethermint.AttoPhoton),
-		AccountTokens:     sdk.TokensFromConsensusPower(1000, ethermint.PowerReduction),
-		StakingTokens:     sdk.TokensFromConsensusPower(500, ethermint.PowerReduction),
-		BondedTokens:      sdk.TokensFromConsensusPower(100, ethermint.PowerReduction),
+		NumValidators:     1,
+		BondDenom:         upticktypes.AttoPhoton,
+		MinGasPrices:      fmt.Sprintf("0.000006%s", upticktypes.AttoPhoton),
+		AccountTokens:     sdk.TokensFromConsensusPower(1000, upticktypes.PowerReduction),
+		StakingTokens:     sdk.TokensFromConsensusPower(500, upticktypes.PowerReduction),
+		BondedTokens:      sdk.TokensFromConsensusPower(100, upticktypes.PowerReduction),
 		PruningStrategy:   pruningtypes.PruningOptionNothing,
 		CleanupDir:        true,
 		SigningAlgo:       string(hd.EthSecp256k1Type),
@@ -142,14 +138,20 @@ func DefaultConfig() Config {
 	}
 }
 
-// NewAppConstructor returns a new Uptick AppConstructor
-func NewAppConstructor(chainID string) AppConstructor {
-
+// NewAppConstructor returns a new Uptick AppConstructor.
+// cosmos/evm v0.6.1 stores chainConfig in process-global state, so a second
+// NewUptick() in the same process panics. Reuse seedApp for the first
+// validator; additional validators are not supported in-process.
+func NewAppConstructor(chainID string, seedApp servertypes.Application) AppConstructor {
+	usedSeed := false
 	return func(val Validator) servertypes.Application {
+		if seedApp != nil && !usedSeed {
+			usedSeed = true
+			return seedApp
+		}
 
 		initAppOptions := viper.New()
-		tempDir := tempDir()
-		initAppOptions.Set(flags.FlagHome, tempDir)
+		initAppOptions.Set(flags.FlagHome, tempDir())
 
 		return app.NewUptick(
 			val.Ctx.Logger, dbm.NewMemDB(), nil, true,
@@ -246,7 +248,13 @@ func New(l Logger, baseDir string, cfg Config) (*Network, error) {
 	l.Log("acquiring test network lock")
 	lock.Lock()
 
-	if !ethermint.IsValidChainID(cfg.ChainID) {
+	if cfg.NumValidators != 1 {
+		lock.Unlock()
+		return nil, fmt.Errorf("in-process network supports 1 validator (cosmos/evm chainConfig is process-global), got %d", cfg.NumValidators)
+	}
+
+	if !upticktypes.IsValidChainID(cfg.ChainID) {
+		lock.Unlock()
 		return nil, fmt.Errorf("invalid chain-id: %s", cfg.ChainID)
 	}
 
@@ -344,6 +352,11 @@ func New(l Logger, baseDir string, cfg Config) (*Network, error) {
 			}
 			appCfg.JSONRPC.Enable = true
 			appCfg.JSONRPC.API = config.GetAPINamespaces()
+			if len(portPool) == 0 {
+				return nil, fmt.Errorf("failed to get port for JSON-RPC websocket")
+			}
+			wsPort := <-portPool
+			appCfg.JSONRPC.WsAddress = fmt.Sprintf("127.0.0.1:%s", wsPort)
 		}
 
 		logger := log.NewNopLogger()
@@ -436,10 +449,7 @@ func New(l Logger, baseDir string, cfg Config) (*Network, error) {
 
 		genFiles = append(genFiles, tmCfg.GenesisFile())
 		genBalances = append(genBalances, banktypes.Balance{Address: addr.String(), Coins: balances.Sort()})
-		genAccounts = append(genAccounts, &ethermint.EthAccount{
-			BaseAccount: authtypes.NewBaseAccount(addr, nil, 0, 0),
-			CodeHash:    common.BytesToHash(evmtypes.EmptyCodeHash).Hex(),
-		})
+		genAccounts = append(genAccounts, authtypes.NewBaseAccount(addr, nil, 0, 0))
 
 		commission, err := math.LegacyNewDecFromStr("0.5")
 		if err != nil {
@@ -495,7 +505,11 @@ func New(l Logger, baseDir string, cfg Config) (*Network, error) {
 			return nil, err
 		}
 
-		customAppTemplate, _ := config.AppConfig(ethermint.AttoPhoton)
+		evmChainID := upticktypes.MainnetEVMChainID
+		if parsed, err := upticktypes.ParseEIP155ChainID(cfg.ChainID); err == nil {
+			evmChainID = parsed
+		}
+		customAppTemplate, _ := evmconfig.InitAppConfig(upticktypes.AttoPhoton, evmChainID)
 		srvconfig.SetConfigTemplate(customAppTemplate)
 		srvconfig.WriteConfigFile(filepath.Join(nodeDir, "config/app.toml"), appCfg)
 
@@ -664,10 +678,10 @@ func (n *Network) Cleanup() {
 
 			if err := v.jsonrpc.Shutdown(shutdownCtx); err != nil {
 				v.tmNode.Logger.Error("HTTP server shutdown produced a warning", "error", err.Error())
-			} else {
+			} else if v.jsonrpcDone != nil {
 				v.tmNode.Logger.Info("HTTP server shut down, waiting 5 sec")
 				select {
-				case <-time.Tick(5 * time.Second):
+				case <-time.After(5 * time.Second):
 				case <-v.jsonrpcDone:
 				}
 			}
@@ -769,14 +783,15 @@ var tempDir = func() string {
 	return dir
 }
 
-// initPortPool 初始化端口池，填充可用的端口号
+// initPortPool initializes the port pool with available port numbers.
 func initPortPool() {
-	// 清空现有的端口池
+	// Drain the existing port pool.
 	for len(portPool) > 0 {
 		<-portPool
 	}
 
-	// 填充新的端口号 (从26656开始，这是Tendermint的默认端口范围)
+	// Fill the pool with new port numbers (starting at 26656,
+	// Tendermint's default port range).
 	for i := 0; i < 200; i++ {
 		port := fmt.Sprintf("%d", 26656+i)
 		portPool <- port

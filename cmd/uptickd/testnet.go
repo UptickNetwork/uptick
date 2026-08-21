@@ -36,14 +36,13 @@ import (
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 
-	"github.com/ethereum/go-ethereum/common"
+	upticktypes "github.com/UptickNetwork/uptick/types"
+	evmconfig "github.com/cosmos/evm/config"
+	"github.com/cosmos/evm/crypto/hd"
+	"github.com/cosmos/evm/server/config"
+	srvflags "github.com/cosmos/evm/server/flags"
 
-	"github.com/evmos/ethermint/crypto/hd"
-	"github.com/evmos/ethermint/server/config"
-	srvflags "github.com/evmos/ethermint/server/flags"
-	ethermint "github.com/evmos/ethermint/types"
-	evmtypes "github.com/evmos/ethermint/x/evm/types"
-
+	"github.com/UptickNetwork/uptick/app"
 	cmdcfg "github.com/UptickNetwork/uptick/cmd/config"
 	"github.com/UptickNetwork/uptick/testutil/network"
 
@@ -96,8 +95,8 @@ type startArgs struct {
 // This transaction consumes approximately 220,000 gas when executed in the genesis block.
 const createValidatorMsgGasLimit = 250_000
 
-func addTestnetFlagsToCmd(cmd *cobra.Command) {
-	cmd.Flags().Int(flagNumValidators, 4, "Number of validators to initialize the testnet with")
+func addTestnetFlagsToCmd(cmd *cobra.Command, numValidators int) {
+	cmd.Flags().Int(flagNumValidators, numValidators, "Number of validators to initialize the testnet with")
 	cmd.Flags().StringP(flagOutputDir, "o", "./.testnets", "Directory to store initialization data for the testnet")
 	cmd.Flags().String(flags.FlagChainID, "", "genesis file chain-id, if left blank will be randomly created")
 	cmd.Flags().String(sdkserver.FlagMinGasPrices, fmt.Sprintf("0.000006%s", cmdcfg.BaseDenom), "Minimum gas prices to accept for transactions; All fees in a tx must meet this minimum (e.g. 0.01uptick,0.001stake)")
@@ -162,7 +161,7 @@ Example:
 		},
 	}
 
-	addTestnetFlagsToCmd(cmd)
+	addTestnetFlagsToCmd(cmd, 4)
 	cmd.Flags().String(flagNodeDirPrefix, "node", "Prefix the directory name for each node with (node results in node0, node1, ...)")
 	cmd.Flags().String(flagNodeDaemonHome, "uptickd", "Home directory of the node's daemon configuration")
 	cmd.Flags().String(flagStartingIPAddress, "192.168.0.1", "Starting IP address (192.168.0.1 results in persistent peers list ID0@192.168.0.1:46656, ID1@192.168.0.2:46656, ...)")
@@ -201,7 +200,7 @@ Example:
 		},
 	}
 
-	addTestnetFlagsToCmd(cmd)
+	addTestnetFlagsToCmd(cmd, 1)
 	cmd.Flags().Bool(flagEnableLogging, false, "Enable INFO logging of tendermint validator nodes")
 	cmd.Flags().String(flagRPCAddress, "tcp://0.0.0.0:26657", "the RPC address to listen on")
 	cmd.Flags().String(flagAPIAddress, "tcp://0.0.0.0:1317", "the address to listen on for REST API")
@@ -223,7 +222,7 @@ func initTestnetFiles(
 	args initArgs,
 ) error {
 	if args.chainID == "" {
-		args.chainID = "uptick_7777-1"
+		args.chainID = "uptick_1170-1"
 	}
 
 	nodeIDs := make([]string, args.numValidators)
@@ -304,26 +303,22 @@ func initTestnetFiles(
 			return err
 		}
 
-		accStakingTokens := sdk.TokensFromConsensusPower(5000, ethermint.PowerReduction)
+		accStakingTokens := sdk.TokensFromConsensusPower(5000, upticktypes.PowerReduction)
 		coins := sdk.Coins{
 			sdk.NewCoin(cmdcfg.BaseDenom, accStakingTokens),
 		}
 
 		genBalances = append(genBalances, banktypes.Balance{Address: addr.String(), Coins: coins.Sort()})
-		genAccounts = append(genAccounts, &ethermint.EthAccount{
-			BaseAccount: authtypes.NewBaseAccount(addr, nil, 0, 0),
-			CodeHash:    common.BytesToHash(evmtypes.EmptyCodeHash).Hex(),
-		})
-
 		genAccounts = append(genAccounts, authtypes.NewBaseAccount(addr, nil, 0, 0))
 
-		valTokens := sdk.TokensFromConsensusPower(100, ethermint.PowerReduction)
+		valTokens := sdk.TokensFromConsensusPower(100, upticktypes.PowerReduction)
+		minCommission := math.LegacyNewDecWithPrec(5, 2) // matches ante.ValidatorCommissionDecorator
 		createValMsg, err := stakingtypes.NewMsgCreateValidator(
 			sdk.ValAddress(addr).String(),
 			valPubKeys[i],
 			sdk.NewCoin(cmdcfg.BaseDenom, valTokens),
 			stakingtypes.NewDescription(nodeDirName, "", "", "", ""),
-			stakingtypes.NewCommissionRates(stakingtypes.DefaultMinCommissionRate, math.LegacyOneDec(), math.LegacyOneDec()),
+			stakingtypes.NewCommissionRates(minCommission, math.LegacyOneDec(), math.LegacyOneDec()),
 			math.OneInt(),
 		)
 		if err != nil {
@@ -336,6 +331,7 @@ func initTestnetFiles(
 		}
 
 		txBuilder.SetMemo(memo)
+		txBuilder.SetGasLimit(createValidatorMsgGasLimit)
 
 		txFactory := tx.Factory{}
 		txFactory = txFactory.
@@ -356,7 +352,11 @@ func initTestnetFiles(
 			return err
 		}
 
-		customAppTemplate, customAppConfig := config.AppConfig(cmdcfg.BaseDenom)
+		evmChainID := upticktypes.TestnetEVMChainID
+		if parsed, err := upticktypes.ParseEIP155ChainID(args.chainID); err == nil {
+			evmChainID = parsed
+		}
+		customAppTemplate, customAppConfig := evmconfig.InitAppConfig(cmdcfg.BaseDenom, evmChainID)
 		srvconfig.SetConfigTemplate(customAppTemplate)
 		customTMConfig := initTendermintConfig()
 
@@ -394,6 +394,7 @@ func initGenFiles(
 	numValidators int,
 ) error {
 	appGenState := mbm.DefaultGenesis(clientCtx.Codec)
+	app.CustomizeDefaultGenesis(clientCtx.Codec, appGenState)
 	// set the accounts in the genesis state
 	var authGenState authtypes.GenesisState
 	clientCtx.Codec.MustUnmarshalJSON(appGenState[authtypes.ModuleName], &authGenState)
@@ -425,11 +426,6 @@ func initGenFiles(
 	govGenState.Params.MinDeposit[0].Denom = coinDenom
 	govGenState.Params.ExpeditedMinDeposit[0].Denom = coinDenom
 	appGenState[govtypes.ModuleName] = clientCtx.Codec.MustMarshalJSON(&govGenState)
-
-	var evmGenState evmtypes.GenesisState
-	clientCtx.Codec.MustUnmarshalJSON(appGenState[evmtypes.ModuleName], &evmGenState)
-	evmGenState.Params.EvmDenom = coinDenom
-	appGenState[evmtypes.ModuleName] = clientCtx.Codec.MustMarshalJSON(&evmGenState)
 
 	appGenStateJSON, err := json.MarshalIndent(appGenState, "", "  ")
 	if err != nil {

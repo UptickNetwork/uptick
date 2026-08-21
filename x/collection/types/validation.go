@@ -2,10 +2,12 @@ package types
 
 import (
 	"fmt"
+	"net/url"
 	"regexp"
 	"strings"
 
 	sdkerrors "cosmossdk.io/errors"
+	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
 )
 
 const (
@@ -34,11 +36,20 @@ var (
 
 // ValidateDenomID verifies whether the  parameters are legal
 func ValidateDenomID(denomID string) error {
-	boolPrifix := strings.HasPrefix(denomID, "uptick-")
-	if !regexpID(denomID) && !boolPrifix {
+	if strings.ContainsRune(denomID, 0) {
+		return sdkerrors.Wrapf(ErrInvalidDenom, "denomID contains NUL")
+	}
+	if strings.HasPrefix(denomID, "uptick-") {
+		suffix := strings.TrimPrefix(denomID, "uptick-")
+		if suffix == "" || strings.Contains(suffix, "/") {
+			return sdkerrors.Wrapf(ErrInvalidDenom, "invalid uptick-prefixed denomID (%s)", denomID)
+		}
+		return ValidateKeywords(denomID)
+	}
+	if !regexpID(denomID) {
 		return sdkerrors.Wrapf(ErrInvalidDenom, "denomID can only accept characters that match the regular expression: (%s),but got (%s)", idString, denomID)
 	}
-	return nil
+	return ValidateKeywords(denomID)
 }
 
 // ValidateTokenID verify that the tokenID is legal
@@ -46,13 +57,26 @@ func ValidateTokenID(tokenID string) error {
 	if len(tokenID) < MinDenomLen || len(tokenID) > MaxDenomLen {
 		return sdkerrors.Wrapf(ErrInvalidTokenID, "the length of nft id(%s) only accepts value [%d, %d]", tokenID, MinDenomLen, MaxDenomLen)
 	}
+	if strings.ContainsRune(tokenID, 0) || strings.Contains(tokenID, "/") {
+		return sdkerrors.Wrapf(ErrInvalidTokenID, "nft id(%s) contains illegal characters", tokenID)
+	}
 	return nil
 }
 
 // ValidateTokenURI verify that the tokenURI is legal
 func ValidateTokenURI(tokenURI string) error {
 	if len(tokenURI) > MaxTokenURILen {
-		return sdkerrors.Wrapf(ErrInvalidTokenURI, "the length of nft uri(%s) only accepts value [0, %d]", tokenURI, MaxTokenURILen)
+		return sdkerrors.Wrapf(errortypes.ErrInvalidRequest, "token URI too long; max %d", MaxTokenURILen)
+	}
+	if strings.ContainsAny(tokenURI, "\n\r\t") {
+		return sdkerrors.Wrap(errortypes.ErrInvalidRequest, "token URI contains control characters")
+	}
+	u, err := url.Parse(tokenURI)
+	if err != nil {
+		return sdkerrors.Wrap(errortypes.ErrInvalidRequest, "invalid token URI")
+	}
+	if u.Scheme != "" && u.Scheme != "http" && u.Scheme != "https" && u.Scheme != "ipfs" {
+		return sdkerrors.Wrap(errortypes.ErrInvalidRequest, "token URI must use http(s) or ipfs scheme")
 	}
 	return nil
 }

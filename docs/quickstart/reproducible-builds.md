@@ -26,7 +26,7 @@ Clone `uptick`:
 git clone git@github.com:UptickNetwork/uptick.git
 ```
 
-Checkout the commit, branch, or release tag you want to build (eg `v0.1.0`):
+Checkout the commit, branch, or release tag you want to build (eg `v0.4.0`):
 
 ```bash
 cd uptick/

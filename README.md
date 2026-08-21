@@ -43,7 +43,21 @@ Uptick Chain is a blockchain network built on the [Cosmos SDK](https://github.co
 
 <img alt="uptick" src="https://github.com/UptickNetwork/uptick/blob/main/uptick.jpg">
 
-**Note**: Requires [Go 1.18+](https://golang.org/dl/)
+**Note**: Requires [Go 1.25+](https://golang.org/dl/)
+
+## v0.4.0 Highlights
+
+The v0.4.0 release upgrades the core stack and adds full NFT interoperability:
+
+- **Native NFT <-> ERC721 conversion** via the new `x/erc721` module, including IBC transfers of ERC721 tokens.
+- **Native NFT <-> CW721 conversion** via the new `x/cw721` module, including IBC transfers of CW721 tokens.
+- **EVM engine migration** to [`cosmos/evm`](https://github.com/cosmos/evm) `x/vm` (go-ethereum v1.16) with time-based hardfork activation (Shanghai/Cancun/Prague) and native EIP-7702 `SetCodeTx` support.
+- **IBC upgrade** from ibc-go v8 to v10 (capability module removed) and Cosmos SDK v0.53, `wasmd` v0.61 (wasmvm v3).
+- **ERC20 conversion** is now provided by `cosmos/evm`'s `x/erc20` module through the ERC20 IBC middleware.
+- **Automatic EVM chain-id** derivation from genesis / `--chain-id` so JSON-RPC `eth_chainId` matches the EIP-155 id.
+
+See the [CHANGELOG](./CHANGELOG.md) for the full list of changes and the
+[node upgrade guide](./docs/guides/upgrades/upgrade_node.md) for upgrade instructions.
 
 ## Installation
 
@@ -75,6 +89,5 @@ The following chat channels and forums are a great spot to ask questions about U
 Looking for a good place to start contributing? Check out some [`good first issues`](https://github.com/UptickNetwork/uptick/issues).
 
 For additional instructions, standards and style guides, please refer to the [Contributing](./CONTRIBUTING.md) document.
-
 
 

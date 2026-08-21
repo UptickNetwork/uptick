@@ -23,6 +23,8 @@ func (k Keeper) Supply(c context.Context, request *types.QuerySupplyRequest) (*t
 	switch {
 	case len(request.Owner) == 0 && len(request.DenomId) > 0:
 		supply = k.GetTotalSupply(ctx, request.DenomId)
+	case len(request.Owner) == 0 && len(request.DenomId) == 0:
+		return nil, status.Errorf(codes.InvalidArgument, "must specify at least one of owner or denom_id")
 	default:
 		owner, err := sdk.AccAddressFromBech32(request.Owner)
 		if err != nil {
@@ -35,6 +37,13 @@ func (k Keeper) Supply(c context.Context, request *types.QuerySupplyRequest) (*t
 
 // NFTsOfOwner queries the NFTs of the specified owner
 func (k Keeper) NFTsOfOwner(c context.Context, request *types.QueryNFTsOfOwnerRequest) (*types.QueryNFTsOfOwnerResponse, error) {
+	if len(request.Owner) == 0 {
+		return nil, status.Errorf(codes.InvalidArgument, "owner address cannot be empty")
+	}
+	if _, err := sdk.AccAddressFromBech32(request.Owner); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid owner address %s", request.Owner)
+	}
+
 	r := &nft.QueryNFTsRequest{
 		ClassId:    request.DenomId,
 		Owner:      request.Owner,
@@ -147,12 +156,12 @@ func (k Keeper) Denoms(c context.Context, req *types.QueryDenomsRequest) (*types
 	}
 
 	var denoms []types.Denom
-	for _, denom := range result.Classes {
-		denom, err := k.GetDenomInfo(ctx, denom.Id)
+	for _, class := range result.Classes {
+		d, err := k.GetDenomInfo(ctx, class.Id)
 		if err != nil {
 			return nil, err
 		}
-		denoms = append(denoms, *denom)
+		denoms = append(denoms, *d)
 	}
 
 	return &types.QueryDenomsResponse{
@@ -172,7 +181,7 @@ func (k Keeper) NFT(c context.Context, request *types.QueryNFTRequest) (*types.Q
 
 	baseNFT, ok := nft.(types.BaseNFT)
 	if !ok {
-		return nil, sdkerrors.Wrapf(types.ErrUnknownNFT, "invalid type NFT %s from collection %s", request.TokenId, request.DenomId)
+		return nil, sdkerrors.Wrapf(types.ErrInvalidNFT, "invalid type NFT %s from collection %s", request.TokenId, request.DenomId)
 	}
 
 	return &types.QueryNFTResponse{NFT: &baseNFT}, nil

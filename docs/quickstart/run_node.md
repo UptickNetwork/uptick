@@ -37,6 +37,14 @@ To start your node, just type:
 uptickd start --json-rpc.enable=true --json-rpc.api="eth,web3,net"
 ```
 
+::: tip
+Since v0.4.0 the JSON-RPC `eth_chainId` is derived automatically from the genesis file /
+`--chain-id` (EIP-155 id), so no manual `evm-chain-id` tuning is required for most networks.
+:::
+
+The `app.toml` file also includes a `[wasm]` section with Uptick's defaults (50M smart-query gas
+limit and 512 MiB memory cache) that can be tuned per node.
+
 ## Key Management
 
 To run a node with the same key every time: replace `uptickd keys add $KEY` in `./init.sh` with:

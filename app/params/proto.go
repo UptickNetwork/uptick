@@ -2,14 +2,16 @@ package params
 
 import (
 	"cosmossdk.io/x/tx/signing"
+	legacy "github.com/UptickNetwork/uptick/app/upgrades/v040/legacy"
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/codec/address"
 	"github.com/cosmos/cosmos-sdk/codec/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/x/auth/tx"
+	enccodec "github.com/cosmos/evm/encoding/codec"
+	erc20types "github.com/cosmos/evm/x/erc20/types"
+	evmtypes "github.com/cosmos/evm/x/vm/types"
 	"github.com/cosmos/gogoproto/proto"
-	enccodec "github.com/evmos/ethermint/encoding/codec"
-	evmtypes "github.com/evmos/ethermint/x/evm/types"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
@@ -24,7 +26,8 @@ func MakeEncodingConfig() EncodingConfig {
 			Bech32Prefix: sdk.GetConfig().GetBech32ValidatorAddrPrefix(),
 		},
 		CustomGetSigners: map[protoreflect.FullName]signing.GetSignersFunc{
-			evmtypes.MsgEthereumTxCustomGetSigner.MsgType: evmtypes.MsgEthereumTxCustomGetSigner.Fn,
+			evmtypes.MsgEthereumTxCustomGetSigner.MsgType:     evmtypes.MsgEthereumTxCustomGetSigner.Fn,
+			erc20types.MsgConvertERC20CustomGetSigner.MsgType: erc20types.MsgConvertERC20CustomGetSigner.Fn,
 		},
 	}
 	interfaceRegistry, _ := types.NewInterfaceRegistryWithOptions(types.InterfaceRegistryOptions{
@@ -37,6 +40,10 @@ func MakeEncodingConfig() EncodingConfig {
 	// Register the evm types
 	enccodec.RegisterLegacyAminoCodec(amino)
 	enccodec.RegisterInterfaces(interfaceRegistry)
+
+	// Register v0.3.3 legacy account/pubkey/erc20-proposal types so runtime
+	// state export and queries can decode records carried over by the upgrade.
+	legacy.RegisterInterfaces(interfaceRegistry)
 
 	return EncodingConfig{
 		InterfaceRegistry: interfaceRegistry,

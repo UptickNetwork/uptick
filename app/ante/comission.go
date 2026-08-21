@@ -10,7 +10,7 @@ import (
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 )
 
-var minCommission = math.LegacyNewDecWithPrec(0, 2) // 0%
+var minCommission = math.LegacyNewDecWithPrec(5, 2) // 5%
 
 // ValidatorCommissionDecorator validates that the validator commission is always
 // greater or equal than the min commission rate
@@ -58,9 +58,38 @@ func (vcd ValidatorCommissionDecorator) validateAuthz(ctx sdk.Context, execMsg *
 		if err := vcd.validateMsg(ctx, innerMsg); err != nil {
 			return err
 		}
+		if nested, ok := innerMsg.(*authz.MsgExec); ok {
+			if err := vcd.validateAuthz(ctx, nested); err != nil {
+				return err
+			}
+		}
 	}
 
 	return nil
+}
+
+// involvesStakingMsg reports whether the message is a staking message that the
+// decorator must validate (create/edit/delegate/undelegate/etc.).
+func (vcd ValidatorCommissionDecorator) involvesStakingMsg(msg sdk.Msg) bool {
+	switch msg.(type) {
+	case *stakingtypes.MsgCreateValidator,
+		*stakingtypes.MsgEditValidator,
+		*stakingtypes.MsgDelegate,
+		*stakingtypes.MsgUndelegate,
+		*stakingtypes.MsgBeginRedelegate:
+		return true
+	default:
+		return false
+	}
+}
+
+// involvesAuthzMsg reports whether the inner message of an authorization exec
+// message is a staking message.
+func (vcd ValidatorCommissionDecorator) involvesAuthzMsg(execMsg *sdk.Msg) bool {
+	if execMsg == nil {
+		return false
+	}
+	return vcd.involvesStakingMsg(*execMsg)
 }
 
 // validateMsg checks that the commission rate is over 5% for create and edit validator msgs

@@ -30,12 +30,22 @@ simple API (ie. the ABCI) between the application process and consensus process.
 
 ## EVM module
 
-Uptick enables EVM compatibility by implementing various components that together support all the EVM state transitions while ensuring the same developer experience as Ethereum:
+Since v0.4.0, Uptick enables EVM compatibility through [`cosmos/evm`](https://github.com/cosmos/evm)
+(`x/vm`, `x/feemarket` and `x/erc20`), which supports all EVM state transitions while ensuring the
+same developer experience as Ethereum:
 
 - Ethereum transaction format as a Cosmos SDK `Tx` and `Msg` interface
 - Ethereum's `secp256k1` curve for the Cosmos Keyring
 - `StateDB` interface for state updates and queries
 - JSON-RPC client for interacting with the EVM
+- Time-based hardfork activation (Shanghai/Cancun/Prague) and native EIP-7702 `SetCodeTx` support
+
+## IBC & NFT interoperability
+
+Uptick runs `ibc-go` v10 (IBC core, ICS-20 transfer and ICS-721 NFT transfer) and wasmd v0.61.
+The `x/erc721` and `x/cw721` modules convert between native Cosmos NFTs and EVM/CosmWasm token
+standards, and the `x/evmibc` middleware bridges these conversions with the ICS-721 packet flow so
+ERC721/CW721 tokens can move across chains.
 
 ## Next {hide}
 

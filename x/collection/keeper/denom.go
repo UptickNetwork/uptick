@@ -94,6 +94,9 @@ func (k Keeper) GetDenomInfo(ctx sdk.Context, denomID string) (*types.Denom, err
 	}
 
 	var denomMetadata types.DenomMetadata
+	if class.Data == nil {
+		return nil, sdkerrors.Wrapf(types.ErrInvalidDenom, "denom ID %s has no metadata", denomID)
+	}
 	if err := k.cdc.Unmarshal(class.Data.GetValue(), &denomMetadata); err != nil {
 		return nil, err
 	}

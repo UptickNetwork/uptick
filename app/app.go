@@ -1,14 +1,20 @@
 package app
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/cosmos/cosmos-sdk/version"
+
+	evmconfig "github.com/cosmos/evm/config"
+	cosmosevmutils "github.com/cosmos/evm/utils"
+	"github.com/ethereum/go-ethereum/common"
+	ethtypes "github.com/ethereum/go-ethereum/core/types"
+	corevm "github.com/ethereum/go-ethereum/core/vm"
 
 	"cosmossdk.io/math"
 
@@ -16,6 +22,7 @@ import (
 	"cosmossdk.io/core/appmodule"
 	evidencetypes "cosmossdk.io/x/evidence/types"
 	"cosmossdk.io/x/feegrant"
+	cosmosnft "cosmossdk.io/x/nft"
 	ibcnfttransfertypes "github.com/bianjieai/nft-transfer/types"
 	sigtypes "github.com/cosmos/cosmos-sdk/types/tx/signing"
 	authcodec "github.com/cosmos/cosmos-sdk/x/auth/codec"
@@ -25,22 +32,23 @@ import (
 	consensusparamtypes "github.com/cosmos/cosmos-sdk/x/consensus/types"
 	crisistypes "github.com/cosmos/cosmos-sdk/x/crisis/types"
 	genutiltypes "github.com/cosmos/cosmos-sdk/x/genutil/types"
-	capabilitytypes "github.com/cosmos/ibc-go/modules/capability/types"
-	ibcexported "github.com/cosmos/ibc-go/v8/modules/core/exported"
-	srvflags "github.com/evmos/ethermint/server/flags"
+	ibcexported "github.com/cosmos/ibc-go/v10/modules/core/exported"
+	// 	porttypes "github.com/cosmos/ibc-go/v10/modules/core/05-port/types" // removed in ibc-go v10
+	srvflags "github.com/cosmos/evm/server/flags"
 
 	"github.com/UptickNetwork/uptick/app/ante"
 	"github.com/UptickNetwork/uptick/app/keepers"
 	uptickparams "github.com/UptickNetwork/uptick/app/params"
 	_ "github.com/UptickNetwork/uptick/client/docs/statik"
+	cmdcfg "github.com/UptickNetwork/uptick/cmd/config"
 	evmostypes "github.com/UptickNetwork/uptick/types"
 	nftmodule "github.com/UptickNetwork/uptick/x/collection/module"
 	nfttypes "github.com/UptickNetwork/uptick/x/collection/types"
-	erc20 "github.com/UptickNetwork/uptick/x/erc20"
-	erc20client "github.com/UptickNetwork/uptick/x/erc20/client"
-	erc20types "github.com/UptickNetwork/uptick/x/erc20/types"
+	cosmoserc20 "github.com/cosmos/evm/x/erc20"
+	cosmoserc20types "github.com/cosmos/evm/x/erc20/types"
 
-	"cosmossdk.io/x/nft"
+	upticktypes "github.com/UptickNetwork/uptick/types"
+	rpcclient "github.com/cometbft/cometbft/rpc/client/http"
 	"github.com/cosmos/cosmos-sdk/baseapp"
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/flags"
@@ -55,6 +63,7 @@ import (
 	servertypes "github.com/cosmos/cosmos-sdk/server/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/mempool"
+	sdkmempool "github.com/cosmos/cosmos-sdk/types/mempool"
 	"github.com/cosmos/cosmos-sdk/types/module"
 	"github.com/cosmos/cosmos-sdk/x/auth"
 	authsims "github.com/cosmos/cosmos-sdk/x/auth/simulation"
@@ -72,6 +81,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/gov"
 	govclient "github.com/cosmos/cosmos-sdk/x/gov/client"
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
+	govv1 "github.com/cosmos/cosmos-sdk/x/gov/types/v1"
 	"github.com/cosmos/cosmos-sdk/x/mint"
 	minttypes "github.com/cosmos/cosmos-sdk/x/mint/types"
 	"github.com/cosmos/cosmos-sdk/x/params"
@@ -82,15 +92,16 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/staking"
 	stakingkeeper "github.com/cosmos/cosmos-sdk/x/staking/keeper"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
-	ibctransfertypes "github.com/cosmos/ibc-go/v8/modules/apps/transfer/types"
-	ibc "github.com/cosmos/ibc-go/v8/modules/core"
-	ibckeeper "github.com/cosmos/ibc-go/v8/modules/core/keeper"
-	ibctm "github.com/cosmos/ibc-go/v8/modules/light-clients/07-tendermint"
-	ethermint "github.com/evmos/ethermint/types"
-	"github.com/evmos/ethermint/x/evm"
-	evmtypes "github.com/evmos/ethermint/x/evm/types"
-	"github.com/evmos/ethermint/x/feemarket"
-	feemarkettypes "github.com/evmos/ethermint/x/feemarket/types"
+	evmmempool "github.com/cosmos/evm/mempool"
+	"github.com/cosmos/evm/x/feemarket"
+	feemarkettypes "github.com/cosmos/evm/x/feemarket/types"
+	vm "github.com/cosmos/evm/x/vm"
+	evmtypes "github.com/cosmos/evm/x/vm/types"
+	ibctransfertypes "github.com/cosmos/ibc-go/v10/modules/apps/transfer/types"
+	ibc "github.com/cosmos/ibc-go/v10/modules/core"
+	ibckeeper "github.com/cosmos/ibc-go/v10/modules/core/keeper"
+	ibcsolomachine "github.com/cosmos/ibc-go/v10/modules/light-clients/06-solomachine"
+	ibctm "github.com/cosmos/ibc-go/v10/modules/light-clients/07-tendermint"
 
 	"github.com/CosmWasm/wasmd/x/wasm"
 	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
@@ -107,19 +118,16 @@ import (
 	"cosmossdk.io/x/upgrade"
 	upgradetypes "cosmossdk.io/x/upgrade/types"
 
+	cw721 "github.com/UptickNetwork/uptick/x/cw721"
+	cw721types "github.com/UptickNetwork/uptick/x/cw721/types"
+	erc721 "github.com/UptickNetwork/uptick/x/erc721"
+	erc721types "github.com/UptickNetwork/uptick/x/erc721/types"
 	abci "github.com/cometbft/cometbft/abci/types"
 	tmjson "github.com/cometbft/cometbft/libs/json"
 	tmos "github.com/cometbft/cometbft/libs/os"
+	tmproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	dbm "github.com/cosmos/cosmos-db"
-	"github.com/cosmos/ibc-go/modules/capability"
-	capabilitykeeper "github.com/cosmos/ibc-go/modules/capability/keeper"
-
-	erc721 "github.com/UptickNetwork/evm-nft-convert"
-	erc721types "github.com/UptickNetwork/evm-nft-convert/types"
-	cw721 "github.com/UptickNetwork/wasm-nft-convert"
-	cw721types "github.com/UptickNetwork/wasm-nft-convert/types"
-	ica "github.com/cosmos/ibc-go/v8/modules/apps/27-interchain-accounts"
-	icatypes "github.com/cosmos/ibc-go/v8/modules/apps/27-interchain-accounts/types"
+	icatypes "github.com/cosmos/ibc-go/v10/modules/apps/27-interchain-accounts/types"
 )
 
 func init() {
@@ -131,7 +139,7 @@ func init() {
 	DefaultNodeHome = filepath.Join(userHomeDir, ".uptickd")
 
 	// manually update the power reduction by replacing micro (u) -> atto (a) uptick
-	sdk.DefaultPowerReduction = ethermint.PowerReduction
+	sdk.DefaultPowerReduction = upticktypes.PowerReduction
 }
 
 const (
@@ -155,8 +163,8 @@ var (
 		NoBaseFee:                false,
 		BaseFeeChangeDenominator: 8,
 		ElasticityMultiplier:     4,
-		BaseFee:                  math.NewInt(10000000000),
-		MinGasPrice:              math.LegacyNewDecFromInt(math.NewInt(10000000000)),
+		BaseFee:                  math.LegacyNewDec(10000000000),
+		MinGasPrice:              math.LegacyNewDec(10000000000),
 		MinGasMultiplier:         math.LegacyNewDecWithPrec(5, 1),
 	}
 
@@ -167,20 +175,21 @@ var (
 		minttypes.ModuleName:           {authtypes.Minter},
 		stakingtypes.BondedPoolName:    {authtypes.Burner, authtypes.Staking},
 		stakingtypes.NotBondedPoolName: {authtypes.Burner, authtypes.Staking},
+		evmtypes.ModuleName:            {authtypes.Minter, authtypes.Burner}, // used for secure addition and subtraction of balance using module account
 		govtypes.ModuleName:            {authtypes.Burner},
 		ibctransfertypes.ModuleName:    {authtypes.Minter, authtypes.Burner},
+		erc721types.ModuleName:         nil,
 
-		evmtypes.ModuleName:    {authtypes.Minter, authtypes.Burner}, // used for secure addition and subtraction of balance using module account
-		erc20types.ModuleName:  {authtypes.Minter, authtypes.Burner},
-		erc721types.ModuleName: nil,
+		cosmoserc20types.ModuleName: {authtypes.Minter, authtypes.Burner},
 
 		cw721types.ModuleName: nil,
 
-		nfttypes.ModuleName: nil,
-		// nft.ModuleName:      nil,
-		wasmtypes.ModuleName: {authtypes.Burner},
-		icatypes.ModuleName:  nil,
-		nft.ModuleName:       nil,
+		cosmosnft.ModuleName:           nil, // cosmossdk.io/x/nft module account required by collection keeper
+		nfttypes.ModuleName:            nil, // x/collection
+		wasmtypes.ModuleName:           {authtypes.Burner},
+		icatypes.ModuleName:            nil,
+		feemarkettypes.ModuleName:      nil,
+		ibcnfttransfertypes.ModuleName: {authtypes.Minter, authtypes.Burner},
 	}
 
 	// module accounts that are allowed to receive tokens
@@ -207,6 +216,10 @@ type Uptick struct {
 	txConfig          client.TxConfig
 	legacyAmino       *codec.LegacyAmino
 
+	// evm mempool (required by cosmos/evm JSON-RPC server)
+	evmMempool *evmmempool.ExperimentalEVMMempool
+	clientCtx  client.Context
+
 	// the module manager
 	mm *module.Manager
 	bm module.BasicManager
@@ -215,7 +228,7 @@ type Uptick struct {
 	tpsCounter *tpsCounter
 }
 
-// NewUptick returns a reference to a new initialized Ethermint application.
+// NewUptick returns a reference to a new initialized Uptick application.
 func NewUptick(
 	logger log.Logger,
 	db dbm.DB,
@@ -233,8 +246,8 @@ func NewUptick(
 	interfaceRegistry := encodingConfig.InterfaceRegistry
 	txConfig := encodingConfig.TxConfig
 
-	// Setup Mempool
-	baseAppOptions = append(baseAppOptions, NoOpMempoolOption())
+	// NOTE: the EVM mempool is configured later (after keepers are set up) via
+	// configureEVMMempool, which requires the EVMKeeper and FeeMarketKeeper.
 
 	// NOTE we use custom transaction decoder that supports the sdk.Tx interface instead of sdk.StdTx
 	bApp := baseapp.NewBaseApp(
@@ -279,6 +292,16 @@ func NewUptick(
 		wasmOpts,
 	)
 
+	// ibc-go v10 ClientKeeper only auto-registers localhost. Tendermint and
+	// solomachine must be routed with the same LightClientModule instances that
+	// are passed to their AppModules, otherwise client updates fail with
+	// ErrRouteNotFound.
+	storeProvider := app.IBCKeeper.ClientKeeper.GetStoreProvider()
+	tmLightClientModule := ibctm.NewLightClientModule(appCodec, storeProvider)
+	app.IBCKeeper.ClientKeeper.AddRoute(ibctm.ModuleName, &tmLightClientModule)
+	smLightClientModule := ibcsolomachine.NewLightClientModule(appCodec, storeProvider)
+	app.IBCKeeper.ClientKeeper.AddRoute(ibcsolomachine.ModuleName, &smLightClientModule)
+
 	/****  Module Options ****/
 	skipGenesisInvariants := false
 	opt := appOpts.Get(crisis.FlagSkipGenesisInvariants)
@@ -308,7 +331,6 @@ func NewUptick(
 			app.AccountKeeper,
 			app.GetSubspace(banktypes.ModuleName),
 		),
-		capability.NewAppModule(appCodec, *app.CapabilityKeeper, false),
 		crisis.NewAppModule(app.CrisisKeeper, skipGenesisInvariants, app.GetSubspace(crisistypes.ModuleName)),
 		gov.NewAppModule(appCodec, app.GovKeeper, app.AccountKeeper, app.BankKeeper, app.GetSubspace(govtypes.ModuleName)),
 		mint.NewAppModule(appCodec, app.MintKeeper, app.AccountKeeper, nil, app.GetSubspace(minttypes.ModuleName)),
@@ -324,16 +346,16 @@ func NewUptick(
 		// nftmodule.NewAppModule(appCodec, app.NF	app.mm.SetOrderBeginBlockers(TKeeper, app.AccountKeeper, app.BankKeeper),
 		// ibc modules
 		ibc.NewAppModule(app.IBCKeeper),
-		ica.NewAppModule(nil, &app.ICAHostKeeper),
-		ibctm.NewAppModule(),
+		ibctm.NewAppModule(tmLightClientModule),
+		ibcsolomachine.NewAppModule(smLightClientModule),
 		app.TransferModule,
 		app.IBCNftTransferModule,
 		app.ICAModule,
-		// Ethermint app modules
-		evm.NewAppModule(app.EvmKeeper, app.AccountKeeper, app.GetSubspace(evmtypes.ModuleName)),
-		feemarket.NewAppModule(app.FeeMarketKeeper, app.GetSubspace(feemarkettypes.ModuleName)),
+		// cosmos/evm app modules
+		vm.NewAppModule(app.EvmKeeper, app.AccountKeeper, app.BankKeeper, app.AccountKeeper.AddressCodec()),
+		feemarket.NewAppModule(app.FeeMarketKeeper),
 		// Uptick app modules
-		erc20.NewAppModule(*app.Erc20Keeper, app.AccountKeeper),
+		cosmoserc20.NewAppModule(app.Erc20Keeper, app.AccountKeeper),
 		erc721.NewAppModule(app.Erc721Keeper, app.AccountKeeper),
 		cw721.NewAppModule(app.Cw721Keeper, app.AccountKeeper),
 		nftmodule.NewAppModule(app.codec, app.NFTKeeper, app.AccountKeeper, app.BankKeeper),
@@ -354,9 +376,6 @@ func NewUptick(
 			govtypes.ModuleName: gov.NewAppModuleBasic(
 				[]govclient.ProposalHandler{
 					paramsclient.ProposalHandler,
-					erc20client.RegisterCoinProposalHandler,
-					erc20client.RegisterERC20ProposalHandler,
-					erc20client.ToggleTokenRelayProposalHandler,
 				},
 			),
 		})
@@ -381,8 +400,11 @@ func NewUptick(
 	app.txConfig = txConfig
 
 	// NOTE: upgrade module is required to be prioritized
+	// cosmos/evm requires auth and evm modules as preblockers.
 	app.mm.SetOrderPreBlockers(
 		upgradetypes.ModuleName,
+		authtypes.ModuleName,
+		evmtypes.ModuleName,
 	)
 
 	// During begin block slashing happens after distr.BeginBlocker so that
@@ -390,10 +412,8 @@ func NewUptick(
 	// CanWithdrawInvariant invariant.
 	// NOTE: upgrade module must go first to handle software upgrades.
 	// NOTE: staking module is required if HistoricalEntries param > 0.
-	// NOTE: capability module's beginblocker must come before any modules using capabilities (e.g. IBC)
 	app.mm.SetOrderBeginBlockers(
 
-		capabilitytypes.ModuleName,
 		// Note: epochs' begin should be "real" start of epochs, we keep epochs beginblock at the beginning
 		feemarkettypes.ModuleName,
 		evmtypes.ModuleName,
@@ -403,6 +423,8 @@ func NewUptick(
 		evidencetypes.ModuleName,
 		stakingtypes.ModuleName,
 		ibcexported.ModuleName,
+		ibctm.ModuleName,
+		ibcsolomachine.ModuleName,
 		// no-op modules
 		ibctransfertypes.ModuleName,
 		authtypes.ModuleName,
@@ -415,7 +437,7 @@ func NewUptick(
 		paramstypes.ModuleName,
 		upgradetypes.ModuleName,
 		vestingtypes.ModuleName,
-		erc20types.ModuleName,
+		cosmoserc20types.ModuleName,
 		erc721types.ModuleName,
 		cw721types.ModuleName,
 		nfttypes.ModuleName,
@@ -435,8 +457,9 @@ func NewUptick(
 		feemarkettypes.ModuleName,
 		// no-op modules
 		ibcexported.ModuleName,
+		ibctm.ModuleName,
+		ibcsolomachine.ModuleName,
 		ibctransfertypes.ModuleName,
-		capabilitytypes.ModuleName,
 		authtypes.ModuleName,
 		banktypes.ModuleName,
 		distrtypes.ModuleName,
@@ -449,7 +472,7 @@ func NewUptick(
 		paramstypes.ModuleName,
 		upgradetypes.ModuleName,
 		vestingtypes.ModuleName,
-		erc20types.ModuleName,
+		cosmoserc20types.ModuleName,
 		erc721types.ModuleName,
 		cw721types.ModuleName,
 		nfttypes.ModuleName,
@@ -461,12 +484,8 @@ func NewUptick(
 
 	// NOTE: The genutils module must occur after staking so that pools are
 	// properly initialized with tokens from genesis accounts.
-	// NOTE: Capability module must occur first so that it can initialize any capabilities
-	// so that other modules that want to create or claim capabilities afterwards in InitChain
-	// can do so safely.
 	app.mm.SetOrderInitGenesis(
 		// SDK modules
-		capabilitytypes.ModuleName,
 		authtypes.ModuleName,
 		banktypes.ModuleName,
 		distrtypes.ModuleName,
@@ -476,7 +495,9 @@ func NewUptick(
 		govtypes.ModuleName,
 		minttypes.ModuleName,
 		ibcexported.ModuleName,
-		// Ethermint modules
+		ibctm.ModuleName,
+		ibcsolomachine.ModuleName,
+		// cosmos/evm modules
 		// evm module denomination is used by the feesplit module, in AnteHandle
 		evmtypes.ModuleName,
 		// NOTE: feemarket module needs to be initialized before genutil module:
@@ -491,7 +512,7 @@ func NewUptick(
 		upgradetypes.ModuleName,
 		vestingtypes.ModuleName,
 
-		erc20types.ModuleName,
+		cosmoserc20types.ModuleName,
 		erc721types.ModuleName,
 		crisistypes.ModuleName,
 		nfttypes.ModuleName,
@@ -504,7 +525,6 @@ func NewUptick(
 
 	app.mm.SetOrderExportGenesis(
 		// SDK modules
-		capabilitytypes.ModuleName,
 		authtypes.ModuleName,
 		banktypes.ModuleName,
 		distrtypes.ModuleName,
@@ -514,7 +534,9 @@ func NewUptick(
 		govtypes.ModuleName,
 		minttypes.ModuleName,
 		ibcexported.ModuleName,
-		// Ethermint modules
+		ibctm.ModuleName,
+		ibcsolomachine.ModuleName,
+		// cosmos/evm modules
 		// evm module denomination is used by the feesplit module, in AnteHandle
 		evmtypes.ModuleName,
 		// NOTE: feemarket module needs to be initialized before genutil module:
@@ -529,7 +551,7 @@ func NewUptick(
 		upgradetypes.ModuleName,
 		vestingtypes.ModuleName,
 
-		erc20types.ModuleName,
+		cosmoserc20types.ModuleName,
 		erc721types.ModuleName,
 		crisistypes.ModuleName,
 		nfttypes.ModuleName,
@@ -549,7 +571,6 @@ func NewUptick(
 	app.sm = module.NewSimulationManager(
 		auth.NewAppModule(appCodec, app.AccountKeeper, nil, app.GetSubspace(authtypes.ModuleName)),
 		bank.NewAppModule(appCodec, app.BankKeeper, app.AccountKeeper, app.GetSubspace(banktypes.ModuleName)),
-		capability.NewAppModule(appCodec, *app.CapabilityKeeper, false),
 		gov.NewAppModule(appCodec, app.GovKeeper, app.AccountKeeper, app.BankKeeper, app.GetSubspace(govtypes.ModuleName)),
 		mint.NewAppModule(appCodec, app.MintKeeper, app.AccountKeeper, nil, app.GetSubspace(minttypes.ModuleName)),
 		staking.NewAppModule(appCodec, app.StakingKeeper, app.AccountKeeper, app.BankKeeper, app.GetSubspace(stakingtypes.ModuleName)),
@@ -561,8 +582,8 @@ func NewUptick(
 		authzmodule.NewAppModule(appCodec, app.AuthzKeeper, app.AccountKeeper, app.BankKeeper, app.interfaceRegistry),
 		ibc.NewAppModule(app.IBCKeeper),
 		app.TransferModule,
-		evm.NewAppModule(app.EvmKeeper, app.AccountKeeper, app.GetSubspace(evmtypes.ModuleName)),
-		feemarket.NewAppModule(app.FeeMarketKeeper, app.GetSubspace(feemarkettypes.ModuleName)),
+		vm.NewAppModule(app.EvmKeeper, app.AccountKeeper, app.BankKeeper, app.AccountKeeper.AddressCodec()),
+		feemarket.NewAppModule(app.FeeMarketKeeper),
 		wasm.NewAppModule(appCodec, &app.WasmKeeper, app.StakingKeeper, app.AccountKeeper, app.BankKeeper, app.MsgServiceRouter(), app.GetSubspace(wasmtypes.ModuleName)),
 		nftmodule.NewAppModule(appCodec, app.NFTKeeper, app.AccountKeeper, app.BankKeeper),
 		app.IBCNftTransferModule,
@@ -576,20 +597,27 @@ func NewUptick(
 
 	maxGasWanted := cast.ToUint64(appOpts.Get(srvflags.EVMMaxTxGasWanted))
 	options := ante.HandlerOptions{
-		AccountKeeper:     app.AccountKeeper,
-		BankKeeper:        app.BankKeeper,
-		IBCKeeper:         app.IBCKeeper,
-		TxCounterStoreKey: app.GetKey(wasm.StoreKey),
-		WasmConfig:        app.WasmConfig,
-		FeeMarketKeeper:   app.FeeMarketKeeper,
-		EvmKeeper:         app.EvmKeeper,
-		FeegrantKeeper:    app.FeeGrantKeeper,
-		SignModeHandler:   txConfig.SignModeHandler(),
-		SigGasConsumer:    SigVerificationGasConsumer,
-		MaxTxGasWanted:    maxGasWanted,
+		Cdc:                   appCodec,
+		AccountKeeper:         app.AccountKeeper,
+		BankKeeper:            app.BankKeeper,
+		IBCKeeper:             app.IBCKeeper,
+		FeeMarketKeeper:       app.FeeMarketKeeper,
+		EvmKeeper:             app.EvmKeeper,
+		FeegrantKeeper:        app.FeeGrantKeeper,
+		SignModeHandler:       txConfig.SignModeHandler(),
+		SigGasConsumer:        SigVerificationGasConsumer,
+		MaxTxGasWanted:        maxGasWanted,
+		WasmKeeper:            &app.WasmKeeper,
+		WasmNodeConfig:        &app.WasmConfig,
+		TXCounterStoreService: runtime.NewKVStoreService(app.GetKey(wasm.StoreKey)),
 		DisabledAuthzMsgs: []string{
 			sdk.MsgTypeURL(&evmtypes.MsgEthereumTx{}),
 			sdk.MsgTypeURL(&vestingtypes.MsgCreateVestingAccount{}),
+			// Governance messages: prevent delegation of governance actions via authz
+			sdk.MsgTypeURL(&govv1.MsgSubmitProposal{}),
+			sdk.MsgTypeURL(&govv1.MsgVote{}),
+			sdk.MsgTypeURL(&govv1.MsgVoteWeighted{}),
+			sdk.MsgTypeURL(&govv1.MsgDeposit{}),
 		},
 	}
 
@@ -605,6 +633,30 @@ func NewUptick(
 	app.SetEndBlocker(app.EndBlocker)
 	app.RegisterUpgradePlans()
 
+	// Build a client context for the EVM mempool (used for broadcasting pending
+	// EVM transactions). This is required by the EVM mempool's broadcast helper.
+	evmClientCtx := client.Context{}.
+		WithCodec(appCodec).
+		WithInterfaceRegistry(interfaceRegistry).
+		WithTxConfig(txConfig).
+		WithLegacyAmino(legacyAmino).
+		WithAccountRetriever(authtypes.AccountRetriever{}).
+		WithHomeDir(cast.ToString(appOpts.Get(flags.FlagHome))).
+		WithBroadcastMode(flags.BroadcastSync)
+	// Wire a CometBFT RPC client so the mempool can broadcast pending EVM txs.
+	if nodeURI := cast.ToString(appOpts.Get(flags.FlagNode)); nodeURI != "" {
+		if rpcClient, err := rpcclient.New(nodeURI, "/websocket"); err == nil {
+			evmClientCtx = evmClientCtx.WithClient(rpcClient)
+		}
+	}
+	app.clientCtx = evmClientCtx
+
+	// Configure the EVM mempool (required for the EVM JSON-RPC server).
+	// Must run before the BaseApp is sealed by LoadLatestVersion.
+	if err := app.configureEVMMempool(appOpts, logger); err != nil {
+		logger.Error("failed to configure EVM mempool", "error", err)
+	}
+
 	if manager := app.SnapshotManager(); manager != nil {
 		err := manager.RegisterExtensions(
 			wasmkeeper.NewWasmSnapshotter(app.CommitMultiStore(), &app.WasmKeeper),
@@ -619,23 +671,146 @@ func NewUptick(
 			tmos.Exit(err.Error())
 		}
 
-		// Initialize and seal the capability keeper
-		app.CapabilityKeeper.Seal()
+		// Pinned codes live in wasmvm's in-memory cache and are not persisted
+		// across process restarts. Reload them from state after the store is mounted.
+		ctx := app.NewUncachedContext(true, tmproto.Header{})
+		if err := app.WasmKeeper.InitializePinnedCodes(ctx); err != nil {
+			tmos.Exit("failed to initialize pinned wasm codes: " + err.Error())
+		}
 	}
 
-	// Finally start the tpsCounter.
-	app.tpsCounter = newTPSCounter(logger)
-	go func() {
-		// Unfortunately golangci-lint is so pedantic
-		// so we have to ignore this error explicitly.
-		_ = app.tpsCounter.start(context.Background())
-	}()
+	// TODO: tpsCounter disabled (unused, references removed SDK types)
+	// app.tpsCounter = newTPSCounter(logger)
+	// go func() {
+	// 	_ = app.tpsCounter.start(context.Background())
+	// }()
 
 	return app
 }
 
 // Name returns the name of the App
 func (app *Uptick) Name() string { return app.BaseApp.Name() }
+
+// GetMempool returns the app's mempool.
+// Required by cosmos/evm server.Application interface.
+func (app *Uptick) GetMempool() mempool.ExtMempool {
+	if extMempool, ok := app.BaseApp.Mempool().(mempool.ExtMempool); ok {
+		return extMempool
+	}
+	// Fallback: return nil if the mempool doesn't implement ExtMempool
+	return nil
+}
+
+// RegisterPendingTxListener registers a pending tx listener.
+// Required by cosmos/evm server.Application interface.
+func (app *Uptick) RegisterPendingTxListener(listener func(common.Hash)) {
+	// no-op: Uptick does not use pending tx listeners
+}
+
+// SetClientCtx sets the client context on the app.
+// Required by cosmos/evm server.Application interface.
+func (app *Uptick) SetClientCtx(clientCtx client.Context) {
+	app.clientCtx = clientCtx
+}
+
+const (
+	defaultCosmosPoolMaxTx  = 5000
+	defaultEVMBlockGasLimit = ^uint64(0)
+)
+
+// configureEVMMempool sets up the cosmos/evm experimental EVM mempool and the
+// related ABCI handlers. Required for the EVM JSON-RPC server to function.
+// Modeled on cosmos/evm's evmd.ConfigureEVMMempool.
+func (app *Uptick) configureEVMMempool(appOpts servertypes.AppOptions, logger log.Logger) error {
+	if evmtypes.GetChainConfig() == nil {
+		logger.Debug("evm chain config is not set, skipping EVM mempool configuration")
+		return nil
+	}
+
+	// Read operator-configurable mempool knobs from the cosmos/evm app.toml
+	// ([evm] section), falling back to genesis/consensus values where relevant.
+	cosmosPoolMaxTx := evmconfig.GetCosmosPoolMaxTx(appOpts, logger)
+	// Critical fix: cosmos-sdk's mempool.DefaultMaxTx = -1. When --mempool.max-txs is
+	// not set, GetCosmosPoolMaxTx returns -1 and PriorityNonceMempool.Insert hits the
+	// `MaxTx < 0` branch and returns nil without inserting. On upgraded/unconfigured
+	// chains this silently drops Cosmos transactions and leaves blocks permanently
+	// empty (num_txs=0). Normalize non-positive values to 5000 to match the mainnet
+	// convention.
+	if cosmosPoolMaxTx <= 0 {
+		logger.Warn(
+			"cosmos pool max tx is non-positive, defaulting to configured fallback",
+			"got", cosmosPoolMaxTx,
+			"fallback", defaultCosmosPoolMaxTx,
+		)
+		cosmosPoolMaxTx = defaultCosmosPoolMaxTx
+	}
+
+	blockGasLimit := evmconfig.GetBlockGasLimit(appOpts, logger)
+	if blockGasLimit == 0 {
+		logger.Warn(
+			"evm mempool block gas limit is zero, using unlimited fallback",
+			"fallback", defaultEVMBlockGasLimit,
+		)
+		blockGasLimit = defaultEVMBlockGasLimit
+	}
+
+	mempoolConfig := &evmmempool.EVMMempoolConfig{
+		AnteHandler:      app.AnteHandler(),
+		LegacyPoolConfig: evmconfig.GetLegacyPoolConfig(appOpts, logger),
+		// Do not use evmconfig.GetBlockGasLimit: it reads from the SDK AppGenesis
+		// ConsensusParams in genesis.json, while v0.3.3 genesis only writes CometBFT's
+		// `consensus` field (no `consensus_params`). After SDK v0.53 parsing,
+		// ConsensusParams is nil and the function returns 0, so the EVM mempool rejects
+		// every Cosmos tx as over the limit (num_txs=0, no Cosmos tx can be packed
+		// after the upgrade). The block gas limit is enforced by the consensus layer,
+		// so use MaxUint64 here (no pre-filtering), matching Uptick's max_gas=-1
+		// semantics.
+		BlockGasLimit: blockGasLimit,
+		MinTip:        evmconfig.GetMinTip(appOpts, logger),
+		// Critical fix: disable the default promote broadcast to avoid a deadlock.
+		//
+		// cosmos/evm's ExperimentalEVMMempool.Insert holds m.mtx and calls
+		// txPool.Add(sync=true), whose requestPromoteExecutables blocks on <-done
+		// waiting for the asynchronous runReorg to finish. runReorg invokes
+		// BroadcastTxFn after promoting transactions; the default implementation
+		// synchronously calls clientCtx.BroadcastTxSync, which re-enters CometBFT's
+		// CheckTx → app-side mempool.Insert → m.mtx.Lock() while m.mtx is already held
+		// by the outer Insert blocking on <-done, forming a deadlock that stalls the
+		// chain at the PrepareProposal stage.
+		//
+		// Transactions already reach the mempool through eth_sendRawTransaction via
+		// CometBFT broadcast, so there is no need to broadcast again during promote;
+		// making this a no-op breaks the deadlock cycle.
+		BroadCastTxFn: func(txs []*ethtypes.Transaction) error {
+			return nil
+		},
+	}
+
+	evmMempool := evmmempool.NewExperimentalEVMMempool(
+		app.CreateQueryContext,
+		logger,
+		app.EvmKeeper,
+		app.FeeMarketKeeper,
+		app.txConfig,
+		app.clientCtx,
+		mempoolConfig,
+		cosmosPoolMaxTx,
+	)
+	app.evmMempool = evmMempool
+	app.SetMempool(evmMempool)
+	checkTxHandler := evmmempool.NewCheckTxHandler(evmMempool)
+	app.SetCheckTxHandler(checkTxHandler)
+
+	abciProposalHandler := baseapp.NewDefaultProposalHandler(evmMempool, app)
+	abciProposalHandler.SetSignerExtractionAdapter(
+		evmmempool.NewEthSignerExtractionAdapter(
+			sdkmempool.NewDefaultSignerExtractionAdapter(),
+		),
+	)
+	app.SetPrepareProposal(abciProposalHandler.PrepareProposalHandler())
+
+	return nil
+}
 
 // BeginBlocker application updates every begin block
 func (app *Uptick) BeginBlocker(ctx sdk.Context) (sdk.BeginBlock, error) {
@@ -784,8 +959,8 @@ func (app *Uptick) GetIBCKeeper() *ibckeeper.Keeper {
 }
 
 // GetScopedIBCKeeper implements the TestingApp interface.
-func (app *Uptick) GetScopedIBCKeeper() capabilitykeeper.ScopedKeeper {
-	return app.ScopedIBCKeeper
+func (app *Uptick) GetScopedIBCKeeper() interface{} {
+	return nil
 }
 
 // GetTxConfig implements the TestingApp interface.
@@ -809,9 +984,15 @@ func RegisterSwaggerAPI(_ client.Context, rtr *mux.Router) {
 func (app *Uptick) BlockedModuleAccountAddrs() map[string]bool {
 	modAccAddrs := app.ModuleAccountAddrs()
 
-	// remove module accounts that are ALLOWED to received funds
-	// delete(modAccAddrs, authtypes.NewModuleAddress(grouptypes.ModuleName).String())
 	delete(modAccAddrs, authtypes.NewModuleAddress(govtypes.ModuleName).String())
+
+	blockedPrecompilesHex := append([]string{}, evmtypes.AvailableStaticPrecompiles...)
+	for _, addr := range corevm.PrecompiledAddressesPrague {
+		blockedPrecompilesHex = append(blockedPrecompilesHex, addr.Hex())
+	}
+	for _, precompile := range blockedPrecompilesHex {
+		modAccAddrs[cosmosevmutils.Bech32StringFromHexAddress(precompile)] = true
+	}
 
 	return modAccAddrs
 }
@@ -871,9 +1052,38 @@ func NoOpMempoolOption() func(*baseapp.BaseApp) {
 	}
 }
 
+// CustomizeDefaultGenesis overlays Uptick-specific defaults onto a
+// BasicManager genesis map. cosmos/evm defaults EvmDenom to "aatom"; Uptick
+// uses "auptick" and must also inject matching bank denom metadata.
+func CustomizeDefaultGenesis(cdc codec.JSONCodec, genesis evmostypes.GenesisState) {
+	evmDenom := cmdcfg.BaseDenom // "auptick"
+
+	var evmGenState evmtypes.GenesisState
+	cdc.MustUnmarshalJSON(genesis[evmtypes.ModuleName], &evmGenState)
+	evmGenState.Params.EvmDenom = evmDenom
+	genesis[evmtypes.ModuleName] = cdc.MustMarshalJSON(&evmGenState)
+
+	var bankGenState banktypes.GenesisState
+	cdc.MustUnmarshalJSON(genesis[banktypes.ModuleName], &bankGenState)
+	bankGenState.DenomMetadata = append(bankGenState.DenomMetadata, banktypes.Metadata{
+		Description: "Uptick mainnet token",
+		DenomUnits: []*banktypes.DenomUnit{
+			{Denom: evmDenom, Exponent: 0},
+			{Denom: cmdcfg.DisplayDenom, Exponent: uint32(upticktypes.BaseDenomUnit)},
+		},
+		Base:    evmDenom,
+		Display: cmdcfg.DisplayDenom,
+		Name:    "Uptick",
+		Symbol:  strings.ToUpper(cmdcfg.DisplayDenom),
+	})
+	genesis[banktypes.ModuleName] = cdc.MustMarshalJSON(&bankGenState)
+}
+
 // DefaultGenesis returns a default genesis from the registered AppModuleBasic's.
 func (app *Uptick) DefaultGenesis() evmostypes.GenesisState {
-	return app.bm.DefaultGenesis(app.AppCodec())
+	genesis := app.bm.DefaultGenesis(app.AppCodec())
+	CustomizeDefaultGenesis(app.AppCodec(), genesis)
+	return genesis
 }
 
 // PreBlocker application updates every pre block

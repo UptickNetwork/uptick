@@ -1,6 +1,8 @@
 package types
 
 import (
+	"strings"
+
 	sdkerrors "cosmossdk.io/errors"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
@@ -58,6 +60,13 @@ func (msg MsgIssueDenom) ValidateBasic() error {
 		return err
 	}
 
+	if len(msg.Name) == 0 {
+		return sdkerrors.Wrap(ErrInvalidDenom, "denom name cannot be empty")
+	}
+	if len(msg.Symbol) == 0 {
+		return sdkerrors.Wrap(ErrInvalidDenom, "denom symbol cannot be empty")
+	}
+
 	if _, err := sdk.AccAddressFromBech32(msg.Sender); err != nil {
 		return sdkerrors.Wrapf(errortypes.ErrInvalidAddress, "invalid sender address (%s)", err)
 	}
@@ -78,7 +87,7 @@ func (msg MsgIssueDenom) GetSignBytes() []byte {
 func (msg MsgIssueDenom) GetSigners() []sdk.AccAddress {
 	from, err := sdk.AccAddressFromBech32(msg.Sender)
 	if err != nil {
-		panic(err)
+		return nil
 	}
 	return []sdk.AccAddress{from}
 }
@@ -111,6 +120,10 @@ func (msg MsgTransferNFT) ValidateBasic() error {
 		return err
 	}
 
+	if err := ValidateTokenURI(msg.URI); err != nil {
+		return err
+	}
+
 	if _, err := sdk.AccAddressFromBech32(msg.Sender); err != nil {
 		return sdkerrors.Wrapf(errortypes.ErrInvalidAddress, "invalid sender address (%s)", err)
 	}
@@ -135,7 +148,7 @@ func (msg MsgTransferNFT) GetSignBytes() []byte {
 func (msg MsgTransferNFT) GetSigners() []sdk.AccAddress {
 	from, err := sdk.AccAddressFromBech32(msg.Sender)
 	if err != nil {
-		panic(err)
+		return nil
 	}
 	return []sdk.AccAddress{from}
 }
@@ -166,6 +179,9 @@ func (msg MsgEditNFT) ValidateBasic() error {
 	if _, err := sdk.AccAddressFromBech32(msg.Sender); err != nil {
 		return sdkerrors.Wrapf(errortypes.ErrInvalidAddress, "invalid sender address (%s)", err)
 	}
+	if strings.TrimSpace(msg.Name) == "" {
+		return sdkerrors.Wrap(errortypes.ErrInvalidRequest, "nft name cannot be empty")
+	}
 
 	if err := ValidateDenomID(msg.DenomId); err != nil {
 		return err
@@ -191,7 +207,7 @@ func (msg MsgEditNFT) GetSignBytes() []byte {
 func (msg MsgEditNFT) GetSigners() []sdk.AccAddress {
 	from, err := sdk.AccAddressFromBech32(msg.Sender)
 	if err != nil {
-		panic(err)
+		return nil
 	}
 	return []sdk.AccAddress{from}
 }
@@ -248,7 +264,7 @@ func (msg MsgMintNFT) GetSignBytes() []byte {
 func (msg MsgMintNFT) GetSigners() []sdk.AccAddress {
 	from, err := sdk.AccAddressFromBech32(msg.Sender)
 	if err != nil {
-		panic(err)
+		return nil
 	}
 	return []sdk.AccAddress{from}
 }
@@ -289,7 +305,7 @@ func (msg MsgBurnNFT) GetSignBytes() []byte {
 func (msg MsgBurnNFT) GetSigners() []sdk.AccAddress {
 	from, err := sdk.AccAddressFromBech32(msg.Sender)
 	if err != nil {
-		panic(err)
+		return nil
 	}
 	return []sdk.AccAddress{from}
 }
@@ -333,7 +349,7 @@ func (msg MsgTransferDenom) GetSignBytes() []byte {
 func (msg MsgTransferDenom) GetSigners() []sdk.AccAddress {
 	from, err := sdk.AccAddressFromBech32(msg.Sender)
 	if err != nil {
-		panic(err)
+		return nil
 	}
 	return []sdk.AccAddress{from}
 }

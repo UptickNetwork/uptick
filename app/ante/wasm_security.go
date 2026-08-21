@@ -1,6 +1,7 @@
 package ante
 
 import (
+	"encoding/json"
 	"fmt"
 
 	sdkerrors "cosmossdk.io/errors"
@@ -8,8 +9,9 @@ import (
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
-	ethante "github.com/evmos/ethermint/app/ante"
-	evmtypes "github.com/evmos/ethermint/x/evm/types"
+	"github.com/cosmos/cosmos-sdk/x/authz"
+	anteinterfaces "github.com/cosmos/evm/ante/interfaces"
+	evmtypes "github.com/cosmos/evm/x/vm/types"
 )
 
 const (
@@ -17,31 +19,49 @@ const (
 	// to prevent DoS attacks via excessive nested messages
 	MaxWasmDispatchMsgCount = 10
 
+	// MaxAuthzNestingDepth limits nested authz.MsgExec unpacking before SetUpContext.
+	MaxAuthzNestingDepth = 5
+
+	// MaxExtractedMessages caps the flattened message list from a single tx,
+	// including nested authz messages.
+	MaxExtractedMessages = 32
+
+	// maxWasmJSONDepth bounds recursive JSON walks of CosmWasm payloads.
+	maxWasmJSONDepth = 32
+
 	// EvmMsgTypeURL is the type URL for EVM messages
-	EvmMsgTypeURL = "/ethermint.evm.v1.MsgEthereumTx"
+	EvmMsgTypeURL = "/cosmos.evm.vm.v1.MsgEthereumTx"
 )
 
 // WasmSecurityDecorator checks for security issues in CosmWasm messages
 // and prevents bypassing AnteHandler gas checks via CosmWasm DispatchMsg
 type WasmSecurityDecorator struct {
 	cdc            codec.BinaryCodec
-	evmKeeper      ethante.EVMKeeper
+	evmKeeper      anteinterfaces.EVMKeeper
 	maxTxGasWanted uint64
+	maxDispatch    uint64
 }
 
 // NewWasmSecurityDecorator creates a new WasmSecurityDecorator
-func NewWasmSecurityDecorator(cdc codec.BinaryCodec, evmKeeper ethante.EVMKeeper, maxTxGasWanted uint64) WasmSecurityDecorator {
+func NewWasmSecurityDecorator(cdc codec.BinaryCodec, evmKeeper anteinterfaces.EVMKeeper, maxTxGasWanted, maxDispatch uint64) WasmSecurityDecorator {
+	if maxDispatch == 0 {
+		maxDispatch = MaxWasmDispatchMsgCount
+	}
 	return WasmSecurityDecorator{
 		cdc:            cdc,
 		evmKeeper:      evmKeeper,
 		maxTxGasWanted: maxTxGasWanted,
+		maxDispatch:    maxDispatch,
 	}
 }
 
 // AnteHandle inspects CosmWasm messages in the tx to ensure AnteHandler checks are not bypassed
 func (wsd WasmSecurityDecorator) AnteHandle(ctx sdk.Context, tx sdk.Tx, simulate bool, next sdk.AnteHandler) (newCtx sdk.Context, err error) {
-	// Get all messages from the transaction
-	msgs := tx.GetMsgs()
+	// Extract all messages from the transaction, including nested messages (e.g., authz.MsgExec)
+	msgs, err := wsd.ExtractMessagesFromTx(ctx, tx)
+	if err != nil {
+		return ctx, err
+	}
 
 	// Validate each message
 	for _, msg := range msgs {
@@ -89,7 +109,6 @@ func (wsd WasmSecurityDecorator) validateWasmExecuteContract(ctx sdk.Context, ms
 			len(msg.Msg),
 		)
 	}
-
 	return nil
 }
 
@@ -172,31 +191,92 @@ func (wsd WasmSecurityDecorator) validateEvmGasLimit(ctx sdk.Context, msg *evmty
 	return nil
 }
 
-// ExtractMessagesFromTx extracts all messages from a transaction
+// ExtractMessagesFromTx extracts all messages from a transaction, including
+// nested messages from authz.MsgExec to prevent ante handler bypass attacks.
 func (wsd WasmSecurityDecorator) ExtractMessagesFromTx(ctx sdk.Context, tx sdk.Tx) ([]sdk.Msg, error) {
+	type queuedMsg struct {
+		msg   sdk.Msg
+		depth int
+	}
+
 	var allMsgs []sdk.Msg
 	msgs := tx.GetMsgs()
-
-	// Use a queue to process nested messages
-	msgQueue := make([]sdk.Msg, 0, len(msgs))
-	msgQueue = append(msgQueue, msgs...)
+	msgQueue := make([]queuedMsg, 0, len(msgs))
+	for _, msg := range msgs {
+		msgQueue = append(msgQueue, queuedMsg{msg: msg, depth: 0})
+	}
 
 	processed := make(map[string]bool)
 
 	for len(msgQueue) > 0 {
-		msg := msgQueue[0]
+		item := msgQueue[0]
 		msgQueue = msgQueue[1:]
+		msg := item.msg
 
-		// Avoid processing the same message multiple times
-		msgKey := fmt.Sprintf("%s:%s", sdk.MsgTypeURL(msg), msg.String())
+		msgKey := fmt.Sprintf("%s:%p", sdk.MsgTypeURL(msg), msg)
 		if processed[msgKey] {
 			continue
 		}
 		processed[msgKey] = true
 
+		if len(allMsgs) >= MaxExtractedMessages {
+			return nil, sdkerrors.Wrapf(
+				errortypes.ErrInvalidRequest,
+				"message count exceeds maximum %d", MaxExtractedMessages,
+			)
+		}
 		allMsgs = append(allMsgs, msg)
 
+		if execMsg, ok := msg.(*authz.MsgExec); ok {
+			if item.depth >= MaxAuthzNestingDepth {
+				return nil, sdkerrors.Wrapf(
+					errortypes.ErrInvalidRequest,
+					"authz nesting depth exceeds maximum %d", MaxAuthzNestingDepth,
+				)
+			}
+			nestedMsgs, err := execMsg.GetMessages()
+			if err != nil {
+				return nil, sdkerrors.Wrapf(err, "failed to unpack authz.MsgExec nested messages")
+			}
+			for _, nested := range nestedMsgs {
+				msgQueue = append(msgQueue, queuedMsg{msg: nested, depth: item.depth + 1})
+			}
+		}
 	}
 
 	return allMsgs, nil
+}
+
+func countWasmDispatchMsgs(raw json.RawMessage, maxDispatch uint64) uint64 {
+	var v interface{}
+	if err := json.Unmarshal(raw, &v); err != nil {
+		return 0
+	}
+	return countCosmosMsgs(v, 0, maxDispatch)
+}
+
+func countCosmosMsgs(v interface{}, depth int, maxDispatch uint64) uint64 {
+	if depth > maxWasmJSONDepth {
+		return maxDispatch + 1
+	}
+	switch x := v.(type) {
+	case map[string]interface{}:
+		var n uint64
+		for k, child := range x {
+			switch k {
+			case "wasm", "bank", "staking", "stargate", "ibc", "gov", "distribution":
+				n++
+			}
+			n += countCosmosMsgs(child, depth+1, maxDispatch)
+		}
+		return n
+	case []interface{}:
+		var n uint64
+		for _, child := range x {
+			n += countCosmosMsgs(child, depth+1, maxDispatch)
+		}
+		return n
+	default:
+		return 0
+	}
 }

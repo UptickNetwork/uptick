@@ -4,15 +4,15 @@ import (
 	_ "embed" // embed compiled smart contract
 	"encoding/json"
 
+	evmtypes "github.com/cosmos/evm/x/vm/types"
 	"github.com/ethereum/go-ethereum/common"
-	evmtypes "github.com/evmos/ethermint/x/evm/types"
 
-	"github.com/UptickNetwork/uptick/x/erc20/types"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 )
 
 var (
 	//go:embed compiled_contracts/ERC721Uptick.json
-	ERC721UptickJSON []byte // nolint: golint
+	ERC721UptickJSON []byte //nolint:revive,stylecheck
 
 	// ERC721UpticksContract is the compiled erc721 contract
 	ERC721UpticksContract evmtypes.CompiledContract
@@ -23,7 +23,7 @@ var (
 
 func init() {
 
-	ERC721UptickAddress = types.ModuleAddress
+	ERC721UptickAddress = common.BytesToAddress(authtypes.NewModuleAddress("erc721").Bytes())
 
 	if err := json.Unmarshal(ERC721UptickJSON, &ERC721UpticksContract); err != nil {
 		panic(err)

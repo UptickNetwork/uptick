@@ -2,7 +2,7 @@
 
 BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
 COMMIT := $(shell git log -1 --format='%H')
-VERSION := v0.3.3
+VERSION := v0.4.0
 
 
 # don't override user values
@@ -358,11 +358,6 @@ else
 	go test -mod=readonly $(ARGS)  $(EXTRA_ARGS) $(TEST_PACKAGES)
 endif
 
-test-import:
-	@go test ./tests/importer -v --vet=off --run=TestImportBlocks --datadir tmp \
-	--blockchain blockchain
-	rm -rf tests/importer/tmp
-
 test-rpc:
 	./scripts/integration-test-all.sh -t "rpc" -q 1 -z 1 -s 2 -m "rpc" -r "true"
 
@@ -545,19 +540,23 @@ localnet-show-logstream:
 ###############################################################################
 
 PACKAGE_NAME:=github.com/UptickNetwork/uptick
-GOLANG_CROSS_VERSION  = v1.17.1
+GOLANG_CROSS_VERSION  = v1.25.8
+GOLANG_CROSS_IMAGE    = ghcr.io/goreleaser/goreleaser-cross
 GOPATH ?= '$(HOME)/go'
 release-dry-run:
 	docker run \
 		--rm \
 		--privileged \
 		-e CGO_ENABLED=1 \
+		-e GOMODCACHE=/go/pkg/mod \
+		-e GOPROXY="`go env GOPROXY`" \
+		-e GOSUMDB="`go env GOSUMDB`" \
 		-v /var/run/docker.sock:/var/run/docker.sock \
 		-v `pwd`:/go/src/$(PACKAGE_NAME) \
 		-v ${GOPATH}/pkg:/go/pkg \
 		-w /go/src/$(PACKAGE_NAME) \
-		ghcr.io/troian/golang-cross:${GOLANG_CROSS_VERSION} \
-		--rm-dist --skip-validate --skip-publish --snapshot
+		${GOLANG_CROSS_IMAGE}:${GOLANG_CROSS_VERSION} \
+		--clean --snapshot
 
 release:
 	@if [ ! -f ".release-env" ]; then \
@@ -568,12 +567,15 @@ release:
 		--rm \
 		--privileged \
 		-e CGO_ENABLED=1 \
+		-e GOMODCACHE=/go/pkg/mod \
+		-e GOPROXY="`go env GOPROXY`" \
+		-e GOSUMDB="`go env GOSUMDB`" \
 		--env-file .release-env \
 		-v /var/run/docker.sock:/var/run/docker.sock \
 		-v `pwd`:/go/src/$(PACKAGE_NAME) \
 		-w /go/src/$(PACKAGE_NAME) \
-		ghcr.io/troian/golang-cross:${GOLANG_CROSS_VERSION} \
-		release --rm-dist --skip-validate
+		${GOLANG_CROSS_IMAGE}:${GOLANG_CROSS_VERSION} \
+		release --clean
 
 .PHONY: release-dry-run release
 

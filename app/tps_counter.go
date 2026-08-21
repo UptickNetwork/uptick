@@ -75,13 +75,15 @@ func (tpc *tpsCounter) start(ctx context.Context) error {
 			if err == nil {
 				nTxn += nSuccess
 			} else {
-				panic(err)
+				tpc.logger.Error("failed to record successful transactions", "error", err)
+				continue
 			}
 			nFailed, err := tpc.recordValue(ctx, latestNFailed, lastNFailed, statusFailure)
 			if err == nil {
 				nTxn += nFailed
 			} else {
-				panic(err)
+				tpc.logger.Error("failed to record failed transactions", "error", err)
+				continue
 			}
 
 			if nTxn != 0 {

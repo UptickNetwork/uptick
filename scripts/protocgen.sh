@@ -29,7 +29,8 @@ cd ..
 
 # move proto files to the right places
 cp -r github.com/UptickNetwork/uptick/x/collection/types/* ./x/collection/types
-cp -r github.com/UptickNetwork/uptick/x/erc20/types/* ./x/erc20/types
-cp -r github.com/UptickNetwork/uptick/x/evmIBC/types/* ./x/evmIBC/types
+cp -r github.com/UptickNetwork/uptick/x/cw721/types/* ./x/cw721/types
+cp -r github.com/UptickNetwork/uptick/x/erc721/types/* ./x/erc721/types
+cp -r github.com/UptickNetwork/uptick/x/evmibc/types/* ./x/evmibc/types
 cp -r github.com/UptickNetwork/uptick/x/nft/types/* ./x/nft/types
 #rm -rf github.com

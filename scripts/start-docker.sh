@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# LOCAL DEV ONLY: this starts a single-node dev environment with unsafe RPC and
+# test keyring settings. Do not use this script for validator or public nodes.
+
 # CHAINID="uptick_7777-1"
 # MONIKER="mymoniker"
 DATA_DIR="/data-dir"

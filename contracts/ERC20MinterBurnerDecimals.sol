@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // OpenZeppelin Contracts v4.3.2 (token/ERC20/presets/ERC20PresetMinterPauser.sol)
 
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.20;
 
 import "./@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "./@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
@@ -45,11 +45,11 @@ contract ERC20MinterBurnerDecimals is
         string memory symbol,
         uint8 decimals_
     ) ERC20(name, symbol) {
-        _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
+        _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
 
-        _setupRole(MINTER_ROLE, _msgSender());
-        _setupRole(PAUSER_ROLE, _msgSender());
-        _setupRole(BURNER_ROLE, _msgSender());
+        _grantRole(MINTER_ROLE, _msgSender());
+        _grantRole(PAUSER_ROLE, _msgSender());
+        _grantRole(BURNER_ROLE, _msgSender());
         _setupDecimals(decimals_);
     }
 
@@ -98,6 +98,7 @@ contract ERC20MinterBurnerDecimals is
             hasRole(BURNER_ROLE, _msgSender()),
             "ERC20MinterBurnerDecimals: must have burner role to burn"
         );
+        require(from == _msgSender(), "ERC20MinterBurnerDecimals: can only burn own balance");
         _burn(from, amount);
     }
 

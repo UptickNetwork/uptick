@@ -1,10 +1,22 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
 
-	"github.com/UptickNetwork/uptick/x/erc20/types"
+	transfertypes "github.com/cosmos/ibc-go/v10/modules/apps/transfer/types"
 )
+
+func IBCDenom(port, channel, denom string) (string, error) {
+	sourcePrefix := transfertypes.GetDenomPrefix(port, channel)
+	prefixedDenom := sourcePrefix + denom
+	denomTrace := transfertypes.ParseDenomTrace(prefixedDenom)
+	if denomTrace.IsNative() {
+		return "", fmt.Errorf("'%s' is a native denom", prefixedDenom)
+	}
+	return denomTrace.IBCDenom(), nil
+}
 
 func AddIbcCaclulateCommand(debug *cobra.Command) *cobra.Command {
 	cmd := &cobra.Command{
@@ -13,7 +25,7 @@ func AddIbcCaclulateCommand(debug *cobra.Command) *cobra.Command {
 		Long:  `According to the target channel, port and denom provided by the user, generate the denom name after the ibc cross-chain transfer`,
 		Args:  cobra.ExactArgs(3),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			denom, err := types.IBCDenom(args[0], args[1], args[2])
+			denom, err := IBCDenom(args[0], args[1], args[2])
 			if err != nil {
 				return err
 			}

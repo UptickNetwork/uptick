@@ -4,18 +4,16 @@ import (
 	upgradetypes "cosmossdk.io/x/upgrade/types"
 
 	"github.com/UptickNetwork/uptick/app/upgrades"
-	v030 "github.com/UptickNetwork/uptick/app/upgrades/v030"
-	v031 "github.com/UptickNetwork/uptick/app/upgrades/v031"
-	v032 "github.com/UptickNetwork/uptick/app/upgrades/v032"
+	// v030-v032 were removed: they were build-ignored historical upgrades with
+	// SDK 0.50 API incompatibilities and stale ethermint fork fields.
 	v033 "github.com/UptickNetwork/uptick/app/upgrades/v033"
+	v040 "github.com/UptickNetwork/uptick/app/upgrades/v040"
 )
 
 var (
 	router = upgrades.NewUpgradeRouter().
-		Register(v030.Upgrade).
-		Register(v031.Upgrade).
-		Register(v032.Upgrade).
-		Register(v033.Upgrade)
+		Register(v033.Upgrade).
+		Register(v040.Upgrade)
 )
 
 // RegisterUpgradePlans register a handler of upgrade plan

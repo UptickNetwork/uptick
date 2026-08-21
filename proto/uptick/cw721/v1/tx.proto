@@ -6,7 +6,7 @@ import "gogoproto/gogo.proto";
 import "google/api/annotations.proto";
 import "ibc/core/client/v1/client.proto";
 
-option go_package = "github.com/UptickNetwork/wasm-nft-convert/cw721/types";
+option go_package = "github.com/UptickNetwork/uptick/x/cw721/types";
 
 // Msg defines the cw721 Msg service.
 service Msg {
@@ -32,13 +32,13 @@ service Msg {
 message MsgConvertNFT {
   option (cosmos.msg.v1.signer) = "sender";
 
-  // nft classID to cnvert to CW721
+  // nft classID to convert to CW721
   string class_id = 1;
-  // nftID to cnvert to CW721
+  // nftID to convert to CW721
   repeated string nft_ids = 2;
   // recipient hex address to receive CW721 token
   string receiver = 3;
-  // cosmos bech32 address from the owner of the given Cosmos coins
+  // cosmos bech32 address from the owner of the given Cosmos NFTs
   string sender = 4;
   // CW721 token contract address registered in a token pair
   string contract_address = 5;
@@ -57,13 +57,13 @@ message MsgConvertCW721 {
   string contract_address = 1;
   // tokenID to convert
   repeated string token_ids = 2;
-  // bech32 address to receive native Cosmos coins
+  // bech32 address to receive native Cosmos NFTs
   string receiver = 3;
   // sender hex address from the owner of the given CW721 tokens
   string sender = 4;
-  // nft classID to cnvert to CW721
+  // nft classID to convert to CW721
   string class_id = 5;
-  // nftID to cnvert to CW721
+  // nftID to convert to CW721
   repeated string nft_ids = 6;
 }
 
@@ -78,9 +78,9 @@ message MsgConvertCW721Response {
   string receiver = 3;
   // sender hex address from the owner of the given CW721 tokens
   string sender = 4;
-  // nft classID to cnvert to CW721
+  // nft classID to convert to CW721
   string class_id = 5;
-  // nftID to cnvert to CW721
+  // nftID to convert to CW721
   repeated string nft_ids = 6;
 }
 

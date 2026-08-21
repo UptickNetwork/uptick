@@ -102,9 +102,14 @@ func GetCmdIssueDenom() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			optionsContent, err := ioutil.ReadFile(schema)
-			if err == nil {
-				schema = string(optionsContent)
+			schema = strings.TrimSpace(schema)
+			if schema != "" {
+				// --schema accepts either a schema.json file path or inline content.
+				// Falls back to inline content when the file does not exist
+				// (consistent with the help text "schema-content or path").
+				if content, rerr := ioutil.ReadFile(schema); rerr == nil {
+					schema = strings.TrimSpace(string(content))
+				}
 			}
 
 			msg := types.NewMsgIssueDenom(

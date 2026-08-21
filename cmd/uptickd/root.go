@@ -1,50 +1,51 @@
 package main
 
 import (
-	"cosmossdk.io/client/v2/autocli"
-	"cosmossdk.io/log"
-	rosettaCmd "cosmossdk.io/tools/rosetta/cmd"
 	"errors"
 	"fmt"
+	"io"
+	"os"
+
+	"cosmossdk.io/client/v2/autocli"
+	"cosmossdk.io/log"
+	confixcmd "cosmossdk.io/tools/confix/cmd"
+	"github.com/CosmWasm/wasmd/x/wasm"
 	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
+	"github.com/UptickNetwork/uptick/app"
 	"github.com/UptickNetwork/uptick/app/params"
 	uptickparams "github.com/UptickNetwork/uptick/app/params"
 	cmdcfg "github.com/UptickNetwork/uptick/cmd/config"
+	upticktypes "github.com/UptickNetwork/uptick/types"
 	tmcfg "github.com/cometbft/cometbft/config"
 	tmcli "github.com/cometbft/cometbft/libs/cli"
 	dbm "github.com/cosmos/cosmos-db"
+	"github.com/cosmos/cosmos-sdk/client"
+	"github.com/cosmos/cosmos-sdk/client/config"
+	"github.com/cosmos/cosmos-sdk/client/flags"
 	"github.com/cosmos/cosmos-sdk/client/pruning"
 	"github.com/cosmos/cosmos-sdk/client/rpc"
 	"github.com/cosmos/cosmos-sdk/client/snapshot"
 	addresscodec "github.com/cosmos/cosmos-sdk/codec/address"
+	"github.com/cosmos/cosmos-sdk/server"
+	servertypes "github.com/cosmos/cosmos-sdk/server/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
 	authcmd "github.com/cosmos/cosmos-sdk/x/auth/client/cli"
-	genutiltypes "github.com/cosmos/cosmos-sdk/x/genutil/types"
-	srvflags "github.com/evmos/ethermint/server/flags"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/spf13/cast"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
-	"io"
-	"os"
-
-	confixcmd "cosmossdk.io/tools/confix/cmd"
-	"github.com/UptickNetwork/uptick/app"
-	"github.com/cosmos/cosmos-sdk/client"
-	"github.com/cosmos/cosmos-sdk/client/config"
-	"github.com/cosmos/cosmos-sdk/client/flags"
-	"github.com/cosmos/cosmos-sdk/server"
-	servertypes "github.com/cosmos/cosmos-sdk/server/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	"github.com/cosmos/cosmos-sdk/x/crisis"
 	genutilcli "github.com/cosmos/cosmos-sdk/x/genutil/client/cli"
-	ethermintclient "github.com/evmos/ethermint/client"
-	"github.com/evmos/ethermint/client/debug"
-	"github.com/evmos/ethermint/crypto/hd"
-	ethermintserver "github.com/evmos/ethermint/server"
-	servercfg "github.com/evmos/ethermint/server/config"
+	genutiltypes "github.com/cosmos/cosmos-sdk/x/genutil/types"
+	evmclient "github.com/cosmos/evm/client"
+	"github.com/cosmos/evm/client/debug"
+	evmconfig "github.com/cosmos/evm/config"
+	"github.com/cosmos/evm/crypto/hd"
+	evmserver "github.com/cosmos/evm/server"
+	srvflags "github.com/cosmos/evm/server/flags"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/spf13/cast"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 const (
@@ -102,16 +103,18 @@ func NewRootCmd() *cobra.Command {
 			customAppTemplate, customAppConfig := initAppConfig()
 			customTMConfig := initTendermintConfig()
 
-			return server.InterceptConfigsPreRunHandler(cmd, customAppTemplate, customAppConfig, customTMConfig)
+			if err := server.InterceptConfigsPreRunHandler(cmd, customAppTemplate, customAppConfig, customTMConfig); err != nil {
+				return err
+			}
+			applyEVMChainID(cmd)
+			return nil
 		},
 		SilenceUsage: true,
 	}
 
 	ac := appCreator{}
 	rootCmd.AddCommand(
-		ethermintclient.ValidateChainID(
-			InitCmd(tempApplication.BasicManager(), app.DefaultNodeHome),
-		),
+		InitCmd(tempApplication.BasicManager(), app.DefaultNodeHome),
 		genutilcli.CollectGenTxsCmd(banktypes.GenesisBalancesIterator{},
 			app.DefaultNodeHome,
 			genutiltypes.DefaultMessageValidator,
@@ -130,9 +133,9 @@ func NewRootCmd() *cobra.Command {
 		snapshot.Cmd(ac.newApp),
 	)
 
-	ethermintserver.AddCommands(
+	evmserver.AddCommands(
 		rootCmd,
-		ethermintserver.NewDefaultStartOptions(ac.newApp, app.DefaultNodeHome),
+		evmserver.NewDefaultStartOptions(ac.newEvmApp, app.DefaultNodeHome),
 		ac.appExport,
 		addModuleInitFlags,
 	)
@@ -143,7 +146,7 @@ func NewRootCmd() *cobra.Command {
 		genesisCommand(tempApplication.BasicManager(), encodingConfig),
 		queryCommand(),
 		txCommand(tempApplication.BasicManager()),
-		ethermintclient.KeyCommands(app.DefaultNodeHome),
+		evmclient.KeyCommands(app.DefaultNodeHome, false),
 	)
 
 	autoCliOpts := enrichAutoCliOpts(tempApplication.AutoCliOpts(), initClientCtx)
@@ -156,8 +159,8 @@ func NewRootCmd() *cobra.Command {
 		panic(err)
 	}
 
-	// add rosetta
-	rootCmd.AddCommand(rosettaCmd.RosettaCommand(encodingConfig.InterfaceRegistry, encodingConfig.Codec))
+	// TODO: rosetta disabled - incompatible with SDK 0.53
+	// rootCmd.AddCommand(rosettaCmd.RosettaCommand(encodingConfig.InterfaceRegistry, encodingConfig.Codec))
 	return rootCmd
 }
 
@@ -187,6 +190,27 @@ func genesisCommand(basicManager module.BasicManager, encodingConfig params.Enco
 
 func addModuleInitFlags(startCmd *cobra.Command) {
 	crisis.AddModuleInitFlags(startCmd)
+	wasm.AddModuleInitFlags(startCmd)
+	// wasmd flags default to 3M query gas / 100 MiB cache. Those defaults win
+	// over app.toml via viper, which would starve CW721 metadata queries.
+	cfg := cmdcfg.DefaultWasmNodeConfig()
+	queryGas := fmt.Sprintf("%d", cfg.SmartQueryGasLimit)
+	if f := startCmd.Flags().Lookup("wasm.query_gas_limit"); f != nil {
+		f.DefValue = queryGas
+		_ = f.Value.Set(queryGas)
+	}
+	cacheSize := fmt.Sprintf("%d", cfg.MemoryCacheSize)
+	if f := startCmd.Flags().Lookup("wasm.memory_cache_size"); f != nil {
+		f.DefValue = cacheSize
+		_ = f.Value.Set(cacheSize)
+	}
+	if cfg.SimulationGasLimit != nil {
+		simGas := fmt.Sprintf("%d", *cfg.SimulationGasLimit)
+		if f := startCmd.Flags().Lookup("wasm.simulation_gas_limit"); f != nil {
+			f.DefValue = simGas
+			_ = f.Value.Set(simGas)
+		}
+	}
 }
 
 func queryCommand() *cobra.Command {
@@ -246,17 +270,19 @@ func txCommand(basicManager module.BasicManager) *cobra.Command {
 // initAppConfig helps to override default appConfig template and configs.
 // return "", nil if no custom configuration is required for the application.
 func initAppConfig() (string, interface{}) {
-	customAppTemplate, customAppConfig := servercfg.AppConfig(cmdcfg.BaseDenom)
+	// cosmos/evm provides the EVM/JSONRPC/TLS app.toml configuration.
+	evmChainID := upticktypes.MainnetEVMChainID
+	customAppTemplate, customAppConfig := evmconfig.InitAppConfig(cmdcfg.BaseDenom, evmChainID)
+	customAppTemplate += cmdcfg.WasmConfigTemplate()
 
-	srvCfg, ok := customAppConfig.(servercfg.Config)
-	if !ok {
-		panic(fmt.Errorf("unknown app config type %T", customAppConfig))
+	// apply snapshot / fast-node settings via the concrete EVMAppConfig type.
+	if cfg, ok := customAppConfig.(evmconfig.EVMAppConfig); ok {
+		cfg.StateSync.SnapshotInterval = 1500
+		cfg.StateSync.SnapshotKeepRecent = 2
+		cfg.IAVLDisableFastNode = false
+		return customAppTemplate, cfg
 	}
-
-	srvCfg.StateSync.SnapshotInterval = 1500
-	srvCfg.StateSync.SnapshotKeepRecent = 2
-	srvCfg.IAVLDisableFastNode = false
-	return customAppTemplate, srvCfg
+	return customAppTemplate, customAppConfig
 }
 
 type appCreator struct {
@@ -265,6 +291,10 @@ type appCreator struct {
 
 // newApp is an appCreator
 func (a appCreator) newApp(logger log.Logger, db dbm.DB, traceStore io.Writer, appOpts servertypes.AppOptions) servertypes.Application {
+	return a.newEvmApp(logger, db, traceStore, appOpts)
+}
+
+func (a appCreator) newEvmApp(logger log.Logger, db dbm.DB, traceStore io.Writer, appOpts servertypes.AppOptions) evmserver.Application {
 
 	var wasmOpts []wasmkeeper.Option
 	if cast.ToBool(appOpts.Get("telemetry.enabled")) {

@@ -21,7 +21,7 @@ Learn about the JSON-RPC server to interact with the EVM. {synopsis}
 
 Uptick supports all standard web3 JSON-RPC APIs. You can find documentation for these APIs on the [`JSON-RPC Methods`](./endpoints.md) page.
 
-JSON-RPC is provided on multiple transports. Uptick supports JSON-RPC over HTTP and WebSocket. Transports must be enabled through command-line flags or through the `app.toml` configuration file. For more details see the []
+JSON-RPC is provided on multiple transports. Uptick supports JSON-RPC over HTTP and WebSocket. Transports must be enabled through command-line flags or through the `app.toml` configuration file. For more details see the [Running the Server](./running_server.md) page.
 
 Ethereum JSON-RPC APIs use a name-space system. RPC methods are grouped into several categories depending on their purpose. All method names are composed of the namespace, an underscore, and the actual method name within the namespace. For example, the eth_call method resides in the eth namespace.
 

@@ -97,7 +97,10 @@ func (ik InterNftKeeper) Transfer(
 	if len(tokenData) == 0 {
 		return nil
 	}
-	nft, _ := ik.nk.GetNFT(ctx, classID, tokenID)
+	nft, found := ik.nk.GetNFT(ctx, classID, tokenID)
+	if !found {
+		return nil
+	}
 	token, err := ik.tb.Build(classID, tokenID, nft.Uri, tokenData)
 	if err != nil {
 		return err
@@ -115,7 +118,7 @@ func (ik InterNftKeeper) GetClass(ctx sdk.Context, classID string) (nfttransfer.
 
 	metadata, err := ik.cb.BuildMetadata(class)
 	if err != nil {
-		ik.Logger(ctx).Error("encode class data failed")
+		ik.Logger(ctx).Error("encode class data failed", "error", err.Error(), "classId", classID)
 		return nil, false
 	}
 	return InterClass{
@@ -133,7 +136,7 @@ func (ik InterNftKeeper) GetNFT(ctx sdk.Context, classID, tokenID string) (nfttr
 	}
 	metadata, err := ik.tb.BuildMetadata(nft)
 	if err != nil {
-		ik.Logger(ctx).Error("encode nft data failed")
+		ik.Logger(ctx).Error("encode nft data failed", "error", err.Error(), "classId", classID, "tokenId", tokenID)
 		return nil, false
 	}
 	return InterToken{

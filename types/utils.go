@@ -3,7 +3,7 @@ package types
 import (
 	"encoding/hex"
 	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
-	"github.com/evmos/ethermint/crypto/ethsecp256k1"
+	"github.com/cosmos/evm/crypto/ethsecp256k1"
 	"strings"
 
 	sdkerrors "cosmossdk.io/errors"

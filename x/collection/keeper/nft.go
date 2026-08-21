@@ -76,6 +76,9 @@ func (k Keeper) UpdateNFT(ctx sdk.Context, denomID,
 	token.Uri = types.Modify(token.Uri, tokenURI)
 	token.UriHash = types.Modify(token.UriHash, tokenURIHash)
 	if types.Modified(tokenNm) || types.Modified(tokenData) {
+		if token.Data == nil {
+			return sdkerrors.Wrapf(types.ErrInvalidTokenID, "nft ID %s has no metadata", tokenID)
+		}
 		nftMetadata, err := types.UnmarshalNFTMetadata(k.cdc, token.Data.GetValue())
 		if err != nil {
 			return err
@@ -130,6 +133,9 @@ func (k Keeper) TransferOwnership(ctx sdk.Context, denomID,
 	token.Uri = types.Modify(token.Uri, tokenURI)
 	token.UriHash = types.Modify(token.UriHash, tokenURIHash)
 	if tokenMetadataChanged {
+		if token.Data == nil {
+			return sdkerrors.Wrapf(types.ErrInvalidTokenID, "nft ID %s has no metadata", tokenID)
+		}
 		nftMetadata, err := types.UnmarshalNFTMetadata(k.cdc, token.Data.GetValue())
 		if err != nil {
 			return err
@@ -162,10 +168,13 @@ func (k Keeper) RemoveNFT(ctx sdk.Context, denomID, tokenID string, owner sdk.Ac
 func (k Keeper) GetNFT(ctx sdk.Context, denomID, tokenID string) (nft exported.NFT, err error) {
 	token, exist := k.nk.GetNFT(ctx, denomID, tokenID)
 	if !exist {
-		return nil, sdkerrors.Wrapf(types.ErrUnknownNFT, "not found NFT: %s", denomID)
+		return nil, sdkerrors.Wrapf(types.ErrUnknownNFT, "not found NFT %s from collection %s", tokenID, denomID)
 	}
 
 	var nftMetadata types.NFTMetadata
+	if token.Data == nil {
+		return nil, sdkerrors.Wrapf(types.ErrInvalidTokenID, "nft ID %s has no metadata", tokenID)
+	}
 	if err := k.cdc.Unmarshal(token.Data.GetValue(), &nftMetadata); err != nil {
 		return nil, err
 	}
@@ -186,6 +195,9 @@ func (k Keeper) GetNFTs(ctx sdk.Context, denom string) (nfts []exported.NFT, err
 	tokens := k.nk.GetNFTsOfClass(ctx, denom)
 	for _, token := range tokens {
 		var nftMetadata types.NFTMetadata
+		if token.Data == nil {
+			return nil, sdkerrors.Wrapf(types.ErrInvalidTokenID, "nft ID %s has no metadata", token.GetId())
+		}
 		if err := k.cdc.Unmarshal(token.Data.GetValue(), &nftMetadata); err != nil {
 			return nil, err
 		}

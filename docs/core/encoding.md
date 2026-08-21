@@ -33,7 +33,7 @@ allows for quick reconstruction of encoded data. Uptick uses RLP to encode/decod
 messages for JSON-RPC handling to conform messages to the proper Ethereum format. This allows
 messages to be encoded and decoded in the exact format as Ethereum's.
 
-The `x/evm` transactions (`MsgEthereumTx`) encoding is performed by casting the message to a go-ethereum's `Transaction` and then marshaling the transaction data using RLP:
+The EVM (`cosmos/evm` `x/vm`) transactions (`MsgEthereumTx`) encoding is performed by casting the message to a go-ethereum's `Transaction` and then marshaling the transaction data using RLP:
 
 ```go
 // TxEncoder overwrites sdk.TxEncoder to support MsgEthereumTx

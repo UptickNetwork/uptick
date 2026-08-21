@@ -1,16 +1,48 @@
 {
     "swagger": "2.0",
     "info": {
-      "title": "Uptick Chain - Legacy REST and gRPC Gateway docs",
-      "description": "A REST interface for state queries, legacy transactions",
-      "version": "0.2.7"
+      "title": "Uptick Chain - REST and gRPC Gateway docs",
+      "description": "A REST interface for state queries and transactions exposed by the gRPC gateway",
+      "version": "v0.4.0"
     },
     "apis": [
       {
-        "url": "./tmp-swagger-gen/ethermint/evm/v1/query.swagger.json",
+        "url": "./tmp-swagger-gen/cosmos/evm/vm/v1/query.swagger.json",
         "operationIds": {
           "rename": {
-            "Params": "EvmParams"
+            "Params": "EvmParams",
+            "Account": "EvmAccount",
+            "CosmosAccount": "EvmCosmosAccount",
+            "ValidatorAccount": "EvmValidatorAccount"
+          }
+        }
+      },
+      {
+        "url": "./tmp-swagger-gen/cosmos/evm/feemarket/v1/query.swagger.json",
+        "operationIds": {
+          "rename": {
+            "Params": "FeeMarketParams",
+            "BaseFee": "FeeMarketBaseFee"
+          }
+        }
+      },
+      {
+        "url": "./tmp-swagger-gen/cosmos/evm/erc20/v1/query.swagger.json",
+        "operationIds": {
+          "rename": {
+            "Params": "Erc20Params",
+            "TokenPairs": "Erc20TokenPairs",
+            "TokenPair": "Erc20TokenPair",
+            "EvmContract": "Erc20EvmContract",
+            "CosmosDenom": "Erc20CosmosDenom"
+          }
+        }
+      },
+      {
+        "url": "./tmp-swagger-gen/cosmos/evm/precisebank/v1/query.swagger.json",
+        "operationIds": {
+          "rename": {
+            "Params": "PreciseBankParams"
           }
         }
       },
@@ -28,7 +60,11 @@
         "operationIds": {
           "rename": {
             "Balance": "BankBalance",
-            "Params": "BankParams"
+            "AllBalances": "BankAllBalances",
+            "Params": "BankParams",
+            "DenomMetadata": "BankDenomMetadata",
+            "DenomsMetadata": "BankDenomsMetadata",
+            "SupplyOf": "BankSupplyOf"
           }
         }
       },
@@ -58,6 +94,21 @@
         }
       },
       {
+        "url": "./tmp-swagger-gen/cosmos/gov/v1/query.swagger.json",
+        "operationIds": {
+          "rename": {
+            "Params": "GovV1Params",
+            "Proposals": "GovV1Proposals",
+            "Proposal": "GovV1Proposal",
+            "Votes": "GovV1Votes",
+            "Vote": "GovV1Vote",
+            "Deposits": "GovV1Deposits",
+            "Deposit": "GovV1Deposit",
+            "TallyResult": "GovV1TallyResult"
+          }
+        }
+      },
+      {
         "url": "./tmp-swagger-gen/cosmos/staking/v1beta1/query.swagger.json",
         "operationIds": {
           "rename": {
@@ -66,10 +117,61 @@
         }
       },
       {
+        "url": "./tmp-swagger-gen/cosmos/slashing/v1beta1/query.swagger.json",
+        "operationIds": {
+          "rename": {
+            "Params": "SlashingParams",
+            "SigningInfos": "SlashingSigningInfos",
+            "SigningInfo": "SlashingSigningInfo"
+          }
+        }
+      },
+      {
+        "url": "./tmp-swagger-gen/cosmos/nft/v1beta1/query.swagger.json",
+        "operationIds": {
+          "rename": {
+            "Balance": "NftBalance",
+            "Owner": "NftOwner",
+            "Supply": "NftSupply",
+            "NFTs": "NftNFTs",
+            "NFT": "NftNFT",
+            "Class": "NftClass",
+            "Classes": "NftClasses"
+          }
+        }
+      },
+      {
+        "url": "./tmp-swagger-gen/cosmwasm/wasm/v1/query.swagger.json",
+        "operationIds": {
+          "rename": {
+            "Params": "WasmParams",
+            "Code": "WasmCode",
+            "Codes": "WasmCodes",
+            "ContractInfo": "WasmContractInfo",
+            "ContractHistory": "WasmContractHistory",
+            "ContractsByCode": "WasmContractsByCode",
+            "AllContractState": "WasmAllContractState",
+            "RawContractState": "WasmRawContractState",
+            "SmartContractState": "WasmSmartContractState",
+            "CodesByCreator": "WasmCodesByCreator",
+            "ContractsByCreator": "WasmContractsByCreator",
+            "BuildAddress": "WasmBuildAddress",
+            "PinnedCodes": "WasmPinnedCodes",
+            "IsPinnedCode": "WasmIsPinnedCode",
+            "LibwasmvmVersion": "WasmLibwasmvmVersion"
+          }
+        }
+      },
+      {
         "url": "./tmp-swagger-gen/ibc/applications/transfer/v1/query.swagger.json",
         "operationIds": {
           "rename": {
-            "Params": "ibcTransferParams"
+            "Params": "IbcTransferParams",
+            "EscrowAddress": "IbcTransferEscrowAddress",
+            "DenomHash": "IbcTransferDenomHash",
+            "Denoms": "IbcTransferDenoms",
+            "Denom": "IbcTransferDenom",
+            "TotalEscrowForDenom": "IbcTransferTotalEscrowForDenom"
           }
         }
       },
@@ -77,7 +179,11 @@
         "url": "./tmp-swagger-gen/ibc/applications/nft_transfer/v1/query.swagger.json",
         "operationIds": {
           "rename": {
-            "Params": "ibcNFTTransferParams"
+            "Params": "IbcNFTTransferParams",
+            "EscrowAddress": "IbcNFTTransferEscrowAddress",
+            "ClassTraces": "IbcNFTTransferClassTraces",
+            "ClassTrace": "IbcNFTTransferClassTrace",
+            "ClassHash": "IbcNFTTransferClassHash"
           }
         }
       },
@@ -85,9 +191,46 @@
         "url": "./tmp-swagger-gen/uptick/collection/v1/query.swagger.json",
         "operationIds": {
           "rename": {
-            "Params": "collectionParams"
+            "Params": "CollectionParams",
+            "Denoms": "CollectionDenoms",
+            "Denom": "CollectionDenom",
+            "Supply": "CollectionSupply",
+            "NFTsOfOwner": "CollectionNFTsOfOwner",
+            "Collection": "CollectionCollection",
+            "NFT": "CollectionNFT"
+          }
+        }
+      },
+      {
+        "url": "./tmp-swagger-gen/uptick/cw721/v1/query.swagger.json",
+        "operationIds": {
+          "rename": {
+            "TokenPairs": "Cw721TokenPairs",
+            "TokenPair": "Cw721TokenPair",
+            "WasmContract": "Cw721WasmContract",
+            "Params": "Cw721Params"
+          }
+        }
+      },
+      {
+        "url": "./tmp-swagger-gen/uptick/erc721/v1/query.swagger.json",
+        "operationIds": {
+          "rename": {
+            "TokenPairs": "Erc721TokenPairs",
+            "TokenPair": "Erc721TokenPair",
+            "EvmContract": "Erc721EvmContract",
+            "Params": "Erc721Params"
+          }
+        }
+      },
+      {
+        "url": "./tmp-swagger-gen/uptick/evm_ibc/v1/query.swagger.json",
+        "operationIds": {
+          "rename": {
+            "EvmContract": "EvmIbcEvmContract",
+            "Params": "EvmIbcParams"
           }
         }
       }
     ]
-  }
+}

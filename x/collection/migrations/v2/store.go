@@ -32,17 +32,16 @@ func Migrate(ctx sdk.Context,
 	}
 
 	var (
-		denomNum int64
-		tokenNum int64
+		denomNum        int64
+		tokenNum        int64
+		skippedDenomNum int64
+		skippedTokenNum int64
 	)
 	for ; iterator.Valid(); iterator.Next() {
 		var denom types.Denom
-		cdc.MustUnmarshal(iterator.Value(), &denom)
-
-		//delete unused key
-		store.Delete(KeyDenom(denom.Id))
-		store.Delete(KeyDenomName(denom.Name))
-		store.Delete(KeyCollection(denom.Id))
+		if err := cdc.Unmarshal(iterator.Value(), &denom); err != nil {
+			return err
+		}
 
 		creator, err := sdk.AccAddressFromBech32(denom.Creator)
 		if err != nil {
@@ -64,17 +63,25 @@ func Migrate(ctx sdk.Context,
 			return err
 		}
 
-		tokenInDenom, err := migrateToken(ctx, k, logger, denom.Id)
+		// delete old keys only after new data is successfully saved
+		store.Delete(KeyDenom(denom.Id))
+		store.Delete(KeyDenomName(denom.Name))
+		store.Delete(KeyCollection(denom.Id))
+
+		tokenInDenom, skippedInDenom, err := migrateToken(ctx, k, logger, denom.Id)
 		if err != nil {
 			return err
 		}
 		denomNum++
 		tokenNum += tokenInDenom
+		skippedTokenNum += skippedInDenom
 
 	}
 	logger.Info("migrate store data success",
 		"denomTotalNum", denomNum,
 		"tokenTotalNum", tokenNum,
+		"skippedDenomNum", skippedDenomNum,
+		"skippedTokenNum", skippedTokenNum,
 		"consume", time.Since(startTime).String(),
 	)
 	return nil
@@ -84,7 +91,7 @@ func migrateToken(
 	k keeper,
 	logger log.Logger,
 	denomID string,
-) (int64, error) {
+) (migrated int64, skipped int64, err error) {
 	var iterator storetypes.Iterator
 	defer func() {
 		if iterator != nil {
@@ -93,20 +100,17 @@ func migrateToken(
 	}()
 
 	store := runtime.KVStoreAdapter(k.storeService.OpenKVStore(ctx))
-	total := int64(0)
 	iterator = storetypes.KVStorePrefixIterator(store, KeyNFT(denomID, ""))
 	for ; iterator.Valid(); iterator.Next() {
 		var baseNFT types.BaseNFT
-		k.cdc.MustUnmarshal(iterator.Value(), &baseNFT)
+		if err := k.cdc.Unmarshal(iterator.Value(), &baseNFT); err != nil {
+			return 0, skipped, err
+		}
 
 		owner, err := sdk.AccAddressFromBech32(baseNFT.Owner)
 		if err != nil {
-			return 0, err
+			return 0, skipped, err
 		}
-
-		//delete unused key
-		store.Delete(KeyNFT(denomID, baseNFT.Id))
-		store.Delete(KeyOwner(owner, denomID, baseNFT.Id))
 
 		if err := k.saveNFT(ctx, denomID,
 			baseNFT.Id,
@@ -116,10 +120,14 @@ func migrateToken(
 			baseNFT.Data,
 			owner,
 		); err != nil {
-			return 0, err
+			return 0, skipped, err
 		}
-		total++
+
+		// delete old keys only after new data is successfully saved
+		store.Delete(KeyNFT(denomID, baseNFT.Id))
+		store.Delete(KeyOwner(owner, denomID, baseNFT.Id))
+		migrated++
 	}
-	logger.Info("migrate nft success", "denomID", denomID, "nftNum", total)
-	return total, nil
+	logger.Info("migrate nft success", "denomID", denomID, "nftNum", migrated, "skippedNftNum", skipped)
+	return migrated, skipped, nil
 }

@@ -28,5 +28,23 @@ $$1 ETH = 1 ~ * ~ 10^{18} wei$$
 
 ### EVM Tokens
 
-Uptick is compatible with ERC20 tokens and other non-fungible token standards (EIP721, EIP1155)
-that are natively supported by the EVM.
+Uptick is compatible with ERC20 tokens and non-fungible token standards (EIP-721) that are
+natively supported by the EVM.
+
+### Native NFTs
+
+Native Cosmos NFTs are managed by the `x/collection` module (and the SDK `x/nft` module). Each NFT
+belongs to a class (denom) and carries an ID plus optional metadata (`tokenURI` / `data`).
+
+### ERC721 and CW721 Conversions
+
+Since v0.4.0, Uptick supports bidirectional conversion between native Cosmos NFTs and:
+
+- **ERC721 tokens** (EVM contracts) through `x/erc721`.
+- **CW721 tokens** (CosmWasm contracts) through `x/cw721`.
+
+Conversions require a registered token pair (ERC721/CW721 contract address <-> native class ID) and
+are gated by the module params (`enable_erc721` / `enable_cw721` and `enable_evm_hook`). Once
+converted, ERC721/CW721 tokens can also be transferred to other chains over IBC.
+
+ERC20 conversion is provided by `cosmos/evm`'s `x/erc20` module through the ERC20 IBC middleware.

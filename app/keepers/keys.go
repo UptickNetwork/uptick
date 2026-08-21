@@ -6,10 +6,9 @@ import (
 	"cosmossdk.io/x/feegrant"
 	upgradetypes "cosmossdk.io/x/upgrade/types"
 	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
-	erc721types "github.com/UptickNetwork/evm-nft-convert/types"
 	nfttypes "github.com/UptickNetwork/uptick/x/collection/types"
-	erc20types "github.com/UptickNetwork/uptick/x/erc20/types"
-	cw721types "github.com/UptickNetwork/wasm-nft-convert/types"
+	cw721types "github.com/UptickNetwork/uptick/x/cw721/types"
+	erc721types "github.com/UptickNetwork/uptick/x/erc721/types"
 	ibcnfttransfertypes "github.com/bianjieai/nft-transfer/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	authzkeeper "github.com/cosmos/cosmos-sdk/x/authz/keeper"
@@ -22,13 +21,13 @@ import (
 	paramstypes "github.com/cosmos/cosmos-sdk/x/params/types"
 	slashingtypes "github.com/cosmos/cosmos-sdk/x/slashing/types"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
-	capabilitytypes "github.com/cosmos/ibc-go/modules/capability/types"
-	icacontrollertypes "github.com/cosmos/ibc-go/v8/modules/apps/27-interchain-accounts/controller/types"
-	icahosttypes "github.com/cosmos/ibc-go/v8/modules/apps/27-interchain-accounts/host/types"
-	ibctransfertypes "github.com/cosmos/ibc-go/v8/modules/apps/transfer/types"
-	ibcexported "github.com/cosmos/ibc-go/v8/modules/core/exported"
-	evmtypes "github.com/evmos/ethermint/x/evm/types"
-	feemarkettypes "github.com/evmos/ethermint/x/feemarket/types"
+	cosmoserc20types "github.com/cosmos/evm/x/erc20/types"
+	feemarkettypes "github.com/cosmos/evm/x/feemarket/types"
+	evmtypes "github.com/cosmos/evm/x/vm/types"
+	icacontrollertypes "github.com/cosmos/ibc-go/v10/modules/apps/27-interchain-accounts/controller/types"
+	icahosttypes "github.com/cosmos/ibc-go/v10/modules/apps/27-interchain-accounts/host/types"
+	ibctransfertypes "github.com/cosmos/ibc-go/v10/modules/apps/transfer/types"
+	ibcexported "github.com/cosmos/ibc-go/v10/modules/core/exported"
 )
 
 func (appKeepers *AppKeepers) genStoreKeys() {
@@ -53,23 +52,19 @@ func (appKeepers *AppKeepers) genStoreKeys() {
 		ibcnfttransfertypes.StoreKey,
 		icahosttypes.StoreKey,
 		icacontrollertypes.StoreKey,
-		capabilitytypes.StoreKey,
 		feegrant.StoreKey,
 		authzkeeper.StoreKey,
 
-		// ethermint keys
+		// cosmos/evm keys
 		evmtypes.StoreKey,
 		feemarkettypes.StoreKey,
+		cosmoserc20types.StoreKey,
 		// uptick keys
-		erc20types.StoreKey,
 		erc721types.StoreKey,
 		cw721types.StoreKey,
 		nfttypes.StoreKey,
 
-		//ibcwasmtypes.StoreKey,
 		wasmtypes.StoreKey,
-		//ibchookstypes.StoreKey,
-		//packetforwardtypes.StoreKey,
 	)
 
 	// Define transient store keys
@@ -80,7 +75,7 @@ func (appKeepers *AppKeepers) genStoreKeys() {
 	)
 
 	// MemKeys are for information that is stored only in RAM.
-	appKeepers.memKeys = storetypes.NewMemoryStoreKeys(capabilitytypes.MemStoreKey)
+	appKeepers.memKeys = storetypes.NewMemoryStoreKeys()
 
 }
 

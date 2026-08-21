@@ -13,11 +13,14 @@ This document describes the in-built accounts system of Uptick. {synopsis}
 
 ## Uptick Accounts
 
-Uptick defines its own custom `Account` type that uses Ethereum's ECDSA secp256k1 curve for keys. This
-satisfies the [EIP84](https://github.com/ethereum/EIPs/issues/84) for full [BIP44](https://github.com/bitcoin/bips/blob/master/bip-0044.mediawiki) paths.
-The root HD path for Uptick-based accounts is `m/44'/60'/0'/0`.
+Uptick accounts use the Cosmos SDK `BaseAccount` type with Ethereum's ECDSA secp256k1 curve for keys
+(provided by [`cosmos/evm`](https://github.com/cosmos/evm)). This satisfies the
+[EIP84](https://github.com/ethereum/EIPs/issues/84) for full
+[BIP44](https://github.com/bitcoin/bips/blob/master/bip-0044.mediawiki) paths. The root HD path for
+Uptick-based accounts is `m/44'/60'/0'/0`.
 
-+++ https://github.com/tharsis/ethermint/blob/main/types/account.pb.go#L28-L33
+In v0.4.0 the legacy Ethermint `EthAccount` type was replaced by the standard `BaseAccount`; the
+`v0.4.0` upgrade handler migrates existing accounts automatically.
 
 ## Addresses and Public Keys
 
@@ -49,7 +52,7 @@ Cosmos `sdk.AccAddress`.
 
 - **Address (Bech32)**: `uptick1z3t55m0l9h0eupuz3dp5t5cypyv674jj7mz2jw`
 - **Address ([EIP55](https://eips.ethereum.org/EIPS/eip-55) Hex)**: `0x91defC7fE5603DFA8CC9B655cF5772459BF10c6f`
-- **Compressed Public Key**: `{"@type":"/ethermint.crypto.v1.ethsecp256k1.PubKey","key":"AsV5oddeB+hkByIJo/4lZiVUgXTzNfBPKC73cZ4K1YD2"}`
+- **Compressed Public Key**: `{"@type":"/cosmos.evm.crypto.v1.ethsecp256k1.PubKey","key":"AsV5oddeB+hkByIJo/4lZiVUgXTzNfBPKC73cZ4K1YD2"}`
 
 ### Address conversion
 
@@ -97,7 +100,7 @@ uptickd keys show mykey --bech acc
 - name: mykey
   type: local
   address: uptick1z3t55m0l9h0eupuz3dp5t5cypyv674jj7mz2jw
-  pubkey: '{"@type":"/ethermint.crypto.v1.ethsecp256k1.PubKey","key":"AsV5oddeB+hkByIJo/4lZiVUgXTzNfBPKC73cZ4K1YD2"}'
+  pubkey: '{"@type":"/cosmos.evm.crypto.v1.ethsecp256k1.PubKey","key":"AsV5oddeB+hkByIJo/4lZiVUgXTzNfBPKC73cZ4K1YD2"}'
   mnemonic: ""
 ```
 
@@ -109,7 +112,7 @@ uptickd keys show mykey --bech val
 - name: mykey
   type: local
   address: uptickvaloper1z3t55m0l9h0eupuz3dp5t5cypyv674jjn4d6nn
-  pubkey: '{"@type":"/ethermint.crypto.v1.ethsecp256k1.PubKey","key":"AsV5oddeB+hkByIJo/4lZiVUgXTzNfBPKC73cZ4K1YD2"}'
+  pubkey: '{"@type":"/cosmos.evm.crypto.v1.ethsecp256k1.PubKey","key":"AsV5oddeB+hkByIJo/4lZiVUgXTzNfBPKC73cZ4K1YD2"}'
   mnemonic: ""
 ```
 
@@ -121,7 +124,7 @@ uptickd keys show mykey --bech cons
 - name: mykey
   type: local
   address: uptickvalcons1rllqa5d97n6zyjhy6cnscc7zu30zjn3f7wyj2n
-  pubkey: '{"@type":"/ethermint.crypto.v1.ethsecp256k1.PubKey","key":"A/fVLgIqiLykFQxum96JkSOoTemrXD0tFaFQ1B0cpB2c"}'
+  pubkey: '{"@type":"/cosmos.evm.crypto.v1.ethsecp256k1.PubKey","key":"A/fVLgIqiLykFQxum96JkSOoTemrXD0tFaFQ1B0cpB2c"}'
   mnemonic: ""
 ```
 
@@ -138,15 +141,13 @@ You can query an account address using the CLI, gRPC or
 # NOTE: the --output (-o) flag will define the output format in JSON or YAML (text)
 uptickd q auth account $(uptickd keys show mykey -a) -o text
 |
-  '@type': /ethermint.types.v1.EthAccount
-  base_account:
-    account_number: "0"
-    address: uptick1z3t55m0l9h0eupuz3dp5t5cypyv674jj7mz2jw
-    pub_key:
-      '@type': /ethermint.crypto.v1.ethsecp256k1.PubKey
-      key: AsV5oddeB+hkByIJo/4lZiVUgXTzNfBPKC73cZ4K1YD2
-    sequence: "1"
-  code_hash: 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470
+  '@type': /cosmos.auth.v1beta1.BaseAccount
+  address: uptick1z3t55m0l9h0eupuz3dp5t5cypyv674jj7mz2jw
+  pub_key:
+    '@type': /cosmos.evm.crypto.v1.ethsecp256k1.PubKey
+    key: AsV5oddeB+hkByIJo/4lZiVUgXTzNfBPKC73cZ4K1YD2
+  account_number: "0"
+  sequence: "1"
 ```
 
 ### Cosmos gRPC and REST

@@ -42,8 +42,9 @@ list of `event` categories
 [here](https://godoc.org/github.com/cometbft/cometbft/types#pkg-constants).
 
 The `type` and `attribute` value of the `query` allow you to filter the specific `event` you are
-looking for. For example, a `MsgEthereumTx` transaction triggers an `event` of type `ethermint` and
-has `sender` and `recipient` as `attributes`. Subscribing to this `event` would be done like so:
+looking for. For example, a `MsgEthereumTx` transaction triggers an `event` of type `ethereum_tx`
+and has `recipient`, `txHash` and `contract` among its `attributes`. Subscribing to this `event`
+would be done like so:
 
 ```json
 {
@@ -51,7 +52,7 @@ has `sender` and `recipient` as `attributes`. Subscribing to this `event` would 
     "method": "subscribe",
     "id": "0",
     "params": {
-        "query": "tm.event='Tx' AND ethereum.recipient='hexAddress'"
+        "query": "tm.event='Tx' AND ethereum_tx.recipient='hexAddress'"
     }
 }
 ```
@@ -115,7 +116,7 @@ You can start a connection with the Ethereum websocket using the `--json-rpc.ws-
 the node (default `"0.0.0.0:8546"`):
 
 ```bash
-uptickd start  --json-rpc.address"0.0.0.0:8545" --json-rpc.ws-address="0.0.0.0:8546" --evm.rpc.api="eth,web3,net,txpool,debug" --json-rpc.enable
+uptickd start --json-rpc.address="0.0.0.0:8545" --json-rpc.ws-address="0.0.0.0:8546" --json-rpc.api="eth,web3,net,txpool,debug" --json-rpc.enable
 ```
 
 Then, start a websocket subscription with [`ws`](https://github.com/hashrocket/ws)

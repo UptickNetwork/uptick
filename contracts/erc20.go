@@ -4,15 +4,16 @@ import (
 	_ "embed" // embed compiled smart contract
 	"encoding/json"
 
-	"github.com/ethereum/go-ethereum/common"
-	evmtypes "github.com/evmos/ethermint/x/evm/types"
+	evmtypes "github.com/cosmos/evm/x/vm/types"
 
-	"github.com/UptickNetwork/uptick/x/erc20/types"
+	"github.com/ethereum/go-ethereum/common"
+
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 )
 
 var (
 	//go:embed compiled_contracts/ERC20MinterBurnerDecimals.json
-	ERC20MinterBurnerDecimalsJSON []byte // nolint: golint
+	ERC20MinterBurnerDecimalsJSON []byte //nolint:revive,stylecheck
 
 	// ERC20MinterBurnerDecimalsContract is the compiled erc20 contract
 	ERC20MinterBurnerDecimalsContract evmtypes.CompiledContract
@@ -22,7 +23,7 @@ var (
 )
 
 func init() {
-	ERC20MinterBurnerDecimalsAddress = types.ModuleAddress
+	ERC20MinterBurnerDecimalsAddress = common.BytesToAddress(authtypes.NewModuleAddress("erc20").Bytes())
 
 	if err := json.Unmarshal(ERC20MinterBurnerDecimalsJSON, &ERC20MinterBurnerDecimalsContract); err != nil {
 		panic(err)
@@ -31,4 +32,5 @@ func init() {
 	if len(ERC20MinterBurnerDecimalsContract.Bin) == 0 {
 		panic("load contract failed")
 	}
+
 }

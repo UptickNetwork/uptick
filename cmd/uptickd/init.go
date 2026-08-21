@@ -4,8 +4,6 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	cmdcfg "github.com/UptickNetwork/uptick/cmd/config"
-	"github.com/cosmos/cosmos-sdk/version"
 	"os"
 	"path/filepath"
 	"time"
@@ -13,20 +11,22 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
+	"github.com/UptickNetwork/uptick/app"
+	cmdcfg "github.com/UptickNetwork/uptick/cmd/config"
+	upticktypes "github.com/UptickNetwork/uptick/types"
 	cfg "github.com/cometbft/cometbft/config"
 	"github.com/cometbft/cometbft/libs/cli"
-	cmtrand "github.com/cometbft/cometbft/libs/rand"
-	"github.com/cosmos/cosmos-sdk/x/genutil/types"
-	"github.com/cosmos/go-bip39"
-
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/flags"
 	"github.com/cosmos/cosmos-sdk/client/input"
 	"github.com/cosmos/cosmos-sdk/server"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
+	"github.com/cosmos/cosmos-sdk/version"
 	"github.com/cosmos/cosmos-sdk/x/genutil"
 	genutilcli "github.com/cosmos/cosmos-sdk/x/genutil/client/cli"
+	"github.com/cosmos/cosmos-sdk/x/genutil/types"
+	"github.com/cosmos/go-bip39"
 )
 
 type printInfo struct {
@@ -89,7 +89,7 @@ func InitCmd(mbm module.BasicManager, defaultNodeHome string) *cobra.Command {
 			case clientCtx.ChainID != "":
 				chainID = clientCtx.ChainID
 			default:
-				chainID = fmt.Sprintf("evmos_9000-%v", cmtrand.Str(6))
+				chainID = MainnetChainID
 			}
 
 			// Get bip39 mnemonic
@@ -131,7 +131,9 @@ func InitCmd(mbm module.BasicManager, defaultNodeHome string) *cobra.Command {
 				sdk.DefaultBondDenom = defaultDenom
 			}
 
-			appState, err := json.MarshalIndent(mbm.DefaultGenesis(cdc), "", " ")
+			genesis := mbm.DefaultGenesis(cdc)
+			app.CustomizeDefaultGenesis(cdc, genesis)
+			appState, err := json.MarshalIndent(genesis, "", " ")
 			if err != nil {
 				return errors.Wrap(err, "Failed to marshal default genesis state")
 			}
@@ -162,6 +164,12 @@ func InitCmd(mbm module.BasicManager, defaultNodeHome string) *cobra.Command {
 
 			if err := genutil.ExportGenesisFile(appGenesis, genFile); err != nil {
 				return errors.Wrap(err, "Failed to export genesis file")
+			}
+
+			if evmID, err := upticktypes.ParseEIP155ChainID(chainID); err == nil {
+				if err := writeAppTomlEVMChainID(clientCtx.HomeDir, evmID); err != nil {
+					return errors.Wrap(err, "failed to write evm-chain-id")
+				}
 			}
 
 			toPrint := newPrintInfo(config.Moniker, chainID, nodeID, "", appState)
