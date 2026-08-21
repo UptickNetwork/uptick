@@ -783,14 +783,15 @@ var tempDir = func() string {
 	return dir
 }
 
-// initPortPool 初始化端口池，填充可用的端口号
+// initPortPool initializes the port pool with available port numbers.
 func initPortPool() {
-	// 清空现有的端口池
+	// Drain the existing port pool.
 	for len(portPool) > 0 {
 		<-portPool
 	}
 
-	// 填充新的端口号 (从26656开始，这是Tendermint的默认端口范围)
+	// Fill the pool with new port numbers (starting at 26656,
+	// Tendermint's default port range).
 	for i := 0; i < 200; i++ {
 		port := fmt.Sprintf("%d", 26656+i)
 		portPool <- port

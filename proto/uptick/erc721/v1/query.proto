@@ -23,7 +23,7 @@ service Query {
 
   // EvmContract retrieves a registered evm contract
   rpc EvmContract(QueryEvmAddressRequest) returns (QueryEvmAddressResponse) {
-    option (google.api.http).get = "/uptick/erc721/v1/evm_contract/{port}/{channel}/{classId}";
+    option (google.api.http).get = "/uptick/erc721/v1/evm_contract/{port}/{channel}/{class_id}";
   }
 
   // Params retrieves the erc721 module params

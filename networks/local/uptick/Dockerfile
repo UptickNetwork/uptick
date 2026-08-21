@@ -1,5 +1,5 @@
 # FROM golang:stretch as build-env
-FROM golang:1.24-bookworm as build-env
+FROM golang:1.25.8-bookworm as build-env
 
 # Install minimum necessary dependencies
 ENV PACKAGES curl make git libc-dev bash gcc
@@ -16,7 +16,7 @@ COPY . .
 RUN make build
 
 # Final image
-FROM golang:1.24-bookworm as final
+FROM golang:1.25.8-bookworm as final
 
 WORKDIR /
 

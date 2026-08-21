@@ -10,6 +10,31 @@ With every new software release, we strongly recommend validators to perform a s
 
 You can upgrade your node by 1) upgrading your software version and 2) upgrading your node to that version. In this guide, you can find out how to automatically upgrade your node with Cosmovisor or perform the update manually.
 
+## Upgrading to v0.4.0
+
+The `v0.4.0` upgrade is a **state machine breaking** upgrade that replaces the core stack:
+
+- EVM engine migrated from the legacy Ethermint `x/evm` to `cosmos/evm` `x/vm` (go-ethereum v1.16).
+- `ibc-go` upgraded from v8 to v10; the `capability` module store is **deleted** by the upgrade handler.
+- Cosmos SDK upgraded to v0.53 and `wasmd` to v0.61.
+- The local `x/erc20` module is replaced by `cosmos/evm`'s `x/erc20`; new `x/erc721` and `x/cw721` modules are added.
+- Legacy `EthAccount` types and `ethsecp256k1` pubkeys are migrated automatically.
+
+::: warning
+The `v0.4.0` upgrade is **not reversible**. Once the `capability` store is deleted and the EVM
+`ChainConfig` is migrated to time-based activation, the chain cannot roll back. Make sure all
+validators are upgraded **before** the upgrade height.
+:::
+
+When using Cosmovisor, place the new binary under:
+
+```bash
+mkdir -p $DAEMON_HOME/cosmovisor/upgrades/v0.4.0/bin
+cp $(which uptickd) $DAEMON_HOME/cosmovisor/upgrades/v0.4.0/bin/
+```
+
+The on-chain upgrade name is `v0.4.0` (e.g. `uptickd tx gov submit-proposal software-upgrade v0.4.0 ...`).
+
 ## Software Upgrade
 
 These instructions are for full nodes that have ran on previous versions of and would like to upgrade to the latest testnet.
@@ -38,7 +63,7 @@ server_name: uptickd
 version: 0.1.0
 commit: d477e775a2596701ea215a4570e8ea9669d76edf
 build_tags: netgo,ledger
-go: go version go1.17 darwin/amd64
+go: go version go1.25.8 darwin/amd64
 ...
 ```
 
@@ -101,7 +126,7 @@ export DAEMON_ALLOW_DOWNLOAD_BINARIES=true
 You can now download the "genesis" file for the chain. It is pre-filled with the entire genesis state and gentxs.
 
 ```bash
-curl https://raw.githubusercontent.com/UptickNetwork/uptick-testnet/main/uptick_7000-2/genesis.json > ~/.uptickd/config/genesis.json
+curl https://raw.githubusercontent.com/UptickNetwork/uptick-testnet/main/origin_1170-3/config/genesis.json > ~/.uptickd/config/genesis.json
 ```
 
 We recommend using `sha256sum` to check the hash of the genesis.
@@ -121,7 +146,7 @@ uptickd tendermint unsafe-reset-all
 
 #### Ensure that you have set peers
 
-In `~/.uptickd/config/config.toml` you can set your peers. See the [peers.txt](https://github.com/UptickNetwork/uptick-testnet/blob/main/uptick_7000-2/peers.txt) file for a list of up to date peers.
+In `~/.uptickd/config/config.toml` you can set your peers. See the [peers.txt](https://github.com/UptickNetwork/uptick-testnet/blob/main/origin_1170-3/peers.txt) file for a list of up to date peers.
 
 See the [Add persistent peers section](https://docs.uptick.network/testnet/join.html#add-persistent-peers) in our docs for an automated method, but field should look something like a comma separated string of peers (do not copy this, just an example):
 

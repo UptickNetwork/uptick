@@ -12,7 +12,7 @@ You specify the network you want to join by setting the **genesis file** and **s
 
 | Network Chain ID | Description                       | Site                                                                     | Version                                               |
 |------------------|-----------------------------------|--------------------------------------------------------------------------|-------------------------------------------------------|
-| `uptick_7000-2`   | Uptick Testnet | [uptick_7000-2 testnet](https://github.com/UptickNetwork/uptick-testnet/tree/main/uptick_7000-2) | [`v0.2.x`](https://github.com/UptickNetwork/uptick/releases) |
+| `origin_1170-3`   | Uptick Testnet | [origin_1170-3 testnet](https://github.com/UptickNetwork/uptick-testnet/tree/main/origin_1170-3) | [`v0.4.0`](https://github.com/UptickNetwork/uptick/releases) |
 
 ## Install `uptickd`
 
@@ -31,7 +31,7 @@ See the Official [Chain IDs](./../basics/chain_id.md#official-chain-ids) for ref
 :::
 
 ```bash
-uptickd config chain-id uptick_7000-2
+uptickd config chain-id origin_1170-3
 ```
 
 ## Initialize Node
@@ -40,10 +40,10 @@ We need to initialize the node to create all the necessary validator and node co
 
 ```bash
 # initialize node configurations
-uptickd init <your_custom_moniker> --chain-id uptick_7000-2
+uptickd init <your_custom_moniker> --chain-id origin_1170-3
 
 # download testnel public genesis.json
-curl -o $HOME/.uptickd/config/genesis.json https://raw.githubusercontent.com/UptickNetwork/uptick-testnet/main/uptick_7000-2/genesis.json
+curl -o $HOME/.uptickd/config/genesis.json https://raw.githubusercontent.com/UptickNetwork/uptick-testnet/main/origin_1170-3/config/genesis.json
 
 
 ```
@@ -58,7 +58,7 @@ uptickd start
 
 ##  Install script
 ```bash
-wget https://raw.githubusercontent.com/UptickNetwork/uptick-testnet/main/uptick_7000-2/node.sh && chmod +x node.sh
+wget https://raw.githubusercontent.com/UptickNetwork/uptick-testnet/main/origin_1170-3/node.sh && chmod +x node.sh
 ./node.sh
 
 ```
@@ -70,7 +70,7 @@ wget https://raw.githubusercontent.com/UptickNetwork/uptick-testnet/main/uptick_
 ## Run a Testnet Validator
 
 Claim your testnet {{ $themeConfig.project.testnet_denom }} on the [faucet](./faucet.md) using your validator account address and submit your validator account address:
-> NOTE: Until `uptickd status 2>&1 | jq ."SyncInfo"."catching_up"` got false, create your validator. If your validator is jailed, unjail it via `uptickd tx slashing unjail --from <wallet name> --chain-id uptick_7000-2 -y -b block`.
+> NOTE: Until `uptickd status 2>&1 | jq ."SyncInfo"."catching_up"` got false, create your validator. If your validator is jailed, unjail it via `uptickd tx slashing unjail --from <wallet name> --chain-id origin_1170-3 -y -b block`.
 
 ::: tip
 For more details on how to configure your validator, follow the validator [setup](./../guides/validators/setup.md) instructions.
@@ -80,7 +80,7 @@ uptickd tx staking create-validator \
   --amount=5000000000000000000auptick \
   --pubkey=$(uptickd tendermint show-validator) \
   --moniker=<$moniker>" \
-  --chain-id=uptick_7000-2 \
+  --chain-id=origin_1170-3 \
   --commission-rate="0.10" \
   --commission-max-rate="0.20" \
   --commission-max-change-rate="0.01" \

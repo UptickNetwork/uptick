@@ -104,8 +104,9 @@ func GetCmdIssueDenom() *cobra.Command {
 			}
 			schema = strings.TrimSpace(schema)
 			if schema != "" {
-				// --schema 可以是 schema.json 文件路径，也可以是内联内容。
-				// 文件不存在时回退为内联内容（与 help 文档 “schema-content or path” 一致）。
+				// --schema accepts either a schema.json file path or inline content.
+				// Falls back to inline content when the file does not exist
+				// (consistent with the help text "schema-content or path").
 				if content, rerr := ioutil.ReadFile(schema); rerr == nil {
 					schema = strings.TrimSpace(string(content))
 				}

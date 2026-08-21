@@ -32,7 +32,7 @@ for dir in $proto_dirs; do
 done
 
 cd ..
-swagger-combine ./docs/config.json -o ./docs/swagger-ui/swagger.yaml -f yaml --continueOnConflictingPaths true --includeDefinitions true
+swagger-combine ./client/docs/config.json -o ./client/docs/swagger-ui/swagger.yaml -f yaml --continueOnConflictingPaths true --includeDefinitions true
 # clean swagger files
 rm -rf ./tmp-swagger-gen
 rm -rf "$SWAGGER_DIR"

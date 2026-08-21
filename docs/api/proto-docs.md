@@ -1037,7 +1037,7 @@ Query defines the gRPC querier service.
 | ----------- | ------------ | ------------- | ------------| ------- | -------- |
 | `TokenPairs` | [QueryTokenPairsRequest](#uptick.cw721.v1.QueryTokenPairsRequest) | [QueryTokenPairsResponse](#uptick.cw721.v1.QueryTokenPairsResponse) | TokenPairs retrieves registered token pairs | GET|/uptick/cw721/v1/token_pairs|
 | `TokenPair` | [QueryTokenPairRequest](#uptick.cw721.v1.QueryTokenPairRequest) | [QueryTokenPairResponse](#uptick.cw721.v1.QueryTokenPairResponse) | TokenPair retrieves a registered token pair | GET|/uptick/cw721/v1/token_pairs/{token}|
-| `WasmContract` | [QueryWasmAddressRequest](#uptick.cw721.v1.QueryWasmAddressRequest) | [QueryWasmContractResponse](#uptick.cw721.v1.QueryWasmContractResponse) | WasmContract retrieves a registered wasm contract | GET|/uptick/erc721/v1/wasm_contract/{port}/{channel}/{class_id}|
+| `WasmContract` | [QueryWasmAddressRequest](#uptick.cw721.v1.QueryWasmAddressRequest) | [QueryWasmContractResponse](#uptick.cw721.v1.QueryWasmContractResponse) | WasmContract retrieves a registered wasm contract | GET|/uptick/cw721/v1/wasm_contract/{port}/{channel}/{class_id}|
 | `Params` | [QueryParamsRequest](#uptick.cw721.v1.QueryParamsRequest) | [QueryParamsResponse](#uptick.cw721.v1.QueryParamsResponse) | Params retrieves the cw721 module params | GET|/uptick/cw721/v1/params|
 
  <!-- end services -->
@@ -1445,7 +1445,7 @@ Query defines the gRPC queried service.
 | ----------- | ------------ | ------------- | ------------| ------- | -------- |
 | `TokenPairs` | [QueryTokenPairsRequest](#uptick.erc721.v1.QueryTokenPairsRequest) | [QueryTokenPairsResponse](#uptick.erc721.v1.QueryTokenPairsResponse) | TokenPairs retrieves registered token pairs | GET|/uptick/erc721/v1/token_pairs|
 | `TokenPair` | [QueryTokenPairRequest](#uptick.erc721.v1.QueryTokenPairRequest) | [QueryTokenPairResponse](#uptick.erc721.v1.QueryTokenPairResponse) | TokenPair retrieves a registered token pair | GET|/uptick/erc721/v1/token_pairs/{token}|
-| `EvmContract` | [QueryEvmAddressRequest](#uptick.erc721.v1.QueryEvmAddressRequest) | [QueryEvmAddressResponse](#uptick.erc721.v1.QueryEvmAddressResponse) | EvmContract retrieves a registered evm contract | GET|/uptick/erc721/v1/evm_contract/{port}/{channel}/{classId}|
+| `EvmContract` | [QueryEvmAddressRequest](#uptick.erc721.v1.QueryEvmAddressRequest) | [QueryEvmAddressResponse](#uptick.erc721.v1.QueryEvmAddressResponse) | EvmContract retrieves a registered evm contract | GET|/uptick/erc721/v1/evm_contract/{port}/{channel}/{class_id}|
 | `Params` | [QueryParamsRequest](#uptick.erc721.v1.QueryParamsRequest) | [QueryParamsResponse](#uptick.erc721.v1.QueryParamsResponse) | Params retrieves the erc721 module params | GET|/uptick/erc721/v1/params|
 
  <!-- end services -->
@@ -2236,4 +2236,3 @@ Msg defines the nft Msg service.
 | <a name="bool" /> bool |  | bool | boolean | boolean | bool | bool | boolean | TrueClass/FalseClass |
 | <a name="string" /> string | A string must always contain UTF-8 encoded or 7-bit ASCII text. | string | String | str/unicode | string | string | string | String (UTF-8) |
 | <a name="bytes" /> bytes | May contain any arbitrary sequence of bytes. | string | ByteString | str | []byte | ByteString | string | String (ASCII-8BIT) |
-

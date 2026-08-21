@@ -730,10 +730,12 @@ func (app *Uptick) configureEVMMempool(appOpts servertypes.AppOptions, logger lo
 	// Read operator-configurable mempool knobs from the cosmos/evm app.toml
 	// ([evm] section), falling back to genesis/consensus values where relevant.
 	cosmosPoolMaxTx := evmconfig.GetCosmosPoolMaxTx(appOpts, logger)
-	// 关键修复：cosmos-sdk 的 mempool.DefaultMaxTx = -1，未传 --mempool.max-txs 时
-	// GetCosmosPoolMaxTx 返回 -1 → PriorityNonceMempool.Insert 走 `MaxTx < 0` 分支
-	// 直接 return nil（不插入），导致升级后/未配置的链上 Cosmos 交易静默丢失、
-	// 区块永远为空（num_txs=0）。这里把非正值归一为 5000，与主链约定一致。
+	// Critical fix: cosmos-sdk's mempool.DefaultMaxTx = -1. When --mempool.max-txs is
+	// not set, GetCosmosPoolMaxTx returns -1 and PriorityNonceMempool.Insert hits the
+	// `MaxTx < 0` branch and returns nil without inserting. On upgraded/unconfigured
+	// chains this silently drops Cosmos transactions and leaves blocks permanently
+	// empty (num_txs=0). Normalize non-positive values to 5000 to match the mainnet
+	// convention.
 	if cosmosPoolMaxTx <= 0 {
 		logger.Warn(
 			"cosmos pool max tx is non-positive, defaulting to configured fallback",
@@ -755,26 +757,30 @@ func (app *Uptick) configureEVMMempool(appOpts servertypes.AppOptions, logger lo
 	mempoolConfig := &evmmempool.EVMMempoolConfig{
 		AnteHandler:      app.AnteHandler(),
 		LegacyPoolConfig: evmconfig.GetLegacyPoolConfig(appOpts, logger),
-		// 不用 evmconfig.GetBlockGasLimit：它从 genesis.json 的 SDK AppGenesis
-		// ConsensusParams 读取，而 v0.3.3 的 genesis 只写 cometbft 的 `consensus`
-		// 字段（无 `consensus_params`），SDK v0.53 解析后 ConsensusParams 为 nil，
-		// 该函数返回 0 → EVM mempool 把每笔 Cosmos tx 都判为超限丢弃（num_txs=0，
-		// 升级后链上无法打包任何 Cosmos 交易）。区块 gas 上限由 consensus 层校验，
-		// 这里用 MaxUint64（不预过滤）与 uptick 的 max_gas=-1 语义一致。
+		// Do not use evmconfig.GetBlockGasLimit: it reads from the SDK AppGenesis
+		// ConsensusParams in genesis.json, while v0.3.3 genesis only writes CometBFT's
+		// `consensus` field (no `consensus_params`). After SDK v0.53 parsing,
+		// ConsensusParams is nil and the function returns 0, so the EVM mempool rejects
+		// every Cosmos tx as over the limit (num_txs=0, no Cosmos tx can be packed
+		// after the upgrade). The block gas limit is enforced by the consensus layer,
+		// so use MaxUint64 here (no pre-filtering), matching Uptick's max_gas=-1
+		// semantics.
 		BlockGasLimit: blockGasLimit,
 		MinTip:        evmconfig.GetMinTip(appOpts, logger),
-		// 关键修复：禁用默认的 promote 广播，避免死锁。
+		// Critical fix: disable the default promote broadcast to avoid a deadlock.
 		//
-		// cosmos/evm 的 ExperimentalEVMMempool.Insert 持有 m.mtx 后调用
-		// txPool.Add(sync=true)，其内部 requestPromoteExecutables 会阻塞在
-		// <-done 上等待异步的 runReorg 完成。runReorg 在 promote 交易后调用
-		// BroadcastTxFn；默认实现会同步执行 clientCtx.BroadcastTxSync，
-		// 该调用重新进入 CometBFT 的 CheckTx → app 侧 mempool.Insert →
-		// m.mtx.Lock()，而此时 m.mtx 正被外层的 Insert 持有并阻塞在 <-done，
-		// 形成死锁，导致整条链停在 PrepareProposal 阶段不再出块。
+		// cosmos/evm's ExperimentalEVMMempool.Insert holds m.mtx and calls
+		// txPool.Add(sync=true), whose requestPromoteExecutables blocks on <-done
+		// waiting for the asynchronous runReorg to finish. runReorg invokes
+		// BroadcastTxFn after promoting transactions; the default implementation
+		// synchronously calls clientCtx.BroadcastTxSync, which re-enters CometBFT's
+		// CheckTx → app-side mempool.Insert → m.mtx.Lock() while m.mtx is already held
+		// by the outer Insert blocking on <-done, forming a deadlock that stalls the
+		// chain at the PrepareProposal stage.
 		//
-		// 交易已经通过 eth_sendRawTransaction 的 CometBFT 广播进入 mempool，
-		// 无需在 promote 阶段再次广播，因此设为 no-op 即可打破死锁环。
+		// Transactions already reach the mempool through eth_sendRawTransaction via
+		// CometBFT broadcast, so there is no need to broadcast again during promote;
+		// making this a no-op breaks the deadlock cycle.
 		BroadCastTxFn: func(txs []*ethtypes.Transaction) error {
 			return nil
 		},

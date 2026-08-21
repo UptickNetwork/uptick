@@ -4,7 +4,7 @@ order: 3
 
 # Use Cases
 
-Check out the 2 use cases for the Uptick project. {synopsis}
+Check out the use cases for the Uptick project. {synopsis}
 
 ## Uptick chain
 
@@ -15,9 +15,17 @@ contracts.
 
 Uptick will also offer built-in interoperability functionalities with other Cosmos and BFT chains by using [IBC](https://cosmos.network/ibc). Developers can also benefit from using a bridge network to enable interoperability between mainnet Ethereum and Uptick.
 
+## Cross-chain NFT interoperability
+
+Uptick v0.4.0 lets projects move NFTs freely between ecosystems:
+
+- Convert native Cosmos NFTs to ERC721 tokens (and back) with `x/erc721`.
+- Convert native Cosmos NFTs to CW721 tokens (and back) with `x/cw721`.
+- Transfer ERC721/CW721 tokens to other chains over IBC through the `x/evmibc` middleware.
+
 ## EVM module dependency
 
-The EVM module (aka [x/evm](https://github.com/tharsis/ethermint/tree/main/x/evm)) packaged inside
+The EVM module (aka [cosmos/evm `x/vm`](https://github.com/cosmos/evm/tree/main/x/vm)) packaged inside
 Uptick can be used separately as its own standalone module. This can be added as a dependency to
 any Cosmos chain, which will allow for smart contract support.
 
@@ -42,7 +50,7 @@ Using Uptick chain will allow for the direct deployment of smart contracts to th
 network. Utilizing the Uptick client will defer the chain maintenance to the Uptick network
 and allow for the participation in a more mature blockchain.
 
-|                                         | Uptick Chain     | x/evm dependency |
+|                                         | Uptick Chain     | x/vm dependency |
 |-----------------------------------------|-----------------|------------------|
 | Maintenance                             | Lower           | Higher           |
 | Sovereignty (validator, config, params) | Lower           | Higher           |

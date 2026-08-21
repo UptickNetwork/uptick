@@ -3,6 +3,7 @@
 ## Changelog
 
 - 2021-08-11: first draft
+- 2026-08-21: updated for the v0.4.0 migration — EVM hooks (`PostTxProcessing`) are implemented by `cosmos/evm` `x/vm` instead of the legacy Ethermint `x/evm`.
 
 ## Status
 

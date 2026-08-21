@@ -173,7 +173,7 @@ make build-docs
 
 ## Important Notes
 
-- **Go Version**: Requires Go 1.24.0+
+- **Go Version**: Requires Go 1.25.8+
 - **Main Binary**: `uptickd` (not `uptick`)
 - **Protobuf Path**: For IDE support, configure protobuf paths to include `proto/` and `third_party/proto/`
 - **Docker Required**: For protobuf generation and reproducible builds

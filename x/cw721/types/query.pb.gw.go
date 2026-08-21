@@ -466,7 +466,7 @@ var (
 
 	pattern_Query_TokenPair_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 1, 0, 4, 1, 5, 4}, []string{"uptick", "cw721", "v1", "token_pairs", "token"}, "", runtime.AssumeColonVerbOpt(false)))
 
-	pattern_Query_WasmContract_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 1, 0, 4, 1, 5, 4, 1, 0, 4, 1, 5, 5, 1, 0, 4, 1, 5, 6}, []string{"uptick", "erc721", "v1", "wasm_contract", "port", "channel", "class_id"}, "", runtime.AssumeColonVerbOpt(false)))
+	pattern_Query_WasmContract_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 1, 0, 4, 1, 5, 4, 1, 0, 4, 1, 5, 5, 1, 0, 4, 1, 5, 6}, []string{"uptick", "cw721", "v1", "wasm_contract", "port", "channel", "class_id"}, "", runtime.AssumeColonVerbOpt(false)))
 
 	pattern_Query_Params_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"uptick", "cw721", "v1", "params"}, "", runtime.AssumeColonVerbOpt(false)))
 )

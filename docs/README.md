@@ -52,7 +52,7 @@ aside: false
 ## Other Resources
 
 - **[Module Directory](../x/)**: Module implementations and their respective documentation.
-- **[Ethermint API Reference](https://godoc.org/github.com/tharsis/ethermint)**: Godocs of Ethermint.
+- **[cosmos/evm API Reference](https://pkg.go.dev/github.com/cosmos/evm)**: Godocs of the EVM module.
 - **[REST API spec](https://cosmos.network/rpc/)**: List of REST endpoints to interact with an full-node through REST.
 
 ## Contribute

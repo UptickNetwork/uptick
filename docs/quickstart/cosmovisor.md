@@ -24,10 +24,10 @@ To install the latest version of `cosmovisor`, run the following command:
 go install github.com/cosmos/cosmos-sdk/cosmovisor/cmd/cosmovisor@latest
 ```
 
-To install a previous version, you can specify the version. IMPORTANT: Chains that use uptick v0.1.0 and want to use auto-download feature MUST use Cosmovisor v0.1.0
+To install a previous version, you can specify the version. IMPORTANT: Chains that use an old uptick release and want to use the auto-download feature MUST use a matching Cosmovisor version.
 
 ```sh
-go install github.com/cosmos/cosmos-sdk/cosmovisor/cmd/cosmovisor@v0.1.0
+go install github.com/cosmos/cosmos-sdk/cosmovisor/cmd/cosmovisor@latest
 ```
 
 You can run `cosmovisor version` to check the Cosmovisor version (works only with Cosmovisor >1.1.0).
@@ -229,12 +229,12 @@ make cosmovisor
 
 ### Chain Setup
 
-Let's create a new chain using the `v0.1.0` version of uptickd:
+Let's create a new chain using the `v0.4.0` version of uptickd:
 
 ```sh
 git clone https://github.com/UptickNetwork/uptick.git
 cd uptick
-git checkout v0.1.0
+git checkout v0.4.0
 make build
 ```
 
@@ -247,7 +247,7 @@ Clean `~/.uptickd` (never do this in a production environment):
 Set up app config:
 
 ```sh
-./build/uptickd config chain-id test_9000-1
+./build/uptickd config chain-id uptick_1170-1
 ./build/uptickd config keyring-backend test
 ./build/uptickd config broadcast-mode block
 ```
@@ -257,7 +257,7 @@ Initialize the node and overwrite any previous genesis file (never do this in a 
 <!-- TODO: init does not read chain-id from config -->
 
 ```sh
-./build/uptickd testnet init-files --chain-id test_9000-1 --keyring-backend test --v 1 --output-dir ./.mytestnet
+./build/uptickd testnet init-files --chain-id uptick_1170-1 --keyring-backend test --v 1 --output-dir ./.mytestnet
 cp -r .mytestnet/node0/uptickd/ ~/.uptickd/
 ```
 
@@ -289,7 +289,7 @@ mkdir -p $DAEMON_HOME/cosmovisor/genesis/bin
 cp ./build/uptickd $DAEMON_HOME/cosmovisor/genesis/bin
 ```
 
-Now you can run cosmovisor with uptickd v0.1.0:
+Now you can run cosmovisor with uptickd v0.4.0:
 
 ```sh
 nohup cosmovisor run start --home $DAEMON_HOME > $DAEMON_HOME/cosmovisor/node.log 2>&1 & 
@@ -297,31 +297,31 @@ nohup cosmovisor run start --home $DAEMON_HOME > $DAEMON_HOME/cosmovisor/node.lo
 
 #### Update App
 
-Update app to the latest version (e.g. v0.2.0).
+Update app to the latest version (e.g. v0.4.0).
 
 Next, we can add a migration - which is defined using `x/upgrade` [upgrade plan](https://github.com/cosmos/cosmos-sdk/blob/main/docs/core/upgrade.md) (you may refer to a past version if you are using an older Cosmos SDK release). In a migration we can do any deterministic state change.
 
 Build the new version `uptickd` binary:
 
 ```sh
-git checkout v0.2.0
+git checkout v0.4.0
 make build
 ```
 
 Create the folder for the upgrade binary and copy the `uptickd` binary:
 
 ```sh
-mkdir -p $DAEMON_HOME/cosmovisor/upgrades/v0.2/bin
-cp ./build/uptickd $DAEMON_HOME/cosmovisor/upgrades/v0.2/bin
+mkdir -p $DAEMON_HOME/cosmovisor/upgrades/v0.4.0/bin
+cp ./build/uptickd $DAEMON_HOME/cosmovisor/upgrades/v0.4.0/bin
 ```
 
 Open a new terminal window and submit an upgrade proposal along with a deposit and a vote (these commands must be run within 20 seconds of each other):
 ```sh
-./build/uptickd tx gov submit-proposal software-upgrade v0.2 --title upgrade --description upgrade --upgrade-height 50 --from node0 --yes --keyring-backend test --keyring-dir ~/.uptickd --chain-id test_9000-1 -b block
+./build/uptickd tx gov submit-proposal software-upgrade v0.4.0 --title upgrade --description upgrade --upgrade-height 50 --from node0 --yes --keyring-backend test --keyring-dir ~/.uptickd --chain-id uptick_1170-1 -b block
 
-./build/uptickd tx gov deposit 1 100000000000000000auptick -y --from node0 --yes --keyring-backend test --keyring-dir ~/.uptickd --chain-id test_9000-1 -b block
+./build/uptickd tx gov deposit 1 100000000000000000auptick -y --from node0 --yes --keyring-backend test --keyring-dir ~/.uptickd --chain-id uptick_1170-1 -b block
 
-./build/uptickd tx gov vote 1 yes --from node0 --yes --keyring-backend test --keyring-dir ~/.uptickd --chain-id test_9000-1 -b block
+./build/uptickd tx gov vote 1 yes --from node0 --yes --keyring-backend test --keyring-dir ~/.uptickd --chain-id uptick_1170-1 -b block
 ```
 
 ### check log

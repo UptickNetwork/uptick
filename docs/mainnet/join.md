@@ -12,7 +12,7 @@ You specify the network you want to join by setting the **genesis file** and **s
 
 | Network Chain ID | Description                       | Site                                                                     | Version                                               |
 |------------------|-----------------------------------|--------------------------------------------------------------------------|-------------------------------------------------------|
-| `uptick_117-1`   | Uptick mainnet | [uptick_117-1](https://github.com/UptickNetwork/uptick-mainnet/tree/main/uptick_117-1) | [`v0.2.4`](https://github.com/UptickNetwork/uptick/tree/v0.2.4) |
+| `uptick_117-1`   | Uptick mainnet | [uptick_117-1](https://github.com/UptickNetwork/uptick-mainnet/tree/main/uptick_117-1) | [latest release](https://github.com/UptickNetwork/uptick/releases) (v0.4.0) |
 
 ## Install `uptickd`
 
@@ -42,7 +42,7 @@ We need to initialize the node to create all the necessary validator and node co
 # initialize node configurations
 uptickd init <moniker> --chain-id uptick_117-1
 
-# download testnel public genesis.json
+# download the public genesis.json
 curl -o $HOME/.uptickd/config/genesis.json https://raw.githubusercontent.com/UptickNetwork/uptick-mainnet/master/uptick_117-1/genesis.json
 
 ```
@@ -76,7 +76,7 @@ The newest state sync configs can be found [here](https://explorer.uptick.networ
 # initialize node configurations
 uptickd init <moniker> --chain-id uptick_117-1
 
-# download testnel public genesis.json
+# download the public genesis.json
 curl -o $HOME/.uptickd/config/genesis.json https://raw.githubusercontent.com/UptickNetwork/uptick-mainnet/master/uptick_117-1/genesis.json
 
 # Configure State sync

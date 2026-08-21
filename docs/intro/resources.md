@@ -9,6 +9,7 @@ Learn about Uptick with the list of official resources. {synopsis}
 - Official Documentation: [https://docs.uptick.network/](https://docs.uptick.network/)
 - Official Codebase: [https://github.com/UptickNetwork/uptick](https://github.com/UptickNetwork/uptick)
 - Official Website: [https://www.uptick.network/](https://www.uptick.network/)
+- EVM Execution Layer: [https://github.com/cosmos/evm](https://github.com/cosmos/evm) (used since v0.4.0)
 
 ## Workshops and Videos
 

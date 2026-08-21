@@ -199,7 +199,7 @@ func (k Keeper) QueryERC721DataByTokenID(
 	contract common.Address,
 	tokenID *big.Int) ([]interface{}, error) {
 
-	//uptick bug fix: 11/07 get from tokenUri
+	// Query the token data from the ERC721 contract.
 	erc721 := contracts.ERC721UpticksContract.ABI
 	res, err := k.CallEVM(ctx, erc721, types.ModuleAddress, contract, false, queryFuncName, tokenID)
 	if err != nil {
