@@ -970,7 +970,11 @@ func (app *Uptick) GetTxConfig() client.TxConfig {
 
 // RegisterSwaggerAPI registers swagger route with API Server
 func RegisterSwaggerAPI(_ client.Context, rtr *mux.Router) {
-	statikFS, err := fs.NewWithNamespace("uptick")
+	// The swagger UI assets are embedded under the default statik namespace
+	// (client/docs/statik). Reading a named "uptick" namespace here fails with
+	// "statik/fs: no zip data registered" because no such namespace is ever
+	// registered, which panics any node that enables api.swagger.
+	statikFS, err := fs.New()
 	if err != nil {
 		panic(err)
 	}

@@ -11,13 +11,24 @@ import (
 	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	dbm "github.com/cosmos/cosmos-db"
 	"github.com/cosmos/cosmos-sdk/codec"
+	"github.com/cosmos/cosmos-sdk/codec/address"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
+	cryptocodec "github.com/cosmos/cosmos-sdk/crypto/codec"
+	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
+	"github.com/cosmos/cosmos-sdk/crypto/keys/multisig"
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
+	"github.com/cosmos/cosmos-sdk/runtime"
+	"github.com/cosmos/cosmos-sdk/testutil"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	vestingtypes "github.com/cosmos/cosmos-sdk/x/auth/vesting/types"
+	bankkeeper "github.com/cosmos/cosmos-sdk/x/bank/keeper"
+	banktestutil "github.com/cosmos/cosmos-sdk/x/bank/testutil"
+	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
+	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
 	paramstypes "github.com/cosmos/cosmos-sdk/x/params/types"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/UptickNetwork/uptick/app/upgrades"
 	"github.com/UptickNetwork/uptick/app/upgrades/v040/legacy"
@@ -175,4 +186,96 @@ func TestDeleteLegacyParamsSubspace(t *testing.T) {
 	require.Nil(t, store.Get([]byte("erc20/EnableErc20")))
 	require.Nil(t, store.Get([]byte("erc721/EnableErc721")))
 	require.NotNil(t, store.Get([]byte("other/Keep")))
+}
+
+// TestMigrateLegacyEVMAccountsSkipsMultisig ensures the migration can decode
+// multisig accounts whose pubkey is a legacy amino multisig key
+// (/cosmos.crypto.multisig.LegacyAminoPubKey) and leaves them intact.
+func TestMigrateLegacyEVMAccountsSkipsMultisig(t *testing.T) {
+	reg := codectypes.NewInterfaceRegistry()
+	authtypes.RegisterInterfaces(reg)
+	vestingtypes.RegisterInterfaces(reg)
+	cryptocodec.RegisterInterfaces(reg)
+	legacy.RegisterInterfaces(reg)
+	reg.RegisterImplementations((*cryptotypes.PubKey)(nil), &evmsecp256k1.PubKey{})
+	cdc := codec.NewProtoCodec(reg)
+
+	db := dbm.NewMemDB()
+	cms := rootstore.NewCommitMultiStore(db, log.NewNopLogger(), storemetrics.NewNoOpMetrics())
+	authKey := storetypes.NewKVStoreKey(authtypes.StoreKey)
+	cms.MountStoreWithDB(authKey, storetypes.StoreTypeIAVL, db)
+	require.NoError(t, cms.LoadLatestVersion())
+
+	msAddr := sdk.AccAddress([]byte("multisigaddr"))
+	subPk := ed25519.GenPrivKey().PubKey()
+	msPk := multisig.NewLegacyAminoPubKey(1, []cryptotypes.PubKey{subPk})
+	msAny, err := codectypes.NewAnyWithValue(msPk)
+	require.NoError(t, err)
+	acc := &authtypes.BaseAccount{
+		Address:       msAddr.String(),
+		AccountNumber: 2,
+		Sequence:      0,
+		PubKey:        msAny,
+	}
+
+	bz, err := cdc.MarshalInterface(acc)
+	require.NoError(t, err)
+	store := prefix.NewStore(cms.GetKVStore(authKey), []byte(authtypes.AddressStoreKeyPrefix))
+	store.Set(msAddr, bz)
+
+	ctx := sdk.NewContext(cms, cmtproto.Header{ChainID: "origin_1170-3"}, false, log.NewNopLogger())
+	require.NoError(t, migrateLegacyEVMAccounts(ctx, authKey, cdc, nil, log.NewNopLogger()))
+
+	var got sdk.AccountI
+	require.NoError(t, cdc.UnmarshalInterface(store.Get(msAddr), &got))
+	pk := got.GetPubKey()
+	_, isMs := pk.(*multisig.LegacyAminoPubKey)
+	require.True(t, isMs, "expected multisig pubkey to be preserved, got %T", pk)
+}
+
+func TestRepairEvmDenomMetadata(t *testing.T) {
+	key := storetypes.NewKVStoreKey(banktypes.StoreKey)
+	testCtx := testutil.DefaultContextWithDB(t, key, storetypes.NewTransientStoreKey("transient_test"))
+	ctx := testCtx.Ctx
+
+	reg := codectypes.NewInterfaceRegistry()
+	banktypes.RegisterInterfaces(reg)
+	authtypes.RegisterInterfaces(reg)
+	cdc := codec.NewProtoCodec(reg)
+
+	ctrl := gomock.NewController(t)
+	authKeeper := banktestutil.NewMockAccountKeeper(ctrl)
+	authKeeper.EXPECT().AddressCodec().Return(address.NewBech32Codec("cosmos")).AnyTimes()
+
+	bk := bankkeeper.NewBaseKeeper(
+		cdc,
+		runtime.NewKVStoreService(key),
+		authKeeper,
+		map[string]bool{},
+		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
+		log.NewNopLogger(),
+	)
+
+	box := upgrades.Toolbox{}
+	box.BankKeeper = bk
+
+	// Scenario: Display unit is missing from DenomUnits (display "origin" while
+	// units only list "auoc"/"uoc"). This is the origin testnet metadata shape
+	// that made decimals resolve to 0 and panic InitEvmCoinInfo.
+	bk.SetDenomMetaData(ctx, banktypes.Metadata{
+		Description: "Origin token",
+		DenomUnits: []*banktypes.DenomUnit{
+			{Denom: "auoc", Exponent: 0, Aliases: []string{}},
+			{Denom: "uoc", Exponent: 18, Aliases: []string{}},
+		},
+		Base:    "auoc",
+		Display: "origin",
+		Name:    "Origin",
+		Symbol:  "UOC",
+	})
+
+	require.NoError(t, repairEvmDenomMetadata(ctx, box, "auoc", log.NewNopLogger()))
+	got, found := bk.GetDenomMetaData(ctx, "auoc")
+	require.True(t, found)
+	require.Equal(t, "uoc", got.Display)
 }

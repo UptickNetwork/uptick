@@ -14,11 +14,13 @@ import (
 	"github.com/UptickNetwork/uptick/app/upgrades/v040/legacy"
 	"github.com/cosmos/cosmos-sdk/codec"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
+	cryptocodec "github.com/cosmos/cosmos-sdk/crypto/codec"
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	vestingtypes "github.com/cosmos/cosmos-sdk/x/auth/vesting/types"
+	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	paramstypes "github.com/cosmos/cosmos-sdk/x/params/types"
 
 	// cosmos/evm imports
@@ -391,6 +393,11 @@ func newLegacyAccountCodec() codec.Codec {
 	// migration iterates every auth account, so those types must be decodable
 	// even though only EthAccount records are rewritten.
 	vestingtypes.RegisterInterfaces(interfaceRegistry)
+	// Chains may also hold multisig accounts whose pubkey is a legacy amino
+	// multisig key (/cosmos.crypto.multisig.LegacyAminoPubKey). Those pubkeys
+	// are not rewritten but still have to be decodable while iterating every
+	// auth account during the migration.
+	cryptocodec.RegisterInterfaces(interfaceRegistry)
 	legacy.RegisterInterfaces(interfaceRegistry)
 	return codec.NewProtoCodec(interfaceRegistry)
 }
@@ -612,12 +619,63 @@ func migrateEVMParams(ctx sdk.Context, box upgrades.Toolbox, logger log.Logger) 
 		return fmt.Errorf("set evm params: %w", err)
 	}
 
+	// Some testnets carry metadata where the Display unit is not present in
+	// DenomUnits (e.g. display "origin" while units only list "auoc"/"uoc").
+	// cosmos/evm derives coin decimals from the Display unit's exponent, so
+	// such metadata would resolve decimals to 0 and panic the upgrade. Repair
+	// it before initializing EvmCoinInfo.
+	if err := repairEvmDenomMetadata(ctx, box, evmParams.EvmDenom, logger); err != nil {
+		return fmt.Errorf("repair evm denom metadata: %w", err)
+	}
+
 	// Persist EvmCoinInfo so the x/vm PreBlock can register the base denom.
 	if err := box.EvmKeeper.InitEvmCoinInfo(ctx); err != nil {
 		return fmt.Errorf("init evm coin info: %w", err)
 	}
 
 	logger.Info("EVM params and coin info initialized")
+	return nil
+}
+
+// repairEvmDenomMetadata normalizes the bank denom metadata for the EVM denom
+// so that InitEvmCoinInfo can derive a supported decimals value. It points
+// Display at the highest-exponent unit when the current Display unit is absent
+// from DenomUnits, and falls back to appending an 18-decimal display unit when
+// no exponent is present at all.
+func repairEvmDenomMetadata(ctx sdk.Context, box upgrades.Toolbox, evmDenom string, logger log.Logger) error {
+	metadata, found := box.BankKeeper.GetDenomMetaData(ctx, evmDenom)
+	if !found {
+		// Let InitEvmCoinInfo surface the missing-metadata error.
+		return nil
+	}
+
+	displayInUnits := false
+	maxExponent := uint32(0)
+	maxUnitDenom := metadata.Base
+	for _, unit := range metadata.DenomUnits {
+		if unit.Denom == metadata.Display {
+			displayInUnits = true
+		}
+		if unit.Exponent > maxExponent {
+			maxExponent = unit.Exponent
+			maxUnitDenom = unit.Denom
+		}
+	}
+	if displayInUnits {
+		return nil
+	}
+
+	if maxExponent > 0 {
+		metadata.Display = maxUnitDenom
+	} else {
+		metadata.DenomUnits = append(metadata.DenomUnits, &banktypes.DenomUnit{
+			Denom:    metadata.Display,
+			Exponent: 18,
+			Aliases:  []string{},
+		})
+	}
+	box.BankKeeper.SetDenomMetaData(ctx, metadata)
+	logger.Info("repaired evm denom metadata", "display", metadata.Display)
 	return nil
 }
 
