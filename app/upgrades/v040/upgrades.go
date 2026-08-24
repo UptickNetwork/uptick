@@ -18,6 +18,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
+	vestingtypes "github.com/cosmos/cosmos-sdk/x/auth/vesting/types"
 	paramstypes "github.com/cosmos/cosmos-sdk/x/params/types"
 
 	// cosmos/evm imports
@@ -385,6 +386,11 @@ func migrateEVMChainConfig(ctx sdk.Context, box upgrades.Toolbox, logger log.Log
 func newLegacyAccountCodec() codec.Codec {
 	interfaceRegistry := codectypes.NewInterfaceRegistry()
 	authtypes.RegisterInterfaces(interfaceRegistry)
+	// Chains may hold vesting accounts (PeriodicVestingAccount,
+	// ContinuousVestingAccount, DelayedVestingAccount, ...). The account
+	// migration iterates every auth account, so those types must be decodable
+	// even though only EthAccount records are rewritten.
+	vestingtypes.RegisterInterfaces(interfaceRegistry)
 	legacy.RegisterInterfaces(interfaceRegistry)
 	return codec.NewProtoCodec(interfaceRegistry)
 }
@@ -483,6 +489,15 @@ func migrateLegacyEVMAccounts(
 
 		legacyAccount, ok := accountI.(*legacy.EthAccount)
 		if !ok {
+			// Retained accounts (vesting, module, ...) are not rewritten to
+			// BaseAccount, but their embedded BaseAccount.PubKey may still be
+			// the legacy /ethermint.crypto.v1.ethsecp256k1.PubKey Any. Without
+			// rewriting that Any to the v0.4.0 key type, the account becomes
+			// unqueryable after the upgrade ("can't resolve type URL
+			// /ethermint.crypto.v1.ethsecp256k1.PubKey: proto: not found").
+			if err := migrateRetainedAccountPubKey(ctx, migrationCdc, appCodec, store, iterator.Key(), accountI, logger); err != nil {
+				return err
+			}
 			continue
 		}
 		if legacyAccount.BaseAccount == nil {
@@ -525,6 +540,42 @@ func migrateLegacyEVMAccounts(
 	}
 
 	logger.Info("legacy EVM accounts migrated to BaseAccount", "migrated", migrated)
+	return nil
+}
+
+// migrateRetainedAccountPubKey rewrites the legacy Ethermint pubkey Any inside
+// a retained (non-EthAccount) auth account into the v0.4.0 key type, so the
+// account stays queryable and signable after the upgrade. Accounts without a
+// legacy pubkey are left untouched.
+func migrateRetainedAccountPubKey(
+	ctx sdk.Context,
+	migrationCdc, appCodec codec.Codec,
+	store storetypes.KVStore,
+	key []byte,
+	account sdk.AccountI,
+	logger log.Logger,
+) error {
+	pk := account.GetPubKey()
+	if pk == nil {
+		return nil
+	}
+
+	ethPk, isEth := pk.(*legacy.EthSecp256k1PubKey)
+	if !isEth {
+		return nil
+	}
+
+	newPk := &evmsecp256k1.PubKey{Key: ethPk.Key}
+	if err := account.SetPubKey(newPk); err != nil {
+		return fmt.Errorf("set migrated pubkey on retained account %x: %w", key, err)
+	}
+
+	newBytes, err := appCodec.MarshalInterface(account)
+	if err != nil {
+		return fmt.Errorf("marshal retained account %x: %w", key, err)
+	}
+	store.Set(key, newBytes)
+	logger.Info("migrated legacy pubkey of retained account", "address", account.GetAddress().String())
 	return nil
 }
 
