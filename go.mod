@@ -12,7 +12,7 @@ require (
 	github.com/cometbft/cometbft v0.38.21
 	github.com/cometbft/cometbft-db v0.14.1 // indirect
 	github.com/cosmos/cosmos-sdk v0.53.6
-	github.com/cosmos/evm v0.6.1
+	github.com/cosmos/evm v0.6.2
 	github.com/cosmos/go-bip39 v1.0.0
 	github.com/cosmos/ibc-go/v10 v10.5.0
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
@@ -68,6 +68,7 @@ require (
 require (
 	cosmossdk.io/x/nft v0.2.0
 	github.com/cosmos/cosmos-db v1.1.3
+	go.uber.org/mock v0.6.0
 )
 
 require (
@@ -194,7 +195,6 @@ require (
 	go.opentelemetry.io/otel/sdk v1.43.0 // indirect
 	go.opentelemetry.io/otel/sdk/metric v1.43.0 // indirect
 	go.opentelemetry.io/otel/trace v1.43.0 // indirect
-	go.uber.org/mock v0.6.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
