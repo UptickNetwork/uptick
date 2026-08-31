@@ -8,12 +8,14 @@ import (
 	// SDK 0.50 API incompatibilities and stale ethermint fork fields.
 	v033 "github.com/UptickNetwork/uptick/app/upgrades/v033"
 	v040 "github.com/UptickNetwork/uptick/app/upgrades/v040"
+	v041 "github.com/UptickNetwork/uptick/app/upgrades/v041"
 )
 
 var (
 	router = upgrades.NewUpgradeRouter().
 		Register(v033.Upgrade).
-		Register(v040.Upgrade)
+		Register(v040.Upgrade).
+		Register(v041.Upgrade)
 )
 
 // RegisterUpgradePlans register a handler of upgrade plan

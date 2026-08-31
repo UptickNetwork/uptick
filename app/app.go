@@ -26,6 +26,7 @@ import (
 	ibcnfttransfertypes "github.com/bianjieai/nft-transfer/types"
 	sigtypes "github.com/cosmos/cosmos-sdk/types/tx/signing"
 	authcodec "github.com/cosmos/cosmos-sdk/x/auth/codec"
+	"github.com/cosmos/cosmos-sdk/x/auth/migrations/legacytx"
 	txmodule "github.com/cosmos/cosmos-sdk/x/auth/tx/config"
 	vestingtypes "github.com/cosmos/cosmos-sdk/x/auth/vesting/types"
 	"github.com/cosmos/cosmos-sdk/x/authz"
@@ -381,6 +382,10 @@ func NewUptick(
 		})
 	app.bm.RegisterLegacyAminoCodec(legacyAmino)
 	app.bm.RegisterInterfaces(interfaceRegistry)
+	// The legacy EIP-712 verification path (Keplr) reconstructs the amino
+	// StdSignBytes for signature checking, which requires the app's fully
+	// populated amino codec.
+	legacytx.RegressionTestingAminoCodec = legacyAmino
 
 	enabledSignModes := append([]sigtypes.SignMode(nil), authtx.DefaultSignModes...)
 	enabledSignModes = append(enabledSignModes, sigtypes.SignMode_SIGN_MODE_TEXTUAL)

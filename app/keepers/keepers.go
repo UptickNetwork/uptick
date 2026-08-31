@@ -68,7 +68,7 @@ import (
 
 	"path/filepath"
 
-	uptickprecompiles "github.com/UptickNetwork/uptick/app/precompiles"
+	precompilestypes "github.com/cosmos/evm/precompiles/types"
 	srvflags "github.com/cosmos/evm/server/flags"
 	feemarketkeeper "github.com/cosmos/evm/x/feemarket/keeper"
 	feemarkettypes "github.com/cosmos/evm/x/feemarket/types"
@@ -437,7 +437,7 @@ func New(
 	// Wire static precompiles (bank, staking, distribution, ics20, etc.)
 	// Uses cosmos/evm's DefaultStaticPrecompiles with the concrete ERC20 keeper.
 	appKeepers.EvmKeeper.WithStaticPrecompiles(
-		uptickprecompiles.DefaultStaticPrecompiles(
+		precompilestypes.DefaultStaticPrecompiles(
 			*appKeepers.StakingKeeper,
 			appKeepers.DistrKeeper,
 			appKeepers.BankKeeper,

@@ -2,7 +2,7 @@ package params
 
 import (
 	"cosmossdk.io/x/tx/signing"
-	legacy "github.com/UptickNetwork/uptick/app/upgrades/v040/legacy"
+	v041 "github.com/UptickNetwork/uptick/app/upgrades/v041"
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/codec/address"
 	"github.com/cosmos/cosmos-sdk/codec/types"
@@ -41,9 +41,11 @@ func MakeEncodingConfig() EncodingConfig {
 	enccodec.RegisterLegacyAminoCodec(amino)
 	enccodec.RegisterInterfaces(interfaceRegistry)
 
-	// Register v0.3.3 legacy account/pubkey/erc20-proposal types so runtime
-	// state export and queries can decode records carried over by the upgrade.
-	legacy.RegisterInterfaces(interfaceRegistry)
+	// Register v0.4.1 Keplr compatibility: legacy ethermint pubkey and EIP-712
+	// extension option type URLs map onto the complete cosmos/evm types, and
+	// the v0.3.3-era account/proposal records remain decodable for genesis
+	// bootstrap and state export.
+	v041.RegisterCompatInterfaces(interfaceRegistry)
 
 	return EncodingConfig{
 		InterfaceRegistry: interfaceRegistry,

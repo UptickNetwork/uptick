@@ -177,10 +177,61 @@ func newCosmosAnteHandler(options HandlerOptions) sdk.AnteHandler {
 	}
 }
 
-// newCosmosAnteHandlerEip712 creates the ante handler for transactions signed with EIP712
+// newCosmosAnteHandlerEip712 creates the ante handler for Cosmos transactions
+// signed with the legacy ethermint EIP-712 scheme (e.g. Keplr). It differs from
+// newCosmosAnteHandler in that it skips the extension-option rejection decorator
+// (the EIP-712 Web3 extension is handled here) and verifies the EIP-712
+// signature through Eip712SigVerificationDecorator instead of the standard
+// signature verification decorator.
 func newCosmosAnteHandlerEip712(options HandlerOptions) sdk.AnteHandler {
-	// In cosmos/evm v0.6.1, EIP-712 is handled by the same cosmos ante handler
-	return newCosmosAnteHandler(options)
+	return func(ctx sdk.Context, tx sdk.Tx, simulate bool) (sdk.Context, error) {
+		feemarketParams := options.FeeMarketKeeper.GetParams(ctx)
+		txFeeChecker := evmevm.NewDynamicFeeChecker(&feemarketParams)
+
+		var simGasLimit *storetypes.Gas
+		if options.WasmNodeConfig != nil {
+			simGasLimit = options.WasmNodeConfig.SimulationGasLimit
+		}
+
+		maxDispatch := options.MaxWasmDispatchMsgCount
+		if maxDispatch == 0 {
+			maxDispatch = MaxWasmDispatchMsgCount
+		}
+
+		decorators := []sdk.AnteDecorator{
+			NewWasmSecurityDecorator(options.Cdc, options.EvmKeeper, options.MaxTxGasWanted, maxDispatch),
+			NewValidatorCommissionDecorator(options.Cdc),
+		}
+		if options.TXCounterStoreService != nil {
+			decorators = append(decorators, wasmkeeper.NewCountTXDecorator(options.TXCounterStoreService))
+		}
+		if options.WasmKeeper != nil {
+			decorators = append(decorators, wasmkeeper.NewGasRegisterDecorator(options.WasmKeeper.GetGasRegister()))
+		}
+
+		decorators = append(decorators,
+			wasmkeeper.NewTxContractsDecorator(),
+			cosmosante.NewRejectMessagesDecorator(),
+			cosmosante.NewAuthzLimiterDecorator(options.disabledAuthzMsgs()...),
+			ante.NewSetUpContextDecorator(),
+			wasmkeeper.NewLimitSimulationGasDecorator(simGasLimit),
+			ante.NewValidateBasicDecorator(),
+			ante.NewTxTimeoutHeightDecorator(),
+			ante.NewValidateMemoDecorator(options.AccountKeeper),
+			cosmosante.NewMinGasPriceDecorator(&feemarketParams),
+			ante.NewConsumeGasForTxSizeDecorator(options.AccountKeeper),
+			ante.NewDeductFeeDecorator(options.AccountKeeper, options.BankKeeper, options.FeegrantKeeper, txFeeChecker),
+			ante.NewSetPubKeyDecorator(options.AccountKeeper),
+			ante.NewValidateSigCountDecorator(options.AccountKeeper),
+			ante.NewSigGasConsumeDecorator(options.AccountKeeper, options.SigGasConsumer),
+			NewEip712SigVerificationDecorator(options.AccountKeeper),
+			ante.NewIncrementSequenceDecorator(options.AccountKeeper),
+			ibcante.NewRedundantRelayDecorator(options.IBCKeeper),
+			evmevm.NewGasWantedDecorator(options.EvmKeeper, options.FeeMarketKeeper, &feemarketParams),
+		)
+
+		return sdk.ChainAnteDecorators(decorators...)(ctx, tx, simulate)
+	}
 }
 
 // evmtypesAccountKeeper is a shim to satisfy evmtypes.AccountKeeper if needed

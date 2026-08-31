@@ -2,7 +2,7 @@
 
 BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
 COMMIT := $(shell git log -1 --format='%H')
-VERSION := v0.4.0
+VERSION := v0.4.1
 
 
 # don't override user values
@@ -129,7 +129,7 @@ BUILD_TARGETS := build install
 
 build: BUILD_ARGS=-o $(BUILDDIR)/
 build-linux:
-	GOOS=linux GOARCH=amd64 LEDGER_ENABLED=false $(MAKE) build
+	GOOS=linux GOARCH=amd64 LEDGER_ENABLED=true $(MAKE) build
 
 $(BUILD_TARGETS): go.sum $(BUILDDIR)/
 	go $@ $(BUILD_FLAGS) $(BUILD_ARGS) ./...

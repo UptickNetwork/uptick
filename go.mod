@@ -1,6 +1,6 @@
 module github.com/UptickNetwork/uptick
 
-go 1.25.8
+go 1.25.13
 
 require (
 	cosmossdk.io/simapp v0.0.0-20240118210941-3897926e722e
@@ -175,7 +175,7 @@ require (
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
 	github.com/sagikazarmark/locafero v0.11.0 // indirect
-	github.com/shamaton/msgpack/v2 v2.2.3 // indirect
+	github.com/shamaton/msgpack/v2 v2.4.2 // indirect
 	github.com/sourcegraph/conc v0.3.1-0.20240121214520-5f936abd7ae8 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.6.0 // indirect
 	github.com/supranational/blst v0.3.14 // indirect
