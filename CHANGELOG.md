@@ -35,6 +35,19 @@ Ref: https://keepachangelog.com/en/1.0.0/
 
 # Changelog
 
+## v0.4.1 - Unreleased
+
+### State Machine Breaking
+
+* (security) Enforce a strict one-to-one NFT mapping for ERC721/CW721 conversions so a caller's own NFT can no longer release a module-escrowed token bound to a different NFT (C-1).
+* (security) Fix the ERC721 IBC refund ordering: release the IBC-escrowed NFT to the module account before reversing the conversion, eliminating a permanent fund lock on error/timeout (C-2).
+* (security) Pin the resolved class ID and contract address to the registered token pair, blocking minting into arbitrary third-party denoms or external compatible contracts (H-1 / M-01).
+
+### Improvements
+
+* (ci) Run CI on push to any `release/**` branch.
+* (cli) Default `uptickd testnet --print-mnemonic` to `false`.
+
 ## v0.4.0 - Unreleased
 
 ### Features

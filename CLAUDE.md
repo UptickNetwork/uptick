@@ -8,7 +8,7 @@ Uptick Network is a Cosmos SDK-based blockchain network designed for NFTs and RW
 - **Cosmos SDK v0.53.6** - Core blockchain framework
 - **CometBFT v0.38.21** - Consensus engine (formerly Tendermint)
 - **ibc-go v10.5.0** - Inter-Blockchain Communication protocol
-- **cosmos/evm v0.6.1** - Official EVM integration for Ethereum compatibility
+- **cosmos/evm v0.6.2** - Official EVM integration for Ethereum compatibility
 - **wasmd v0.61.14 / wasmvm v3** - WebAssembly smart contracts
 
 The chain is fully interoperable with both EVM and IBC chains, supporting cross-chain NFT and token transfers.

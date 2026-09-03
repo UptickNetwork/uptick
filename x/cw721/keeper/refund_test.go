@@ -25,7 +25,7 @@ func TestRefundPacketToken_MissingReceiver(t *testing.T) {
 	sdk.GetConfig().SetBech32PrefixForAccount("uptick", "uptickpub")
 	contract := sdk.AccAddress(make([]byte, 20)).String()
 
-	k.SetNFTPairs(ctx, contract, "1", "kitty", "nft1")
+	require.NoError(t, k.SetNFTPairs(ctx, contract, "1", "kitty", "nft1"))
 
 	err := k.RefundPacketToken(ctx, ibcnfttransfertypes.NonFungibleTokenPacketData{
 		ClassId:  "kitty",

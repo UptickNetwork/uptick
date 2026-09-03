@@ -12,10 +12,17 @@ FROM debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y ca-certificates jq && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /root
+RUN useradd -m -u 1000 uptick
 
 COPY --from=build-env /go/src/github.com/UptickNetwork/uptick/build/uptickd /usr/bin/uptickd
 
+USER uptick
+
+WORKDIR /home/uptick
+
 EXPOSE 26656 26657 1317 9090
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD uptickd version >/dev/null 2>&1 || exit 1
 
 CMD ["uptickd"]

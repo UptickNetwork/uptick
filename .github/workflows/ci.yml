@@ -6,6 +6,7 @@ on:
     branches:
       - development
       - release/v0.4.0
+      - release/**
 
 jobs:
   build-test:
