@@ -293,6 +293,22 @@ func TestCallEVMWithData_UsesNonNilStateDB(t *testing.T) {
 	require.NotNil(t, evm.lastStateDB)
 }
 
+func TestCallEVMWithData_ChargesSDKGasMeter(t *testing.T) {
+	k, ctx, _ := setupConvertKeeper(t)
+	evm := k.evmKeeper.(*fakeEVMKeeper)
+	evm.gasUsed = 50000
+	contract := common.HexToAddress("0x1111111111111111111111111111111111111111")
+
+	// Use a finite gas meter so we can observe the charge (the test ctx defaults
+	// to an infinite meter).
+	gm := storetypes.NewGasMeter(1000000)
+	ctx = ctx.WithGasMeter(gm)
+
+	_, err := k.CallEVMWithData(ctx, types.ModuleAddress, &contract, []byte{0x01}, false)
+	require.NoError(t, err)
+	require.Equal(t, uint64(50000), gm.GasConsumed())
+}
+
 func TestERC721StateDBKeeper_ModuleAccountSkipsBalanceWrite(t *testing.T) {
 	base := authtypes.NewBaseAccountWithAddress(types.AccModuleAddress)
 	ak := &moduleAccountKeeper{account: base}
@@ -360,6 +376,7 @@ type fakeEVMKeeper struct {
 	lastCommit  bool
 	lastStateDB *statedb.StateDB
 	applyCalls  int
+	gasUsed     uint64
 }
 
 func (f *fakeEVMKeeper) GetParams(_ sdk.Context) evmtypes.Params { return evmtypes.Params{} }
@@ -387,7 +404,7 @@ func (f *fakeEVMKeeper) ApplyMessage(
 	f.lastCommit = commit
 	f.lastStateDB = stateDB
 	f.applyCalls++
-	return &evmtypes.MsgEthereumTxResponse{}, nil
+	return &evmtypes.MsgEthereumTxResponse{GasUsed: f.gasUsed}, nil
 }
 
 type stateDBKeeperStub struct{}

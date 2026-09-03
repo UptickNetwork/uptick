@@ -351,9 +351,17 @@ func (k Keeper) CallEVMWithData(
 		statedb.NewEmptyTxConfig(),
 	)
 
-	res, err := k.evmKeeper.ApplyMessage(ctx, stateDB, msg, evmtypes.NewNoOpTracer(), commit, false, false)
+	res, err := k.evmKeeper.ApplyMessage(ctx, stateDB, msg, evmtypes.NewNoOpTracer(), commit, false, true)
 	if err != nil {
 		return nil, err
+	}
+
+	// Charge the EVM gas used back to the SDK gas meter. Passing internal=true
+	// makes cosmos/evm report the true gas used (skipping the fee-market
+	// min-gas floor), so a native-module EVM call counts against the transaction
+	// budget instead of exposing an unbounded 25M×N CPU surface (L-6).
+	if res != nil && res.GasUsed > 0 {
+		ctx.GasMeter().ConsumeGas(res.GasUsed, "erc721 evm call")
 	}
 
 	if res.Failed() {
