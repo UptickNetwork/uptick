@@ -177,6 +177,87 @@ func TestConvertNFT_SuccessMintsERC721(t *testing.T) {
 	require.Equal(t, types.AccModuleAddress.String(), got.GetOwner().String())
 }
 
+// TestConvertNFT_RejectsTokenIDCollision reproduces the C-1 registry-poisoning
+// attack: a caller's own Cosmos NFT must not be allowed to release a
+// module-escrowed ERC721 token already bound to a different NFT. The token id
+// 7 is pre-bound to nft "nft-victim"; supplying the caller's nft1 must fail.
+func TestConvertNFT_RejectsTokenIDCollision(t *testing.T) {
+	k, ctx, owner := setupConvertKeeper(t)
+	contract := "0x1111111111111111111111111111111111111111"
+	receiver := "0x2222222222222222222222222222222222222222"
+
+	// Simulate a previously-converted victim token escrowed by the module.
+	require.NoError(t, k.SetNFTPairs(ctx, contract, "7", "kitty", "nft-victim"))
+
+	_, err := k.ConvertNFT(ctx, &types.MsgConvertNFT{
+		ClassId:            "kitty",
+		CosmosTokenIds:     []string{"nft1"},
+		EvmContractAddress: contract,
+		EvmTokenIds:        []string{"7"},
+		CosmosSender:       owner.String(),
+		EvmReceiver:        receiver,
+	})
+	require.ErrorIs(t, err, types.ErrNFTMappingConflict)
+
+	// The mapping must remain unchanged (nft-victim still bound to token 7).
+	require.Equal(t, []byte(types.CreateNFTUID("kitty", "nft-victim")),
+		k.GetNFTPairByContractTokenID(ctx, contract, "7"))
+}
+
+// TestConvertNFT_RejectsCommaID covers L-3 interim: an NFT id containing a comma
+// would corrupt the comma-delimited mapping key, so the conversion must be
+// rejected up front.
+func TestConvertNFT_RejectsCommaID(t *testing.T) {
+	k, ctx, owner := setupConvertKeeper(t)
+	contract := "0x1111111111111111111111111111111111111111"
+	receiver := "0x2222222222222222222222222222222222222222"
+
+	_, err := k.ConvertNFT(ctx, &types.MsgConvertNFT{
+		ClassId:            "kitty",
+		CosmosTokenIds:     []string{"nft,with-comma"},
+		EvmContractAddress: contract,
+		EvmTokenIds:        []string{"1"},
+		CosmosSender:       owner.String(),
+		EvmReceiver:        receiver,
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "comma")
+}
+
+// TestConvertNFT_RejectsWrongContract covers M-01: a registered class must not
+// bind to a caller-supplied contract that differs from the canonical pair.
+func TestConvertNFT_RejectsWrongContract(t *testing.T) {
+	k, ctx, owner := setupConvertKeeper(t)
+	receiver := "0x2222222222222222222222222222222222222222"
+
+	_, err := k.ConvertNFT(ctx, &types.MsgConvertNFT{
+		ClassId:            "kitty",
+		CosmosTokenIds:     []string{"nft1"},
+		EvmContractAddress: "0x9999999999999999999999999999999999999999",
+		EvmTokenIds:        []string{"1"},
+		CosmosSender:       owner.String(),
+		EvmReceiver:        receiver,
+	})
+	require.ErrorIs(t, err, types.ErrContractAddressNotCorrect)
+}
+
+// TestConvertERC721_RejectsWrongClassId covers H-1: for a registered token pair,
+// a caller-supplied ClassId differing from the pair's canonical class must be
+// rejected instead of minting an NFT into an arbitrary third-party denom.
+func TestConvertERC721_RejectsWrongClassId(t *testing.T) {
+	k, ctx, owner := setupConvertKeeper(t)
+
+	_, err := k.ConvertERC721(ctx, &types.MsgConvertERC721{
+		ClassId:            "some-other-denom",
+		CosmosTokenIds:     []string{"nft1"},
+		EvmContractAddress: "0x1111111111111111111111111111111111111111",
+		EvmTokenIds:        []string{"5"},
+		CosmosSender:       owner.String(),
+		CosmosReceiver:     owner.String(),
+	})
+	require.ErrorIs(t, err, types.ErrClassIdNotCorrect)
+}
+
 func TestRefundPacketToken_MissingPair(t *testing.T) {
 	k, ctx, _ := setupConvertKeeper(t)
 	err := k.RefundPacketToken(ctx, ibcnfttransfertypes.NonFungibleTokenPacketData{

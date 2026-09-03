@@ -1,6 +1,8 @@
 package keeper
 
 import (
+	"strings"
+
 	sdkerrors "cosmossdk.io/errors"
 	"github.com/UptickNetwork/uptick/x/erc721/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -141,6 +143,39 @@ func (k Keeper) GetContractAddressAndTokenIds(ctx sdk.Context, msg *types.MsgCon
 
 		if err != nil {
 			return "", nil, err
+		}
+
+		// A registered class has a canonical contract. Reject a caller-supplied
+		// address that differs from the pair (this would allow conversion against
+		// an external compatible contract and break the class↔contract identity).
+		if EvmContractAddress != "" && strings.ToLower(EvmContractAddress) != pair.Erc721Address {
+			return "", nil, sdkerrors.Wrapf(
+				types.ErrContractAddressNotCorrect,
+				"contract address is not correct, expect %s got %s",
+				pair.Erc721Address, EvmContractAddress,
+			)
+		}
+		EvmContractAddress = pair.Erc721Address
+
+		// Enforce a strict one-to-one binding up front: if the resolved ERC721
+		// tokenID is already forward-mapped to a NFT, that NFT MUST be the one
+		// the caller is converting. Otherwise an attacker could pair their own
+		// NFT with a victim's escrowed ERC721 token id and drain it.
+		for i, tokenID := range EvmTokenIds {
+			if tokenID == "" {
+				continue
+			}
+			forward := k.GetNFTPairByContractTokenID(ctx, pair.Erc721Address, tokenID)
+			if len(forward) != 0 {
+				expectedNFTUID := types.CreateNFTUID(msg.ClassId, msg.CosmosTokenIds[i])
+				if string(forward) != expectedNFTUID {
+					return "", nil, sdkerrors.Wrapf(
+						types.ErrNFTMappingConflict,
+						"erc721 token %s is already bound to nft %s, not %s",
+						tokenID, string(forward), expectedNFTUID,
+					)
+				}
+			}
 		}
 
 		return EvmContractAddress, EvmTokenIds, nil

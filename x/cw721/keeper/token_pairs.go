@@ -1,6 +1,7 @@
 package keeper
 
 import (
+	sdkerrors "cosmossdk.io/errors"
 	storetypes "cosmossdk.io/store/types"
 	"strconv"
 
@@ -133,16 +134,39 @@ func (k Keeper) IsClassRegistered(ctx sdk.Context, classID string) bool {
 	return store.Has([]byte(classID))
 }
 
-func (k Keeper) SetNFTPairs(ctx sdk.Context, contractAddress string, tokenID string, classID string, nftID string) {
+// SetNFTPairs atomically binds a CW721 (contract, tokenID) to a Cosmos NFT
+// (classID, nftID) in both directions, enforcing a strict one-to-one invariant
+// forward[x]=y ⟺ reverse[y]=x. If either side already points to a different
+// partner the call fails, mirroring x/erc721.
+func (k Keeper) SetNFTPairs(ctx sdk.Context, contractAddress string, tokenID string, classID string, nftID string) error {
+	tokenUID := types.CreateTokenUID(contractAddress, tokenID)
+	nftUID := types.CreateNFTUID(classID, nftID)
 
-	// save nft pair
-	if len(k.GetNFTPairByContractTokenID(ctx, contractAddress, tokenID)) == 0 {
+	forward := k.GetNFTUIDPairByTokenUID(ctx, tokenUID)
+	reverse := k.GetTokenUIDPairByNFTUID(ctx, nftUID)
+
+	if len(forward) != 0 && string(forward) != nftUID {
+		return sdkerrors.Wrapf(
+			types.ErrNFTMappingConflict,
+			"cw721 token %s on %s is already bound to nft %s (attempted %s)",
+			tokenID, contractAddress, string(forward), nftUID,
+		)
+	}
+	if len(reverse) != 0 && string(reverse) != tokenUID {
+		return sdkerrors.Wrapf(
+			types.ErrNFTMappingConflict,
+			"nft %s of class %s is already bound to token %s (attempted %s)",
+			nftID, classID, string(reverse), tokenUID,
+		)
+	}
+
+	if len(forward) == 0 {
 		k.SetNFTPairByContractTokenID(ctx, contractAddress, tokenID, classID, nftID)
 	}
-
-	if len(k.GetNFTPairByClassNFTID(ctx, classID, nftID)) == 0 {
+	if len(reverse) == 0 {
 		k.SetNFTPairByClassNFTID(ctx, classID, nftID, contractAddress, tokenID)
 	}
+	return nil
 }
 
 // GetTokenPairID returns the pair id from either of the registered tokens.

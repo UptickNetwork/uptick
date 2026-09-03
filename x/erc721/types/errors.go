@@ -22,4 +22,5 @@ var (
 	ErrClassIdNotCorrect         = sdkerrors.Register(ModuleName, 15, "nft class is not correct")
 	ErrContractAddressNotCorrect = sdkerrors.Register(ModuleName, 16, "contract address is not correct")
 	ErrTokenIdNotCorrect         = sdkerrors.Register(ModuleName, 17, "token id is not correct")
+	ErrNFTMappingConflict        = sdkerrors.Register(ModuleName, 18, "erc721/nft token pair mapping is not one-to-one")
 )

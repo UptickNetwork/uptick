@@ -167,14 +167,22 @@ func (k Keeper) OnAcknowledgementPacket(ctx sdk.Context, packet channeltypes.Pac
 				return err
 			}
 			data.ClassId = classID
-			if err := k.erc721keeper.RefundPacketToken(ctx, data); err != nil {
-				return err
-			}
 			// Redirect the NFT refund to the module address so the sender
 			// does not receive both the ERC721 and the NFT (double refund).
 			nftData := data
 			nftData.Sender = erc721types.AccModuleAddress.String()
-			return k.ibcKeeper.OnAcknowledgementPacket(ctx, packet, nftData, ack)
+			// Release the IBC-escrowed NFT back to the module account FIRST, then
+			// reverse the ERC721 conversion. RefundPacketToken burns the native NFT
+			// and transfers the ERC721 back to the sender, both of which require the
+			// NFT to be owned by the module account. Doing the escrow release after
+			// RefundPacketToken would leave the NFT in escrow (owner != module), so
+			// BurnNFT fails, the whole cache-context rolls back and the escrow is
+			// never released -- permanently locking both the ERC721 and the NFT.
+			// This instruction order mirrors the CW721 branch below.
+			if err := k.ibcKeeper.OnAcknowledgementPacket(ctx, packet, nftData, ack); err != nil {
+				return err
+			}
+			return k.erc721keeper.RefundPacketToken(ctx, data)
 		case evmibctypes.ConvertKindCW721:
 			classID, err := k.getRefundClassId(packet, data)
 			if err != nil {
@@ -206,14 +214,15 @@ func (k Keeper) OnTimeoutPacket(ctx sdk.Context, packet channeltypes.Packet, dat
 			return err
 		}
 		data.ClassId = classID
-		if err := k.erc721keeper.RefundPacketToken(ctx, data); err != nil {
-			return err
-		}
 		// Redirect the NFT refund to the module address so the sender
 		// does not receive both the ERC721 and the NFT (double refund).
 		nftData := data
 		nftData.Sender = erc721types.AccModuleAddress.String()
-		return k.ibcKeeper.OnTimeoutPacket(ctx, packet, nftData)
+		// Release the IBC-escrowed NFT first (see OnAcknowledgementPacket).
+		if err := k.ibcKeeper.OnTimeoutPacket(ctx, packet, nftData); err != nil {
+			return err
+		}
+		return k.erc721keeper.RefundPacketToken(ctx, data)
 	case evmibctypes.ConvertKindCW721:
 		classID, err := k.getRefundClassId(packet, data)
 		if err != nil {

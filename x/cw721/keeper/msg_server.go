@@ -17,6 +17,25 @@ var _ types.MsgServer = &Keeper{}
 
 const maxCW721BatchSize = 100
 
+// validateNoCommaIDs rejects IDs that contain a comma. The NFT↔CW721 mapping
+// keys are comma-delimited (CreateTokenUID/CreateNFTUID), so an ID containing a
+// comma would produce an ambiguous key that GetNFTFromUID cannot round-trip,
+// permanently breaking the mapping and any refund path (L-3 interim).
+func validateNoCommaIDs(ids ...[]string) error {
+	for _, list := range ids {
+		for _, id := range list {
+			if strings.Contains(id, ",") {
+				return sdkerrors.Wrapf(
+					errortypes.ErrInvalidRequest,
+					"token/nft id contains illegal comma: %q",
+					id,
+				)
+			}
+		}
+	}
+	return nil
+}
+
 // TransferCW721 converts CW721 tokens into native Cosmos nft for both
 // Cosmos-native and CW721 TokenPair Owners and transfer through IBC
 func (k Keeper) TransferCW721(
@@ -87,6 +106,9 @@ func (k Keeper) ConvertCW721(
 	}
 	msg.ClassId = classId
 	msg.NftIds = nftIds
+	if err := validateNoCommaIDs(msg.TokenIds, msg.NftIds); err != nil {
+		return nil, err
+	}
 	if len(msg.TokenIds) == 0 || len(msg.TokenIds) != len(msg.NftIds) {
 		return nil, sdkerrors.Wrapf(errortypes.ErrInvalidRequest, "CW721 token ids and NFT ids length mismatch")
 	}
@@ -104,6 +126,21 @@ func (k Keeper) ConvertCW721(
 			return nil, err
 		}
 	}
+
+	pair, err := k.GetPair(ctx, msg.ContractAddress)
+	if err != nil {
+		return nil, err
+	}
+	// Pin the resolved class ID to the pair's canonical class so the caller
+	// cannot mint a CW721-derived NFT into an arbitrary third-party denom.
+	if msg.ClassId != "" && msg.ClassId != pair.ClassId {
+		return nil, sdkerrors.Wrapf(
+			types.ErrClassIdNotCorrect,
+			"class id is not correct, expect %s got %s",
+			pair.ClassId, msg.ClassId,
+		)
+	}
+	msg.ClassId = pair.ClassId
 
 	msgconvertcw721, err := k.convertWasm2Cosmos(ctx, msg) //
 	if err != nil {
@@ -189,7 +226,9 @@ func (k Keeper) convertWasm2Cosmos(
 
 	// save nft pair
 	for i, tokenId := range msg.TokenIds {
-		k.SetNFTPairs(ctx, msg.ContractAddress, tokenId, msg.ClassId, msg.NftIds[i])
+		if err := k.SetNFTPairs(ctx, msg.ContractAddress, tokenId, msg.ClassId, msg.NftIds[i]); err != nil {
+			return nil, err
+		}
 	}
 
 	return msg, nil
@@ -217,6 +256,9 @@ func (k Keeper) ConvertNFT(
 
 	msg.ContractAddress = contractAddress
 	msg.TokenIds = tokenIds
+	if err := validateNoCommaIDs(msg.TokenIds, msg.NftIds); err != nil {
+		return nil, err
+	}
 
 	id := k.GetClassMap(ctx, msg.ClassId)
 	k.Logger(ctx).Info("ConvertNFT ", "id", id, "msg", msg)
@@ -284,6 +326,14 @@ func (k Keeper) convertCosmos2Wasm(
 				return nil, err
 			}
 		} else {
+			expectedNFTUID := types.CreateNFTUID(msg.ClassId, msg.NftIds[i])
+			if string(nftPair) != expectedNFTUID {
+				return nil, sdkerrors.Wrapf(
+					types.ErrNFTMappingConflict,
+					"cw721 token %s is already bound to nft %s, not %s",
+					tokenId, string(nftPair), expectedNFTUID,
+				)
+			}
 			_, err := k.TransferCw721(ctx, msg.ContractAddress, tokenId, msg.Receiver, types.AccModuleAddress.String())
 			if err != nil {
 				return nil, err
@@ -293,7 +343,9 @@ func (k Keeper) convertCosmos2Wasm(
 	}
 
 	for i, tokenId := range msg.TokenIds {
-		k.SetNFTPairs(ctx, msg.ContractAddress, tokenId, msg.ClassId, msg.NftIds[i])
+		if err := k.SetNFTPairs(ctx, msg.ContractAddress, tokenId, msg.ClassId, msg.NftIds[i]); err != nil {
+			return nil, err
+		}
 	}
 	ctx.EventManager().EmitEvents(
 		sdk.Events{

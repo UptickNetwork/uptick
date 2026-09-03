@@ -23,4 +23,5 @@ var (
 	ErrContractAddressNotCorrect = sdkerrors.Register(ModuleName, 16, "contract address is not correct")
 	ErrTokenIdNotCorrect         = sdkerrors.Register(ModuleName, 17, "token id is not correct")
 	ErrCW721CodeNotFound         = sdkerrors.Register(ModuleName, 18, "cw721 wasm code is not stored")
+	ErrNFTMappingConflict        = sdkerrors.Register(ModuleName, 19, "cw721/nft token pair mapping is not one-to-one")
 )

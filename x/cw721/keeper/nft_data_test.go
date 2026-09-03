@@ -150,3 +150,26 @@ func TestGetContractAddressAndTokenIds_MissingCode(t *testing.T) {
 	})
 	require.ErrorIs(t, err, cw721types.ErrCW721CodeNotFound)
 }
+
+// TestGetContractAddressAndTokenIds_RejectsTokenIDCollision reproduces the C-1
+// attack for CW721: a caller's unbound NFT must not resolve to a token already
+// bound to a different NFT (which would release the escrowed victim token).
+func TestGetContractAddressAndTokenIds_RejectsTokenIDCollision(t *testing.T) {
+	k, ctx := setupKeeper(t)
+	contract := sdk.AccAddress([]byte("cw721contractaddrxx")).String()
+	pair := cw721types.NewTokenPair(contract, "class-1")
+	k.SetTokenPair(ctx, pair)
+	k.SetClassMap(ctx, pair.ClassId, pair.GetID())
+	k.SetCW721Map(ctx, pair.Cw721Address, pair.GetID())
+
+	// A previously-converted victim token is bound to nft-victim.
+	require.NoError(t, k.SetNFTPairs(ctx, contract, "7", "class-1", "nft-victim"))
+
+	_, _, err := k.GetContractAddressAndTokenIds(ctx, &cw721types.MsgConvertNFT{
+		ClassId:         "class-1",
+		NftIds:          []string{"nft-attacker"},
+		ContractAddress: contract,
+		TokenIds:        []string{"7"},
+	})
+	require.ErrorIs(t, err, cw721types.ErrNFTMappingConflict)
+}

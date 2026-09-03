@@ -116,6 +116,38 @@ func (k Keeper) GetContractAddressAndTokenIds(ctx sdk.Context, msg *types.MsgCon
 		return "", nil, err
 	}
 
+	// A registered class has a canonical CW721 contract. Reject a caller-supplied
+	// address that differs from the pair (CW721 contract is bech32, so compare
+	// exactly) and pin to the canonical value.
+	if evmContractAddress != "" && evmContractAddress != pair.Cw721Address {
+		return "", nil, sdkerrors.Wrapf(
+			types.ErrContractAddressNotCorrect,
+			"contract address is not correct, expect %s got %s",
+			pair.Cw721Address, evmContractAddress,
+		)
+	}
+	evmContractAddress = pair.Cw721Address
+
+	// Enforce a strict one-to-one binding up front (mirrors x/erc721): if the
+	// resolved CW721 tokenID is already forward-mapped to a NFT, that NFT MUST be
+	// the one the caller is converting.
+	for i, tokenID := range evmTokenIds {
+		if tokenID == "" {
+			continue
+		}
+		forward := k.GetNFTPairByContractTokenID(ctx, pair.Cw721Address, tokenID)
+		if len(forward) != 0 {
+			expectedNFTUID := types.CreateNFTUID(msg.ClassId, msg.NftIds[i])
+			if string(forward) != expectedNFTUID {
+				return "", nil, sdkerrors.Wrapf(
+					types.ErrNFTMappingConflict,
+					"cw721 token %s is already bound to nft %s, not %s",
+					tokenID, string(forward), expectedNFTUID,
+				)
+			}
+		}
+	}
+
 	return evmContractAddress, evmTokenIds, nil
 }
 

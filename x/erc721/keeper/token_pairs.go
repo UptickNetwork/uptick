@@ -1,6 +1,7 @@
 package keeper
 
 import (
+	sdkerrors "cosmossdk.io/errors"
 	"cosmossdk.io/store/prefix"
 	storetypes "cosmossdk.io/store/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -145,19 +146,47 @@ func (k Keeper) IsClassRegistered(ctx sdk.Context, classID string) bool {
 	return store.Has([]byte(classID))
 }
 
-func (k Keeper) SetNFTPairs(ctx sdk.Context, contractAddress string, tokenID string, classID string, nftID string) {
+// SetNFTPairs atomically binds an EVM (contract, tokenID) to a Cosmos NFT
+// (classID, nftID) in both directions. It enforces a strict one-to-one
+// invariant forward[x]=y ⟺ reverse[y]=x:
+//   - if the forward mapping already exists it MUST equal the new NFT UID,
+//     otherwise the ERC721 token is already bound to a different NFT;
+//   - if the reverse mapping already exists it MUST equal the new token UID,
+//     otherwise the Cosmos NFT is already bound to a different ERC721 token.
+//
+// Binding the same (contract, tokenID) to a different Cosmos NFT would let an
+// attacker use their own NFT id to release a module-escrowed victim token
+// (registry poisoning / mapping collision). This returns ErrNFTMappingConflict
+// so the conversion is rolled back instead of corrupting state.
+func (k Keeper) SetNFTPairs(ctx sdk.Context, contractAddress string, tokenID string, classID string, nftID string) error {
+	tokenUID := types.CreateTokenUID(contractAddress, tokenID)
+	nftUID := types.CreateNFTUID(classID, nftID)
 
-	// save nft pair
-	if len(k.GetNFTPairByContractTokenID(ctx, contractAddress, tokenID)) == 0 {
+	forward := k.GetNFTUIDPairByTokenUID(ctx, tokenUID)
+	reverse := k.GetTokenUIDPairByNFTUID(ctx, nftUID)
 
+	if len(forward) != 0 && string(forward) != nftUID {
+		return sdkerrors.Wrapf(
+			types.ErrNFTMappingConflict,
+			"erc721 token %s on %s is already bound to nft %s (attempted %s)",
+			tokenID, contractAddress, string(forward), nftUID,
+		)
+	}
+	if len(reverse) != 0 && string(reverse) != tokenUID {
+		return sdkerrors.Wrapf(
+			types.ErrNFTMappingConflict,
+			"nft %s of class %s is already bound to token %s (attempted %s)",
+			nftID, classID, string(reverse), tokenUID,
+		)
+	}
+
+	if len(forward) == 0 {
 		k.SetNFTPairByContractTokenID(ctx, contractAddress, tokenID, classID, nftID)
 	}
-
-	if len(k.GetNFTPairByClassNFTID(ctx, classID, nftID)) == 0 {
-
+	if len(reverse) == 0 {
 		k.SetNFTPairByClassNFTID(ctx, classID, nftID, contractAddress, tokenID)
 	}
-
+	return nil
 }
 
 func (k Keeper) SetNFTPairByContractTokenID(ctx sdk.Context, contractAddress string, tokenID string, classID string, nftID string) {

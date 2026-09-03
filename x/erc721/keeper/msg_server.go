@@ -23,6 +23,25 @@ var _ types.MsgServer = &Keeper{}
 
 const maxERC721BatchSize = 100
 
+// validateNoCommaIDs rejects IDs that contain a comma. The NFT↔ERC721 mapping
+// keys are comma-delimited (CreateTokenUID/CreateNFTUID), so an ID containing a
+// comma would produce an ambiguous key that GetNFTFromUID cannot round-trip,
+// permanently breaking the mapping and any refund path (L-3 interim).
+func validateNoCommaIDs(ids ...[]string) error {
+	for _, list := range ids {
+		for _, id := range list {
+			if strings.Contains(id, ",") {
+				return sdkerrors.Wrapf(
+					errortypes.ErrInvalidRequest,
+					"token/nft id contains illegal comma: %q",
+					id,
+				)
+			}
+		}
+	}
+	return nil
+}
+
 func parseERC721TokenID(tokenID string) (*big.Int, error) {
 	n, ok := new(big.Int).SetString(tokenID, 10)
 	if !ok || n.Sign() < 0 || n.BitLen() > 256 {
@@ -110,6 +129,9 @@ func (k Keeper) ConvertERC721(
 	}
 	msg.ClassId = classId
 	msg.CosmosTokenIds = nftIds
+	if err := validateNoCommaIDs(msg.CosmosTokenIds); err != nil {
+		return nil, err
+	}
 	if len(msg.EvmTokenIds) == 0 || len(msg.EvmTokenIds) != len(msg.CosmosTokenIds) {
 		return nil, sdkerrors.Wrapf(errortypes.ErrInvalidRequest, "evm token ids and cosmos token ids length mismatch")
 	}
@@ -150,18 +172,19 @@ func (k Keeper) ConvertERC721(
 		return nil, sdkerrors.Wrapf(types.ErrInternalTokenPair, "erc721 contract %s is self-destructed", pair.Erc721Address)
 	}
 
-	bigTokenId, err := parseERC721TokenID(msg.EvmTokenIds[0])
-	if err != nil {
-		return nil, err
+	// Pin the resolved class ID to the pair's canonical class. If the caller
+	// supplied a ClassId that differs from the registered pair (e.g. minting an
+	// NFT into an arbitrary third-party denom), reject it. This binds the
+	// conversion to the registered token pair and blocks minting into
+	// non-canonical / attacker-controlled denoms.
+	if msg.ClassId != "" && msg.ClassId != pair.ClassId {
+		return nil, sdkerrors.Wrapf(
+			types.ErrClassIdNotCorrect,
+			"class id is not correct, expect %s got %s",
+			pair.ClassId, msg.ClassId,
+		)
 	}
-
-	owner, err := k.QueryERC721TokenOwner(ctx, erc721, bigTokenId)
-	if err != nil {
-		return nil, sdkerrors.Wrap(err, "failed to QueryERC721TokenOwner")
-	}
-	if owner != sender {
-		return nil, sdkerrors.Wrapf(errortypes.ErrUnauthorized, "%s is not the owner of erc721 token %s", sender, strings.Join(msg.EvmTokenIds, ","))
-	}
+	msg.ClassId = pair.ClassId
 
 	convertedERC721, err := k.convertEvm2Cosmos(ctx, pair, msg, sender)
 	if err != nil {
@@ -206,6 +229,9 @@ func (k Keeper) ConvertNFT(
 	}
 	msg.EvmContractAddress = strings.ToLower(contractAddress)
 	msg.EvmTokenIds = tokenIds
+	if err := validateNoCommaIDs(msg.CosmosTokenIds); err != nil {
+		return nil, err
+	}
 
 	// Error checked during msg validation
 	receiver := common.HexToAddress(msg.EvmReceiver)
@@ -315,6 +341,19 @@ func (k Keeper) convertCosmos2Evm(
 				}
 			}
 		} else {
+			// Enforce a strict one-to-one NFT mapping before releasing the
+			// module-escrowed ERC721. The user-supplied (classID, nftID) MUST
+			// equal the persisted binding for this (contract, tokenID). If it
+			// does not, an attacker could pair their own Cosmos NFT with a
+			// victim's already-escrowed ERC721 token id and drain it.
+			expectedNFTUID := types.CreateNFTUID(msg.ClassId, msg.CosmosTokenIds[i])
+			if string(nftPair) != expectedNFTUID {
+				return nil, sdkerrors.Wrapf(
+					types.ErrNFTMappingConflict,
+					"erc721 token %s is already bound to nft %s, not %s",
+					tokenId, string(nftPair), expectedNFTUID,
+				)
+			}
 			// token previously converted and escrowed by the module -> transfer
 			owner, err := k.QueryERC721TokenOwner(ctx, common.HexToAddress(msg.EvmContractAddress), bigTokenIds[i])
 			if err != nil {
@@ -334,8 +373,9 @@ func (k Keeper) convertCosmos2Evm(
 	}
 
 	for i, tokenId := range msg.EvmTokenIds {
-
-		k.SetNFTPairs(ctx, msg.EvmContractAddress, tokenId, msg.ClassId, msg.CosmosTokenIds[i])
+		if err := k.SetNFTPairs(ctx, msg.EvmContractAddress, tokenId, msg.ClassId, msg.CosmosTokenIds[i]); err != nil {
+			return nil, err
+		}
 	}
 
 	ctx.EventManager().EmitEvents(
@@ -393,6 +433,10 @@ func (k Keeper) convertEvm2Cosmos(
 		if err != nil {
 			return nil, sdkerrors.Wrap(err, "failed to query ERC721 token owner")
 		}
+		// UNIQUE AUTHORITATIVE OWNERSHIP CHECK. This loop-level check is the
+		// only place ConvertERC721 verifies the caller owns every token in the
+		// batch. Do not remove or replace it with a single-element sample -- a
+		// batch may contain tokens belonging to different owners.
 		if owner != sender {
 			return nil, sdkerrors.Wrapf(errortypes.ErrUnauthorized, "%s is not the owner of erc721 token %s", sender, tokenId)
 		}
@@ -444,7 +488,9 @@ func (k Keeper) convertEvm2Cosmos(
 
 	// save nft pair
 	for i, tokenId := range msg.EvmTokenIds {
-		k.SetNFTPairs(ctx, msg.EvmContractAddress, tokenId, msg.ClassId, msg.CosmosTokenIds[i])
+		if err := k.SetNFTPairs(ctx, msg.EvmContractAddress, tokenId, msg.ClassId, msg.CosmosTokenIds[i]); err != nil {
+			return nil, err
+		}
 	}
 
 	ctx.EventManager().EmitEvents(

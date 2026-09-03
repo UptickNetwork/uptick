@@ -173,14 +173,60 @@ func TestSetNFTPairs_Idempotent(t *testing.T) {
 	nftID := "nft-42"
 
 	// First call sets the mapping
-	k.SetNFTPairs(ctx, contractAddr, tokenID, classID, nftID)
+	require.NoError(t, k.SetNFTPairs(ctx, contractAddr, tokenID, classID, nftID))
 	first := k.GetNFTPairByContractTokenID(ctx, contractAddr, tokenID)
 	require.NotEmpty(t, first)
 
 	// Second call with same params is idempotent
-	k.SetNFTPairs(ctx, contractAddr, tokenID, classID, nftID)
+	require.NoError(t, k.SetNFTPairs(ctx, contractAddr, tokenID, classID, nftID))
 	second := k.GetNFTPairByContractTokenID(ctx, contractAddr, tokenID)
 	require.Equal(t, first, second)
+}
+
+func TestSetNFTPairs_RejectsForwardConflict(t *testing.T) {
+	k, ctx := setupKeeper(t)
+
+	contractAddr := "0xCAFE00000000000000000000000000000000CAFE"
+	tokenID := "7"
+	classID := "kitty"
+
+	require.NoError(t, k.SetNFTPairs(ctx, contractAddr, tokenID, classID, "nft-victim"))
+
+	// Binding the SAME (contract, tokenID) to a different NFT must fail, which
+	// blocks the C-1 registry-poisoning attack.
+	err := k.SetNFTPairs(ctx, contractAddr, tokenID, classID, "nft-attacker")
+	require.ErrorIs(t, err, cw721types.ErrNFTMappingConflict)
+
+	// Forward mapping is untouched.
+	require.Equal(t, []byte(cw721types.CreateNFTUID(classID, "nft-victim")),
+		k.GetNFTPairByContractTokenID(ctx, contractAddr, tokenID))
+}
+
+func TestSetNFTPairs_RejectsReverseConflict(t *testing.T) {
+	k, ctx := setupKeeper(t)
+
+	contractAddr := "0xCAFE00000000000000000000000000000000CAFE"
+	classID := "kitty"
+
+	require.NoError(t, k.SetNFTPairs(ctx, contractAddr, "1", classID, "nft-victim"))
+
+	// Binding the SAME NFT to a different (contract, tokenID) must fail.
+	err := k.SetNFTPairs(ctx, "0xDEAD000000000000000000000000000000DEAD", "2", classID, "nft-victim")
+	require.ErrorIs(t, err, cw721types.ErrNFTMappingConflict)
+}
+
+func TestValidateNoCommaIDs(t *testing.T) {
+	k, ctx := setupKeeper(t)
+	_ = k
+	_ = ctx
+
+	// Comma-free IDs pass.
+	require.NoError(t, validateNoCommaIDs([]string{"nft1"}, []string{"token-42"}))
+
+	// A comma in any ID is rejected (mapping key is comma-delimited, L-3).
+	err := validateNoCommaIDs([]string{"nft,with-comma"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "comma")
 }
 
 func TestGetPair_NotFound(t *testing.T) {
