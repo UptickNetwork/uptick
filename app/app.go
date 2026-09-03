@@ -981,7 +981,11 @@ func RegisterSwaggerAPI(_ client.Context, rtr *mux.Router) {
 	// registered, which panics any node that enables api.swagger.
 	statikFS, err := fs.New()
 	if err != nil {
-		panic(err)
+		// Do not panic when the statik namespace is unavailable -- a chain that
+		// enables api.swagger without the UI asset must degrade gracefully
+		// (log and leave the /swagger route unregistered) instead of crashing.
+		_, _ = fmt.Fprintf(os.Stderr, "failed to register swagger UI, swagger route disabled: %v\n", err)
+		return
 	}
 
 	staticServer := http.FileServer(statikFS)

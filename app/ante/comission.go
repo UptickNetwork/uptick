@@ -12,6 +12,10 @@ import (
 
 var minCommission = math.LegacyNewDecWithPrec(5, 2) // 5%
 
+// maxAuthzValidationDepth bounds recursion into nested authz.MsgExec so a deeply
+// nested authorization cannot cause unbounded recursive validation.
+const maxAuthzValidationDepth = 5
+
 // ValidatorCommissionDecorator validates that the validator commission is always
 // greater or equal than the min commission rate
 type ValidatorCommissionDecorator struct {
@@ -48,6 +52,17 @@ func (vcd ValidatorCommissionDecorator) AnteHandle(ctx sdk.Context, tx sdk.Tx, s
 
 // validateAuthz validates the authorization internal message
 func (vcd ValidatorCommissionDecorator) validateAuthz(ctx sdk.Context, execMsg *authz.MsgExec) error {
+	return vcd.validateAuthzDepth(ctx, execMsg, 0)
+}
+
+func (vcd ValidatorCommissionDecorator) validateAuthzDepth(ctx sdk.Context, execMsg *authz.MsgExec, depth int) error {
+	if depth > maxAuthzValidationDepth {
+		return sdkerrors.Wrapf(
+			errortypes.ErrInvalidRequest,
+			"authz nesting depth exceeds maximum %d",
+			maxAuthzValidationDepth,
+		)
+	}
 	for _, v := range execMsg.Msgs {
 		var innerMsg sdk.Msg
 		err := vcd.cdc.UnpackAny(v, &innerMsg)
@@ -59,7 +74,7 @@ func (vcd ValidatorCommissionDecorator) validateAuthz(ctx sdk.Context, execMsg *
 			return err
 		}
 		if nested, ok := innerMsg.(*authz.MsgExec); ok {
-			if err := vcd.validateAuthz(ctx, nested); err != nil {
+			if err := vcd.validateAuthzDepth(ctx, nested, depth+1); err != nil {
 				return err
 			}
 		}

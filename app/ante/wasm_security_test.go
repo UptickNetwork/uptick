@@ -1,7 +1,6 @@
 package ante
 
 import (
-	"encoding/json"
 	"testing"
 
 	txsigning "cosmossdk.io/x/tx/signing"
@@ -91,17 +90,6 @@ func TestExtractMessagesFromTxCountLimit(t *testing.T) {
 	_, err := extractMessagesFromTx(&mockTxWithMsgs{msgs: msgs})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "message count exceeds maximum")
-}
-
-func TestCountWasmDispatchMsgsJSONDepthLimit(t *testing.T) {
-	var v interface{} = map[string]interface{}{"wasm": map[string]interface{}{}}
-	for i := 0; i < maxWasmJSONDepth+1; i++ {
-		v = map[string]interface{}{"nested": v}
-	}
-	bz, err := json.Marshal(v)
-	require.NoError(t, err)
-	n := countWasmDispatchMsgs(bz, MaxWasmDispatchMsgCount)
-	require.Greater(t, n, uint64(MaxWasmDispatchMsgCount))
 }
 
 // mockTxWithMsgs implements the sdk.Tx interface with configurable messages

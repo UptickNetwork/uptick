@@ -2,6 +2,7 @@ package ante
 
 import (
 	"fmt"
+	"math/big"
 	"strconv"
 	"strings"
 
@@ -108,6 +109,29 @@ func (svd Eip712SigVerificationDecorator) AnteHandle(
 	pubKey := acc.GetPubKey()
 	if !simulate && pubKey == nil {
 		return ctx, errorsmod.Wrap(errortypes.ErrInvalidPubKey, "pubkey on account is not set")
+	}
+
+	// Self-contained signer binding (M-2). Do not rely solely on the SDK
+	// IsSigverifyTx gate: if that gate is disabled, or the account has a balance
+	// but no pubkey yet, a tx that swaps in an attacker pubkey must still be
+	// rejected here.
+	if sig.PubKey != nil {
+		sigAddr := sdk.AccAddress(sig.PubKey.Address().Bytes())
+		if !sigAddr.Equals(sdk.AccAddress(signerAddrs[i])) {
+			return ctx, errorsmod.Wrapf(
+				errortypes.ErrorInvalidSigner,
+				"tx signer pubkey %s does not match declared signer %s",
+				sigAddr, sdk.AccAddress(signerAddrs[i]),
+			)
+		}
+	}
+
+	if pubKey != nil && sig.PubKey != nil && !pubKey.Equals(sig.PubKey) {
+		return ctx, errorsmod.Wrapf(
+			errortypes.ErrInvalidPubKey,
+			"on-chain pubkey %s does not match tx-declared pubkey %s",
+			pubKey, sig.PubKey,
+		)
 	}
 
 	if sig.Sequence != acc.GetSequence() {
@@ -236,6 +260,13 @@ func verifyEip712Signature(
 	// Remove the recovery offset if needed (e.g. MetaMask EIP-712 signature).
 	if feePayerSig[ethcrypto.RecoveryIDOffset] == 27 || feePayerSig[ethcrypto.RecoveryIDOffset] == 28 {
 		feePayerSig[ethcrypto.RecoveryIDOffset] -= 27
+	}
+
+	// Enforce EIP-2 low-s normalization to reject malleable high-s signatures.
+	r := new(big.Int).SetBytes(feePayerSig[:ethcrypto.RecoveryIDOffset-32])
+	s := new(big.Int).SetBytes(feePayerSig[ethcrypto.RecoveryIDOffset-32 : ethcrypto.RecoveryIDOffset])
+	if !ethcrypto.ValidateSignatureValues(feePayerSig[ethcrypto.RecoveryIDOffset], r, s, true) {
+		return errorsmod.Wrap(errortypes.ErrorInvalidSigner, "invalid signature values (high-s or out-of-range)")
 	}
 
 	feePayerPubkey, err := secp256k1.RecoverPubkey(sigHash, feePayerSig)

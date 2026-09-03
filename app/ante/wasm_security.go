@@ -1,7 +1,6 @@
 package ante
 
 import (
-	"encoding/json"
 	"fmt"
 
 	sdkerrors "cosmossdk.io/errors"
@@ -15,19 +14,12 @@ import (
 )
 
 const (
-	// MaxWasmDispatchMsgCount limits the maximum number of nested messages in a CosmWasm DispatchMsg
-	// to prevent DoS attacks via excessive nested messages
-	MaxWasmDispatchMsgCount = 10
-
 	// MaxAuthzNestingDepth limits nested authz.MsgExec unpacking before SetUpContext.
 	MaxAuthzNestingDepth = 5
 
 	// MaxExtractedMessages caps the flattened message list from a single tx,
 	// including nested authz messages.
 	MaxExtractedMessages = 32
-
-	// maxWasmJSONDepth bounds recursive JSON walks of CosmWasm payloads.
-	maxWasmJSONDepth = 32
 
 	// EvmMsgTypeURL is the type URL for EVM messages
 	EvmMsgTypeURL = "/cosmos.evm.vm.v1.MsgEthereumTx"
@@ -39,19 +31,14 @@ type WasmSecurityDecorator struct {
 	cdc            codec.BinaryCodec
 	evmKeeper      anteinterfaces.EVMKeeper
 	maxTxGasWanted uint64
-	maxDispatch    uint64
 }
 
 // NewWasmSecurityDecorator creates a new WasmSecurityDecorator
-func NewWasmSecurityDecorator(cdc codec.BinaryCodec, evmKeeper anteinterfaces.EVMKeeper, maxTxGasWanted, maxDispatch uint64) WasmSecurityDecorator {
-	if maxDispatch == 0 {
-		maxDispatch = MaxWasmDispatchMsgCount
-	}
+func NewWasmSecurityDecorator(cdc codec.BinaryCodec, evmKeeper anteinterfaces.EVMKeeper, maxTxGasWanted uint64) WasmSecurityDecorator {
 	return WasmSecurityDecorator{
 		cdc:            cdc,
 		evmKeeper:      evmKeeper,
 		maxTxGasWanted: maxTxGasWanted,
-		maxDispatch:    maxDispatch,
 	}
 }
 
@@ -245,38 +232,4 @@ func (wsd WasmSecurityDecorator) ExtractMessagesFromTx(ctx sdk.Context, tx sdk.T
 	}
 
 	return allMsgs, nil
-}
-
-func countWasmDispatchMsgs(raw json.RawMessage, maxDispatch uint64) uint64 {
-	var v interface{}
-	if err := json.Unmarshal(raw, &v); err != nil {
-		return 0
-	}
-	return countCosmosMsgs(v, 0, maxDispatch)
-}
-
-func countCosmosMsgs(v interface{}, depth int, maxDispatch uint64) uint64 {
-	if depth > maxWasmJSONDepth {
-		return maxDispatch + 1
-	}
-	switch x := v.(type) {
-	case map[string]interface{}:
-		var n uint64
-		for k, child := range x {
-			switch k {
-			case "wasm", "bank", "staking", "stargate", "ibc", "gov", "distribution":
-				n++
-			}
-			n += countCosmosMsgs(child, depth+1, maxDispatch)
-		}
-		return n
-	case []interface{}:
-		var n uint64
-		for _, child := range x {
-			n += countCosmosMsgs(child, depth+1, maxDispatch)
-		}
-		return n
-	default:
-		return 0
-	}
 }

@@ -29,22 +29,21 @@ import (
 // AnteHandler decorators. It wraps cosmos/evm's HandlerOptions and adds
 // Uptick-specific fields.
 type HandlerOptions struct {
-	AccountKeeper           anteinterfaces.AccountKeeper
-	BankKeeper              anteinterfaces.BankKeeper
-	IBCKeeper               *ibckeeper.Keeper
-	FeeMarketKeeper         anteinterfaces.FeeMarketKeeper
-	EvmKeeper               anteinterfaces.EVMKeeper
-	FeegrantKeeper          ante.FeegrantKeeper
-	SignModeHandler         *txsigning.HandlerMap
-	SigGasConsumer          func(meter storetypes.GasMeter, sig signing.SignatureV2, params authtypes.Params) error
-	Cdc                     codec.BinaryCodec
-	MaxTxGasWanted          uint64
-	TxFeeChecker            ante.TxFeeChecker
-	DisabledAuthzMsgs       []string
-	MaxWasmDispatchMsgCount uint64
-	WasmKeeper              *wasmkeeper.Keeper
-	WasmNodeConfig          *wasmtypes.NodeConfig
-	TXCounterStoreService   corestoretypes.KVStoreService
+	AccountKeeper         anteinterfaces.AccountKeeper
+	BankKeeper            anteinterfaces.BankKeeper
+	IBCKeeper             *ibckeeper.Keeper
+	FeeMarketKeeper       anteinterfaces.FeeMarketKeeper
+	EvmKeeper             anteinterfaces.EVMKeeper
+	FeegrantKeeper        ante.FeegrantKeeper
+	SignModeHandler       *txsigning.HandlerMap
+	SigGasConsumer        func(meter storetypes.GasMeter, sig signing.SignatureV2, params authtypes.Params) error
+	Cdc                   codec.BinaryCodec
+	MaxTxGasWanted        uint64
+	TxFeeChecker          ante.TxFeeChecker
+	DisabledAuthzMsgs     []string
+	WasmKeeper            *wasmkeeper.Keeper
+	WasmNodeConfig        *wasmtypes.NodeConfig
+	TXCounterStoreService corestoretypes.KVStoreService
 }
 
 // Validate checks if the keepers are defined
@@ -133,13 +132,8 @@ func newCosmosAnteHandler(options HandlerOptions) sdk.AnteHandler {
 			simGasLimit = options.WasmNodeConfig.SimulationGasLimit
 		}
 
-		maxDispatch := options.MaxWasmDispatchMsgCount
-		if maxDispatch == 0 {
-			maxDispatch = MaxWasmDispatchMsgCount
-		}
-
 		decorators := []sdk.AnteDecorator{
-			NewWasmSecurityDecorator(options.Cdc, options.EvmKeeper, options.MaxTxGasWanted, maxDispatch),
+			NewWasmSecurityDecorator(options.Cdc, options.EvmKeeper, options.MaxTxGasWanted),
 			NewValidatorCommissionDecorator(options.Cdc),
 		}
 		if options.TXCounterStoreService != nil {
@@ -193,13 +187,8 @@ func newCosmosAnteHandlerEip712(options HandlerOptions) sdk.AnteHandler {
 			simGasLimit = options.WasmNodeConfig.SimulationGasLimit
 		}
 
-		maxDispatch := options.MaxWasmDispatchMsgCount
-		if maxDispatch == 0 {
-			maxDispatch = MaxWasmDispatchMsgCount
-		}
-
 		decorators := []sdk.AnteDecorator{
-			NewWasmSecurityDecorator(options.Cdc, options.EvmKeeper, options.MaxTxGasWanted, maxDispatch),
+			NewWasmSecurityDecorator(options.Cdc, options.EvmKeeper, options.MaxTxGasWanted),
 			NewValidatorCommissionDecorator(options.Cdc),
 		}
 		if options.TXCounterStoreService != nil {
