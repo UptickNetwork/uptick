@@ -40,7 +40,12 @@ func NewConvertNFTCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "convert-nft [class_id] [cosmos_token_ids] [evm_contract_address] [evm_token_ids] [receiver_hex]",
 		Short: "Convert a Cosmos nft to erc721. When the receiver [optional] is omitted, the erc721 tokens are transferred to the sender.",
-		Args:  cobra.RangeArgs(4, 5),
+		Long: "Convert a native Cosmos nft (x/collection) into an ERC721 token.\n" +
+			"  - evm_contract_address: empty ('') triggers the module to auto-deploy an ERC721Uptick;\n" +
+			"    pass an existing contract address to reuse it instead. A non-empty value must be a valid 0x address.\n" +
+			"  - evm_token_ids: leave empty when auto-deploying (the module derives them from cosmos_token_ids).\n" +
+			"  - receiver_hex: optional; if omitted the tokens are minted to the sender.",
+		Args: cobra.RangeArgs(4, 5),
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			cliCtx, err := client.GetClientTxContext(cmd)
@@ -63,14 +68,14 @@ func NewConvertNFTCmd() *cobra.Command {
 			//	return fmt.Errorf("evm contract address can not be empty")
 			//}
 
-		// When evm token ids are omitted (first conversion / auto-deploy), leave
-		// the slice empty so the module derives them from the cosmos token ids.
-		// A bare strings.Split("", ",") would yield [""], which fails
-		// ValidateEVMTokenID in ValidateBasic.
-		var evmTokenIds []string
-		if args[3] != "" {
-			evmTokenIds = strings.Split(args[3], ",")
-		}
+			// When evm token ids are omitted (first conversion / auto-deploy), leave
+			// the slice empty so the module derives them from the cosmos token ids.
+			// A bare strings.Split("", ",") would yield [""], which fails
+			// ValidateEVMTokenID in ValidateBasic.
+			var evmTokenIds []string
+			if args[3] != "" {
+				evmTokenIds = strings.Split(args[3], ",")
+			}
 
 			var evmReceiver string
 			cosmosSender := cliCtx.GetFromAddress()

@@ -7,6 +7,8 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/ethereum/go-ethereum/common"
+
+	collectiontypes "github.com/UptickNetwork/uptick/x/collection/types"
 )
 
 var (
@@ -37,6 +39,12 @@ func (msg MsgConvertNFT) ValidateBasic() error {
 	if !common.IsHexAddress(msg.EvmReceiver) {
 		return sdkerrors.Wrapf(errortypes.ErrInvalidAddress, "invalid receiver hex address %s", msg.EvmReceiver)
 	}
+	// 若提供了 EVM 合约地址（空 = 触发模块自动部署 ERC721Uptick），则必须是合法 0x 地址，
+	// 否则会在 keeper 层 ABI 打包时才报“unknown request”，这里提前拦截。
+	if msg.EvmContractAddress != "" && !common.IsHexAddress(msg.EvmContractAddress) {
+		return sdkerrors.Wrapf(errortypes.ErrInvalidAddress,
+			"invalid contract hex address '%s'", msg.EvmContractAddress)
+	}
 	if strings.TrimSpace(msg.ClassId) == "" {
 		return sdkerrors.Wrap(errortypes.ErrInvalidRequest, "class id cannot be empty")
 	}
@@ -46,6 +54,11 @@ func (msg MsgConvertNFT) ValidateBasic() error {
 	for _, id := range msg.CosmosTokenIds {
 		if id == "" {
 			return sdkerrors.Wrap(errortypes.ErrInvalidRequest, "cosmos token id cannot be empty")
+		}
+		// 复用 collection 的 nft id 校验（长度 [3,128]、禁 NUL 和 "/"），
+		// 避免短 id（如 "n1"）发到链上才报错。
+		if err := collectiontypes.ValidateTokenID(id); err != nil {
+			return sdkerrors.Wrapf(err, "invalid cosmos token id '%s'", id)
 		}
 	}
 	for _, tokenID := range msg.EvmTokenIds {
@@ -101,6 +114,9 @@ func (msg MsgConvertERC721) ValidateBasic() error {
 	for _, id := range msg.CosmosTokenIds {
 		if id == "" {
 			return sdkerrors.Wrap(errortypes.ErrInvalidRequest, "cosmos token id cannot be empty")
+		}
+		if err := collectiontypes.ValidateTokenID(id); err != nil {
+			return sdkerrors.Wrapf(err, "invalid cosmos token id '%s'", id)
 		}
 	}
 	return nil

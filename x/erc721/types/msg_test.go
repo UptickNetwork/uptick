@@ -10,12 +10,13 @@ func TestMsgConvertNFT_ValidateBasic_ERC721(t *testing.T) {
 	validSender := "cosmos1qypqxpq9qcrsszg2pvxq6rs0zqg3yyc5lzv7xu"
 
 	tests := []struct {
-		name        string
-		sender      string
-		evmReceiver string
-		classID     string
-		nftIDs      []string
-		wantErr     bool
+		name            string
+		sender          string
+		evmReceiver     string
+		evmContractAddr string
+		classID         string
+		nftIDs          []string
+		wantErr         bool
 	}{
 		{
 			name:        "valid complete",
@@ -57,15 +58,33 @@ func TestMsgConvertNFT_ValidateBasic_ERC721(t *testing.T) {
 			nftIDs:      []string{"nft-1"},
 			wantErr:     true,
 		},
+		{
+			name:            "invalid contract hex address",
+			sender:          validSender,
+			evmReceiver:     "0x1234567890123456789012345678901234567890",
+			evmContractAddr: "0x123",
+			classID:         "class-1",
+			nftIDs:          []string{"nft-1"},
+			wantErr:         true,
+		},
+		{
+			name:        "short nft id",
+			sender:      validSender,
+			evmReceiver: "0x1234567890123456789012345678901234567890",
+			classID:     "class-1",
+			nftIDs:      []string{"n1"},
+			wantErr:     true,
+		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			msg := MsgConvertNFT{
-				CosmosSender:   tc.sender,
-				EvmReceiver:    tc.evmReceiver,
-				ClassId:        tc.classID,
-				CosmosTokenIds: tc.nftIDs,
+				CosmosSender:       tc.sender,
+				EvmReceiver:        tc.evmReceiver,
+				EvmContractAddress: tc.evmContractAddr,
+				ClassId:            tc.classID,
+				CosmosTokenIds:     tc.nftIDs,
 			}
 			err := msg.ValidateBasic()
 			if tc.wantErr {
