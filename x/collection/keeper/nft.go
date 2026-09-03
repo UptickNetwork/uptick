@@ -213,11 +213,12 @@ func (k Keeper) GetNFTs(ctx sdk.Context, denom string) (nfts []exported.NFT, err
 	tokens := k.nk.GetNFTsOfClass(ctx, denom)
 	for _, token := range tokens {
 		var nftMetadata types.NFTMetadata
-		if token.Data == nil {
-			return nil, sdkerrors.Wrapf(types.ErrInvalidTokenID, "nft ID %s has no metadata", token.GetId())
-		}
-		if err := k.cdc.Unmarshal(token.Data.GetValue(), &nftMetadata); err != nil {
-			return nil, err
+		// A legacy / migrated NFT may carry nil Data; treat it as empty metadata
+		// instead of failing genesis export or collection queries.
+		if token.Data != nil {
+			if err := k.cdc.Unmarshal(token.Data.GetValue(), &nftMetadata); err != nil {
+				return nil, err
+			}
 		}
 		nfts = append(nfts, types.BaseNFT{
 			Id:      token.GetId(),

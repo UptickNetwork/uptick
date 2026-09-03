@@ -10,6 +10,7 @@ import (
 	rootstore "cosmossdk.io/store"
 	storemetrics "cosmossdk.io/store/metrics"
 	storetypes "cosmossdk.io/store/types"
+	"cosmossdk.io/x/nft"
 	nftkeeper "cosmossdk.io/x/nft/keeper"
 
 	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
@@ -177,6 +178,26 @@ func (s *KeeperTestSuite) TestAuthorize() {
 
 	// A non-existent NFT is never authorized.
 	s.Require().Error(s.keeper.Authorize(s.ctx, "denom1", "does-not-exist", creator))
+}
+
+// TestExportGenesisNilData ensures a legacy / migrated NFT with nil Data does not
+// make genesis export panic (it is exported with empty metadata instead).
+func (s *KeeperTestSuite) TestExportGenesisNilData() {
+	creator := sdk.AccAddress([]byte("creator-nil"))
+	s.Require().NoError(s.keeper.SaveDenom(s.ctx, "denom-nil", "Nil", "", "NIL", creator, false, false, "", "", "", ""))
+
+	// Mint directly via the underlying nft keeper to produce a nil-Data NFT
+	// (SaveNFT always attaches NFTMetadata).
+	s.Require().NoError(s.nftKpr.Mint(s.ctx, nft.NFT{
+		ClassId: "denom-nil",
+		Id:      "nft-nil",
+		Uri:     "ipfs://nil",
+	}, creator))
+
+	gs := s.keeper.ExportGenesis(s.ctx)
+	s.Require().NotNil(gs)
+	s.Require().Len(gs.Collections, 1)
+	s.Require().Len(gs.Collections[0].NFTs, 1)
 }
 
 // ============================================================================
