@@ -119,8 +119,26 @@ func (k Keeper) TransferOwnership(ctx sdk.Context, denomID,
 		return err
 	}
 
-	tokenChanged := types.Modified(tokenURI) || types.Modified(tokenURIHash)
-	tokenMetadataChanged := types.Modified(tokenNm) || types.Modified(tokenData)
+	// A field only counts as a real change if the incoming value actually
+	// differs from the stored one. Copying the current URI/URIHash/metadata on a
+	// pure transfer must not be treated as an update, otherwise an
+	// UpdateRestricted denom would block legitimate ownership transfers (L-1).
+	tokenChanged := (types.Modified(tokenURI) && tokenURI != token.Uri) ||
+		(types.Modified(tokenURIHash) && tokenURIHash != token.UriHash)
+
+	tokenMetadataChanged := false
+	if types.Modified(tokenNm) || types.Modified(tokenData) {
+		if token.Data == nil {
+			tokenMetadataChanged = true
+		} else {
+			nftMetadata, err := types.UnmarshalNFTMetadata(k.cdc, token.Data.GetValue())
+			if err != nil {
+				return err
+			}
+			tokenMetadataChanged = (types.Modified(tokenNm) && tokenNm != nftMetadata.Name) ||
+				(types.Modified(tokenData) && tokenData != nftMetadata.Data)
+		}
+	}
 
 	if denom.UpdateRestricted && (tokenChanged || tokenMetadataChanged) {
 		return sdkerrors.Wrapf(errortypes.ErrUnauthorized, "It is restricted to update NFT under this denom %s", denom.Id)

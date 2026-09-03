@@ -71,8 +71,25 @@ func (msg MsgIssueDenom) ValidateBasic() error {
 		return sdkerrors.Wrapf(errortypes.ErrInvalidAddress, "invalid sender address (%s)", err)
 	}
 
+	if len(msg.Schema) > MaxDenomSchemaLen {
+		return sdkerrors.Wrapf(
+			errortypes.ErrInvalidRequest,
+			"denom schema too long; max %d",
+			MaxDenomSchemaLen,
+		)
+	}
+	if len(msg.Schema) != 0 && !gjson.Valid(msg.Schema) {
+		return sdkerrors.Wrap(errortypes.ErrJSONUnmarshal, "invalid schema, must be a JSON string or empty")
+	}
 	if len(msg.Data) != 0 && !gjson.Valid(msg.Data) {
 		return sdkerrors.Wrap(errortypes.ErrJSONUnmarshal, "invalid data, must be a JSON string or empty")
+	}
+	if len(msg.Data) > MaxDenomDataLen {
+		return sdkerrors.Wrapf(
+			errortypes.ErrInvalidRequest,
+			"denom data too long; max %d",
+			MaxDenomDataLen,
+		)
 	}
 	return ValidateKeywords(msg.Id)
 }

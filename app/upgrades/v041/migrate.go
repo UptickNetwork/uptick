@@ -40,6 +40,12 @@ func init() {
 // never loads the contract and precompile calls fail.
 func migrateActiveStaticPrecompiles(ctx sdk.Context, box upgrades.Toolbox) error {
 	params := box.EvmKeeper.GetParams(ctx)
+	if len(params.ActiveStaticPrecompiles) != 0 {
+		// Preserve any existing governance / on-chain decision. Overwriting an
+		// already-populated list would silently revert an administrator's choice
+		// (e.g. removing the distribution precompile to mitigate a vulnerability).
+		return nil
+	}
 	params.ActiveStaticPrecompiles = defaultActiveStaticPrecompiles
 	if err := box.EvmKeeper.SetParams(ctx, params); err != nil {
 		return fmt.Errorf("set evm params: %w", err)

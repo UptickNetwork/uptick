@@ -164,7 +164,11 @@ func (k Keeper) QueryClassEnhance(
 	}
 
 	if len(ret) != 7 {
-		return types.ClassEnhance{}, nil
+		return types.ClassEnhance{}, sdkerrors.Wrapf(
+			types.ErrABIUnpack,
+			"unexpected getClassEnhanceInfo length %d, expected 7",
+			len(ret),
+		)
 	}
 
 	return types.NewClassEnhance(

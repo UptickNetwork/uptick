@@ -17,6 +17,12 @@ const (
 
 	MaxTokenURILen = 256
 
+	// MaxDenomSchemaLen bounds the denom schema (it is embedded in the first
+	// ERC721 deployment calldata, so an unbounded schema can permanently DoS
+	// conversion). MaxDenomDataLen bounds arbitrary denom metadata.
+	MaxDenomSchemaLen = 8192
+	MaxDenomDataLen   = 65536
+
 	ReservedIBC = "ibc"
 )
 

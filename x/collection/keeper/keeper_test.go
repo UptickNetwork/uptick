@@ -155,6 +155,30 @@ func (s *KeeperTestSuite) TestGetTotalSupply() {
 	})
 }
 
+// TestAuthorize covers the single authority checkpoint that gates every NFT
+// mutation (transfer, burn, update). A non-owner must never pass, regardless of
+// denom-level permission flags.
+func (s *KeeperTestSuite) TestAuthorize() {
+	creator := sdk.AccAddress([]byte("creator"))
+	other := sdk.AccAddress([]byte("other"))
+
+	err := s.keeper.SaveDenom(s.ctx, "denom1", "Denom One", "", "ONE", creator, true, false, "", "", "", "")
+	s.Require().NoError(err)
+	err = s.keeper.SaveNFT(s.ctx, "denom1", "nft1", "NFT One", "ipfs://nft1", "", "", creator)
+	s.Require().NoError(err)
+
+	// The owner is authorized.
+	s.Require().NoError(s.keeper.Authorize(s.ctx, "denom1", "nft1", creator))
+
+	// A non-owner is rejected with the canonical unauthorized error.
+	err = s.keeper.Authorize(s.ctx, "denom1", "nft1", other)
+	s.Require().Error(err)
+	s.Require().ErrorIs(err, types.ErrUnauthorized)
+
+	// A non-existent NFT is never authorized.
+	s.Require().Error(s.keeper.Authorize(s.ctx, "denom1", "does-not-exist", creator))
+}
+
 // ============================================================================
 // Invariant tests
 // ============================================================================

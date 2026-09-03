@@ -73,3 +73,128 @@ func (s *KeeperTestSuite) TestMsgServerNFTLifecycleAuthorization() {
 	_, err = s.keeper.GetNFT(s.ctx, "denom1", "nft1")
 	s.Require().Error(err)
 }
+
+// TestUpdateRestrictedAllowsPureTransfer covers L-1: for an UpdateRestricted
+// denom a pure ownership transfer MUST succeed even when the caller echoes the
+// existing metadata, while a real metadata change must remain blocked.
+func (s *KeeperTestSuite) TestUpdateRestrictedAllowsPureTransfer() {
+	creator := sdk.AccAddress([]byte("creator2"))
+	recipient := sdk.AccAddress([]byte("recipient2"))
+	goCtx := sdk.WrapSDKContext(s.ctx)
+
+	_, err := s.keeper.IssueDenom(goCtx, &types.MsgIssueDenom{
+		Id:               "denom-locked",
+		Name:             "Locked",
+		Symbol:           "LCK",
+		Schema:           "",
+		Sender:           creator.String(),
+		MintRestricted:   true,
+		UpdateRestricted: true,
+	})
+	s.Require().NoError(err)
+
+	_, err = s.keeper.MintNFT(goCtx, &types.MsgMintNFT{
+		DenomId:   "denom-locked",
+		Id:        "nft1",
+		Name:      "NFT One",
+		URI:       "ipfs://nft1",
+		Data:      "",
+		Sender:    creator.String(),
+		Recipient: recipient.String(),
+	})
+	s.Require().NoError(err)
+
+	// Pure transfer: echo the SAME metadata. This must not be treated as an
+	// update, so UpdateRestricted must not block it.
+	_, err = s.keeper.TransferNFT(goCtx, &types.MsgTransferNFT{
+		DenomId:   "denom-locked",
+		Id:        "nft1",
+		Name:      "NFT One",
+		URI:       "ipfs://nft1",
+		Data:      "",
+		UriHash:   "",
+		Sender:    recipient.String(),
+		Recipient: creator.String(),
+	})
+	s.Require().NoError(err)
+
+	// Setting a genuinely different URI on an UpdateRestricted denom is blocked.
+	_, err = s.keeper.TransferNFT(goCtx, &types.MsgTransferNFT{
+		DenomId:   "denom-locked",
+		Id:        "nft1",
+		Name:      "NFT One",
+		URI:       "ipfs://changed",
+		Data:      "",
+		Sender:    creator.String(),
+		Recipient: recipient.String(),
+	})
+	s.Require().Error(err)
+	s.Require().ErrorContains(err, "restricted to update NFT")
+}
+
+// TestMsgServerEditNFT covers the EditNFT branch: on a non-restricted denom the
+// owner can update metadata, while an UpdateRestricted denom reject edits.
+func (s *KeeperTestSuite) TestMsgServerEditNFT() {
+	creator := sdk.AccAddress([]byte("editor-creator"))
+	goCtx := sdk.WrapSDKContext(s.ctx)
+
+	_, err := s.keeper.IssueDenom(goCtx, &types.MsgIssueDenom{
+		Id:               "denom-edit",
+		Name:             "Editable",
+		Symbol:           "EDT",
+		Schema:           "",
+		Sender:           creator.String(),
+		MintRestricted:   true,
+		UpdateRestricted: false,
+	})
+	s.Require().NoError(err)
+	_, err = s.keeper.MintNFT(goCtx, &types.MsgMintNFT{
+		DenomId: "denom-edit", Id: "nft1", Name: "Old", URI: "ipfs://old", Data: "",
+		Sender: creator.String(), Recipient: creator.String(),
+	})
+	s.Require().NoError(err)
+
+	_, err = s.keeper.EditNFT(goCtx, &types.MsgEditNFT{
+		DenomId: "denom-edit", Id: "nft1", Name: "New", URI: "ipfs://new", Sender: creator.String(),
+	})
+	s.Require().NoError(err)
+	nft, err := s.keeper.GetNFT(s.ctx, "denom-edit", "nft1")
+	s.Require().NoError(err)
+	s.Require().Equal("New", nft.GetName())
+	s.Require().Equal("ipfs://new", nft.GetURI())
+
+	// A non-owner cannot edit.
+	_, err = s.keeper.EditNFT(goCtx, &types.MsgEditNFT{
+		DenomId: "denom-edit", Id: "nft1", Name: "Hacked", Sender: sdk.AccAddress([]byte("evil")).String(),
+	})
+	s.Require().Error(err)
+}
+
+// TestMsgServerTransferDenom covers the TransferDenom branch: only the current
+// denom creator may transfer ownership.
+func (s *KeeperTestSuite) TestMsgServerTransferDenom() {
+	creator := sdk.AccAddress([]byte("creator-denom"))
+	newOwner := sdk.AccAddress([]byte("new-denom-owner"))
+	goCtx := sdk.WrapSDKContext(s.ctx)
+
+	_, err := s.keeper.IssueDenom(goCtx, &types.MsgIssueDenom{
+		Id: "denom-transfer", Name: "Transfer", Symbol: "TRF", Schema: "",
+		Sender: creator.String(), MintRestricted: true, UpdateRestricted: false,
+	})
+	s.Require().NoError(err)
+
+	// A non-creator cannot transfer the denom.
+	_, err = s.keeper.TransferDenom(goCtx, &types.MsgTransferDenom{
+		Id: "denom-transfer", Sender: sdk.AccAddress([]byte("evil")).String(), Recipient: newOwner.String(),
+	})
+	s.Require().Error(err)
+
+	// The creator transfers ownership.
+	_, err = s.keeper.TransferDenom(goCtx, &types.MsgTransferDenom{
+		Id: "denom-transfer", Sender: creator.String(), Recipient: newOwner.String(),
+	})
+	s.Require().NoError(err)
+	denom, err := s.keeper.GetDenomInfo(s.ctx, "denom-transfer")
+	s.Require().NoError(err)
+	s.Require().Equal(newOwner.String(), denom.Creator)
+}

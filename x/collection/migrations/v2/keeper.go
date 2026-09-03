@@ -3,7 +3,6 @@ package v2
 import (
 	"cosmossdk.io/core/store"
 	"github.com/cosmos/cosmos-sdk/runtime"
-	"reflect"
 	"unsafe"
 
 	"cosmossdk.io/store/prefix"
@@ -148,13 +147,7 @@ func nftOfClassByOwnerStoreKey(owner sdk.AccAddress, classID string) []byte {
 // UnsafeStrToBytes uses unsafe to convert string into byte array. Returned bytes
 // must not be altered after this function is called as it will cause a segmentation fault.
 func UnsafeStrToBytes(s string) []byte {
-	var buf []byte
-	sHdr := (*reflect.StringHeader)(unsafe.Pointer(&s))
-	bufHdr := (*reflect.SliceHeader)(unsafe.Pointer(&buf))
-	bufHdr.Data = sHdr.Data
-	bufHdr.Cap = sHdr.Len
-	bufHdr.Len = sHdr.Len
-	return buf
+	return unsafe.Slice(unsafe.StringData(s), len(s))
 }
 
 // UnsafeBytesToStr is meant to make a zero allocation conversion
@@ -162,5 +155,5 @@ func UnsafeStrToBytes(s string) []byte {
 // to be used generally, but for a specific pattern to delete keys
 // from a map.
 func UnsafeBytesToStr(b []byte) string {
-	return *(*string)(unsafe.Pointer(&b))
+	return unsafe.String(unsafe.SliceData(b), len(b))
 }
