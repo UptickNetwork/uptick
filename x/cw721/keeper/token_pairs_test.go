@@ -215,20 +215,6 @@ func TestSetNFTPairs_RejectsReverseConflict(t *testing.T) {
 	require.ErrorIs(t, err, cw721types.ErrNFTMappingConflict)
 }
 
-func TestValidateNoCommaIDs(t *testing.T) {
-	k, ctx := setupKeeper(t)
-	_ = k
-	_ = ctx
-
-	// Comma-free IDs pass.
-	require.NoError(t, validateNoCommaIDs([]string{"nft1"}, []string{"token-42"}))
-
-	// A comma in any ID is rejected (mapping key is comma-delimited, L-3).
-	err := validateNoCommaIDs([]string{"nft,with-comma"})
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "comma")
-}
-
 func TestGetPair_NotFound(t *testing.T) {
 	k, ctx := setupKeeper(t)
 

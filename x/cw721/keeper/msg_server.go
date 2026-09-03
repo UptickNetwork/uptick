@@ -17,25 +17,6 @@ var _ types.MsgServer = &Keeper{}
 
 const maxCW721BatchSize = 100
 
-// validateNoCommaIDs rejects IDs that contain a comma. The NFT↔CW721 mapping
-// keys are comma-delimited (CreateTokenUID/CreateNFTUID), so an ID containing a
-// comma would produce an ambiguous key that GetNFTFromUID cannot round-trip,
-// permanently breaking the mapping and any refund path (L-3 interim).
-func validateNoCommaIDs(ids ...[]string) error {
-	for _, list := range ids {
-		for _, id := range list {
-			if strings.Contains(id, ",") {
-				return sdkerrors.Wrapf(
-					errortypes.ErrInvalidRequest,
-					"token/nft id contains illegal comma: %q",
-					id,
-				)
-			}
-		}
-	}
-	return nil
-}
-
 // TransferCW721 converts CW721 tokens into native Cosmos nft for both
 // Cosmos-native and CW721 TokenPair Owners and transfer through IBC
 func (k Keeper) TransferCW721(
@@ -106,9 +87,6 @@ func (k Keeper) ConvertCW721(
 	}
 	msg.ClassId = classId
 	msg.NftIds = nftIds
-	if err := validateNoCommaIDs(msg.TokenIds, msg.NftIds); err != nil {
-		return nil, err
-	}
 	if len(msg.TokenIds) == 0 || len(msg.TokenIds) != len(msg.NftIds) {
 		return nil, sdkerrors.Wrapf(errortypes.ErrInvalidRequest, "CW721 token ids and NFT ids length mismatch")
 	}
@@ -256,9 +234,6 @@ func (k Keeper) ConvertNFT(
 
 	msg.ContractAddress = contractAddress
 	msg.TokenIds = tokenIds
-	if err := validateNoCommaIDs(msg.TokenIds, msg.NftIds); err != nil {
-		return nil, err
-	}
 
 	id := k.GetClassMap(ctx, msg.ClassId)
 	k.Logger(ctx).Info("ConvertNFT ", "id", id, "msg", msg)

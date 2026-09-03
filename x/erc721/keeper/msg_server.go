@@ -23,25 +23,6 @@ var _ types.MsgServer = &Keeper{}
 
 const maxERC721BatchSize = 100
 
-// validateNoCommaIDs rejects IDs that contain a comma. The NFT↔ERC721 mapping
-// keys are comma-delimited (CreateTokenUID/CreateNFTUID), so an ID containing a
-// comma would produce an ambiguous key that GetNFTFromUID cannot round-trip,
-// permanently breaking the mapping and any refund path (L-3 interim).
-func validateNoCommaIDs(ids ...[]string) error {
-	for _, list := range ids {
-		for _, id := range list {
-			if strings.Contains(id, ",") {
-				return sdkerrors.Wrapf(
-					errortypes.ErrInvalidRequest,
-					"token/nft id contains illegal comma: %q",
-					id,
-				)
-			}
-		}
-	}
-	return nil
-}
-
 func parseERC721TokenID(tokenID string) (*big.Int, error) {
 	n, ok := new(big.Int).SetString(tokenID, 10)
 	if !ok || n.Sign() < 0 || n.BitLen() > 256 {
@@ -129,9 +110,6 @@ func (k Keeper) ConvertERC721(
 	}
 	msg.ClassId = classId
 	msg.CosmosTokenIds = nftIds
-	if err := validateNoCommaIDs(msg.CosmosTokenIds); err != nil {
-		return nil, err
-	}
 	if len(msg.EvmTokenIds) == 0 || len(msg.EvmTokenIds) != len(msg.CosmosTokenIds) {
 		return nil, sdkerrors.Wrapf(errortypes.ErrInvalidRequest, "evm token ids and cosmos token ids length mismatch")
 	}
@@ -229,9 +207,6 @@ func (k Keeper) ConvertNFT(
 	}
 	msg.EvmContractAddress = strings.ToLower(contractAddress)
 	msg.EvmTokenIds = tokenIds
-	if err := validateNoCommaIDs(msg.CosmosTokenIds); err != nil {
-		return nil, err
-	}
 
 	// Error checked during msg validation
 	receiver := common.HexToAddress(msg.EvmReceiver)

@@ -177,15 +177,33 @@ func TestGetNFTFromUID_Invalid(t *testing.T) {
 	require.Equal(t, "", nftID)
 	require.Equal(t, "", classID)
 
-	// Too many commas
-	nftID2, classID2 := GetNFTFromUID("a,b,c")
-	require.Equal(t, "", nftID2)
-	require.Equal(t, "", classID2)
-
 	// Empty
 	nftID3, classID3 := GetNFTFromUID("")
 	require.Equal(t, "", nftID3)
 	require.Equal(t, "", classID3)
+
+	// Leading comma (empty first field)
+	nftID4, classID4 := GetNFTFromUID(",y")
+	require.Equal(t, "", nftID4)
+	require.Equal(t, "", classID4)
+
+	// Trailing comma (empty second field)
+	nftID5, classID5 := GetNFTFromUID("x,")
+	require.Equal(t, "", nftID5)
+	require.Equal(t, "", classID5)
+}
+
+func TestGetNFTFromUID_CommaInFirstField(t *testing.T) {
+	// L-3: the UID is "<content>,<context>"; the context (class id / contract)
+	// never contains a comma, so a comma in the first field is handled by
+	// splitting on the LAST comma.
+	nftID, classID := GetNFTFromUID("a,b,c")
+	require.Equal(t, "a,b", nftID)
+	require.Equal(t, "c", classID)
+
+	tok, addr := GetNFTFromUID("tok,en,0x1234")
+	require.Equal(t, "tok,en", tok)
+	require.Equal(t, "0x1234", addr)
 }
 
 func TestCreateTokenUID(t *testing.T) {

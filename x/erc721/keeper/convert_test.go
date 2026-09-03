@@ -204,24 +204,28 @@ func TestConvertNFT_RejectsTokenIDCollision(t *testing.T) {
 		k.GetNFTPairByContractTokenID(ctx, contract, "7"))
 }
 
-// TestConvertNFT_RejectsCommaID covers L-3 interim: an NFT id containing a comma
-// would corrupt the comma-delimited mapping key, so the conversion must be
-// rejected up front.
-func TestConvertNFT_RejectsCommaID(t *testing.T) {
-	k, ctx, owner := setupConvertKeeper(t)
+// TestConvertNFT_MappingCommaIDRoundTrip covers L-3: a Cosmos NFT id containing
+// a comma can be stored in and parsed back out of the NFT mapping (split on the
+// last comma) without corruption or a migration.
+func TestConvertNFT_MappingCommaIDRoundTrip(t *testing.T) {
+	k, ctx, _ := setupConvertKeeper(t)
 	contract := "0x1111111111111111111111111111111111111111"
-	receiver := "0x2222222222222222222222222222222222222222"
 
-	_, err := k.ConvertNFT(ctx, &types.MsgConvertNFT{
-		ClassId:            "kitty",
-		CosmosTokenIds:     []string{"nft,with-comma"},
-		EvmContractAddress: contract,
-		EvmTokenIds:        []string{"1"},
-		CosmosSender:       owner.String(),
-		EvmReceiver:        receiver,
-	})
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "comma")
+	nftUID := types.CreateNFTUID("kitty", "nft,with,comma")
+	tokenUID := types.CreateTokenUID(contract, "7")
+	require.NoError(t, k.SetNFTPairs(ctx, contract, "7", "kitty", "nft,with,comma"))
+
+	got := k.GetNFTPairByContractTokenID(ctx, contract, "7")
+	nftID, classID := types.GetNFTFromUID(string(got))
+	require.Equal(t, "nft,with,comma", nftID)
+	require.Equal(t, "kitty", classID)
+
+	// Reverse mapping resolves back to the token UID and parses correctly.
+	rev := k.GetTokenUIDPairByNFTUID(ctx, nftUID)
+	tok, addr := types.GetNFTFromUID(string(rev))
+	require.Equal(t, "7", tok)
+	require.Equal(t, contract, addr)
+	require.Equal(t, tokenUID, string(rev))
 }
 
 // TestConvertNFT_RejectsWrongContract covers M-01: a registered class must not

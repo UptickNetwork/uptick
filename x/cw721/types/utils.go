@@ -137,12 +137,13 @@ func CreateNFTUID(classID string, nftID string) string {
 }
 
 func GetNFTFromUID(uid string) (string, string) {
-
-	uidArray := strings.Split(uid, ",")
-
-	if len(uidArray) != 2 {
+	// The UID is "<tokenId>,<contractAddress>" or "<nftId>,<classId>". The second
+	// component (contract address / class id) never contains a comma, so splitting
+	// on the LAST comma makes the round-trip robust to commas inside the first
+	// component (L-3) without a state migration.
+	idx := strings.LastIndex(uid, ",")
+	if idx <= 0 || idx == len(uid)-1 {
 		return "", ""
-	} else {
-		return uidArray[0], uidArray[1]
 	}
+	return uid[:idx], uid[idx+1:]
 }
