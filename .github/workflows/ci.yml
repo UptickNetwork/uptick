@@ -41,3 +41,27 @@ jobs:
         uses: golangci/golangci-lint-action@v6
         with:
           version: v1.64.8
+
+  contracts-reproducible:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: contracts/package-lock.json
+
+      - name: Install pinned solc
+        run: |
+          curl -fsSL https://github.com/ethereum/solidity/releases/download/v0.8.28/solc-static-linux \
+            -o /usr/local/bin/solc
+          chmod +x /usr/local/bin/solc
+          solc --version
+
+      - name: Verify reproducible contract bytecode
+        working-directory: contracts
+        run: make verify-contracts-reproducible
