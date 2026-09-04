@@ -63,6 +63,9 @@ func (options HandlerOptions) Validate() error {
 	if options.EvmKeeper == nil {
 		return sdkerrors.Wrap(errortypes.ErrLogic, "evm keeper is required for AnteHandler")
 	}
+	if options.Cdc == nil {
+		return sdkerrors.Wrap(errortypes.ErrLogic, "cdc is required for AnteHandler")
+	}
 	return nil
 }
 

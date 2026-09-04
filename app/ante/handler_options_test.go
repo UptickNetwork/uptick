@@ -7,6 +7,9 @@ import (
 	anteinterfaces "github.com/cosmos/evm/ante/interfaces"
 	evmtypes "github.com/cosmos/evm/x/vm/types"
 	"github.com/stretchr/testify/require"
+
+	"github.com/cosmos/cosmos-sdk/codec"
+	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 )
 
 // stubAcctKeeper is a non-nil stub satisfying evmtypes.AccountKeeper
@@ -21,6 +24,12 @@ type stubEvmKeeper struct{ anteinterfaces.EVMKeeper }
 // stubFeeMarketKeeper is a non-nil stub satisfying anteinterfaces.FeeMarketKeeper
 type stubFeeMarketKeeper struct{ anteinterfaces.FeeMarketKeeper }
 
+// makeTestCodec builds a minimal non-nil BinaryCodec for option validation.
+func makeTestCodec() codec.BinaryCodec {
+	registry := codectypes.NewInterfaceRegistry()
+	return codec.NewProtoCodec(registry)
+}
+
 func TestHandlerOptionsValidate(t *testing.T) {
 	validOptions := func() HandlerOptions {
 		return HandlerOptions{
@@ -29,6 +38,7 @@ func TestHandlerOptionsValidate(t *testing.T) {
 			SignModeHandler: &txsigning.HandlerMap{},
 			FeeMarketKeeper: &stubFeeMarketKeeper{},
 			EvmKeeper:       &stubEvmKeeper{},
+			Cdc:             makeTestCodec(),
 		}
 	}
 
@@ -66,6 +76,12 @@ func TestHandlerOptionsValidate(t *testing.T) {
 		opts.EvmKeeper = nil
 		require.ErrorContains(t, opts.Validate(), "evm keeper")
 	})
+
+	t.Run("nil Cdc fails", func(t *testing.T) {
+		opts := validOptions()
+		opts.Cdc = nil
+		require.ErrorContains(t, opts.Validate(), "cdc")
+	})
 }
 
 func TestNewAnteHandler(t *testing.T) {
@@ -75,6 +91,7 @@ func TestNewAnteHandler(t *testing.T) {
 		SignModeHandler: &txsigning.HandlerMap{},
 		FeeMarketKeeper: &stubFeeMarketKeeper{},
 		EvmKeeper:       &stubEvmKeeper{},
+		Cdc:             makeTestCodec(),
 	}
 
 	t.Run("returns non-nil handler", func(t *testing.T) {

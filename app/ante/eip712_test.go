@@ -1,7 +1,9 @@
 package ante
 
 import (
+	"context"
 	"testing"
+	"time"
 
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/signer/core/apitypes"
@@ -14,12 +16,18 @@ import (
 	"github.com/cosmos/cosmos-sdk/codec"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
+	"github.com/cosmos/cosmos-sdk/testutil"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	txtypes "github.com/cosmos/cosmos-sdk/types/tx"
 	signing "github.com/cosmos/cosmos-sdk/types/tx/signing"
 	"github.com/cosmos/cosmos-sdk/x/auth/migrations/legacytx"
 	authsigning "github.com/cosmos/cosmos-sdk/x/auth/signing"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
+
+	address "cosmossdk.io/core/address"
+	storetypes "cosmossdk.io/store/types"
+	codecaddress "github.com/cosmos/cosmos-sdk/codec/address"
 
 	"github.com/UptickNetwork/uptick/app/params"
 )
@@ -51,6 +59,100 @@ func TestVerifyKeplrEip712SignatureRejectsTamperedSig(t *testing.T) {
 		sig[0] ^= 0xff
 	})
 	require.Error(t, verifyEip712Signature(testCodec(), verify.pubKey, verify.signerData, verify.sigData, verify.tx))
+}
+
+// fakeAccountKeeper is a minimal AccountKeeper backed by a single in-memory
+// account, so decorator-level tests can drive AnteHandle end to end.
+type fakeAccountKeeper struct {
+	acc sdk.AccountI
+}
+
+func (k *fakeAccountKeeper) NewAccountWithAddress(context.Context, sdk.AccAddress) sdk.AccountI {
+	panic("not implemented")
+}
+func (k *fakeAccountKeeper) GetModuleAddress(string) sdk.AccAddress { return nil }
+func (k *fakeAccountKeeper) GetAccount(context.Context, sdk.AccAddress) sdk.AccountI {
+	return k.acc
+}
+func (k *fakeAccountKeeper) SetAccount(context.Context, sdk.AccountI)    {}
+func (k *fakeAccountKeeper) RemoveAccount(context.Context, sdk.AccountI) {}
+func (k *fakeAccountKeeper) GetParams(context.Context) authtypes.Params  { return authtypes.Params{} }
+func (k *fakeAccountKeeper) GetSequence(context.Context, sdk.AccAddress) (uint64, error) {
+	return k.acc.GetSequence(), nil
+}
+func (k *fakeAccountKeeper) AddressCodec() address.Codec {
+	return codecaddress.NewBech32Codec(sdk.GetConfig().GetBech32AccountAddrPrefix())
+}
+func (k *fakeAccountKeeper) UnorderedTransactionsEnabled() bool             { return false }
+func (k *fakeAccountKeeper) RemoveExpiredUnorderedNonces(sdk.Context) error { return nil }
+func (k *fakeAccountKeeper) TryAddUnorderedNonce(sdk.Context, []byte, time.Time) error {
+	return nil
+}
+
+// TestEip712DecoratorAnteHandleEndToEnd drives AnteHandle through the real
+// decorator (constructed via NewEip712SigVerificationDecorator) with a valid
+// Keplr-built tx. Regression guard for the injected-codec wiring: a decorator
+// built without its codec must not be able to pass this path (it would panic
+// inside LegacyWrapTxToTypedData on a nil AnyUnpacker).
+func TestEip712DecoratorAnteHandleEndToEnd(t *testing.T) {
+	verify := buildKeplrEip712Tx(t, nil)
+
+	acc := authtypes.NewBaseAccount(
+		sdk.AccAddress(verify.pubKey.Address().Bytes()),
+		verify.pubKey,
+		7, 3,
+	)
+	ak := &fakeAccountKeeper{acc: acc}
+
+	key := storetypes.NewKVStoreKey("eip712-test")
+	tkey := storetypes.NewTransientStoreKey("eip712-test-t")
+	ctx := testutil.DefaultContext(key, tkey).
+		WithChainID("uptick_1170-1").
+		WithBlockHeight(10)
+
+	nextCalled := false
+	next := func(ctx sdk.Context, tx sdk.Tx, simulate bool) (sdk.Context, error) {
+		nextCalled = true
+		return ctx, nil
+	}
+
+	dec := NewEip712SigVerificationDecorator(ak, testCodec())
+	_, err := dec.AnteHandle(ctx, verify.tx, false, next)
+	require.NoError(t, err)
+	require.True(t, nextCalled, "valid EIP-712 tx must pass the decorator and call next")
+}
+
+// TestEip712DecoratorAnteHandleRejectsTamperedSig drives AnteHandle with a
+// tampered signature: the decorator must return an error (not panic) and must
+// not call next.
+func TestEip712DecoratorAnteHandleRejectsTamperedSig(t *testing.T) {
+	verify := buildKeplrEip712Tx(t, func(sig []byte) {
+		sig[0] ^= 0xff
+	})
+
+	acc := authtypes.NewBaseAccount(
+		sdk.AccAddress(verify.pubKey.Address().Bytes()),
+		verify.pubKey,
+		7, 3,
+	)
+	ak := &fakeAccountKeeper{acc: acc}
+
+	key := storetypes.NewKVStoreKey("eip712-test")
+	tkey := storetypes.NewTransientStoreKey("eip712-test-t")
+	ctx := testutil.DefaultContext(key, tkey).
+		WithChainID("uptick_1170-1").
+		WithBlockHeight(10)
+
+	nextCalled := false
+	next := func(ctx sdk.Context, tx sdk.Tx, simulate bool) (sdk.Context, error) {
+		nextCalled = true
+		return ctx, nil
+	}
+
+	dec := NewEip712SigVerificationDecorator(ak, testCodec())
+	_, err := dec.AnteHandle(ctx, verify.tx, false, next)
+	require.Error(t, err)
+	require.False(t, nextCalled, "invalid EIP-712 tx must be rejected before next")
 }
 
 type keplrEip712Verify struct {

@@ -47,7 +47,8 @@ func NewEip712SigVerificationDecorator(
 	cdc codec.BinaryCodec,
 ) Eip712SigVerificationDecorator {
 	return Eip712SigVerificationDecorator{
-		ak: ak,
+		ak:  ak,
+		cdc: cdc,
 	}
 }
 

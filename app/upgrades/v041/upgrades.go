@@ -33,14 +33,14 @@ func upgradeHandlerConstructor(
 	return func(ctx context.Context, _ upgradetypes.Plan, vm module.VersionMap) (module.VersionMap, error) {
 		sdkCtx := sdk.UnwrapSDKContext(ctx)
 
-		// Idempotency guard (M-5): a re-scheduled/replayed plan must not
-		// re-run the one-shot state repairs below.
-		if box.UpgradeAlreadyApplied(vm) {
-			sdkCtx.Logger().Warn("upgrade plan already applied; skipping one-shot migrations",
-				"name", upgradeName,
-			)
-			return vm, nil
-		}
+		// No UpgradeAlreadyApplied guard here (unlike v040): v0.4.1 bumps no
+		// module ConsensusVersion, so a chain upgrading from v0.4.0 already
+		// has a version map equal to the current consensus versions and the
+		// guard would wrongly skip the one-shot repairs below on their first
+		// (and only legitimate) run. Both repairs are inherently idempotent —
+		// migrateActiveStaticPrecompiles only writes when the param is empty
+		// and migrateICAControllerParams only flips a disabled flag — so a
+		// replayed plan is harmless without the guard.
 
 		sdkCtx.Logger().Info(
 			"executing upgrade plan",

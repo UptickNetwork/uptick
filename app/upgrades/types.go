@@ -82,6 +82,14 @@ func (r *upgradeRouter) UpgradeInfo(planName string) Upgrade {
 // modules removed by the upgrade (e.g. capability in v0.4.0) are irrelevant.
 // A module missing from vm (newly added by this upgrade) means the first run
 // has not completed, so the result is false.
+//
+// PRECONDITION: the guard is only sound for upgrades that bump at least one
+// module's ConsensusVersion (or add/remove modules). For an upgrade that
+// changes no consensus versions, a chain coming from the previous release
+// already satisfies "all stored versions == current" and the guard would
+// wrongly report "applied" on the first legitimate run (this bit v0.4.1 —
+// do not add this guard to such upgrade handlers; rely on the migrations
+// being idempotent instead).
 func (b Toolbox) UpgradeAlreadyApplied(vm module.VersionMap) bool {
 	if len(vm) == 0 {
 		return false
