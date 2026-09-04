@@ -69,7 +69,7 @@ func PrecheckLegacyStore(ctx sdk.Context, storeKey storetypes.StoreKey, cdc code
 			})
 		}
 	}
-	denomIter.Close()
+	// Closed by the deferred denomIter.Close() above.
 
 	// NFTs are stored per-denom under the KeyNFT prefix; walk every denom
 	// subtree the same way migrateToken does.

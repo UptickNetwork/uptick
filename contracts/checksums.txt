@@ -1,5 +1,3 @@
-# SHA-256 of the committed compiled contract artifacts (solc 0.8.28 + OZ 4.9.6).
-# Regenerate with: `cd contracts && make verify-contracts`
-2ccda23c12a4f07361660375b08af1432a7bfebf53ddf524ddd952f60b6d60a8  compiled_contracts/ERC20Burnable.json
-6e7ebe2857685e5af77530a90e01e584402906cebc30227d5be3c56f3721f2a9  compiled_contracts/ERC20MinterBurnerDecimals.json
-95583cc4a754dae84dd723259d4c56e3ef9d0494bcd9a6e7920f50589062beee  compiled_contracts/ERC721Uptick.json
+f9a8b508b3ce0896f718f1208aa76590294237bddb9f6cadbf019a2543f08b27  compiled_contracts/ERC20Burnable.json
+b897163914f21d42435a02c955d4019f6bacea55404cfa892359f6c317000e04  compiled_contracts/ERC20MinterBurnerDecimals.json
+114bc5b337a8e9ea1ae8621c018f5c01b8a89344ebb12aa6309d2401ea97621b  compiled_contracts/ERC721Uptick.json

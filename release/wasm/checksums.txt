@@ -1,0 +1,14 @@
+# SHA-256 checksums for release/wasm artifacts (audit P3-5).
+#
+# Verify with:  (cd release/wasm && shasum -a 256 -c checksums.txt)
+#          or:  (cd release/wasm && sha256sum -c checksums.txt)
+#
+# Provenance:
+#   cw721_base.wasm — the CosmWasm cw721-base contract (github.com/CosmWasm/cw-nfts,
+#   cw721-base) compiled with wasmvm-compatible rust toolchain. Introduced in
+#   commit bd58ead ("add wasm contract and merge wasm module for convert",
+#   2024-01-15) and byte-identical since that commit. Consumed by the x/cw721
+#   conversion flow as the reference base contract. If this file is ever
+#   replaced, update the checksum AND record the upstream source commit and
+#   compiler version here in the same change.
+1fa0402e9a4eea4bb100fc0e96d09ee5305eada2efd976c74a59934a0eee48e9  cw721_base.wasm

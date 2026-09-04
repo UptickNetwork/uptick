@@ -20,26 +20,40 @@ func NewAnteHandler(options HandlerOptions) sdk.AnteHandler {
 		// EIP-712 transactions receive the appropriate ante handling instead of
 		// being rejected by the cosmos handler.
 		switch extensionOptionTypeURL(tx) {
-		case "/cosmos.evm.vm.v1.ExtensionOptionsEthereumTx":
+		case extOptionEthereumTx:
 			return ethAnteHandler(ctx, tx, simulate)
-		case "/ethermint.types.v1.ExtensionOptionsWeb3Tx",
-			"/cosmos.evm.eip712.v1.ExtensionOptionsWeb3Tx":
+		case extOptionWeb3Tx, extOptionEip712Tx:
 			return eip712AnteHandler(ctx, tx, simulate)
 		}
 		return cosmosAnteHandler(ctx, tx, simulate)
 	}
 }
 
-// extensionOptionTypeURL returns the type URL of the tx's first extension
-// option, or an empty string if it has none.
+// Extension option type URLs recognized by the ante router.
+const (
+	extOptionEthereumTx = "/cosmos.evm.vm.v1.ExtensionOptionsEthereumTx"
+	extOptionWeb3Tx     = "/ethermint.types.v1.ExtensionOptionsWeb3Tx"
+	extOptionEip712Tx   = "/cosmos.evm.eip712.v1.ExtensionOptionsWeb3Tx"
+)
+
+// extensionOptionTypeURL scans ALL of the tx's extension options and returns
+// the first recognized routing URL, or an empty string if none matches.
+// Audit P3-10: the previous implementation read only opts[0], so a transaction
+// carrying an EVM option at any later position was mis-routed to the plain
+// cosmos ante handler and rejected. Unknown option URLs are skipped rather
+// than short-circuiting the scan. Downstream handlers still enforce their own
+// tx-type validation, so a spurious EVM option on a plain cosmos tx is
+// rejected by the EVM handlers themselves.
 func extensionOptionTypeURL(tx sdk.Tx) string {
 	txWithExtensions, ok := tx.(ante.HasExtensionOptionsTx)
 	if !ok {
 		return ""
 	}
-	opts := txWithExtensions.GetExtensionOptions()
-	if len(opts) == 0 {
-		return ""
+	for _, opt := range txWithExtensions.GetExtensionOptions() {
+		switch opt.GetTypeUrl() {
+		case extOptionEthereumTx, extOptionWeb3Tx, extOptionEip712Tx:
+			return opt.GetTypeUrl()
+		}
 	}
-	return opts[0].GetTypeUrl()
+	return ""
 }

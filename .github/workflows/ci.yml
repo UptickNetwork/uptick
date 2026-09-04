@@ -102,8 +102,12 @@ jobs:
 
       - name: Install pinned solc
         run: |
+          # Audit follow-up: verify the downloaded binary against the official
+          # v0.8.28 release asset (size 15,708,640 B) so a supply-chain swap of
+          # the compiler cannot silently change contract bytecode.
           curl -fsSL https://github.com/ethereum/solidity/releases/download/v0.8.28/solc-static-linux \
             -o /usr/local/bin/solc
+          echo "9a0fb7e0db2c0641dbae1c5cc645dc686820c83af516226abb1c0a2f76636f25  /usr/local/bin/solc" | sha256sum -c -
           chmod +x /usr/local/bin/solc
           solc --version
 

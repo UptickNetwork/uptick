@@ -608,9 +608,16 @@ func initParamsKeeper(
 	// uptick subspaces
 	paramsKeeper.Subspace(icahosttypes.SubModuleName).WithKeyTable(icahosttypes.ParamKeyTable())
 
+	// Audit P3-6: subspaces must not accept unvalidated param writes.
+	//
+	// wasmd: upstream removed ParamKeyTable() in wasmd v0.61 (params moved to
+	// NodeConfig), so there is no KeyTable to attach; the subspace is kept only
+	// because wasm.NewAppModule still takes one. It is never written through
+	// governance — do NOT add param-change proposals against it.
 	paramsKeeper.Subspace(wasmtypes.ModuleName)
-	paramsKeeper.Subspace(ibcnfttransfertypes.ModuleName)
-	paramsKeeper.Subspace(cw721types.ModuleName)
+	// ibcnft-transfer: the Uptick fork (v1.3.0-ibc-v10) removed params entirely
+	// (no types.ParamKeyTable, keeper takes no paramSpace) — dead registration.
+	// x/cw721: never had params — dead registration. Both removed (audit P3-6).
 
 	paramsKeeper.Subspace(icacontrollertypes.SubModuleName).WithKeyTable(icacontrollertypes.ParamKeyTable())
 

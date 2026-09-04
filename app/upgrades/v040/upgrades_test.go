@@ -144,6 +144,49 @@ func TestMigrateLegacyEVMAccountsSkipsVesting(t *testing.T) {
 	require.True(t, isNew, "expected migrated cosmos/evm pubkey, got %T", newPk)
 }
 
+// TestMigrateLegacyEVMAccountsAggregatesFailures ensures the auth migration
+// (audit P2-3) scans the FULL auth store and reports every undecodable account
+// in one aggregated error, instead of aborting at the first bad record. A
+// rehearsal on a state snapshot therefore surfaces all problem accounts at
+// once. The error must still be returned (fail-closed) because a skipped
+// legacy EthAccount would be unreadable after the upgrade.
+func TestMigrateLegacyEVMAccountsAggregatesFailures(t *testing.T) {
+	cdc := codec.NewProtoCodec(codectypes.NewInterfaceRegistry())
+	authtypes.RegisterInterfaces(cdc.InterfaceRegistry())
+
+	db := dbm.NewMemDB()
+	cms := rootstore.NewCommitMultiStore(db, log.NewNopLogger(), storemetrics.NewNoOpMetrics())
+	authKey := storetypes.NewKVStoreKey(authtypes.StoreKey)
+	cms.MountStoreWithDB(authKey, storetypes.StoreTypeIAVL, db)
+	require.NoError(t, cms.LoadLatestVersion())
+
+	store := prefix.NewStore(cms.GetKVStore(authKey), []byte(authtypes.AddressStoreKeyPrefix))
+
+	// A healthy legacy EthAccount that should be migratable.
+	goodAddr := sdk.AccAddress([]byte("goodaccount"))
+	goodAccount := &legacy.EthAccount{
+		BaseAccount: &authtypes.BaseAccount{Address: goodAddr.String(), AccountNumber: 1, Sequence: 1},
+	}
+	migrationCdc := newLegacyAccountCodec()
+	goodBytes, err := migrationCdc.MarshalInterface(goodAccount)
+	require.NoError(t, err)
+	store.Set(goodAddr.Bytes(), goodBytes)
+
+	// Two corrupted records (invalid protobuf for any registered account type).
+	badAddr1 := sdk.AccAddress([]byte("badaccount1"))
+	badAddr2 := sdk.AccAddress([]byte("badaccount2"))
+	store.Set(badAddr1.Bytes(), []byte{0xde, 0xad, 0xbe, 0xef})
+	store.Set(badAddr2.Bytes(), []byte{0x00, 0xff})
+
+	ctx := sdk.NewContext(cms, cmtproto.Header{ChainID: "uptick_117-1"}, false, log.NewNopLogger())
+	err = migrateLegacyEVMAccounts(ctx, authKey, cdc, nil, log.NewNopLogger())
+
+	// Fail-closed: one aggregated error covering both bad records — proving the
+	// scan continued past the first failure instead of stopping there.
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "2 legacy auth account(s) failed to migrate")
+}
+
 func TestDecodeLegacyBoolRaw(t *testing.T) {
 	logger := log.NewNopLogger()
 	ctx := sdk.Context{}

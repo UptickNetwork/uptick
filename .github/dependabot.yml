@@ -1,0 +1,29 @@
+# Audit P2-8: automated dependency updates.
+#
+# Note on scope: the /contracts npm dependencies are deliberately PINNED
+# (openzeppelin 4.9.6, solc 0.8.28) — they are load-bearing for the
+# reproducible-build gate (checksums.txt / refs/ in contracts/). A dependabot
+# bump there would change bytecode and fail the integrity checks, so the npm
+# ecosystem is intentionally NOT configured here. Bump those deps only as an
+# explicit, reviewed change that regenerates the contract artifacts.
+version: 2
+updates:
+  # Go module dependencies (app + x/* modules).
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    # Chain repos upgrade dependencies deliberately (upgrade handler coupling),
+    # not automatically — cap concurrent PRs to keep signal high.
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+
+  # GitHub Actions versions (ci.yml / deps.yml / release.yml).
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"

@@ -76,12 +76,15 @@ func (k Keeper) UpdateNFT(ctx sdk.Context, denomID,
 	token.Uri = types.Modify(token.Uri, tokenURI)
 	token.UriHash = types.Modify(token.UriHash, tokenURIHash)
 	if types.Modified(tokenNm) || types.Modified(tokenData) {
-		if token.Data == nil {
-			return sdkerrors.Wrapf(types.ErrInvalidTokenID, "nft ID %s has no metadata", tokenID)
-		}
-		nftMetadata, err := types.UnmarshalNFTMetadata(k.cdc, token.Data.GetValue())
-		if err != nil {
-			return err
+		// A nil-Data record is metadata-less, not invalid: build from an empty
+		// value so owners can attach metadata to such NFTs (same policy as
+		// TransferOwnership, audit follow-up).
+		var nftMetadata types.NFTMetadata
+		if token.Data != nil {
+			nftMetadata, err = types.UnmarshalNFTMetadata(k.cdc, token.Data.GetValue())
+			if err != nil {
+				return err
+			}
 		}
 
 		nftMetadata.Name = types.Modify(nftMetadata.Name, tokenNm)
@@ -151,12 +154,16 @@ func (k Keeper) TransferOwnership(ctx sdk.Context, denomID,
 	token.Uri = types.Modify(token.Uri, tokenURI)
 	token.UriHash = types.Modify(token.UriHash, tokenURIHash)
 	if tokenMetadataChanged {
-		if token.Data == nil {
-			return sdkerrors.Wrapf(types.ErrInvalidTokenID, "nft ID %s has no metadata", tokenID)
-		}
-		nftMetadata, err := types.UnmarshalNFTMetadata(k.cdc, token.Data.GetValue())
-		if err != nil {
-			return err
+		// Audit follow-up: a nil Data record is metadata-less, not invalid —
+		// build the metadata from an empty value so users can attach metadata
+		// to such NFTs (and transfers can repair dirty records) instead of
+		// failing with the misleading "has no metadata" error.
+		var nftMetadata types.NFTMetadata
+		if token.Data != nil {
+			nftMetadata, err = types.UnmarshalNFTMetadata(k.cdc, token.Data.GetValue())
+			if err != nil {
+				return err
+			}
 		}
 
 		nftMetadata.Name = types.Modify(nftMetadata.Name, tokenNm)
@@ -190,11 +197,13 @@ func (k Keeper) GetNFT(ctx sdk.Context, denomID, tokenID string) (nft exported.N
 	}
 
 	var nftMetadata types.NFTMetadata
-	if token.Data == nil {
-		return nil, sdkerrors.Wrapf(types.ErrInvalidTokenID, "nft ID %s has no metadata", tokenID)
-	}
-	if err := k.cdc.Unmarshal(token.Data.GetValue(), &nftMetadata); err != nil {
-		return nil, err
+	// A legacy / migrated NFT may carry nil Data; degrade to empty metadata so
+	// the single-NFT query matches GetNFTs / ExportGenesis behavior instead of
+	// erroring on the same record (audit follow-up).
+	if token.Data != nil {
+		if err := k.cdc.Unmarshal(token.Data.GetValue(), &nftMetadata); err != nil {
+			return nil, err
+		}
 	}
 
 	owner := k.nk.GetOwner(ctx, denomID, tokenID)

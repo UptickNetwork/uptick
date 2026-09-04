@@ -117,9 +117,12 @@ func (k Keeper) GetContractAddressAndTokenIds(ctx sdk.Context, msg *types.MsgCon
 	}
 
 	// A registered class has a canonical CW721 contract. Reject a caller-supplied
-	// address that differs from the pair (CW721 contract is bech32, so compare
-	// exactly) and pin to the canonical value.
-	if evmContractAddress != "" && evmContractAddress != pair.Cw721Address {
+	// address that differs from the pair and pin to the canonical value.
+	// Bech32 is case-insensitive at the character level (all-lowercase and
+	// all-uppercase encodings are both valid), so normalize to lowercase before
+	// comparing instead of rejecting valid uppercase input. This mirrors the
+	// erc721 side, which lowercases contract addresses on ingest (params.go).
+	if evmContractAddress != "" && strings.ToLower(evmContractAddress) != strings.ToLower(pair.Cw721Address) {
 		return "", nil, sdkerrors.Wrapf(
 			types.ErrContractAddressNotCorrect,
 			"contract address is not correct, expect %s got %s",

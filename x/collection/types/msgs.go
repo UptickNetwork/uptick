@@ -149,7 +149,10 @@ func (msg MsgTransferNFT) ValidateBasic() error {
 		return sdkerrors.Wrapf(errortypes.ErrInvalidAddress, "invalid recipient address (%s)", err)
 	}
 
-	if len(msg.Data) != 0 && Modified(msg.Data) && !gjson.Valid(msg.Data) {
+	// RemoveField ("[remove]") is the sentinel for clearing Data and must pass
+	// validation even though it is not itself valid JSON; otherwise the M-1
+	// "explicit clear" semantics could never reach the keeper for Data.
+	if len(msg.Data) != 0 && Modified(msg.Data) && msg.Data != RemoveField && !gjson.Valid(msg.Data) {
 		return sdkerrors.Wrap(errortypes.ErrJSONUnmarshal, "invalid data, must be a JSON string or empty")
 	}
 	return ValidateTokenID(msg.Id)
@@ -211,7 +214,10 @@ func (msg MsgEditNFT) ValidateBasic() error {
 		return err
 	}
 
-	if len(msg.Data) != 0 && Modified(msg.Data) && !gjson.Valid(msg.Data) {
+	// RemoveField ("[remove]") is the sentinel for clearing Data and must pass
+	// validation even though it is not itself valid JSON; otherwise the M-1
+	// "explicit clear" semantics could never reach the keeper for Data.
+	if len(msg.Data) != 0 && Modified(msg.Data) && msg.Data != RemoveField && !gjson.Valid(msg.Data) {
 		return sdkerrors.Wrap(errortypes.ErrJSONUnmarshal, "invalid data, must be a JSON string or empty")
 	}
 	return ValidateTokenID(msg.Id)

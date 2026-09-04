@@ -1,6 +1,8 @@
 package keepers
 
 import (
+	"errors"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/vm"
 
@@ -18,12 +20,19 @@ type erc20KeeperProxy struct {
 
 var _ evmtypes.Erc20Keeper = (*erc20KeeperProxy)(nil)
 
+// errErc20ProxyNotWired is returned when the proxy is consulted before the
+// ERC20 keeper has been wired in. Audit P3-2: this used to degrade silently to
+// (nil, false, nil), which reads as "no precompile at this address" and hides
+// wiring bugs — precompile calls would silently miss ERC20 overrides.
+var errErc20ProxyNotWired = errors.New(
+	"erc20 keeper proxy not wired: GetERC20PrecompileInstance called before the ERC20 keeper was set")
+
 func (p *erc20KeeperProxy) GetERC20PrecompileInstance(
 	ctx sdk.Context,
 	address common.Address,
 ) (vm.PrecompiledContract, bool, error) {
 	if p == nil || p.keeper == nil {
-		return nil, false, nil
+		return nil, false, errErc20ProxyNotWired
 	}
 	return p.keeper.GetERC20PrecompileInstance(ctx, address)
 }

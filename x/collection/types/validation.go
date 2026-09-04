@@ -141,6 +141,13 @@ func ValidateKeywords(denomID string) error {
 // Modify merges an incoming optional field into the stored value.
 // Empty string and DoNotModify keep the origin; RemoveField clears it;
 // anything else replaces it.
+//
+// NOTE (documented limitation, audit follow-up): because the exact string
+// "[remove]" (RemoveField) is the sentinel for clearing a field, a client
+// CANNOT set a field to the literal value "[remove]" — it will always be
+// interpreted as "clear this field". This applies to token URI, URI hash,
+// metadata name and data fields in MsgUpdateNFT / MsgTransferNFT. There is no
+// escape sequence by design; treat "[remove]" as a reserved value in clients.
 func Modify(origin, target string) string {
 	switch target {
 	case DoNotModify, "":

@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -87,4 +88,36 @@ func TestValidateKeywordsAndIsIBCDenom(t *testing.T) {
 	require.NoError(t, ValidateKeywords("custom-token"))
 	require.True(t, IsIBCDenom("ibc/ABCDEF"))
 	require.False(t, IsIBCDenom("denom"))
+}
+
+// TestEditNFTDataRemoveFieldSemantics pins the M-1 explicit-clear path for the
+// JSON-valued Data field: the "[remove]" sentinel is not itself valid JSON, so
+// ValidateBasic must exempt it from the JSON check — otherwise clearing Data
+// would be impossible (audit follow-up, evidence recorded in
+// review2/audit_remove_field_test.go.txt).
+func TestEditNFTDataRemoveFieldSemantics(t *testing.T) {
+	sender := sdk.AccAddress([]byte("remove-sender-addr")).String()
+
+	edit := func(data string) *MsgEditNFT {
+		return &MsgEditNFT{
+			Id:      "nft1",
+			DenomId: "denom1",
+			Data:    data,
+			Sender:  sender,
+		}
+	}
+
+	// Explicit clear must pass validation.
+	require.NoError(t, edit(RemoveField).ValidateBasic())
+	// Plain JSON replaces.
+	require.NoError(t, edit(`{"k":"v"}`).ValidateBasic())
+	// Empty means keep.
+	require.NoError(t, edit("").ValidateBasic())
+	// Other non-JSON values stay rejected.
+	require.Error(t, edit("not-json").ValidateBasic())
+
+	// The sentinel actually clears through Modify.
+	require.Equal(t, "", Modify(`{"old":true}`, RemoveField))
+	// Empty keeps the origin.
+	require.Equal(t, `{"old":true}`, Modify(`{"old":true}`, ""))
 }

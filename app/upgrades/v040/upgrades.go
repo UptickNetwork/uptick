@@ -492,6 +492,15 @@ func decodeLegacyBoolRaw(
 // standard SDK BaseAccount records. cosmos/evm v0.6.1 no longer uses the
 // EthAccount type, so leaving the legacy protobuf Any values in the auth store
 // would make accounts unreadable after the upgrade.
+//
+// Failure policy (audit P2-3): an account that cannot be migrated would be
+// unreadable after the upgrade — cosmos/evm cannot decode the legacy EthAccount
+// Any — so failures are never skipped silently; that would brick the account.
+// Instead the FULL auth store is scanned, every failure is collected, and one
+// aggregated error is returned at the end. A single rehearsal on a state
+// snapshot therefore surfaces ALL problem accounts at once instead of fixing
+// them one per retry. The upgrade tx rolls back atomically on error and can be
+// re-run unchanged after the offending accounts are patched.
 func migrateLegacyEVMAccounts(
 	ctx sdk.Context,
 	storeKey *storetypes.KVStoreKey,
@@ -510,11 +519,26 @@ func migrateLegacyEVMAccounts(
 	migrationCdc := newLegacyAccountCodec()
 	migrated := 0
 
+	// Collected failures: key hex -> reason. We keep scanning after a failure
+	// so that every bad account is reported in a single pass (P2-3).
+	type authMigrationFailure struct {
+		key    string
+		reason string
+	}
+	var failures []authMigrationFailure
+	fail := func(key []byte, format string, args ...interface{}) {
+		failures = append(failures, authMigrationFailure{
+			key:    fmt.Sprintf("%x", key),
+			reason: fmt.Sprintf(format, args...),
+		})
+	}
+
 	for ; iterator.Valid(); iterator.Next() {
 		accountBytes := iterator.Value()
 		var accountI sdk.AccountI
 		if err := migrationCdc.UnmarshalInterface(accountBytes, &accountI); err != nil {
-			return fmt.Errorf("decode auth account %x: %w", iterator.Key(), err)
+			fail(iterator.Key(), "decode auth account: %v", err)
+			continue
 		}
 
 		legacyAccount, ok := accountI.(*legacy.EthAccount)
@@ -526,12 +550,13 @@ func migrateLegacyEVMAccounts(
 			// unqueryable after the upgrade ("can't resolve type URL
 			// /ethermint.crypto.v1.ethsecp256k1.PubKey: proto: not found").
 			if err := migrateRetainedAccountPubKey(ctx, migrationCdc, appCodec, store, iterator.Key(), accountI, logger); err != nil {
-				return err
+				fail(iterator.Key(), "migrate retained account pubkey: %v", err)
 			}
 			continue
 		}
 		if legacyAccount.BaseAccount == nil {
-			return fmt.Errorf("legacy EthAccount %x has nil BaseAccount", iterator.Key())
+			fail(iterator.Key(), "legacy EthAccount has nil BaseAccount")
+			continue
 		}
 
 		if legacyAccount.CodeHash != "" && evmKeeper != nil {
@@ -545,10 +570,9 @@ func migrateLegacyEVMAccounts(
 			case 32:
 				evmKeeper.SetCodeHash(ctx, iterator.Key(), codeHashBytes)
 			default:
-				return fmt.Errorf(
-					"legacy EthAccount %x has malformed code hash %q: expected 32-byte hex, got %d bytes",
-					iterator.Key(), legacyAccount.CodeHash, len(codeHashBytes),
-				)
+				fail(iterator.Key(), "legacy EthAccount has malformed code hash %q: expected 32-byte hex, got %d bytes",
+					legacyAccount.CodeHash, len(codeHashBytes))
+				continue
 			}
 		}
 
@@ -561,13 +585,15 @@ func migrateLegacyEVMAccounts(
 		if legacyAccount.BaseAccount.PubKey != nil {
 			var oldPk cryptotypes.PubKey
 			if err := migrationCdc.UnpackAny(legacyAccount.BaseAccount.PubKey, &oldPk); err != nil {
-				return fmt.Errorf("decode legacy pubkey %x: %w", iterator.Key(), err)
+				fail(iterator.Key(), "decode legacy pubkey: %v", err)
+				continue
 			}
 			if ethPk, isEth := oldPk.(*legacy.EthSecp256k1PubKey); isEth {
 				newPk := &evmsecp256k1.PubKey{Key: ethPk.Key}
 				anyPk, err := codectypes.NewAnyWithValue(newPk)
 				if err != nil {
-					return fmt.Errorf("pack migrated pubkey %x: %w", iterator.Key(), err)
+					fail(iterator.Key(), "pack migrated pubkey: %v", err)
+					continue
 				}
 				legacyAccount.BaseAccount.PubKey = anyPk
 			}
@@ -575,11 +601,27 @@ func migrateLegacyEVMAccounts(
 
 		newBytes, err := appCodec.MarshalInterface(legacyAccount.BaseAccount)
 		if err != nil {
-			return fmt.Errorf("marshal migrated BaseAccount %x: %w", iterator.Key(), err)
+			fail(iterator.Key(), "marshal migrated BaseAccount: %v", err)
+			continue
 		}
 
 		store.Set(iterator.Key(), newBytes)
 		migrated++
+	}
+
+	if len(failures) > 0 {
+		for _, f := range failures {
+			logger.Error("legacy auth account failed to migrate",
+				"account_key", f.key,
+				"reason", f.reason,
+			)
+		}
+		// Abort with an aggregated error: the upgrade tx rolls back atomically,
+		// and after patching the accounts the upgrade can be re-run unchanged.
+		return fmt.Errorf(
+			"%d legacy auth account(s) failed to migrate — the full list was logged above; first failure: account %s: %s",
+			len(failures), failures[0].key, failures[0].reason,
+		)
 	}
 
 	logger.Info("legacy EVM accounts migrated to BaseAccount", "migrated", migrated)
