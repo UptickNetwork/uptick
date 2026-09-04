@@ -11,6 +11,8 @@ import (
 	storetypes "cosmossdk.io/store/types"
 	upgradetypes "cosmossdk.io/x/upgrade/types"
 	"github.com/UptickNetwork/uptick/app/upgrades"
+	v2 "github.com/UptickNetwork/uptick/x/collection/migrations/v2"
+	collectiontypes "github.com/UptickNetwork/uptick/x/collection/types"
 	"github.com/UptickNetwork/uptick/app/upgrades/v040/legacy"
 	"github.com/cosmos/cosmos-sdk/codec"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
@@ -274,6 +276,15 @@ func upgradeHandlerConstructor(
 			erc721types.ModuleName,
 			cw721types.ModuleName,
 		)
+
+		// Step 3.9: Precheck the legacy collection store (L-4). The collection
+		// 1→2 migration below fails fast on a single dirty record; scanning
+		// the store read-only first turns that into a complete, readable
+		// report BEFORE any state change, so an operator can fix or exclude
+		// the data instead of debugging an opaque halt mid-upgrade.
+		if problems := v2.PrecheckLegacyStore(sdkCtx, box.GetKVStoreKey(collectiontypes.StoreKey), box.AppCodec); len(problems) > 0 {
+			return nil, fmt.Errorf("legacy collection store precheck failed:\n%s", v2.FormatProblems(problems))
+		}
 
 		// Step 4: Run module migrations
 		//

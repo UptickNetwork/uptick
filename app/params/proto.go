@@ -1,6 +1,8 @@
 package params
 
 import (
+	"fmt"
+
 	"cosmossdk.io/x/tx/signing"
 	v041 "github.com/UptickNetwork/uptick/app/upgrades/v041"
 	"github.com/cosmos/cosmos-sdk/codec"
@@ -16,7 +18,21 @@ import (
 )
 
 // MakeEncodingConfig creates an EncodingConfig for an amino based test configuration.
+//
+// Boot-time fail-fast wrapper around MakeEncodingConfigChecked (M-7): a
+// Keplr-compat registration failure is a build/SDK-compatibility defect that
+// must stop the process with a readable message instead of silently serving
+// EIP-712 txs that cannot be verified.
 func MakeEncodingConfig() EncodingConfig {
+	enc, err := MakeEncodingConfigChecked()
+	if err != nil {
+		panic(err)
+	}
+	return enc
+}
+
+// MakeEncodingConfigChecked is MakeEncodingConfig with an explicit error path.
+func MakeEncodingConfigChecked() (EncodingConfig, error) {
 	amino := codec.NewLegacyAmino()
 	signingOptions := signing.Options{
 		AddressCodec: address.Bech32Codec{
@@ -45,12 +61,14 @@ func MakeEncodingConfig() EncodingConfig {
 	// extension option type URLs map onto the complete cosmos/evm types, and
 	// the v0.3.3-era account/proposal records remain decodable for genesis
 	// bootstrap and state export.
-	v041.RegisterCompatInterfaces(interfaceRegistry)
+	if err := v041.RegisterCompatInterfaces(interfaceRegistry); err != nil {
+		return EncodingConfig{}, fmt.Errorf("register v0.4.1 Keplr compat interfaces: %w", err)
+	}
 
 	return EncodingConfig{
 		InterfaceRegistry: interfaceRegistry,
 		Codec:             marshaler,
 		TxConfig:          txCfg,
 		LegacyAmino:       amino,
-	}
+	}, nil
 }

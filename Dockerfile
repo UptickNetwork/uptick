@@ -22,7 +22,7 @@ WORKDIR /home/uptick
 
 EXPOSE 26656 26657 1317 9090
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD uptickd version >/dev/null 2>&1 || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+  CMD uptickd status --node tcp://127.0.0.1:26657 >/dev/null 2>&1 || exit 1
 
 CMD ["uptickd"]

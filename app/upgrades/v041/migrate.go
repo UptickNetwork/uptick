@@ -26,9 +26,14 @@ var defaultActiveStaticPrecompiles = []string{
 	evmtypes.SlashingPrecompileAddress,
 }
 
-func init() {
-	// Fix the EVM module's default params so fresh chains also activate the
-	// static precompiles (the cosmos/evm default is an empty list).
+// ConfigureDefaultStaticPrecompiles overrides the EVM module's default params
+// so fresh chains also activate the static precompiles (the cosmos/evm default
+// is an empty list). It must be called before any evmtypes.DefaultParams()
+// invocation — i.e. before the module manager (and its DefaultGenesis) is
+// built in app.go. It replaces the former package init(): a global mutation
+// as an import side effect is invisible to readers and easy to lose during
+// refactors, so the app wires it explicitly.
+func ConfigureDefaultStaticPrecompiles() {
 	evmtypes.DefaultStaticPrecompiles = defaultActiveStaticPrecompiles
 }
 

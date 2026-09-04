@@ -40,6 +40,7 @@ import (
 	"github.com/UptickNetwork/uptick/app/ante"
 	"github.com/UptickNetwork/uptick/app/keepers"
 	uptickparams "github.com/UptickNetwork/uptick/app/params"
+	v041 "github.com/UptickNetwork/uptick/app/upgrades/v041"
 	_ "github.com/UptickNetwork/uptick/client/docs/statik"
 	cmdcfg "github.com/UptickNetwork/uptick/cmd/config"
 	evmostypes "github.com/UptickNetwork/uptick/types"
@@ -304,6 +305,11 @@ func NewUptick(
 	app.IBCKeeper.ClientKeeper.AddRoute(ibcsolomachine.ModuleName, &smLightClientModule)
 
 	/****  Module Options ****/
+	// Wire the EVM default static precompiles explicitly (M-6 #1): fresh-chain
+	// genesis defaults must activate Uptick's precompile set before the module
+	// manager (and its DefaultGenesis -> evmtypes.DefaultParams) is built.
+	v041.ConfigureDefaultStaticPrecompiles()
+
 	skipGenesisInvariants := false
 	opt := appOpts.Get(crisis.FlagSkipGenesisInvariants)
 	if opt, ok := opt.(bool); ok {

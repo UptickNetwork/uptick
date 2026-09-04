@@ -30,6 +30,9 @@ func TestDefaultActiveStaticPrecompiles(t *testing.T) {
 	}
 }
 
-func TestInitPopulatesDefaultStaticPrecompiles(t *testing.T) {
+func TestConfigureDefaultStaticPrecompiles(t *testing.T) {
+	// The app wires this explicitly instead of a package init(): the call
+	// must set the EVM module default deterministically.
+	ConfigureDefaultStaticPrecompiles()
 	require.Equal(t, defaultActiveStaticPrecompiles, evmtypes.DefaultStaticPrecompiles)
 }
