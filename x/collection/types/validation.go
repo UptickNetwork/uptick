@@ -45,6 +45,16 @@ func ValidateDenomID(denomID string) error {
 	if strings.ContainsRune(denomID, 0) {
 		return sdkerrors.Wrapf(ErrInvalidDenom, "denomID contains NUL")
 	}
+	// A denom ID becomes the classId component of NFT UIDs once the denom is
+	// bridged to ERC721/CW721 (CreateNFTUID -> "<nftId>,<classId>"). The UID
+	// parser (GetNFTFromUID) splits on the LAST comma because only the second
+	// component is guaranteed comma-free; a comma inside the classId would
+	// corrupt the round-trip and strand the reverse mapping. The regex branch
+	// below already excludes commas, but the "uptick-" prefixed branch does
+	// not -- reject commas for every denom ID.
+	if strings.Contains(denomID, ",") {
+		return sdkerrors.Wrapf(ErrInvalidDenom, "denomID cannot contain comma (%s)", denomID)
+	}
 	if strings.HasPrefix(denomID, "uptick-") {
 		suffix := strings.TrimPrefix(denomID, "uptick-")
 		if suffix == "" || strings.Contains(suffix, "/") {

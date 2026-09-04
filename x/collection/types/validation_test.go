@@ -16,6 +16,20 @@ func TestValidateDenomID(t *testing.T) {
 	require.Error(t, ValidateDenomID("ibc-token"))
 }
 
+// A comma inside a denom ID would end up in the classId component of NFT UIDs
+// (CreateNFTUID -> "<nftId>,<classId>") and break the last-comma round-trip in
+// GetNFTFromUID. The "uptick-" prefix branch of ValidateDenomID bypasses the
+// character-set regex, so comma rejection must cover both branches.
+func TestValidateDenomID_RejectsComma(t *testing.T) {
+	// regex branch (already rejected by the charset, pinned here explicitly)
+	require.Error(t, ValidateDenomID("a,b"))
+	// uptick- prefixed branch: previously accepted, must now be rejected
+	require.Error(t, ValidateDenomID("uptick-a,b"))
+	require.Error(t, ValidateDenomID("uptick-denom,with,commas"))
+	// the UID parser round-trips only comma-free classIds
+	require.NoError(t, ValidateDenomID("uptick-abcdef"))
+}
+
 func TestValidateTokenID(t *testing.T) {
 	require.NoError(t, ValidateTokenID("abc"))
 	require.Error(t, ValidateTokenID("ab"))
