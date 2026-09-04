@@ -19,6 +19,13 @@ func (k Keeper) IssueDenom(goCtx context.Context, msg *types.MsgIssueDenom) (*ty
 	}
 
 	ctx := sdk.UnwrapSDKContext(goCtx)
+	// Keeper-level guard (defense in depth): the same reservation is enforced
+	// in MsgIssueDenom.ValidateBasic, but modules or future code paths calling
+	// the msg server directly must not bypass the "uptick-" prefix reservation
+	// (M-8).
+	if err := types.ValidateIssueDenomID(msg.Id); err != nil {
+		return nil, err
+	}
 	if err := k.SaveDenom(
 		ctx,
 		msg.Id,

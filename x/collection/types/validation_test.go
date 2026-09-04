@@ -50,6 +50,38 @@ func TestModifyAndModified(t *testing.T) {
 	require.Equal(t, "new-value", Modify("origin", "new-value"))
 }
 
+// M-1 (2026-09-04): an empty string must mean "do not modify" so REST/gRPC
+// clients that only fill required fields cannot silently wipe metadata.
+// Clearing a field requires the explicit [remove] sentinel.
+func TestModifyAndModified_EmptyStringKeepsOrigin(t *testing.T) {
+	require.False(t, Modified(""))
+	require.Equal(t, "origin", Modify("origin", ""))
+	require.Equal(t, "origin", Modify("origin", DoNotModify))
+	// explicit clear
+	require.True(t, Modified(RemoveField))
+	require.Equal(t, "", Modify("origin", RemoveField))
+	// whitespace-only is a real value (a name of spaces is still suspicious at
+	// the msg layer, but Modify itself must not reinterpret it)
+	require.True(t, Modified(" "))
+	require.Equal(t, " ", Modify("origin", " "))
+}
+
+// M-8 (2026-09-04): MsgIssueDenom must reject the "uptick-" prefix, which is
+// reserved for module-derived class IDs (erc721/cw721 bridging derives class
+// IDs as "uptick-<contract>"). A user pre-minting such a denom would
+// permanently block registration of the matching contract.
+func TestValidateIssueDenomID_ReservedPrefix(t *testing.T) {
+	require.NoError(t, ValidateIssueDenomID("abc"))
+	require.NoError(t, ValidateIssueDenomID("mycustomdenom"))
+	// module-derived class ID shape
+	require.Error(t, ValidateIssueDenomID("uptick-abcdef"))
+	require.Error(t, ValidateIssueDenomID("uptick-b37eb5464b45a8097cbbb7c22727a6b259a3d85e"))
+	// base rules still apply on top
+	require.Error(t, ValidateIssueDenomID("ibc-token"))
+	require.Error(t, ValidateIssueDenomID("a,b"))
+	require.Error(t, ValidateIssueDenomID("A-!"))
+}
+
 func TestValidateKeywordsAndIsIBCDenom(t *testing.T) {
 	require.Error(t, ValidateKeywords("ibc-token"))
 	require.NoError(t, ValidateKeywords("custom-token"))

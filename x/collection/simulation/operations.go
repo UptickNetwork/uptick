@@ -477,11 +477,11 @@ func genDenomID(r *rand.Rand) string {
 	var denomID string
 	for {
 		denomID = strings.ToLower(simtypes.RandStringOfLength(r, len))
-		if err := types.ValidateDenomID(denomID); err != nil {
-			continue
-		}
-
-		if err := types.ValidateKeywords(denomID); err != nil {
+		// ValidateIssueDenomID (not ValidateDenomID): simulated issuance goes
+		// through MsgIssueDenom, whose ValidateBasic rejects the module
+		// reserved "uptick-" prefix (M-8). Reuse the same rule so generated
+		// IDs always pass message validation.
+		if err := types.ValidateIssueDenomID(denomID); err != nil {
 			continue
 		}
 		break

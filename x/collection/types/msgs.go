@@ -56,7 +56,7 @@ func (msg MsgIssueDenom) Type() string { return TypeMsgIssueDenom }
 
 // ValidateBasic Implements Msg.
 func (msg MsgIssueDenom) ValidateBasic() error {
-	if err := ValidateDenomID(msg.Id); err != nil {
+	if err := ValidateIssueDenomID(msg.Id); err != nil {
 		return err
 	}
 
@@ -196,8 +196,11 @@ func (msg MsgEditNFT) ValidateBasic() error {
 	if _, err := sdk.AccAddressFromBech32(msg.Sender); err != nil {
 		return sdkerrors.Wrapf(errortypes.ErrInvalidAddress, "invalid sender address (%s)", err)
 	}
-	if strings.TrimSpace(msg.Name) == "" {
-		return sdkerrors.Wrap(errortypes.ErrInvalidRequest, "nft name cannot be empty")
+	// M-1: an empty name means "do not modify" (same as DoNotModify), so
+	// REST/gRPC clients that omit it are not rejected. Only a non-empty
+	// blank/whitespace name is invalid.
+	if msg.Name != "" && strings.TrimSpace(msg.Name) == "" {
+		return sdkerrors.Wrap(errortypes.ErrInvalidRequest, "nft name cannot be blank")
 	}
 
 	if err := ValidateDenomID(msg.DenomId); err != nil {

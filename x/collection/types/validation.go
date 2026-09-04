@@ -12,6 +12,12 @@ import (
 
 const (
 	DoNotModify = "[do-not-modify]"
+	// RemoveField is the explicit sentinel for CLEARING an optional field.
+	// M-1 decision (2026-09-04): an empty string means "do not modify" so
+	// REST/gRPC clients that only fill the required fields can no longer
+	// silently wipe on-chain metadata. Callers that truly want a field
+	// emptied must send this sentinel.
+	RemoveField = "[remove]"
 	MinDenomLen = 3
 	MaxDenomLen = 128
 
@@ -97,9 +103,31 @@ func ValidateTokenURI(tokenURI string) error {
 	return nil
 }
 
-// Modified returns whether the field is modified
+// Modified reports whether an incoming optional field carries a change.
+// Semantics (M-1, 2026-09-04): an empty string and DoNotModify both mean
+// "keep the current value"; only a non-empty value (or the RemoveField
+// sentinel) counts as a modification. This keeps CLI (defaults to
+// DoNotModify) and REST/gRPC (which leave optional fields empty) on the
+// same code path instead of letting empty strings erase metadata.
 func Modified(target string) bool {
-	return target != DoNotModify
+	return target != DoNotModify && target != ""
+}
+
+// ValidateIssueDenomID validates a denom ID for user-facing issuance via
+// MsgIssueDenom. On top of the base denom rules it rejects the "uptick-"
+// prefix: erc721/cw721 bridging derives class IDs as "uptick-<contract>" and
+// a user pre-minting such a denom would permanently block registration of
+// the matching contract (M-8 griefing). Module paths create derived denoms
+// directly through keeper.SaveDenom and never go through MsgIssueDenom.
+func ValidateIssueDenomID(denomID string) error {
+	if err := ValidateDenomID(denomID); err != nil {
+		return err
+	}
+	if strings.HasPrefix(denomID, "uptick-") {
+		return sdkerrors.Wrapf(ErrInvalidDenom,
+			"denomID prefix \"uptick-\" is reserved for module-derived NFT classes and cannot be issued via MsgIssueDenom (%s)", denomID)
+	}
+	return nil
 }
 
 // ValidateKeywords checks if the given denomID begins with `DenomKeywords`
@@ -110,12 +138,18 @@ func ValidateKeywords(denomID string) error {
 	return nil
 }
 
+// Modify merges an incoming optional field into the stored value.
+// Empty string and DoNotModify keep the origin; RemoveField clears it;
+// anything else replaces it.
 func Modify(origin, target string) string {
-
-	if target == DoNotModify {
+	switch target {
+	case DoNotModify, "":
 		return origin
+	case RemoveField:
+		return ""
+	default:
+		return target
 	}
-	return target
 }
 
 func IsIBCDenom(denomID string) bool {

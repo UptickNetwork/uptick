@@ -56,6 +56,14 @@ func (s *KeeperTestSuite) TestMsgServerNFTLifecycleAuthorization() {
 	})
 	s.Require().NoError(err)
 
+	// M-1: the transfer above left every optional field empty (the REST/gRPC
+	// shape). The metadata must survive untouched -- empty string means "do
+	// not modify", never "clear".
+	nft, err := s.keeper.GetNFT(s.ctx, "denom1", "nft1")
+	s.Require().NoError(err)
+	s.Require().Equal("NFT One", nft.GetName())
+	s.Require().Equal("ipfs://nft1", nft.GetURI())
+
 	_, err = s.keeper.BurnNFT(goCtx, &types.MsgBurnNFT{
 		DenomId: "denom1",
 		Id:      "nft1",
@@ -83,7 +91,7 @@ func (s *KeeperTestSuite) TestUpdateRestrictedAllowsPureTransfer() {
 	goCtx := sdk.WrapSDKContext(s.ctx)
 
 	_, err := s.keeper.IssueDenom(goCtx, &types.MsgIssueDenom{
-		Id:               "denom-locked",
+		Id:               "denomlocked",
 		Name:             "Locked",
 		Symbol:           "LCK",
 		Schema:           "",
@@ -94,7 +102,7 @@ func (s *KeeperTestSuite) TestUpdateRestrictedAllowsPureTransfer() {
 	s.Require().NoError(err)
 
 	_, err = s.keeper.MintNFT(goCtx, &types.MsgMintNFT{
-		DenomId:   "denom-locked",
+		DenomId:   "denomlocked",
 		Id:        "nft1",
 		Name:      "NFT One",
 		URI:       "ipfs://nft1",
@@ -107,7 +115,7 @@ func (s *KeeperTestSuite) TestUpdateRestrictedAllowsPureTransfer() {
 	// Pure transfer: echo the SAME metadata. This must not be treated as an
 	// update, so UpdateRestricted must not block it.
 	_, err = s.keeper.TransferNFT(goCtx, &types.MsgTransferNFT{
-		DenomId:   "denom-locked",
+		DenomId:   "denomlocked",
 		Id:        "nft1",
 		Name:      "NFT One",
 		URI:       "ipfs://nft1",
@@ -120,7 +128,7 @@ func (s *KeeperTestSuite) TestUpdateRestrictedAllowsPureTransfer() {
 
 	// Setting a genuinely different URI on an UpdateRestricted denom is blocked.
 	_, err = s.keeper.TransferNFT(goCtx, &types.MsgTransferNFT{
-		DenomId:   "denom-locked",
+		DenomId:   "denomlocked",
 		Id:        "nft1",
 		Name:      "NFT One",
 		URI:       "ipfs://changed",
@@ -139,7 +147,7 @@ func (s *KeeperTestSuite) TestMsgServerEditNFT() {
 	goCtx := sdk.WrapSDKContext(s.ctx)
 
 	_, err := s.keeper.IssueDenom(goCtx, &types.MsgIssueDenom{
-		Id:               "denom-edit",
+		Id:               "denomedit",
 		Name:             "Editable",
 		Symbol:           "EDT",
 		Schema:           "",
@@ -149,23 +157,23 @@ func (s *KeeperTestSuite) TestMsgServerEditNFT() {
 	})
 	s.Require().NoError(err)
 	_, err = s.keeper.MintNFT(goCtx, &types.MsgMintNFT{
-		DenomId: "denom-edit", Id: "nft1", Name: "Old", URI: "ipfs://old", Data: "",
+		DenomId: "denomedit", Id: "nft1", Name: "Old", URI: "ipfs://old", Data: "",
 		Sender: creator.String(), Recipient: creator.String(),
 	})
 	s.Require().NoError(err)
 
 	_, err = s.keeper.EditNFT(goCtx, &types.MsgEditNFT{
-		DenomId: "denom-edit", Id: "nft1", Name: "New", URI: "ipfs://new", Sender: creator.String(),
+		DenomId: "denomedit", Id: "nft1", Name: "New", URI: "ipfs://new", Sender: creator.String(),
 	})
 	s.Require().NoError(err)
-	nft, err := s.keeper.GetNFT(s.ctx, "denom-edit", "nft1")
+	nft, err := s.keeper.GetNFT(s.ctx, "denomedit", "nft1")
 	s.Require().NoError(err)
 	s.Require().Equal("New", nft.GetName())
 	s.Require().Equal("ipfs://new", nft.GetURI())
 
 	// A non-owner cannot edit.
 	_, err = s.keeper.EditNFT(goCtx, &types.MsgEditNFT{
-		DenomId: "denom-edit", Id: "nft1", Name: "Hacked", Sender: sdk.AccAddress([]byte("evil")).String(),
+		DenomId: "denomedit", Id: "nft1", Name: "Hacked", Sender: sdk.AccAddress([]byte("evil")).String(),
 	})
 	s.Require().Error(err)
 }
@@ -178,23 +186,93 @@ func (s *KeeperTestSuite) TestMsgServerTransferDenom() {
 	goCtx := sdk.WrapSDKContext(s.ctx)
 
 	_, err := s.keeper.IssueDenom(goCtx, &types.MsgIssueDenom{
-		Id: "denom-transfer", Name: "Transfer", Symbol: "TRF", Schema: "",
+		Id: "denomtransfer", Name: "Transfer", Symbol: "TRF", Schema: "",
 		Sender: creator.String(), MintRestricted: true, UpdateRestricted: false,
 	})
 	s.Require().NoError(err)
 
 	// A non-creator cannot transfer the denom.
 	_, err = s.keeper.TransferDenom(goCtx, &types.MsgTransferDenom{
-		Id: "denom-transfer", Sender: sdk.AccAddress([]byte("evil")).String(), Recipient: newOwner.String(),
+		Id: "denomtransfer", Sender: sdk.AccAddress([]byte("evil")).String(), Recipient: newOwner.String(),
 	})
 	s.Require().Error(err)
 
 	// The creator transfers ownership.
 	_, err = s.keeper.TransferDenom(goCtx, &types.MsgTransferDenom{
-		Id: "denom-transfer", Sender: creator.String(), Recipient: newOwner.String(),
+		Id: "denomtransfer", Sender: creator.String(), Recipient: newOwner.String(),
 	})
 	s.Require().NoError(err)
-	denom, err := s.keeper.GetDenomInfo(s.ctx, "denom-transfer")
+	denom, err := s.keeper.GetDenomInfo(s.ctx, "denomtransfer")
 	s.Require().NoError(err)
 	s.Require().Equal(newOwner.String(), denom.Creator)
+}
+
+// TestMsgServerIssueDenomReservedPrefix covers M-8 (2026-09-04 decision A):
+// the "uptick-" prefix is reserved for module-derived class IDs (erc721/cw721
+// bridging derives "uptick-<contract>"). User-facing issuance must reject it
+// so a pre-minted denom can never permanently block contract registration.
+func (s *KeeperTestSuite) TestMsgServerIssueDenomReservedPrefix() {
+	creator := sdk.AccAddress([]byte("prefix-creator"))
+	goCtx := sdk.WrapSDKContext(s.ctx)
+
+	for _, id := range []string{
+		"uptick-b37eb5464b45a8097cbbb7c22727a6b259a3d85e", // erc721-derived shape
+		"uptick-wasm-contract",                            // cw721-derived shape
+		"uptick-anything",
+	} {
+		_, err := s.keeper.IssueDenom(goCtx, &types.MsgIssueDenom{
+			Id: id, Name: "Squat", Symbol: "SQT", Sender: creator.String(),
+		})
+		s.Require().Error(err, id)
+		s.Require().ErrorContains(err, "reserved", id)
+	}
+
+	// Non-reserved IDs keep working.
+	_, err := s.keeper.IssueDenom(goCtx, &types.MsgIssueDenom{
+		Id: "plaindenom", Name: "Plain", Symbol: "PLN", Sender: creator.String(),
+	})
+	s.Require().NoError(err)
+}
+
+// TestMsgServerEditNFTEmptyFieldsKeepMetadata covers the M-1 decision (A):
+// empty optional fields mean "do not modify"; clearing requires the explicit
+// [remove] sentinel.
+func (s *KeeperTestSuite) TestMsgServerEditNFTEmptyFieldsKeepMetadata() {
+	creator := sdk.AccAddress([]byte("m1-creator"))
+	goCtx := sdk.WrapSDKContext(s.ctx)
+
+	_, err := s.keeper.IssueDenom(goCtx, &types.MsgIssueDenom{
+		Id: "denomm1", Name: "M1", Symbol: "M1", Sender: creator.String(),
+	})
+	s.Require().NoError(err)
+	_, err = s.keeper.MintNFT(goCtx, &types.MsgMintNFT{
+		DenomId: "denomm1", Id: "nft1", Name: "Keep", URI: "ipfs://keep",
+		UriHash: "hash1", Data: `{"k":"v"}`,
+		Sender: creator.String(), Recipient: creator.String(),
+	})
+	s.Require().NoError(err)
+
+	// EditNFT with every optional field empty: metadata must survive.
+	_, err = s.keeper.EditNFT(goCtx, &types.MsgEditNFT{
+		DenomId: "denomm1", Id: "nft1", Sender: creator.String(),
+	})
+	s.Require().NoError(err)
+	got, err := s.keeper.GetNFT(s.ctx, "denomm1", "nft1")
+	s.Require().NoError(err)
+	s.Require().Equal("Keep", got.GetName())
+	s.Require().Equal("ipfs://keep", got.GetURI())
+	s.Require().Equal("hash1", got.GetURIHash())
+	s.Require().Equal(`{"k":"v"}`, got.GetData())
+
+	// Explicit [remove] sentinel clears a field.
+	_, err = s.keeper.EditNFT(goCtx, &types.MsgEditNFT{
+		DenomId: "denomm1", Id: "nft1", URI: types.RemoveField, Sender: creator.String(),
+	})
+	s.Require().NoError(err)
+	got, err = s.keeper.GetNFT(s.ctx, "denomm1", "nft1")
+	s.Require().NoError(err)
+	s.Require().Equal("", got.GetURI())
+	// ...while the other fields are still intact.
+	s.Require().Equal("Keep", got.GetName())
+	s.Require().Equal("hash1", got.GetURIHash())
 }
