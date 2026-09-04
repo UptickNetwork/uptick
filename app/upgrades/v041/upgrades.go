@@ -32,6 +32,16 @@ func upgradeHandlerConstructor(
 ) upgradetypes.UpgradeHandler {
 	return func(ctx context.Context, _ upgradetypes.Plan, vm module.VersionMap) (module.VersionMap, error) {
 		sdkCtx := sdk.UnwrapSDKContext(ctx)
+
+		// Idempotency guard (M-5): a re-scheduled/replayed plan must not
+		// re-run the one-shot state repairs below.
+		if box.UpgradeAlreadyApplied(vm) {
+			sdkCtx.Logger().Warn("upgrade plan already applied; skipping one-shot migrations",
+				"name", upgradeName,
+			)
+			return vm, nil
+		}
+
 		sdkCtx.Logger().Info(
 			"executing upgrade plan",
 			"name", upgradeName,

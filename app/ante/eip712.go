@@ -27,26 +27,24 @@ import (
 	authsigning "github.com/cosmos/cosmos-sdk/x/auth/signing"
 )
 
-var evmCodec codec.Codec
-
-func init() {
-	registry := codectypes.NewInterfaceRegistry()
-	eip712.RegisterInterfaces(registry)
-	evmCodec = codec.NewProtoCodec(registry)
-}
-
 // Eip712SigVerificationDecorator verifies EIP-712 signatures produced by
 // wallets (e.g. Keplr) that sign Cosmos txs against the legacy ethermint
 // ExtensionOptionsWeb3Tx extension option.
 //
 // CONTRACT: Pubkeys are set in context for all signers before this decorator runs.
 type Eip712SigVerificationDecorator struct {
-	ak anteinterfaces.AccountKeeper
+	ak  anteinterfaces.AccountKeeper
+	cdc codec.BinaryCodec
 }
 
 // NewEip712SigVerificationDecorator creates a new Eip712SigVerificationDecorator.
+// The codec is injected explicitly (the app's fully-populated ProtoCodec) so
+// message unpacking for typed-data construction works for every registered
+// interface — a package-level init() codec would only know the eip712 types
+// and silently break for any message type it does not register.
 func NewEip712SigVerificationDecorator(
 	ak anteinterfaces.AccountKeeper,
+	cdc codec.BinaryCodec,
 ) Eip712SigVerificationDecorator {
 	return Eip712SigVerificationDecorator{
 		ak: ak,
@@ -159,7 +157,7 @@ func (svd Eip712SigVerificationDecorator) AnteHandle(
 		return next(ctx, tx, simulate)
 	}
 
-	if err := verifyEip712Signature(pubKey, signerData, sig.Data, authSignTx); err != nil {
+	if err := verifyEip712Signature(svd.cdc, pubKey, signerData, sig.Data, authSignTx); err != nil {
 		errMsg := fmt.Errorf("signature verification failed; please verify account number (%d) and chain-id (%s): %w", accNum, chainID, err)
 		return ctx, errorsmod.Wrap(errortypes.ErrUnauthorized, errMsg.Error())
 	}
@@ -170,6 +168,7 @@ func (svd Eip712SigVerificationDecorator) AnteHandle(
 // verifyEip712Signature verifies an EIP-712 signature embedded in a legacy
 // ethermint ExtensionOptionsWeb3Tx extension option.
 func verifyEip712Signature(
+	cdc codectypes.AnyUnpacker,
 	pubKey cryptotypes.PubKey,
 	signerData authsigning.SignerData,
 	sigData signing.SignatureData,
@@ -242,7 +241,7 @@ func verifyEip712Signature(
 		FeePayer: feePayer,
 	}
 
-	typedData, err := eip712.LegacyWrapTxToTypedData(evmCodec, extOpt.TypedDataChainID, msgs[0], txBytes, feeDelegation)
+	typedData, err := eip712.LegacyWrapTxToTypedData(cdc, extOpt.TypedDataChainID, msgs[0], txBytes, feeDelegation)
 	if err != nil {
 		return errorsmod.Wrap(err, "failed to create EIP-712 typed data from tx")
 	}

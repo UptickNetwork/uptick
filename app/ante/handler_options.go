@@ -204,6 +204,10 @@ func newCosmosAnteHandlerEip712(options HandlerOptions) sdk.AnteHandler {
 			cosmosante.NewAuthzLimiterDecorator(options.disabledAuthzMsgs()...),
 			ante.NewSetUpContextDecorator(),
 			wasmkeeper.NewLimitSimulationGasDecorator(simGasLimit),
+			// Keep parity with newCosmosAnteHandler: EIP-712 (Keplr) txs may
+			// carry the dynamic-fee Web3 extension option, so it must be
+			// accepted here instead of falling through to an opaque rejection.
+			ante.NewExtensionOptionsDecorator(antetypes.HasDynamicFeeExtensionOption),
 			ante.NewValidateBasicDecorator(),
 			ante.NewTxTimeoutHeightDecorator(),
 			ante.NewValidateMemoDecorator(options.AccountKeeper),
@@ -213,7 +217,7 @@ func newCosmosAnteHandlerEip712(options HandlerOptions) sdk.AnteHandler {
 			ante.NewSetPubKeyDecorator(options.AccountKeeper),
 			ante.NewValidateSigCountDecorator(options.AccountKeeper),
 			ante.NewSigGasConsumeDecorator(options.AccountKeeper, options.SigGasConsumer),
-			NewEip712SigVerificationDecorator(options.AccountKeeper),
+			NewEip712SigVerificationDecorator(options.AccountKeeper, options.Cdc),
 			ante.NewIncrementSequenceDecorator(options.AccountKeeper),
 			ibcante.NewRedundantRelayDecorator(options.IBCKeeper),
 			evmevm.NewGasWantedDecorator(options.EvmKeeper, options.FeeMarketKeeper, &feemarketParams),

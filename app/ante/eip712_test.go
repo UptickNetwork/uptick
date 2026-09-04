@@ -11,6 +11,7 @@ import (
 	"github.com/cosmos/evm/ethereum/eip712"
 	"github.com/cosmos/gogoproto/proto"
 
+	"github.com/cosmos/cosmos-sdk/codec"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -28,9 +29,20 @@ import (
 // SIGN_MODE_LEGACY_AMINO_JSON signer with an empty body signature, the EIP-712
 // signature stored in the /ethermint.types.v1.ExtensionOptionsWeb3Tx extension
 // option, and the /ethermint.crypto.v1.ethsecp256k1.PubKey public key.
+
+// testCodec builds a fully-populated codec once for tests that call
+// verifyEip712Signature directly (the decorator now takes its codec by
+// injection instead of a package-level global).
+func testCodec() codec.Codec {
+	enc := params.MakeEncodingConfig()
+	banktypes.RegisterInterfaces(enc.InterfaceRegistry)
+	banktypes.RegisterLegacyAminoCodec(enc.LegacyAmino)
+	return enc.Codec
+}
+
 func TestVerifyKeplrEip712Signature(t *testing.T) {
 	verify := buildKeplrEip712Tx(t, nil)
-	require.NoError(t, verifyEip712Signature(verify.pubKey, verify.signerData, verify.sigData, verify.tx))
+	require.NoError(t, verifyEip712Signature(testCodec(), verify.pubKey, verify.signerData, verify.sigData, verify.tx))
 }
 
 func TestVerifyKeplrEip712SignatureRejectsTamperedSig(t *testing.T) {
@@ -38,7 +50,7 @@ func TestVerifyKeplrEip712SignatureRejectsTamperedSig(t *testing.T) {
 		// Flip the first byte of the signature so verification must fail.
 		sig[0] ^= 0xff
 	})
-	require.Error(t, verifyEip712Signature(verify.pubKey, verify.signerData, verify.sigData, verify.tx))
+	require.Error(t, verifyEip712Signature(testCodec(), verify.pubKey, verify.signerData, verify.sigData, verify.tx))
 }
 
 type keplrEip712Verify struct {
@@ -83,7 +95,7 @@ func buildKeplrEip712Tx(t *testing.T, mutateSig func([]byte)) keplrEip712Verify 
 	signBytes := legacytx.StdSignBytes(chainID, accNum, seq, 0, fee, msgs, "")
 
 	feeDelegation := &eip712.FeeDelegationOptions{FeePayer: from}
-	typedData, err := eip712.LegacyWrapTxToTypedData(evmCodec, evmChainID, msgs[0], signBytes, feeDelegation)
+	typedData, err := eip712.LegacyWrapTxToTypedData(enc.Codec, evmChainID, msgs[0], signBytes, feeDelegation)
 	require.NoError(t, err)
 
 	sigHash, _, err := apitypes.TypedDataAndHash(typedData)

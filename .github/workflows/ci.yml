@@ -26,6 +26,51 @@ jobs:
       - name: Test
         run: make test
 
+  e2e-keplr-eip712:
+    # M-10: run the Keplr EIP-712 e2e suite against a real local single-node
+    # chain instead of letting tests skip when no node is reachable.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.8"
+
+      - name: Build uptickd
+        run: make build
+
+      - name: Init single-node chain
+        run: |
+          BIN="$PWD/build/uptickd"
+          HOME_DIR=/tmp/uptick-keplr
+          $BIN init e2e-node --chain-id uptick_1170-1 --default-denom auptick --home "$HOME_DIR"
+          $BIN keys add keplr --keyring-backend test --home "$HOME_DIR"
+          KEPLR_ADDR=$($BIN keys show keplr -a --keyring-backend test --home "$HOME_DIR")
+          $BIN add-genesis-account "$KEPLR_ADDR" 100000000000000000000000auptick --home "$HOME_DIR" --keyring-backend test
+          $BIN gentx keplr 10000000000000000000000auptick --chain-id uptick_1170-1 --home "$HOME_DIR" --keyring-backend test
+          $BIN collect-gentxs --home "$HOME_DIR"
+          # Enable REST (the e2e suite broadcasts via the API port).
+          sed -i 's/enable = false/enable = true/' "$HOME_DIR/config/app.toml"
+          $BIN validate-genesis --home "$HOME_DIR"
+
+      - name: Start node
+        run: |
+          $PWD/build/uptickd start --home /tmp/uptick-keplr \
+            --minimum-gas-prices 0.000000001auptick \
+            --rpc.laddr tcp://127.0.0.1:26657 \
+            --api.address tcp://127.0.0.1:1317 > /tmp/uptick-e2e.log 2>&1 &
+          for i in $(seq 1 60); do
+            curl -sf http://127.0.0.1:1317/cosmos/base/tendermint/v1beta1/node_info > /dev/null && exit 0
+            sleep 2
+          done
+          echo "node failed to start"; tail -50 /tmp/uptick-e2e.log; exit 1
+
+      - name: Run Keplr EIP-712 e2e tests
+        run: go test ./tests/e2e/... -count=1 -v
+
   lint:
     runs-on: ubuntu-latest
     steps:

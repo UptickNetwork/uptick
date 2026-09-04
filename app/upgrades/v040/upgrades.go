@@ -130,6 +130,18 @@ func upgradeHandlerConstructor(
 		sdkCtx := sdk.UnwrapSDKContext(ctx)
 		logger := sdkCtx.Logger()
 
+		// Idempotency guard (M-5): this upgrade is NOT reversible. If the plan
+		// was already executed (re-scheduled plan, crash-restart replay), the
+		// one-shot migrations below would run a second time and hard-stop the
+		// chain. Every module already at its current consensus version means
+		// the handler ran before — skip and report.
+		if box.UpgradeAlreadyApplied(vm) {
+			logger.Warn("upgrade plan already applied; skipping one-shot migrations",
+				"name", upgradeName,
+			)
+			return vm, nil
+		}
+
 		logger.Info(
 			"executing upgrade plan",
 			"name", upgradeName,
@@ -512,8 +524,21 @@ func migrateLegacyEVMAccounts(
 		}
 
 		if legacyAccount.CodeHash != "" && evmKeeper != nil {
-			codeHash := common.HexToHash(legacyAccount.CodeHash)
-			evmKeeper.SetCodeHash(ctx, iterator.Key(), codeHash.Bytes())
+			// common.HexToHash silently truncates/zero-pads malformed input,
+			// which would persist an unresolvable "ghost" code hash. Validate
+			// explicitly: legacy code hashes are keccak256 (32 bytes) hex.
+			codeHashBytes := common.FromHex(legacyAccount.CodeHash)
+			switch len(codeHashBytes) {
+			case 0:
+				// Empty / "0x" — nothing to migrate.
+			case 32:
+				evmKeeper.SetCodeHash(ctx, iterator.Key(), codeHashBytes)
+			default:
+				return fmt.Errorf(
+					"legacy EthAccount %x has malformed code hash %q: expected 32-byte hex, got %d bytes",
+					iterator.Key(), legacyAccount.CodeHash, len(codeHashBytes),
+				)
+			}
 		}
 
 		// Rewrite the legacy pubkey Any (/ethermint.crypto.v1.ethsecp256k1.PubKey)
