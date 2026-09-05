@@ -64,7 +64,7 @@ func NewConvertNFTCmd() *cobra.Command {
 			}
 
 			evmContractAddress := args[2]
-			//if evmContractAddress == "" {
+			// if evmContractAddress == "" {
 			//	return fmt.Errorf("evm contract address can not be empty")
 			//}
 
@@ -139,15 +139,15 @@ func NewConvertERC721Cmd() *cobra.Command {
 			cosmosSender := cliCtx.GetFromAddress()
 
 			classId := args[2]
-			//if classId == "" {
+			// if classId == "" {
 			//	return fmt.Errorf("classId can not be empty")
 			//}
 
-			//if args[3] == "" {
+			// if args[3] == "" {
 			//	return fmt.Errorf("cosmos tokenids can not be empty")
 			//}
 			cosmosTokenIds := strings.Split(args[3], ",")
-			//if len(cosmosTokenIds) == 0 {
+			// if len(cosmosTokenIds) == 0 {
 			//	return fmt.Errorf("cosmos Token ids can not be empty")
 			//}
 
@@ -230,15 +230,15 @@ func NewTransferERC721Cmd() *cobra.Command {
 			}
 
 			classId := args[5]
-			//if classId == "" {
+			// if classId == "" {
 			//	return fmt.Errorf("classId can not be empty")
 			//}
 
-			//if args[6] == "" {
+			// if args[6] == "" {
 			//	return fmt.Errorf("cosmos tokenids can not be empty")
 			//}
 			cosmosTokenIds := strings.Split(args[6], ",")
-			//if len(cosmosTokenIds) == 0 {
+			// if len(cosmosTokenIds) == 0 {
 			//	return fmt.Errorf("cosmos token ids cannot be empty")
 			//}
 

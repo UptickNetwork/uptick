@@ -2,6 +2,7 @@ package internft
 
 import (
 	context "context"
+
 	nftkeeper "cosmossdk.io/x/nft/keeper"
 	nfttypes "github.com/UptickNetwork/uptick/x/collection/types"
 	"github.com/cosmos/cosmos-sdk/codec"

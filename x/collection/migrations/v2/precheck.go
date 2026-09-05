@@ -136,9 +136,9 @@ func indexByte(b []byte, c byte) int {
 // FormatProblems renders a precheck report for upgrade-handler error output.
 func FormatProblems(problems []Problem) string {
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("collection v1→v2 migration precheck found %d record(s) that would abort the upgrade:\n", len(problems)))
+	fmt.Fprintf(&sb, "collection v1→v2 migration precheck found %d record(s) that would abort the upgrade:\n", len(problems))
 	for i, p := range problems {
-		sb.WriteString(fmt.Sprintf("  %d) %s (store key %x)\n", i+1, p.String(), p.StoreKey))
+		fmt.Fprintf(&sb, "  %d) %s (store key %x)\n", i+1, p.String(), p.StoreKey)
 	}
 	return sb.String()
 }

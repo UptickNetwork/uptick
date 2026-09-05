@@ -123,7 +123,7 @@ func (am AppModule) RegisterInvariants(ir sdk.InvariantRegistry) {
 }
 
 //// Route returns the message routing key for the NFT module.
-//func (am AppModule) Route() sdk.Route {
+// func (am AppModule) Route() sdk.Route {
 //	return sdk.Route{}
 //}
 
@@ -131,7 +131,7 @@ func (am AppModule) RegisterInvariants(ir sdk.InvariantRegistry) {
 func (AppModule) QuerierRoute() string { return "" }
 
 // LegacyQuerierHandler returns the NFT module sdk.Querier.
-//func (am AppModule) LegacyQuerierHandler(_ *codec.LegacyAmino) sdk.Queryable {
+// func (am AppModule) LegacyQuerierHandler(_ *codec.LegacyAmino) sdk.Queryable {
 //	return nil
 //}
 

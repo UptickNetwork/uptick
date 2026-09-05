@@ -1,12 +1,13 @@
 package keeper
 
 import (
+	"strings"
+
 	sdkerrors "cosmossdk.io/errors"
 	"cosmossdk.io/store/prefix"
 	storetypes "cosmossdk.io/store/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
-	"strings"
 
 	"github.com/UptickNetwork/uptick/x/erc721/types"
 )
@@ -85,7 +86,7 @@ func (k Keeper) DeleteTokenPair(ctx sdk.Context, tokenPair types.TokenPair) {
 // GetERC721Map returns the token pair id for the given address
 func (k Keeper) GetERC721Map(ctx sdk.Context, erc721 common.Address) []byte {
 	store := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixTokenPairByERC721)
-	//Compatible with older versions
+	// Compatible with older versions
 	val := store.Get([]byte(strings.ToLower(erc721.String())))
 	if len(val) == 0 {
 		val = store.Get(erc721.Bytes())
@@ -132,7 +133,7 @@ func (k Keeper) IsTokenPairRegistered(ctx sdk.Context, id []byte) bool {
 // IsERC721Registered check if registered ERC721 token is registered
 func (k Keeper) IsERC721Registered(ctx sdk.Context, erc721 common.Address) bool {
 	store := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixTokenPairByERC721)
-	//Compatible with older versions
+	// Compatible with older versions
 	val := store.Has([]byte(strings.ToLower(erc721.String())))
 	if !val {
 		val = store.Has(erc721.Bytes())

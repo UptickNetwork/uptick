@@ -1,9 +1,10 @@
 package keeper
 
 import (
+	"strconv"
+
 	sdkerrors "cosmossdk.io/errors"
 	storetypes "cosmossdk.io/store/types"
-	"strconv"
 
 	"cosmossdk.io/store/prefix"
 	sdk "github.com/cosmos/cosmos-sdk/types"

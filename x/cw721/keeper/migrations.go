@@ -27,6 +27,6 @@ func (m Migrator) GetParams(ctx sdk.Context) types.Params {
 }
 
 // SetParams sets the cw721 module params - used for migration
-func (m Migrator) SetParams(ctx sdk.Context, params types.Params) {
-	m.keeper.SetParams(ctx, params)
+func (m Migrator) SetParams(ctx sdk.Context, params types.Params) error {
+	return m.keeper.SetParams(ctx, params)
 }

@@ -125,7 +125,7 @@ func (am AppModule) QuerierRoute() string {
 	return types.RouterKey
 }
 
-//func (am AppModule) LegacyQuerierHandler(amino *codec.LegacyAmino) sdk.Queryable {
+// func (am AppModule) LegacyQuerierHandler(amino *codec.LegacyAmino) sdk.Queryable {
 //	return nil
 //}
 

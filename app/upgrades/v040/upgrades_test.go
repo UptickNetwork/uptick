@@ -39,7 +39,7 @@ import (
 func TestMigrateEVMChainConfig(t *testing.T) {
 	ctx := sdk.NewContext(nil, cmtproto.Header{ChainID: "uptick_117-1"}, false, log.NewNopLogger())
 
-	require.NoError(t, migrateEVMChainConfig(ctx, upgrades.Toolbox{}, log.NewNopLogger()))
+	require.NoError(t, migrateEVMChainConfig(ctx, log.NewNopLogger()))
 
 	cfg := evmtypes.GetChainConfig()
 	require.NotNil(t, cfg)
@@ -317,7 +317,7 @@ func TestRepairEvmDenomMetadata(t *testing.T) {
 		Symbol:  "UOC",
 	})
 
-	require.NoError(t, repairEvmDenomMetadata(ctx, box, "auoc", log.NewNopLogger()))
+	repairEvmDenomMetadata(ctx, box, "auoc", log.NewNopLogger())
 	got, found := bk.GetDenomMetaData(ctx, "auoc")
 	require.True(t, found)
 	require.Equal(t, "uoc", got.Display)

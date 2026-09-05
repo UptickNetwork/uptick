@@ -40,19 +40,19 @@ type Toolbox struct {
 	keepers.AppKeepers
 }
 
-type upgradeRouter struct {
+type UpgradeRouter struct {
 	mu map[string]Upgrade
 }
 
 // NewUpgradeRouter creates a new upgrade router.
 //
 // No parameters.
-// Returns a pointer to upgradeRouter.
-func NewUpgradeRouter() *upgradeRouter {
-	return &upgradeRouter{make(map[string]Upgrade)}
+// Returns a pointer to UpgradeRouter.
+func NewUpgradeRouter() *UpgradeRouter {
+	return &UpgradeRouter{make(map[string]Upgrade)}
 }
 
-func (r *upgradeRouter) Register(u Upgrade) *upgradeRouter {
+func (r *UpgradeRouter) Register(u Upgrade) *UpgradeRouter {
 	if _, has := r.mu[u.UpgradeName]; has {
 		panic(u.UpgradeName + " already registered")
 	}
@@ -60,11 +60,11 @@ func (r *upgradeRouter) Register(u Upgrade) *upgradeRouter {
 	return r
 }
 
-func (r *upgradeRouter) Routers() map[string]Upgrade {
+func (r *UpgradeRouter) Routers() map[string]Upgrade {
 	return r.mu
 }
 
-func (r *upgradeRouter) UpgradeInfo(planName string) Upgrade {
+func (r *UpgradeRouter) UpgradeInfo(planName string) Upgrade {
 	return r.mu[planName]
 }
 

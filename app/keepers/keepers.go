@@ -582,7 +582,7 @@ func initParamsKeeper(
 	// SDK subspaces
 	// paramsKeeper.Subspace(authtypes.ModuleName)
 	paramsKeeper.Subspace(authtypes.ModuleName).WithKeyTable(authtypes.ParamKeyTable())
-	//paramsKeeper.Subspace(banktypes.ModuleName)
+	// paramsKeeper.Subspace(banktypes.ModuleName)
 	paramsKeeper.Subspace(banktypes.ModuleName).WithKeyTable(banktypes.ParamKeyTable())
 	// paramsKeeper.Subspace(stakingtypes.ModuleName)
 	paramsKeeper.Subspace(stakingtypes.ModuleName).WithKeyTable(stakingtypes.ParamKeyTable())
@@ -593,7 +593,7 @@ func initParamsKeeper(
 	paramsKeeper.Subspace(distrtypes.ModuleName).WithKeyTable(distrtypes.ParamKeyTable())
 	// paramsKeeper.Subspace(slashingtypes.ModuleName)
 	paramsKeeper.Subspace(slashingtypes.ModuleName).WithKeyTable(slashingtypes.ParamKeyTable())
-	//paramsKeeper.Subspace(govtypes.ModuleName).WithKeyTable(govtypes.ParamKeyTable())
+	// paramsKeeper.Subspace(govtypes.ModuleName).WithKeyTable(govtypes.ParamKeyTable())
 	paramsKeeper.Subspace(govtypes.ModuleName).WithKeyTable(govv1.ParamKeyTable())
 	// paramsKeeper.Subspace(crisistypes.ModuleName)
 	paramsKeeper.Subspace(crisistypes.ModuleName).WithKeyTable(crisistypes.ParamKeyTable())

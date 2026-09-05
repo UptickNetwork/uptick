@@ -1,8 +1,9 @@
 package v2
 
 import (
-	"github.com/cosmos/cosmos-sdk/runtime"
 	"time"
+
+	"github.com/cosmos/cosmos-sdk/runtime"
 
 	"cosmossdk.io/core/store"
 	"cosmossdk.io/log"

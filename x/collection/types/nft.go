@@ -42,8 +42,8 @@ func (bNFT BaseNFT) GetURI() string {
 }
 
 // GetURIHash return the UriHash of BaseNFT
-func (bnft BaseNFT) GetURIHash() string {
-	return bnft.UriHash
+func (bNFT BaseNFT) GetURIHash() string {
+	return bNFT.UriHash
 }
 
 // GetData return the Data of BaseNFT

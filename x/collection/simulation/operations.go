@@ -473,10 +473,10 @@ func SimulateMsgIssueDenom(k keeper.Keeper, ak types.AccountKeeper, bk types.Ban
 }
 
 func genDenomID(r *rand.Rand) string {
-	len := simtypes.RandIntBetween(r, 3, 128)
+	randLen := simtypes.RandIntBetween(r, 3, 128)
 	var denomID string
 	for {
-		denomID = strings.ToLower(simtypes.RandStringOfLength(r, len))
+		denomID = strings.ToLower(simtypes.RandStringOfLength(r, randLen))
 		// ValidateIssueDenomID (not ValidateDenomID): simulated issuance goes
 		// through MsgIssueDenom, whose ValidateBasic rejects the module
 		// reserved "uptick-" prefix (M-8). Reuse the same rule so generated
@@ -523,8 +523,8 @@ func randData(r *rand.Rand) string {
 	return data[idx]
 }
 
-func genNFTID(r *rand.Rand, min, max int) string {
-	n := simtypes.RandIntBetween(r, min, max)
+func genNFTID(r *rand.Rand, minID, maxID int) string {
+	n := simtypes.RandIntBetween(r, minID, maxID)
 	id := simtypes.RandStringOfLength(r, n)
 	return strings.ToLower(id)
 }

@@ -154,7 +154,7 @@ func InitCmd(mbm module.BasicManager, defaultNodeHome string) *cobra.Command {
 			initHeight, _ := cmd.Flags().GetInt64(flags.FlagInitHeight)
 
 			appGenesis.AppName = version.AppName
-			//appGenesis.AppVersion = version.Version
+			// appGenesis.AppVersion = version.Version
 			appGenesis.ChainID = chainID
 			appGenesis.AppState = appState
 			appGenesis.InitialHeight = initHeight

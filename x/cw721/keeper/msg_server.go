@@ -2,8 +2,9 @@ package keeper
 
 import (
 	"context"
-	sdkerrors "cosmossdk.io/errors"
 	"strings"
+
+	sdkerrors "cosmossdk.io/errors"
 
 	ibcnfttransfertypes "github.com/bianjieai/nft-transfer/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -80,7 +81,7 @@ func (k Keeper) ConvertCW721(
 		return nil, types.ErrCW721Disabled
 	}
 
-	//classId, nftId
+	// classId, nftId
 	classId, nftIds, err := k.GetClassIDAndNFTID(ctx, msg)
 	if err != nil {
 		return nil, err
@@ -226,7 +227,7 @@ func (k Keeper) ConvertNFT(
 		return nil, types.ErrCW721Disabled
 	}
 
-	//classId, nftIDs
+	// classId, nftIDs
 	contractAddress, tokenIds, err := k.GetContractAddressAndTokenIds(ctx, msg)
 	if err != nil {
 		return nil, err

@@ -122,7 +122,7 @@ func (k Keeper) GetContractAddressAndTokenIds(ctx sdk.Context, msg *types.MsgCon
 	// all-uppercase encodings are both valid), so normalize to lowercase before
 	// comparing instead of rejecting valid uppercase input. This mirrors the
 	// erc721 side, which lowercases contract addresses on ingest (params.go).
-	if evmContractAddress != "" && strings.ToLower(evmContractAddress) != strings.ToLower(pair.Cw721Address) {
+	if evmContractAddress != "" && !strings.EqualFold(evmContractAddress, pair.Cw721Address) {
 		return "", nil, sdkerrors.Wrapf(
 			types.ErrContractAddressNotCorrect,
 			"contract address is not correct, expect %s got %s",
@@ -157,20 +157,15 @@ func (k Keeper) GetContractAddressAndTokenIds(ctx sdk.Context, msg *types.MsgCon
 // nftType: 0:nftId 1:classId 2:tokenId 3:contract address
 func getNftData(nftOrg string, nftPairOrg string, nftSaved string, nftType int) (string, error) {
 	var nftRet string
-	if nftOrg == "" {
-		if nftSaved == "" {
-			nftRet = createNftDataByType(nftPairOrg, nftType)
-		} else {
-			nftRet = nftSaved
-		}
-	} else {
-		if nftSaved == "" {
-			nftRet = nftOrg
-		} else if nftSaved == nftOrg {
-			nftRet = nftOrg
-		} else {
-			return "", getNftDataErrorByType(nftSaved, nftOrg, nftType)
-		}
+	switch {
+	case nftOrg == "" && nftSaved == "":
+		nftRet = createNftDataByType(nftPairOrg, nftType)
+	case nftOrg == "":
+		nftRet = nftSaved
+	case nftSaved == "", nftSaved == nftOrg:
+		nftRet = nftOrg
+	default:
+		return "", getNftDataErrorByType(nftSaved, nftOrg, nftType)
 	}
 	return nftRet, nil
 }

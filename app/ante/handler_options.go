@@ -104,20 +104,6 @@ func newEthAnteHandler(options HandlerOptions) sdk.AnteHandler {
 	return evmante.NewAnteHandler(options.toEvmHandlerOptions())
 }
 
-// anteHandlerDecorator adapts an sdk.AnteHandler so it can sit in a decorator chain.
-// The inner handler is treated as a single step; its returned context is passed to next.
-type anteHandlerDecorator struct {
-	handler sdk.AnteHandler
-}
-
-func (d anteHandlerDecorator) AnteHandle(ctx sdk.Context, tx sdk.Tx, simulate bool, next sdk.AnteHandler) (sdk.Context, error) {
-	newCtx, err := d.handler(ctx, tx, simulate)
-	if err != nil {
-		return newCtx, err
-	}
-	return next(newCtx, tx, simulate)
-}
-
 // newCosmosAnteHandler creates the default ante handler for Cosmos transactions.
 // Wasm CountTX / GasRegister / TxContracts run before SetUpContext.
 // LimitSimulationGas runs immediately after SetUpContext so the simulation gas

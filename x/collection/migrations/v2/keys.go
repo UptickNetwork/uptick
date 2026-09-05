@@ -14,19 +14,22 @@ var (
 
 // KeyDenom gets the storeKey by the denom id
 func KeyDenom(id string) []byte {
-	key := append(PrefixDenom, delimiter...)
+	key := append([]byte(nil), PrefixDenom...)
+	key = append(key, delimiter...)
 	return append(key, []byte(id)...)
 }
 
 // KeyDenomName gets the storeKey by the denom name
 func KeyDenomName(name string) []byte {
-	key := append(PrefixDenomName, delimiter...)
+	key := append([]byte(nil), PrefixDenomName...)
+	key = append(key, delimiter...)
 	return append(key, []byte(name)...)
 }
 
 // KeyNFT gets the key of nft stored by an denom and id
 func KeyNFT(denomID, tokenID string) []byte {
-	key := append(PrefixNFT, delimiter...)
+	key := append([]byte(nil), PrefixNFT...)
+	key = append(key, delimiter...)
 	if len(denomID) > 0 {
 		key = append(key, []byte(denomID)...)
 		key = append(key, delimiter...)
@@ -40,13 +43,15 @@ func KeyNFT(denomID, tokenID string) []byte {
 
 // KeyCollection gets the storeKey by the collection
 func KeyCollection(denomID string) []byte {
-	key := append(PrefixCollection, delimiter...)
+	key := append([]byte(nil), PrefixCollection...)
+	key = append(key, delimiter...)
 	return append(key, []byte(denomID)...)
 }
 
 // KeyOwner gets the key of a collection owned by an account address
 func KeyOwner(address sdk.AccAddress, denomID, tokenID string) []byte {
-	key := append(PrefixOwners, delimiter...)
+	key := append([]byte(nil), PrefixOwners...)
+	key = append(key, delimiter...)
 	if address != nil {
 		key = append(key, []byte(address.String())...)
 		key = append(key, delimiter...)

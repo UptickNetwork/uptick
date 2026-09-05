@@ -52,7 +52,7 @@ func (wsd WasmSecurityDecorator) AnteHandle(ctx sdk.Context, tx sdk.Tx, simulate
 
 	// Validate each message
 	for _, msg := range msgs {
-		if err := wsd.validateMessage(ctx, msg); err != nil {
+		if err := wsd.validateMessage(msg); err != nil {
 			return ctx, err
 		}
 	}
@@ -61,29 +61,29 @@ func (wsd WasmSecurityDecorator) AnteHandle(ctx sdk.Context, tx sdk.Tx, simulate
 }
 
 // validateMessage validates a single sdk.Msg
-func (wsd WasmSecurityDecorator) validateMessage(ctx sdk.Context, msg sdk.Msg) error {
+func (wsd WasmSecurityDecorator) validateMessage(msg sdk.Msg) error {
 	switch msg := msg.(type) {
 	case *wasmTypes.MsgExecuteContract:
 		// Validate CosmWasm MsgExecuteContract
-		return wsd.validateWasmExecuteContract(ctx, msg)
+		return wsd.validateWasmExecuteContract(msg)
 
 	case *wasmTypes.MsgInstantiateContract:
 		// Validate MsgInstantiateContract
-		return wsd.validateWasmInstantiateContract(ctx, msg)
+		return wsd.validateWasmInstantiateContract(msg)
 
 	case *wasmTypes.MsgInstantiateContract2:
 		// Validate MsgInstantiateContract2
-		return wsd.validateWasmInstantiateContract2(ctx, msg)
+		return wsd.validateWasmInstantiateContract2(msg)
 
 	default:
 		// Check the message type URL to see if it is an EVM message
 		// If it is an EVM message, ensure it goes through the proper AnteHandler
-		return wsd.checkEvmMessage(ctx, msg)
+		return wsd.checkEvmMessage(msg)
 	}
 }
 
 // validateWasmExecuteContract validates a CosmWasm MsgExecuteContract
-func (wsd WasmSecurityDecorator) validateWasmExecuteContract(ctx sdk.Context, msg *wasmTypes.MsgExecuteContract) error {
+func (wsd WasmSecurityDecorator) validateWasmExecuteContract(msg *wasmTypes.MsgExecuteContract) error {
 	// Check basic validity of the message
 	if err := msg.ValidateBasic(); err != nil {
 		return sdkerrors.Wrap(err, "invalid wasm execute contract message")
@@ -100,7 +100,7 @@ func (wsd WasmSecurityDecorator) validateWasmExecuteContract(ctx sdk.Context, ms
 }
 
 // validateWasmInstantiateContract validates a CosmWasm MsgInstantiateContract
-func (wsd WasmSecurityDecorator) validateWasmInstantiateContract(ctx sdk.Context, msg *wasmTypes.MsgInstantiateContract) error {
+func (wsd WasmSecurityDecorator) validateWasmInstantiateContract(msg *wasmTypes.MsgInstantiateContract) error {
 	if err := msg.ValidateBasic(); err != nil {
 		return sdkerrors.Wrap(err, "invalid wasm instantiate contract message")
 	}
@@ -118,7 +118,7 @@ func (wsd WasmSecurityDecorator) validateWasmInstantiateContract(ctx sdk.Context
 }
 
 // validateWasmInstantiateContract2 validates a CosmWasm MsgInstantiateContract2
-func (wsd WasmSecurityDecorator) validateWasmInstantiateContract2(ctx sdk.Context, msg *wasmTypes.MsgInstantiateContract2) error {
+func (wsd WasmSecurityDecorator) validateWasmInstantiateContract2(msg *wasmTypes.MsgInstantiateContract2) error {
 	if err := msg.ValidateBasic(); err != nil {
 		return sdkerrors.Wrap(err, "invalid wasm instantiate contract2 message")
 	}
@@ -137,13 +137,13 @@ func (wsd WasmSecurityDecorator) validateWasmInstantiateContract2(ctx sdk.Contex
 
 // checkEvmMessage checks whether the message is an EVM message and,
 // if so, ensures it goes through the correct AnteHandler
-func (wsd WasmSecurityDecorator) checkEvmMessage(ctx sdk.Context, msg sdk.Msg) error {
+func (wsd WasmSecurityDecorator) checkEvmMessage(msg sdk.Msg) error {
 	// Check message type URL
 	msgTypeURL := sdk.MsgTypeURL(msg)
 	if msgTypeURL == EvmMsgTypeURL {
 		// If it is an EVM message, validate gas limit
 		if evmMsg, ok := msg.(*evmtypes.MsgEthereumTx); ok {
-			return wsd.validateEvmGasLimit(ctx, evmMsg)
+			return wsd.validateEvmGasLimit(evmMsg)
 		}
 	}
 
@@ -151,7 +151,7 @@ func (wsd WasmSecurityDecorator) checkEvmMessage(ctx sdk.Context, msg sdk.Msg) e
 }
 
 // validateEvmGasLimit validates the gas limit of an EVM message
-func (wsd WasmSecurityDecorator) validateEvmGasLimit(ctx sdk.Context, msg *evmtypes.MsgEthereumTx) error {
+func (wsd WasmSecurityDecorator) validateEvmGasLimit(msg *evmtypes.MsgEthereumTx) error {
 	// Get gas limit from the Ethereum transaction
 	tx := msg.AsTransaction()
 	if tx == nil {

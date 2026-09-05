@@ -2,9 +2,11 @@ package network
 
 import (
 	"context"
-	"cosmossdk.io/log"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
+
+	"cosmossdk.io/log"
 	cmtcfg "github.com/cometbft/cometbft/config"
 	tmos "github.com/cometbft/cometbft/libs/os"
 	"github.com/cometbft/cometbft/node"
@@ -32,7 +34,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
-	"path/filepath"
 )
 
 func startInProcess(cfg Config, val *Validator) error {
@@ -92,6 +93,7 @@ func startInProcess(cfg Config, val *Validator) error {
 
 	ctx := context.Background()
 	ctx, val.cancelFn = context.WithCancel(ctx)
+	defer val.cancelFn()
 	val.errGroup, ctx = errgroup.WithContext(ctx)
 
 	if val.AppConfig.GRPC.Enable {

@@ -48,5 +48,6 @@ func writeAppTomlEVMChainID(home string, id uint64) error {
 		return err
 	}
 	next := evmChainIDLine.ReplaceAll(bz, []byte(fmt.Sprintf("evm-chain-id = %d", id)))
-	return os.WriteFile(path, next, 0o644)
+	//nolint:gosec // G703: path is derived from the operator's own --home flag on a local CLI, not untrusted input
+	return os.WriteFile(path, next, 0o600)
 }

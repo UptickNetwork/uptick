@@ -58,10 +58,12 @@ jobs:
 
       - name: Start node
         run: |
+          # Note: --api.address does not exist in the cosmos/evm-era start
+          # command; the REST API address comes from app.toml ([api] section,
+          # enabled in the previous step, default listen :1317).
           $PWD/build/uptickd start --home /tmp/uptick-keplr \
             --minimum-gas-prices 0.000000001auptick \
-            --rpc.laddr tcp://127.0.0.1:26657 \
-            --api.address tcp://127.0.0.1:1317 > /tmp/uptick-e2e.log 2>&1 &
+            --rpc.laddr tcp://127.0.0.1:26657 > /tmp/uptick-e2e.log 2>&1 &
           for i in $(seq 1 60); do
             curl -sf http://127.0.0.1:1317/cosmos/base/tendermint/v1beta1/node_info > /dev/null && exit 0
             sleep 2
@@ -85,7 +87,7 @@ jobs:
       - name: Lint
         uses: golangci/golangci-lint-action@v6
         with:
-          version: v1.64.8
+          version: v2.13.2
 
   contracts-reproducible:
     runs-on: ubuntu-latest

@@ -1,9 +1,10 @@
 package v2
 
 import (
+	"unsafe"
+
 	"cosmossdk.io/core/store"
 	"github.com/cosmos/cosmos-sdk/runtime"
-	"unsafe"
 
 	"cosmossdk.io/store/prefix"
 	"cosmossdk.io/x/nft"

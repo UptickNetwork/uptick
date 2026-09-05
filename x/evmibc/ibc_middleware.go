@@ -58,7 +58,7 @@ func (im IBCMiddleware) OnRecvPacket(
 	relayer sdk.AccAddress,
 ) exported.Acknowledgement {
 
-	ackResult := channeltypes.NewResultAcknowledgement([]byte{byte(1)})
+	var ackResult exported.Acknowledgement
 	var data types.NonFungibleTokenPacketData
 	if err := types.ModuleCdc.UnmarshalJSON(packet.GetData(), &data); err != nil {
 		ackResult = channeltypes.NewErrorAcknowledgement(
@@ -82,8 +82,8 @@ func (im IBCMiddleware) OnRecvPacket(
 		return im.Module.OnRecvPacket(ctx, channelVersion, packet, relayer)
 	}
 
-	if strings.ToLower(packageMemo.ConvertTo) == convertERC721 {
-
+	switch strings.ToLower(packageMemo.ConvertTo) {
+	case convertERC721:
 		newPackage, dstReceiver := PackageToModuleAccount(packet, erc721Types.AccModuleAddress)
 		if !common.IsHexAddress(dstReceiver) || common.HexToAddress(dstReceiver) == (common.Address{}) {
 			ackResult = channeltypes.NewErrorAcknowledgement(
@@ -93,8 +93,7 @@ func (im IBCMiddleware) OnRecvPacket(
 		}
 		return im.recvAndConvert(ctx, channelVersion, newPackage, relayer, dstReceiver, 0)
 
-	} else if strings.ToLower(packageMemo.ConvertTo) == convertCW721 {
-
+	case convertCW721:
 		newPackage, dstReceiver := PackageToModuleAccount(packet, cw721Types.AccModuleAddress)
 		if _, err := sdk.AccAddressFromBech32(dstReceiver); err != nil {
 			ackResult = channeltypes.NewErrorAcknowledgement(
@@ -103,9 +102,8 @@ func (im IBCMiddleware) OnRecvPacket(
 			return ackResult
 		}
 		return im.recvAndConvert(ctx, channelVersion, newPackage, relayer, dstReceiver, 1)
-	} else {
-		return im.Module.OnRecvPacket(ctx, channelVersion, packet, relayer)
 	}
+	return im.Module.OnRecvPacket(ctx, channelVersion, packet, relayer)
 
 }
 

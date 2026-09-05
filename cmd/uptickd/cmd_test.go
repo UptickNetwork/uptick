@@ -2,8 +2,9 @@ package main_test
 
 import (
 	"fmt"
-	uptickd "github.com/UptickNetwork/uptick/cmd/uptickd"
 	"testing"
+
+	uptickd "github.com/UptickNetwork/uptick/cmd/uptickd"
 
 	"github.com/stretchr/testify/require"
 

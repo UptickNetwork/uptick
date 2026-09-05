@@ -2,6 +2,7 @@ package keeper
 
 import (
 	"context"
+
 	sdkerrors "cosmossdk.io/errors"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
@@ -60,7 +61,6 @@ func (k Keeper) IssueDenom(goCtx context.Context, msg *types.MsgIssueDenom) (*ty
 	return &types.MsgIssueDenomResponse{}, nil
 }
 
-//nolint:dupl
 func (k Keeper) MintNFT(goCtx context.Context, msg *types.MsgMintNFT) (*types.MsgMintNFTResponse, error) {
 	recipient, err := sdk.AccAddressFromBech32(msg.Recipient)
 	if err != nil {

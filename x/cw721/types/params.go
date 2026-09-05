@@ -1,9 +1,5 @@
 package types
 
-import (
-	"fmt"
-)
-
 // Parameter store key
 var (
 	KeyPrefixParams = []byte("cw721/params/")
@@ -25,13 +21,6 @@ func DefaultParams() Params {
 		EnableCw721:   true,
 		EnableEVMHook: true,
 	}
-}
-
-func validateBool(i interface{}) error {
-	if _, ok := i.(bool); !ok {
-		return fmt.Errorf("invalid parameter type: %T", i)
-	}
-	return nil
 }
 
 func (p Params) Validate() error { return nil }

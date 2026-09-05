@@ -103,7 +103,7 @@ func (k Keeper) ConvertERC721(
 	// lowercases before lookup, so the reverse direction must store lowercase too.
 	msg.EvmContractAddress = strings.ToLower(msg.EvmContractAddress)
 
-	//classId, nftId
+	// classId, nftId
 	classId, nftIds, err := k.GetClassIDAndNFTID(ctx, msg)
 	if err != nil {
 		return nil, err
@@ -200,7 +200,7 @@ func (k Keeper) ConvertNFT(
 		return nil, types.ErrERC721Disabled
 	}
 
-	//classId, nftIDs
+	// classId, nftIDs
 	contractAddress, tokenIds, err := k.GetContractAddressAndTokenIds(ctx, msg)
 	if err != nil {
 		return nil, err

@@ -1,8 +1,9 @@
 package keeper
 
 import (
-	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
 	"math/big"
+
+	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -189,12 +190,10 @@ func (k Keeper) QueryNFTEnhance(
 		retTokenUri, err := k.QueryERC721DataByTokenID("tokenURI", ctx, contract, tokenID)
 		if err != nil {
 			return types.NFTEnhance{}, err
-		} else {
-			return types.NewNFTEnhance("", retTokenUri[0].(string), "", ""), nil
 		}
-	} else {
-		return types.NewNFTEnhance(retEnhance[0].(string), retEnhance[1].(string), retEnhance[2].(string), retEnhance[3].(string)), nil
+		return types.NewNFTEnhance("", retTokenUri[0].(string), "", ""), nil
 	}
+	return types.NewNFTEnhance(retEnhance[0].(string), retEnhance[1].(string), retEnhance[2].(string), retEnhance[3].(string)), nil
 }
 
 func (k Keeper) QueryERC721DataByTokenID(

@@ -2,9 +2,10 @@ package types
 
 import (
 	"encoding/hex"
+	"strings"
+
 	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/cosmos/evm/crypto/ethsecp256k1"
-	"strings"
 
 	sdkerrors "cosmossdk.io/errors"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"

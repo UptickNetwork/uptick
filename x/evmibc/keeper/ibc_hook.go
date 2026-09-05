@@ -74,11 +74,12 @@ func (k Keeper) OnRecvPacket(
 	// use cctx to ConvertCoin
 	context := sdk.WrapSDKContext(cctx)
 	var err error
-	if convertType == 0 {
+	switch convertType {
+	case 0:
 		err = k.ConvertNFTFromErc721(context, voucherClassID, data.TokenIds, receiver)
-	} else if convertType == 1 {
+	case 1:
 		err = k.ConvertNFTFromCw721(context, voucherClassID, data.TokenIds, receiver)
-	} else {
+	default:
 		return channeltypes.NewErrorAcknowledgement(
 			sdkerrors.Wrapf(errortypes.ErrInvalidRequest, "unknown convert type %d", convertType),
 		)

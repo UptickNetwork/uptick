@@ -1,10 +1,11 @@
 package keeper
 
 import (
+	"fmt"
+
 	"cosmossdk.io/errors"
 	"cosmossdk.io/log"
 	storetypes "cosmossdk.io/store/types"
-	"fmt"
 	nftkeeper "github.com/UptickNetwork/uptick/x/collection/keeper"
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"

@@ -1,8 +1,9 @@
 package app
 
 import (
-	storetypes "cosmossdk.io/store/types"
 	"encoding/json"
+
+	storetypes "cosmossdk.io/store/types"
 	tmproto "github.com/cometbft/cometbft/proto/tendermint/types"
 
 	servertypes "github.com/cosmos/cosmos-sdk/server/types"
@@ -57,12 +58,7 @@ func (app *Uptick) ExportAppStateAndValidators(
 //
 //	in favor of export at a block height
 func (app *Uptick) prepForZeroHeightGenesis(ctx sdk.Context, jailAllowedAddrs []string) error {
-	applyAllowedAddrs := false
-
-	// check if there is a allowed address list
-	if len(jailAllowedAddrs) > 0 {
-		applyAllowedAddrs = true
-	}
+	applyAllowedAddrs := len(jailAllowedAddrs) > 0
 
 	allowedAddrsMap := make(map[string]bool)
 
@@ -121,7 +117,7 @@ func (app *Uptick) prepForZeroHeightGenesis(ctx sdk.Context, jailAllowedAddrs []
 	ctx = ctx.WithBlockHeight(0)
 
 	// reinitialize all validators
-	app.StakingKeeper.IterateValidators(ctx, func(_ int64, val stakingtypes.ValidatorI) (stop bool) {
+	_ = app.StakingKeeper.IterateValidators(ctx, func(_ int64, val stakingtypes.ValidatorI) (stop bool) {
 		// donate any unwithdrawn outstanding reward fraction tokens to the community pool
 		valBz, err := app.StakingKeeper.ValidatorAddressCodec().StringToBytes(val.GetOperator())
 		if err != nil {
@@ -155,8 +151,8 @@ func (app *Uptick) prepForZeroHeightGenesis(ctx sdk.Context, jailAllowedAddrs []
 		if err != nil {
 			return err
 		}
-		app.DistrKeeper.Hooks().BeforeDelegationCreated(ctx, delAddr, valAddr)
-		app.DistrKeeper.Hooks().AfterDelegationModified(ctx, delAddr, valAddr)
+		_ = app.DistrKeeper.Hooks().BeforeDelegationCreated(ctx, delAddr, valAddr)
+		_ = app.DistrKeeper.Hooks().AfterDelegationModified(ctx, delAddr, valAddr)
 	}
 
 	// reset context height
@@ -165,20 +161,20 @@ func (app *Uptick) prepForZeroHeightGenesis(ctx sdk.Context, jailAllowedAddrs []
 	/* Handle staking state. */
 
 	// iterate through redelegations, reset creation height
-	app.StakingKeeper.IterateRedelegations(ctx, func(_ int64, red stakingtypes.Redelegation) (stop bool) {
+	_ = app.StakingKeeper.IterateRedelegations(ctx, func(_ int64, red stakingtypes.Redelegation) (stop bool) {
 		for i := range red.Entries {
 			red.Entries[i].CreationHeight = 0
 		}
-		app.StakingKeeper.SetRedelegation(ctx, red)
+		_ = app.StakingKeeper.SetRedelegation(ctx, red)
 		return false
 	})
 
 	// iterate through unbonding delegations, reset creation height
-	app.StakingKeeper.IterateUnbondingDelegations(ctx, func(_ int64, ubd stakingtypes.UnbondingDelegation) (stop bool) {
+	_ = app.StakingKeeper.IterateUnbondingDelegations(ctx, func(_ int64, ubd stakingtypes.UnbondingDelegation) (stop bool) {
 		for i := range ubd.Entries {
 			ubd.Entries[i].CreationHeight = 0
 		}
-		app.StakingKeeper.SetUnbondingDelegation(ctx, ubd)
+		_ = app.StakingKeeper.SetUnbondingDelegation(ctx, ubd)
 		return false
 	})
 
@@ -216,11 +212,11 @@ func (app *Uptick) prepForZeroHeightGenesis(ctx sdk.Context, jailAllowedAddrs []
 	/* Handle slashing state. */
 
 	// reset start height on signing infos
-	app.SlashingKeeper.IterateValidatorSigningInfos(
+	_ = app.SlashingKeeper.IterateValidatorSigningInfos(
 		ctx,
 		func(addr sdk.ConsAddress, info slashingtypes.ValidatorSigningInfo) (stop bool) {
 			info.StartHeight = 0
-			app.SlashingKeeper.SetValidatorSigningInfo(ctx, addr, info)
+			_ = app.SlashingKeeper.SetValidatorSigningInfo(ctx, addr, info)
 			return false
 		},
 	)

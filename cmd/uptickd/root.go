@@ -13,7 +13,6 @@ import (
 	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
 	"github.com/UptickNetwork/uptick/app"
 	"github.com/UptickNetwork/uptick/app/params"
-	uptickparams "github.com/UptickNetwork/uptick/app/params"
 	cmdcfg "github.com/UptickNetwork/uptick/cmd/config"
 	upticktypes "github.com/UptickNetwork/uptick/types"
 	tmcfg "github.com/cometbft/cometbft/config"
@@ -231,9 +230,9 @@ func queryCommand() *cobra.Command {
 		authcmd.QueryTxsByEventsCmd(),
 		authcmd.QueryTxCmd(),
 
-		//authcmd.GetAccountCmd(),
-		//rpc.BlockCommand(),
-		//rpc.QueryEventForTxCmd(),
+		// authcmd.GetAccountCmd(),
+		// rpc.BlockCommand(),
+		// rpc.QueryEventForTxCmd(),
 	)
 
 	cmd.PersistentFlags().String(flags.FlagChainID, "", "The network chain ID")
@@ -285,9 +284,7 @@ func initAppConfig() (string, interface{}) {
 	return customAppTemplate, customAppConfig
 }
 
-type appCreator struct {
-	encCfg uptickparams.EncodingConfig
-}
+type appCreator struct{}
 
 // newApp is an appCreator
 func (a appCreator) newApp(logger log.Logger, db dbm.DB, traceStore io.Writer, appOpts servertypes.AppOptions) servertypes.Application {
@@ -313,7 +310,7 @@ func (a appCreator) newEvmApp(logger log.Logger, db dbm.DB, traceStore io.Writer
 }
 
 // createIrisappAndExport creates a new irisapp (optionally at a given height) and exports state.
-func (ac appCreator) appExport(
+func (a appCreator) appExport(
 	logger log.Logger,
 	db dbm.DB,
 	traceStore io.Writer,

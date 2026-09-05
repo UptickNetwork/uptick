@@ -2,9 +2,10 @@ package main
 
 import (
 	"fmt"
+	"os"
+
 	svrcmd "github.com/cosmos/cosmos-sdk/server/cmd"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"os"
 
 	"github.com/UptickNetwork/uptick/app"
 	cmdcfg "github.com/UptickNetwork/uptick/cmd/config"

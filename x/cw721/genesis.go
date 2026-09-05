@@ -15,7 +15,9 @@ func InitGenesis(
 	accountKeeper authkeeper.AccountKeeper,
 	data types.GenesisState,
 ) {
-	k.SetParams(ctx, data.Params)
+	if err := k.SetParams(ctx, data.Params); err != nil {
+		panic(err) // genesis InitGenesis must not silently skip params
+	}
 
 	// ensure cw721 module account is set on genesis
 	if acc := accountKeeper.GetModuleAccount(ctx, types.ModuleName); acc == nil {

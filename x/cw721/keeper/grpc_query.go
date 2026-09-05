@@ -90,7 +90,7 @@ func (k Keeper) WasmContract(
 		return nil, status.Error(codes.InvalidArgument, "empty request")
 	}
 
-	//from the ibc info derive the wasm contract info
+	// from the ibc info derive the wasm contract info
 	ClassId := req.ClassId
 	Port := req.Port
 	Channel := req.Channel

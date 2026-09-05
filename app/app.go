@@ -16,8 +16,6 @@ import (
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	corevm "github.com/ethereum/go-ethereum/core/vm"
 
-	"cosmossdk.io/math"
-
 	"cosmossdk.io/client/v2/autocli"
 	"cosmossdk.io/core/appmodule"
 	evidencetypes "cosmossdk.io/x/evidence/types"
@@ -34,6 +32,7 @@ import (
 	crisistypes "github.com/cosmos/cosmos-sdk/x/crisis/types"
 	genutiltypes "github.com/cosmos/cosmos-sdk/x/genutil/types"
 	ibcexported "github.com/cosmos/ibc-go/v10/modules/core/exported"
+
 	// 	porttypes "github.com/cosmos/ibc-go/v10/modules/core/05-port/types" // removed in ibc-go v10
 	srvflags "github.com/cosmos/evm/server/flags"
 
@@ -41,9 +40,8 @@ import (
 	"github.com/UptickNetwork/uptick/app/keepers"
 	uptickparams "github.com/UptickNetwork/uptick/app/params"
 	v041 "github.com/UptickNetwork/uptick/app/upgrades/v041"
-	_ "github.com/UptickNetwork/uptick/client/docs/statik"
+	_ "github.com/UptickNetwork/uptick/client/docs/statik" // registers statik FS for the Swagger UI
 	cmdcfg "github.com/UptickNetwork/uptick/cmd/config"
-	evmostypes "github.com/UptickNetwork/uptick/types"
 	nftmodule "github.com/UptickNetwork/uptick/x/collection/module"
 	nfttypes "github.com/UptickNetwork/uptick/x/collection/types"
 	cosmoserc20 "github.com/cosmos/evm/x/erc20"
@@ -64,7 +62,6 @@ import (
 	"github.com/cosmos/cosmos-sdk/server/config"
 	servertypes "github.com/cosmos/cosmos-sdk/server/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/types/mempool"
 	sdkmempool "github.com/cosmos/cosmos-sdk/types/mempool"
 	"github.com/cosmos/cosmos-sdk/types/module"
 	"github.com/cosmos/cosmos-sdk/x/auth"
@@ -161,15 +158,6 @@ var (
 	// DefaultNodeHome default home directories for the application daemon
 	DefaultNodeHome string
 
-	feemarketParams = feemarkettypes.Params{
-		NoBaseFee:                false,
-		BaseFeeChangeDenominator: 8,
-		ElasticityMultiplier:     4,
-		BaseFee:                  math.LegacyNewDec(10000000000),
-		MinGasPrice:              math.LegacyNewDec(10000000000),
-		MinGasMultiplier:         math.LegacyNewDecWithPrec(5, 1),
-	}
-
 	// module account permissions
 	maccPerms = map[string][]string{
 		authtypes.FeeCollectorName:     nil,
@@ -226,8 +214,7 @@ type Uptick struct {
 	mm *module.Manager
 	bm module.BasicManager
 	// simulation manager
-	sm         *module.SimulationManager
-	tpsCounter *tpsCounter
+	sm *module.SimulationManager
 }
 
 // NewUptick returns a reference to a new initialized Uptick application.
@@ -575,7 +562,9 @@ func NewUptick(
 	app.configurator = module.NewConfigurator(app.codec, app.MsgServiceRouter(), app.GRPCQueryRouter())
 
 	app.mm.RegisterInvariants(app.CrisisKeeper)
-	app.mm.RegisterServices(app.configurator)
+	if err := app.mm.RegisterServices(app.configurator); err != nil {
+		panic(err)
+	}
 
 	// create the simulation manager and define the order of the modules for deterministic simulations
 	app.sm = module.NewSimulationManager(
@@ -663,9 +652,7 @@ func NewUptick(
 
 	// Configure the EVM mempool (required for the EVM JSON-RPC server).
 	// Must run before the BaseApp is sealed by LoadLatestVersion.
-	if err := app.configureEVMMempool(appOpts, logger); err != nil {
-		logger.Error("failed to configure EVM mempool", "error", err)
-	}
+	app.configureEVMMempool(appOpts, logger)
 
 	if manager := app.SnapshotManager(); manager != nil {
 		err := manager.RegisterExtensions(
@@ -689,12 +676,6 @@ func NewUptick(
 		}
 	}
 
-	// TODO: tpsCounter disabled (unused, references removed SDK types)
-	// app.tpsCounter = newTPSCounter(logger)
-	// go func() {
-	// 	_ = app.tpsCounter.start(context.Background())
-	// }()
-
 	return app
 }
 
@@ -703,8 +684,8 @@ func (app *Uptick) Name() string { return app.BaseApp.Name() }
 
 // GetMempool returns the app's mempool.
 // Required by cosmos/evm server.Application interface.
-func (app *Uptick) GetMempool() mempool.ExtMempool {
-	if extMempool, ok := app.BaseApp.Mempool().(mempool.ExtMempool); ok {
+func (app *Uptick) GetMempool() sdkmempool.ExtMempool {
+	if extMempool, ok := app.BaseApp.Mempool().(sdkmempool.ExtMempool); ok {
 		return extMempool
 	}
 	// Fallback: return nil if the mempool doesn't implement ExtMempool
@@ -731,10 +712,10 @@ const (
 // configureEVMMempool sets up the cosmos/evm experimental EVM mempool and the
 // related ABCI handlers. Required for the EVM JSON-RPC server to function.
 // Modeled on cosmos/evm's evmd.ConfigureEVMMempool.
-func (app *Uptick) configureEVMMempool(appOpts servertypes.AppOptions, logger log.Logger) error {
+func (app *Uptick) configureEVMMempool(appOpts servertypes.AppOptions, logger log.Logger) {
 	if evmtypes.GetChainConfig() == nil {
 		logger.Debug("evm chain config is not set, skipping EVM mempool configuration")
-		return nil
+		return
 	}
 
 	// Read operator-configurable mempool knobs from the cosmos/evm app.toml
@@ -819,7 +800,6 @@ func (app *Uptick) configureEVMMempool(appOpts servertypes.AppOptions, logger lo
 	)
 	app.SetPrepareProposal(abciProposalHandler.PrepareProposalHandler())
 
-	return nil
 }
 
 // BeginBlocker application updates every begin block
@@ -1015,54 +995,12 @@ func (app *Uptick) BlockedModuleAccountAddrs() map[string]bool {
 	return modAccAddrs
 }
 
-// Deprecated.
-//func wasmParamsKeyTable() paramstypes.KeyTable {
-//
-//	var addrees []string
-//	return paramstypes.NewKeyTable(
-//		paramstypes.NewParamSetPair(
-//			wasmtypes.ParamStoreKeyUploadAccess, wasmtypes.AccessConfig{
-//				Permission: wasmtypes.AccessTypeEverybody,
-//				Addresses:  addrees,
-//			}, validateAccessConfig,
-//		),
-//		paramstypes.NewParamSetPair(
-//			wasmtypes.ParamStoreKeyInstantiateAccess, wasmtypes.AccessTypeEverybody, validateAccessType,
-//		),
-//	)
-//}
-
-func validateAccessConfig(i interface{}) error {
-	v, ok := i.(wasmtypes.AccessConfig)
-	if !ok {
-		return fmt.Errorf("invalid parameter type: %T", i)
-	}
-	return v.ValidateBasic()
-}
-
-func validateAccessType(i interface{}) error {
-	a, ok := i.(wasmtypes.AccessType)
-	if !ok {
-		return fmt.Errorf("invalid parameter type: %T", i)
-	}
-	if a == wasmtypes.AccessTypeUnspecified {
-		return fmt.Errorf("ErrEmpty: %T", i)
-		// errorsmod.Wrap(ErrEmpty, "type")
-	}
-	for _, v := range wasmtypes.AllAccessTypes {
-		if v == a {
-			return nil
-		}
-	}
-	return fmt.Errorf("unknown type: %q", a)
-}
-
 // NoOpMempoolOption returns a function that sets up a no-op mempool for the given BaseApp.
 //
 // The function takes a pointer to a BaseApp as a parameter and returns nothing.
 func NoOpMempoolOption() func(*baseapp.BaseApp) {
 	return func(app *baseapp.BaseApp) {
-		memPool := mempool.NoOpMempool{}
+		memPool := sdkmempool.NoOpMempool{}
 		app.SetMempool(memPool)
 		handler := baseapp.NewDefaultProposalHandler(memPool, app)
 		app.SetPrepareProposal(handler.PrepareProposalHandler())
@@ -1073,7 +1011,7 @@ func NoOpMempoolOption() func(*baseapp.BaseApp) {
 // CustomizeDefaultGenesis overlays Uptick-specific defaults onto a
 // BasicManager genesis map. cosmos/evm defaults EvmDenom to "aatom"; Uptick
 // uses "auptick" and must also inject matching bank denom metadata.
-func CustomizeDefaultGenesis(cdc codec.JSONCodec, genesis evmostypes.GenesisState) {
+func CustomizeDefaultGenesis(cdc codec.JSONCodec, genesis upticktypes.GenesisState) {
 	evmDenom := cmdcfg.BaseDenom // "auptick"
 
 	var evmGenState evmtypes.GenesisState
@@ -1098,7 +1036,7 @@ func CustomizeDefaultGenesis(cdc codec.JSONCodec, genesis evmostypes.GenesisStat
 }
 
 // DefaultGenesis returns a default genesis from the registered AppModuleBasic's.
-func (app *Uptick) DefaultGenesis() evmostypes.GenesisState {
+func (app *Uptick) DefaultGenesis() upticktypes.GenesisState {
 	genesis := app.bm.DefaultGenesis(app.AppCodec())
 	CustomizeDefaultGenesis(app.AppCodec(), genesis)
 	return genesis

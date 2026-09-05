@@ -4,14 +4,15 @@ package main
 
 import (
 	"bufio"
-	"cosmossdk.io/math"
 	"encoding/json"
 	"fmt"
-	"github.com/ethereum/go-ethereum/params"
 	"net"
 	"os"
 	"path/filepath"
 	"strconv"
+
+	"cosmossdk.io/math"
+	"github.com/ethereum/go-ethereum/params"
 
 	"github.com/spf13/cobra"
 
@@ -73,8 +74,6 @@ type initArgs struct {
 	numValidators     int
 	outputDir         string
 	startingIPAddress string
-	baseFee           math.LegacyDec
-	minGasPrice       math.LegacyDec
 }
 
 type startArgs struct {

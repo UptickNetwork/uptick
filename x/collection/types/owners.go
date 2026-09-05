@@ -22,15 +22,15 @@ func (idc IDCollection) AddID(tokenID string) IDCollection {
 type IDCollections []IDCollection
 
 // Add adds an Id to the idCollection
-func (idcs IDCollections) Add(DenomId, tokenID string) IDCollections {
+func (idcs IDCollections) Add(denomID, tokenID string) IDCollections {
 	for i, idc := range idcs {
-		if idc.DenomId == DenomId {
+		if idc.DenomId == denomID {
 			idcs[i] = idc.AddID(tokenID)
 			return idcs
 		}
 	}
 	return append(idcs, IDCollection{
-		DenomId:  DenomId,
+		DenomId:  denomID,
 		TokenIds: []string{tokenID},
 	})
 }

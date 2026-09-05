@@ -37,28 +37,26 @@ func (k Keeper) QueryCW721(
 
 	if err != nil {
 		return types.CW721Data{}, err
-	} else {
-		contractInfoResult, err := k.QueryWasmState(ctx,
-			&wasmtypes.QuerySmartContractStateRequest{
-				Address:   contractAddress,
-				QueryData: jsonStr,
-			})
-
-		if err != nil {
-			return types.CW721Data{}, err
-		}
-
-		var contractInfoResultJson ContractInfoData
-		if err := json.Unmarshal(contractInfoResult.Data, &contractInfoResultJson); err != nil {
-			return types.CW721Data{}, sdkerrors.Wrap(err, "failed to unmarshal CW721 contract info")
-		}
-
-		return types.CW721Data{
-			Name:   contractInfoResultJson.Name,
-			Symbol: contractInfoResultJson.Symbol,
-		}, nil
-
 	}
+	contractInfoResult, err := k.QueryWasmState(ctx,
+		&wasmtypes.QuerySmartContractStateRequest{
+			Address:   contractAddress,
+			QueryData: jsonStr,
+		})
+
+	if err != nil {
+		return types.CW721Data{}, err
+	}
+
+	var contractInfoResultJson ContractInfoData
+	if err := json.Unmarshal(contractInfoResult.Data, &contractInfoResultJson); err != nil {
+		return types.CW721Data{}, sdkerrors.Wrap(err, "failed to unmarshal CW721 contract info")
+	}
+
+	return types.CW721Data{
+		Name:   contractInfoResultJson.Name,
+		Symbol: contractInfoResultJson.Symbol,
+	}, nil
 
 }
 
@@ -93,23 +91,22 @@ func (k Keeper) QueryCW721AllNftInfo(
 	jsonConditionStr, err := json.Marshal(allNftInfoCondition)
 	if err != nil {
 		return AllNftInfo{}, err
-	} else {
-		allNftInfo, err := k.QueryWasmState(ctx,
-			&wasmtypes.QuerySmartContractStateRequest{
-				Address:   contractAddress,
-				QueryData: jsonConditionStr,
-			})
-		if err != nil {
-			return AllNftInfo{}, err
-		}
-
-		var allContractInfoResultJson AllNftInfo
-		if err := json.Unmarshal(allNftInfo.Data, &allContractInfoResultJson); err != nil {
-			return AllNftInfo{}, sdkerrors.Wrap(err, "failed to unmarshal CW721 all_nft_info")
-		}
-
-		return allContractInfoResultJson, nil
 	}
+	allNftInfo, err := k.QueryWasmState(ctx,
+		&wasmtypes.QuerySmartContractStateRequest{
+			Address:   contractAddress,
+			QueryData: jsonConditionStr,
+		})
+	if err != nil {
+		return AllNftInfo{}, err
+	}
+
+	var allContractInfoResultJson AllNftInfo
+	if err := json.Unmarshal(allNftInfo.Data, &allContractInfoResultJson); err != nil {
+		return AllNftInfo{}, sdkerrors.Wrap(err, "failed to unmarshal CW721 all_nft_info")
+	}
+
+	return allContractInfoResultJson, nil
 
 }
 

@@ -11,9 +11,9 @@ import (
 	storetypes "cosmossdk.io/store/types"
 	upgradetypes "cosmossdk.io/x/upgrade/types"
 	"github.com/UptickNetwork/uptick/app/upgrades"
+	"github.com/UptickNetwork/uptick/app/upgrades/v040/legacy"
 	v2 "github.com/UptickNetwork/uptick/x/collection/migrations/v2"
 	collectiontypes "github.com/UptickNetwork/uptick/x/collection/types"
-	"github.com/UptickNetwork/uptick/app/upgrades/v040/legacy"
 	"github.com/cosmos/cosmos-sdk/codec"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	cryptocodec "github.com/cosmos/cosmos-sdk/crypto/codec"
@@ -178,7 +178,7 @@ func upgradeHandlerConstructor(
 		// EIP-7702 SetCodeTx (type 0x04) is enabled when PragueTime is set.
 		// This allows EOA accounts to delegate to smart contract code,
 		// enabling account abstraction without protocol-level changes.
-		if err := migrateEVMChainConfig(sdkCtx, box, logger); err != nil {
+		if err := migrateEVMChainConfig(sdkCtx, logger); err != nil {
 			return nil, fmt.Errorf("migrate EVM chain config: %w", err)
 		}
 
@@ -228,9 +228,7 @@ func upgradeHandlerConstructor(
 		// rather than merely disabled: the old ERC20 is being deprecated and real
 		// data volume is low, so no backwards compatibility is required. Deleted
 		// pairs are logged for auditability.
-		if err := deleteLegacyOwnerModulePairs(sdkCtx, box, logger); err != nil {
-			return nil, fmt.Errorf("delete legacy OWNER_MODULE pairs: %w", err)
-		}
+		deleteLegacyOwnerModulePairs(sdkCtx, box, logger)
 
 		// Step 3.2: Delete legacy IBC transfer provenance records
 		//
@@ -312,7 +310,7 @@ func upgradeHandlerConstructor(
 // 1. Shanghai/Cancun/Prague were already activated in v032 (at block 0)
 // 2. The upgrade block's timestamp is used as the reference point
 // 3. Setting time=0 means "active since genesis timestamp"
-func migrateEVMChainConfig(ctx sdk.Context, box upgrades.Toolbox, logger log.Logger) error {
+func migrateEVMChainConfig(ctx sdk.Context, logger log.Logger) error {
 	logger.Info("migrating EVM ChainConfig from Block-based to Time-based")
 
 	evmChainID, err := upticktypes.ParseEIP155ChainID(ctx.ChainID())
@@ -549,7 +547,7 @@ func migrateLegacyEVMAccounts(
 			// rewriting that Any to the v0.4.0 key type, the account becomes
 			// unqueryable after the upgrade ("can't resolve type URL
 			// /ethermint.crypto.v1.ethsecp256k1.PubKey: proto: not found").
-			if err := migrateRetainedAccountPubKey(ctx, migrationCdc, appCodec, store, iterator.Key(), accountI, logger); err != nil {
+			if err := migrateRetainedAccountPubKey(appCodec, store, iterator.Key(), accountI, logger); err != nil {
 				fail(iterator.Key(), "migrate retained account pubkey: %v", err)
 			}
 			continue
@@ -633,8 +631,7 @@ func migrateLegacyEVMAccounts(
 // account stays queryable and signable after the upgrade. Accounts without a
 // legacy pubkey are left untouched.
 func migrateRetainedAccountPubKey(
-	ctx sdk.Context,
-	migrationCdc, appCodec codec.Codec,
+	appCodec codec.Codec,
 	store storetypes.KVStore,
 	key []byte,
 	account sdk.AccountI,
@@ -702,9 +699,7 @@ func migrateEVMParams(ctx sdk.Context, box upgrades.Toolbox, logger log.Logger) 
 	// cosmos/evm derives coin decimals from the Display unit's exponent, so
 	// such metadata would resolve decimals to 0 and panic the upgrade. Repair
 	// it before initializing EvmCoinInfo.
-	if err := repairEvmDenomMetadata(ctx, box, evmParams.EvmDenom, logger); err != nil {
-		return fmt.Errorf("repair evm denom metadata: %w", err)
-	}
+	repairEvmDenomMetadata(ctx, box, evmParams.EvmDenom, logger)
 
 	// Persist EvmCoinInfo so the x/vm PreBlock can register the base denom.
 	if err := box.EvmKeeper.InitEvmCoinInfo(ctx); err != nil {
@@ -720,11 +715,11 @@ func migrateEVMParams(ctx sdk.Context, box upgrades.Toolbox, logger log.Logger) 
 // Display at the highest-exponent unit when the current Display unit is absent
 // from DenomUnits, and falls back to appending an 18-decimal display unit when
 // no exponent is present at all.
-func repairEvmDenomMetadata(ctx sdk.Context, box upgrades.Toolbox, evmDenom string, logger log.Logger) error {
+func repairEvmDenomMetadata(ctx sdk.Context, box upgrades.Toolbox, evmDenom string, logger log.Logger) {
 	metadata, found := box.BankKeeper.GetDenomMetaData(ctx, evmDenom)
 	if !found {
 		// Let InitEvmCoinInfo surface the missing-metadata error.
-		return nil
+		return
 	}
 
 	displayInUnits := false
@@ -740,7 +735,7 @@ func repairEvmDenomMetadata(ctx sdk.Context, box upgrades.Toolbox, evmDenom stri
 		}
 	}
 	if displayInUnits {
-		return nil
+		return
 	}
 
 	if maxExponent > 0 {
@@ -754,7 +749,6 @@ func repairEvmDenomMetadata(ctx sdk.Context, box upgrades.Toolbox, evmDenom stri
 	}
 	box.BankKeeper.SetDenomMetaData(ctx, metadata)
 	logger.Info("repaired evm denom metadata", "display", metadata.Display)
-	return nil
 }
 
 // migrateErc20Params migrates erc20 module parameters from x/params subspace
@@ -812,7 +806,7 @@ func migrateErc20Params(ctx sdk.Context, box upgrades.Toolbox, logger log.Logger
 // Deleted pairs are logged (denom + erc20 address) for auditability. The
 // Cosmos-native coin itself is NOT removed from the bank module — only the
 // ERC20↔coin mapping is dropped.
-func deleteLegacyOwnerModulePairs(ctx sdk.Context, box upgrades.Toolbox, logger log.Logger) error {
+func deleteLegacyOwnerModulePairs(ctx sdk.Context, box upgrades.Toolbox, logger log.Logger) {
 	logger.Info("deleting legacy OWNER_MODULE token pairs")
 
 	erc20Keeper := box.Erc20Keeper
@@ -850,7 +844,6 @@ func deleteLegacyOwnerModulePairs(ctx sdk.Context, box upgrades.Toolbox, logger 
 		logger.Debug(d)
 	}
 
-	return nil
 }
 
 // deleteLegacyIBCTransferProvenance removes the IBC transfer provenance records
