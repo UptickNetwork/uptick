@@ -29,6 +29,12 @@ type GenesisState struct {
 	Params Params `protobuf:"bytes,1,opt,name=params,proto3" json:"params"`
 	// registered token pairs
 	TokenPairs []TokenPair `protobuf:"bytes,2,rep,name=token_pairs,json=tokenPairs,proto3" json:"token_pairs"`
+	// per-token conversion bindings between EVM token UIDs and Cosmos NFT UIDs.
+	// H-02: this runtime state was previously lost on genesis export.
+	NftUidPairs []NFTUIDPair `protobuf:"bytes,3,rep,name=nft_uid_pairs,json=nftUidPairs,proto3" json:"nft_uid_pairs"`
+	// original ERC721 owners recorded at IBC send, used for timeout/error
+	// refunds. H-02: this runtime state was previously lost on genesis export.
+	RefundReceivers []RefundReceiver `protobuf:"bytes,4,rep,name=refund_receivers,json=refundReceivers,proto3" json:"refund_receivers"`
 }
 
 func (m *GenesisState) Reset()         { *m = GenesisState{} }
@@ -78,6 +84,139 @@ func (m *GenesisState) GetTokenPairs() []TokenPair {
 	return nil
 }
 
+func (m *GenesisState) GetNftUidPairs() []NFTUIDPair {
+	if m != nil {
+		return m.NftUidPairs
+	}
+	return nil
+}
+
+func (m *GenesisState) GetRefundReceivers() []RefundReceiver {
+	if m != nil {
+		return m.RefundReceivers
+	}
+	return nil
+}
+
+// NFTUIDPair binds an EVM token UID ("<tokenID>,<contractAddress>") to a
+// Cosmos NFT UID ("<nftID>,<classID>"). Import rebuilds both directions of
+// the runtime bidirectional index from this single entry.
+type NFTUIDPair struct {
+	TokenUid string `protobuf:"bytes,1,opt,name=token_uid,json=tokenUid,proto3" json:"token_uid,omitempty"`
+	NftUid   string `protobuf:"bytes,2,opt,name=nft_uid,json=nftUid,proto3" json:"nft_uid,omitempty"`
+}
+
+func (m *NFTUIDPair) Reset()         { *m = NFTUIDPair{} }
+func (m *NFTUIDPair) String() string { return proto.CompactTextString(m) }
+func (*NFTUIDPair) ProtoMessage()    {}
+func (*NFTUIDPair) Descriptor() ([]byte, []int) {
+	return fileDescriptor_fc044dbce6d614a3, []int{1}
+}
+func (m *NFTUIDPair) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *NFTUIDPair) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_NFTUIDPair.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *NFTUIDPair) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_NFTUIDPair.Merge(m, src)
+}
+func (m *NFTUIDPair) XXX_Size() int {
+	return m.Size()
+}
+func (m *NFTUIDPair) XXX_DiscardUnknown() {
+	xxx_messageInfo_NFTUIDPair.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_NFTUIDPair proto.InternalMessageInfo
+
+func (m *NFTUIDPair) GetTokenUid() string {
+	if m != nil {
+		return m.TokenUid
+	}
+	return ""
+}
+
+func (m *NFTUIDPair) GetNftUid() string {
+	if m != nil {
+		return m.NftUid
+	}
+	return ""
+}
+
+// RefundReceiver records the original ERC721 owner of a converted token so an
+// IBC timeout/error refund can return the token to the right address.
+type RefundReceiver struct {
+	// lowercased ERC721 contract address (0x + 40 hex)
+	EvmContractAddress string `protobuf:"bytes,1,opt,name=evm_contract_address,json=evmContractAddress,proto3" json:"evm_contract_address,omitempty"`
+	TokenId            string `protobuf:"bytes,2,opt,name=token_id,json=tokenId,proto3" json:"token_id,omitempty"`
+	// EVM address of the original owner (0x + 40 hex)
+	EvmAddress string `protobuf:"bytes,3,opt,name=evm_address,json=evmAddress,proto3" json:"evm_address,omitempty"`
+}
+
+func (m *RefundReceiver) Reset()         { *m = RefundReceiver{} }
+func (m *RefundReceiver) String() string { return proto.CompactTextString(m) }
+func (*RefundReceiver) ProtoMessage()    {}
+func (*RefundReceiver) Descriptor() ([]byte, []int) {
+	return fileDescriptor_fc044dbce6d614a3, []int{2}
+}
+func (m *RefundReceiver) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *RefundReceiver) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_RefundReceiver.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *RefundReceiver) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_RefundReceiver.Merge(m, src)
+}
+func (m *RefundReceiver) XXX_Size() int {
+	return m.Size()
+}
+func (m *RefundReceiver) XXX_DiscardUnknown() {
+	xxx_messageInfo_RefundReceiver.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_RefundReceiver proto.InternalMessageInfo
+
+func (m *RefundReceiver) GetEvmContractAddress() string {
+	if m != nil {
+		return m.EvmContractAddress
+	}
+	return ""
+}
+
+func (m *RefundReceiver) GetTokenId() string {
+	if m != nil {
+		return m.TokenId
+	}
+	return ""
+}
+
+func (m *RefundReceiver) GetEvmAddress() string {
+	if m != nil {
+		return m.EvmAddress
+	}
+	return ""
+}
+
 // Params defines the erc721 module params
 type Params struct {
 	// parameter to enable the conversion of Cosmos nft <--> ERC721 tokens.
@@ -92,7 +231,7 @@ func (m *Params) Reset()         { *m = Params{} }
 func (m *Params) String() string { return proto.CompactTextString(m) }
 func (*Params) ProtoMessage()    {}
 func (*Params) Descriptor() ([]byte, []int) {
-	return fileDescriptor_fc044dbce6d614a3, []int{1}
+	return fileDescriptor_fc044dbce6d614a3, []int{3}
 }
 func (m *Params) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -137,33 +276,45 @@ func (m *Params) GetEnableEVMHook() bool {
 
 func init() {
 	proto.RegisterType((*GenesisState)(nil), "uptick.erc721.v1.GenesisState")
+	proto.RegisterType((*NFTUIDPair)(nil), "uptick.erc721.v1.NFTUIDPair")
+	proto.RegisterType((*RefundReceiver)(nil), "uptick.erc721.v1.RefundReceiver")
 	proto.RegisterType((*Params)(nil), "uptick.erc721.v1.Params")
 }
 
 func init() { proto.RegisterFile("uptick/erc721/v1/genesis.proto", fileDescriptor_fc044dbce6d614a3) }
 
 var fileDescriptor_fc044dbce6d614a3 = []byte{
-	// 317 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x64, 0x90, 0x4f, 0x4f, 0xc2, 0x30,
-	0x18, 0xc6, 0x37, 0x34, 0xc4, 0x14, 0x88, 0xba, 0x78, 0x58, 0x30, 0x16, 0x82, 0x17, 0x2e, 0xb4,
-	0x01, 0x13, 0x8d, 0xd7, 0x25, 0x44, 0x2e, 0x1a, 0x82, 0x7f, 0x0e, 0x5e, 0xc8, 0x58, 0xea, 0x58,
-	0xe6, 0xf6, 0x2e, 0x6d, 0xa9, 0xf1, 0x2b, 0x78, 0xf2, 0x63, 0x71, 0xe4, 0xe8, 0x89, 0x98, 0xed,
-	0x8b, 0x98, 0xb5, 0xe3, 0x22, 0xb7, 0xf6, 0xfd, 0xfd, 0x9e, 0xa7, 0x6f, 0x8a, 0xf0, 0x2a, 0x93,
-	0x51, 0x10, 0x53, 0xc6, 0x83, 0x9b, 0xd1, 0x90, 0xaa, 0x21, 0x0d, 0x59, 0xca, 0x44, 0x24, 0x48,
-	0xc6, 0x41, 0x82, 0x73, 0x62, 0x38, 0x31, 0x9c, 0xa8, 0x61, 0xfb, 0x2c, 0x84, 0x10, 0x34, 0xa4,
-	0xe5, 0xc9, 0x78, 0xed, 0x8b, 0xbd, 0x9e, 0x2a, 0xa1, 0x71, 0xef, 0xcb, 0x46, 0xcd, 0x3b, 0x53,
-	0xfc, 0x28, 0x7d, 0xc9, 0x9c, 0x6b, 0x54, 0xcf, 0x7c, 0xee, 0x27, 0xc2, 0xb5, 0xbb, 0x76, 0xbf,
-	0x31, 0x72, 0xc9, 0xff, 0x87, 0xc8, 0x54, 0x73, 0xef, 0x70, 0xbd, 0xed, 0x58, 0xb3, 0xca, 0x76,
-	0x3c, 0xd4, 0x90, 0x10, 0xb3, 0x74, 0x9e, 0xf9, 0x11, 0x17, 0x6e, 0xad, 0x7b, 0xd0, 0x6f, 0x8c,
-	0xce, 0xf7, 0xc3, 0x4f, 0xa5, 0x34, 0xf5, 0x23, 0x5e, 0xe5, 0x91, 0xdc, 0x0d, 0x44, 0x6f, 0x89,
-	0xea, 0xa6, 0xdb, 0xb9, 0x44, 0x2d, 0x96, 0xfa, 0x8b, 0x77, 0x36, 0x37, 0x49, 0xbd, 0xcc, 0xd1,
-	0xac, 0x69, 0x86, 0x63, 0x3d, 0x73, 0x6e, 0xd1, 0xf1, 0x4e, 0x52, 0xc9, 0x7c, 0x09, 0x10, 0xbb,
-	0xb5, 0x52, 0xf3, 0x4e, 0xf3, 0x6d, 0xa7, 0x35, 0x36, 0xea, 0xcb, 0xfd, 0x04, 0x20, 0x9e, 0x55,
-	0x75, 0x63, 0x95, 0x94, 0x57, 0x6f, 0xb2, 0xce, 0xb1, 0xbd, 0xc9, 0xb1, 0xfd, 0x9b, 0x63, 0xfb,
-	0xbb, 0xc0, 0xd6, 0xa6, 0xc0, 0xd6, 0x4f, 0x81, 0xad, 0x57, 0x12, 0x46, 0x72, 0xb9, 0x5a, 0x90,
-	0x00, 0x12, 0xfa, 0xac, 0x97, 0x7f, 0x60, 0xf2, 0x03, 0x78, 0x4c, 0x99, 0x4a, 0x06, 0xe9, 0x9b,
-	0x1c, 0x04, 0x90, 0x2a, 0xc6, 0x25, 0x95, 0x9f, 0x19, 0x13, 0x8b, 0xba, 0xfe, 0xc7, 0xab, 0xbf,
-	0x00, 0x00, 0x00, 0xff, 0xff, 0x60, 0x10, 0x4d, 0x70, 0xb0, 0x01, 0x00, 0x00,
+	// 471 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x64, 0x92, 0xcd, 0x6e, 0xd3, 0x40,
+	0x14, 0x85, 0xf3, 0x53, 0xa5, 0xe9, 0x75, 0x43, 0xcb, 0xa8, 0x12, 0xa6, 0x05, 0x27, 0x0a, 0x9b,
+	0xae, 0x6c, 0x12, 0x24, 0x10, 0x4b, 0x0c, 0x29, 0xed, 0x82, 0xaa, 0x98, 0x86, 0x05, 0x1b, 0xcb,
+	0xb1, 0x6f, 0x92, 0x91, 0xb1, 0xc7, 0x9a, 0x19, 0x1b, 0xd8, 0xf0, 0x0c, 0xbc, 0x04, 0xef, 0xd2,
+	0x65, 0x97, 0xac, 0x2a, 0x94, 0xbc, 0x08, 0xca, 0xcc, 0x04, 0x68, 0xb3, 0xf3, 0x9c, 0x73, 0xee,
+	0x77, 0x3c, 0x3f, 0xe0, 0x94, 0x85, 0xa4, 0x71, 0xea, 0x21, 0x8f, 0x5f, 0x0c, 0x07, 0x5e, 0x35,
+	0xf0, 0x66, 0x98, 0xa3, 0xa0, 0xc2, 0x2d, 0x38, 0x93, 0x8c, 0xec, 0x6b, 0xdf, 0xd5, 0xbe, 0x5b,
+	0x0d, 0x0e, 0x0f, 0x66, 0x6c, 0xc6, 0x94, 0xe9, 0xad, 0xbe, 0x74, 0xee, 0xf0, 0xf1, 0x06, 0xc7,
+	0x4c, 0x28, 0xbb, 0xff, 0xb3, 0x01, 0xbb, 0x6f, 0x35, 0xf8, 0x83, 0x8c, 0x24, 0x92, 0xe7, 0xd0,
+	0x2a, 0x22, 0x1e, 0x65, 0xc2, 0xae, 0xf7, 0xea, 0xc7, 0xd6, 0xd0, 0x76, 0xef, 0x16, 0xb9, 0x17,
+	0xca, 0xf7, 0xb7, 0xae, 0x6e, 0xba, 0xb5, 0xc0, 0xa4, 0x89, 0x0f, 0x96, 0x64, 0x29, 0xe6, 0x61,
+	0x11, 0x51, 0x2e, 0xec, 0x46, 0xaf, 0x79, 0x6c, 0x0d, 0x8f, 0x36, 0x87, 0x2f, 0x57, 0xa1, 0x8b,
+	0x88, 0x72, 0x33, 0x0f, 0x72, 0x2d, 0x08, 0x72, 0x02, 0x9d, 0x7c, 0x2a, 0xc3, 0x92, 0x26, 0x86,
+	0xd2, 0x54, 0x94, 0x47, 0x9b, 0x94, 0xf3, 0x93, 0xcb, 0xf1, 0xd9, 0x9b, 0xff, 0x30, 0x56, 0x3e,
+	0x95, 0x63, 0x9a, 0x68, 0xce, 0x7b, 0xd8, 0xe7, 0x38, 0x2d, 0xf3, 0x24, 0xe4, 0x18, 0x23, 0xad,
+	0x90, 0x0b, 0x7b, 0x4b, 0xa1, 0x7a, 0x9b, 0xa8, 0x40, 0x25, 0x03, 0x13, 0x34, 0xb8, 0x3d, 0x7e,
+	0x4b, 0x15, 0x7d, 0x1f, 0xe0, 0x5f, 0x27, 0x39, 0x82, 0x1d, 0xbd, 0xd9, 0x92, 0x26, 0xea, 0x9c,
+	0x76, 0x82, 0xb6, 0x12, 0xc6, 0x34, 0x21, 0x0f, 0x60, 0xdb, 0xec, 0xc2, 0x6e, 0x28, 0xab, 0xa5,
+	0xff, 0xad, 0xff, 0x1d, 0xee, 0xdd, 0x2e, 0x23, 0x4f, 0xe1, 0x00, 0xab, 0x2c, 0x8c, 0x59, 0x2e,
+	0x79, 0x14, 0xcb, 0x30, 0x4a, 0x12, 0x8e, 0x42, 0x18, 0x24, 0xc1, 0x2a, 0x7b, 0x6d, 0xac, 0x57,
+	0xda, 0x21, 0x0f, 0x41, 0x17, 0x85, 0x7f, 0xe9, 0xdb, 0x6a, 0x7d, 0x96, 0x90, 0x2e, 0x58, 0x2b,
+	0xd8, 0x9a, 0xd1, 0x54, 0x2e, 0x60, 0x95, 0x99, 0xd9, 0xfe, 0x1c, 0x5a, 0xfa, 0xea, 0xc8, 0x13,
+	0xe8, 0x60, 0x1e, 0x4d, 0x3e, 0x63, 0xa8, 0xcf, 0x41, 0x15, 0xb6, 0x83, 0x5d, 0x2d, 0x8e, 0x94,
+	0x46, 0x5e, 0xc2, 0xde, 0x3a, 0x54, 0x65, 0xe1, 0x9c, 0xb1, 0x54, 0x35, 0xb6, 0xfd, 0xfb, 0x8b,
+	0x9b, 0x6e, 0x67, 0xa4, 0xa3, 0x1f, 0xdf, 0x9d, 0x32, 0x96, 0x06, 0x06, 0x37, 0xaa, 0xb2, 0xd5,
+	0xd2, 0x3f, 0xbd, 0x5a, 0x38, 0xf5, 0xeb, 0x85, 0x53, 0xff, 0xbd, 0x70, 0xea, 0x3f, 0x96, 0x4e,
+	0xed, 0x7a, 0xe9, 0xd4, 0x7e, 0x2d, 0x9d, 0xda, 0x27, 0x77, 0x46, 0xe5, 0xbc, 0x9c, 0xb8, 0x31,
+	0xcb, 0xbc, 0xb1, 0xba, 0x8a, 0x73, 0x94, 0x5f, 0x18, 0x4f, 0x3d, 0xf3, 0x4e, 0xbf, 0xae, 0x5f,
+	0xaa, 0xfc, 0x56, 0xa0, 0x98, 0xb4, 0xd4, 0x33, 0x7d, 0xf6, 0x27, 0x00, 0x00, 0xff, 0xff, 0x0c,
+	0xad, 0x20, 0x3e, 0x0f, 0x03, 0x00, 0x00,
 }
 
 func (m *GenesisState) Marshal() (dAtA []byte, err error) {
@@ -186,6 +337,34 @@ func (m *GenesisState) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if len(m.RefundReceivers) > 0 {
+		for iNdEx := len(m.RefundReceivers) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.RefundReceivers[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenesis(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x22
+		}
+	}
+	if len(m.NftUidPairs) > 0 {
+		for iNdEx := len(m.NftUidPairs) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.NftUidPairs[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenesis(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x1a
+		}
+	}
 	if len(m.TokenPairs) > 0 {
 		for iNdEx := len(m.TokenPairs) - 1; iNdEx >= 0; iNdEx-- {
 			{
@@ -210,6 +389,87 @@ func (m *GenesisState) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	}
 	i--
 	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
+func (m *NFTUIDPair) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *NFTUIDPair) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *NFTUIDPair) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.NftUid) > 0 {
+		i -= len(m.NftUid)
+		copy(dAtA[i:], m.NftUid)
+		i = encodeVarintGenesis(dAtA, i, uint64(len(m.NftUid)))
+		i--
+		dAtA[i] = 0x12
+	}
+	if len(m.TokenUid) > 0 {
+		i -= len(m.TokenUid)
+		copy(dAtA[i:], m.TokenUid)
+		i = encodeVarintGenesis(dAtA, i, uint64(len(m.TokenUid)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *RefundReceiver) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *RefundReceiver) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *RefundReceiver) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.EvmAddress) > 0 {
+		i -= len(m.EvmAddress)
+		copy(dAtA[i:], m.EvmAddress)
+		i = encodeVarintGenesis(dAtA, i, uint64(len(m.EvmAddress)))
+		i--
+		dAtA[i] = 0x1a
+	}
+	if len(m.TokenId) > 0 {
+		i -= len(m.TokenId)
+		copy(dAtA[i:], m.TokenId)
+		i = encodeVarintGenesis(dAtA, i, uint64(len(m.TokenId)))
+		i--
+		dAtA[i] = 0x12
+	}
+	if len(m.EvmContractAddress) > 0 {
+		i -= len(m.EvmContractAddress)
+		copy(dAtA[i:], m.EvmContractAddress)
+		i = encodeVarintGenesis(dAtA, i, uint64(len(m.EvmContractAddress)))
+		i--
+		dAtA[i] = 0xa
+	}
 	return len(dAtA) - i, nil
 }
 
@@ -280,6 +540,56 @@ func (m *GenesisState) Size() (n int) {
 			l = e.Size()
 			n += 1 + l + sovGenesis(uint64(l))
 		}
+	}
+	if len(m.NftUidPairs) > 0 {
+		for _, e := range m.NftUidPairs {
+			l = e.Size()
+			n += 1 + l + sovGenesis(uint64(l))
+		}
+	}
+	if len(m.RefundReceivers) > 0 {
+		for _, e := range m.RefundReceivers {
+			l = e.Size()
+			n += 1 + l + sovGenesis(uint64(l))
+		}
+	}
+	return n
+}
+
+func (m *NFTUIDPair) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.TokenUid)
+	if l > 0 {
+		n += 1 + l + sovGenesis(uint64(l))
+	}
+	l = len(m.NftUid)
+	if l > 0 {
+		n += 1 + l + sovGenesis(uint64(l))
+	}
+	return n
+}
+
+func (m *RefundReceiver) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.EvmContractAddress)
+	if l > 0 {
+		n += 1 + l + sovGenesis(uint64(l))
+	}
+	l = len(m.TokenId)
+	if l > 0 {
+		n += 1 + l + sovGenesis(uint64(l))
+	}
+	l = len(m.EvmAddress)
+	if l > 0 {
+		n += 1 + l + sovGenesis(uint64(l))
 	}
 	return n
 }
@@ -400,6 +710,334 @@ func (m *GenesisState) Unmarshal(dAtA []byte) error {
 			if err := m.TokenPairs[len(m.TokenPairs)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field NftUidPairs", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.NftUidPairs = append(m.NftUidPairs, NFTUIDPair{})
+			if err := m.NftUidPairs[len(m.NftUidPairs)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field RefundReceivers", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.RefundReceivers = append(m.RefundReceivers, RefundReceiver{})
+			if err := m.RefundReceivers[len(m.RefundReceivers)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenesis(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *NFTUIDPair) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenesis
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: NFTUIDPair: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: NFTUIDPair: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field TokenUid", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.TokenUid = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field NftUid", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.NftUid = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenesis(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *RefundReceiver) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenesis
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: RefundReceiver: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: RefundReceiver: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field EvmContractAddress", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.EvmContractAddress = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field TokenId", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.TokenId = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field EvmAddress", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenesis
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenesis
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.EvmAddress = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
