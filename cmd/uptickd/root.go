@@ -145,7 +145,7 @@ func NewRootCmd() *cobra.Command {
 		genesisCommand(tempApplication.BasicManager(), encodingConfig),
 		queryCommand(),
 		txCommand(tempApplication.BasicManager()),
-		evmclient.KeyCommands(app.DefaultNodeHome, false),
+		evmclient.KeyCommands(app.DefaultNodeHome, true),
 	)
 
 	autoCliOpts := enrichAutoCliOpts(tempApplication.AutoCliOpts(), initClientCtx)
