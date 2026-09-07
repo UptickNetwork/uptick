@@ -35,7 +35,12 @@ Ref: https://keepachangelog.com/en/1.0.0/
 
 # Changelog
 
-## v0.4.1 - Unreleased
+## v0.4.1 - 2026-09-07
+
+> **Release note**: v0.4.0 was never released standalone. This release ships the
+> whole v0.4.0 change set (Cosmos SDK 0.53 / ibc-go v10 / cosmos-evm migration)
+> together with the v0.4.1 fixes below, so a validator moving from v0.3.x
+> performs a single upgrade covering both handlers.
 
 ### State Machine Breaking
 
@@ -75,14 +80,23 @@ Ref: https://keepachangelog.com/en/1.0.0/
 * (build) Add the `ledger` build tag to goreleaser artifacts.
 * (erc721/cw721) Document the per-transaction commit semantics of pair/per-token cleanup; give CW721 a symmetric `DeletePairPerTokenState` and case-insensitive (bech32) refund-key handling in genesis export/validation; make the `WasmContract` query return the registered pair or `NotFound` instead of an empty success.
 * (cli) `uptickd migrate` explains that offline genesis migration is unsupported (upgrade in-app) instead of reporting an opaque "unknown migration function".
+* (chore) Normalize comments across `app/` and `x/`: English-only, functional descriptions with audit-tracking references removed. Rename the ante `WasmSecurityDecorator` to `MessageSecurityDecorator` to match its actual scope (CosmWasm validation + authz flattening + EVM gas checks); move the erc721 ID-resolution helpers from `keeper/params.go` to `keeper/nft_data.go` (mirroring x/cw721). Drop the stale `x/erc721/proto` shadow directory — `proto/uptick` is the source of truth for `make proto-gen` — and the unreferenced `client/docs/uptick/statik.go` artifact.
 
 ### Bug Fixes
 
 * (erc721) Register a legacy alias so `MsgConvertERC721CustomGetSigner`-style signing keeps working; normalise token ids as base-10 uint256; document CLI semantics for `convert-nft` (81bfd1d).
 * (collection) Tolerate nil-`Data` NFTs during genesis export; reject NUL/comma and over-length schema/data inputs with bounded limits.
 * (ante) Reject an empty/blank NFT name only when a non-empty value was supplied (M-1).
+* (cw721) Skip the CW721 IBC refund when the module account no longer owns the token instead of returning an error: an error aborts the `OnTimeout`/`OnAcknowledgement` callback, after which the relayer's `MsgTimeout`/`MsgAcknowledgement` can never succeed and the packet is stranded (CW721 half of C-2).
+* (erc721) Emit the EVM token id, not the Cosmos NFT id, in the `erc721_token_ids` attribute of `refund_packet_token`, and emit one event per (contract, receiver) pair so multi-contract batches are reported completely.
+* (erc721) Validate the one-to-one NFT binding in `ConvertERC721` *before* minting or transferring, instead of relying on `SetNFTPairs` to reject the conflict afterwards, so a rejected conversion leaves no side effects.
+* (cw721) Validate `nft_ids` and `cosmos_token_ids` against the collection token-id rules in `ValidateBasic`, closing the validation gap with x/erc721.
+* (app) Fail fast when `upgrade-info.json` exists but cannot be parsed instead of silently skipping the store loader and booting into an inconsistent state.
+* (build) Inject `AppVersion`/`GitCommit` into the `uptick/version` package from the Makefile and goreleaser; previously only the SDK's `version` package was populated, leaving the project's own package permanently at `dev`.
 
-## v0.4.0 - Unreleased
+## v0.4.0 - Unreleased (folded into v0.4.1)
+
+> Never released standalone; every change listed here ships as part of v0.4.1.
 
 ### Features
 

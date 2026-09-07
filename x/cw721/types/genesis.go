@@ -46,8 +46,8 @@ func (gs GenesisState) Validate() error {
 		seenClass[b.ClassId] = true
 	}
 
-	// H-02: validate the per-token conversion bindings and IBC refund
-	// receivers during genesis validation, so `genesis validate` reports a
+	// Validate the per-token conversion bindings and IBC refund receivers
+	// during genesis validation, so `genesis validate` reports a
 	// clean error instead of leaving malformed state to panic in InitGenesis.
 	if err := ValidateGenesisPairs(gs.NftUidPairs, gs.RefundReceivers, gs.TokenPairs); err != nil {
 		return err
@@ -56,8 +56,8 @@ func (gs GenesisState) Validate() error {
 	return gs.Params.Validate()
 }
 
-// ValidateGenesisPairs performs the import/validate-side integrity checks that
-// the audit required: non-empty UIDs, one-to-one uniqueness across the batch,
+// ValidateGenesisPairs performs the import/validate-side integrity checks:
+// non-empty UIDs, one-to-one uniqueness across the batch,
 // UID membership in a registered token pair, and refund receivers that
 // reference registered token pairs. CW721 contracts are bech32: membership
 // matching is case-insensitive (character case is not significant), mirroring

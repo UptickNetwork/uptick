@@ -326,7 +326,7 @@ func (k Keeper) CallEVMWithData(
 	// Deployment / mint / transfer all use the module account as sender with
 	// zero value, so a fixed gas cap (DefaultGasCap) is sufficient.
 	//
-	// H-01: the internal budget must also be capped at the SDK transaction's
+	// The internal budget must also be capped at the SDK transaction's
 	// remaining gas. A fixed 25M cap lets a caller-supplied external contract
 	// (e.g. name() during RegisterERC721) burn the full budget inside the EVM
 	// interpreter before the post-hoc ConsumeGas below ever runs — the SDK gas
@@ -371,7 +371,7 @@ func (k Keeper) CallEVMWithData(
 	// Charge the EVM gas used back to the SDK gas meter. Passing internal=true
 	// makes cosmos/evm report the true gas used (skipping the fee-market
 	// min-gas floor), so a native-module EVM call counts against the transaction
-	// budget instead of exposing an unbounded 25M×N CPU surface (L-6).
+	// budget instead of exposing an unbounded 25M×N CPU surface.
 	if res != nil && res.GasUsed > 0 {
 		ctx.GasMeter().ConsumeGas(res.GasUsed, "erc721 evm call")
 	}

@@ -19,7 +19,7 @@ import (
 
 // MakeEncodingConfig creates an EncodingConfig for an amino based test configuration.
 //
-// Boot-time fail-fast wrapper around MakeEncodingConfigChecked (M-7): a
+// Boot-time fail-fast wrapper around MakeEncodingConfigChecked: a
 // Keplr-compat registration failure is a build/SDK-compatibility defect that
 // must stop the process with a readable message instead of silently serving
 // EIP-712 txs that cannot be verified.

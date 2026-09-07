@@ -25,34 +25,39 @@ const (
 	EvmMsgTypeURL = "/cosmos.evm.vm.v1.MsgEthereumTx"
 )
 
-// WasmSecurityDecorator checks for security issues in CosmWasm messages
-// and prevents bypassing AnteHandler gas checks via CosmWasm DispatchMsg
-type WasmSecurityDecorator struct {
+// MessageSecurityDecorator validates every message in a transaction before it
+// reaches the keeper layer, including messages hidden inside nested authz
+// MsgExec wrappers:
+//   - CosmWasm messages are checked for basic validity and payload size, and
+//     cannot be used to bypass AnteHandler gas accounting via DispatchMsg;
+//   - Ethereum transactions are checked for a sane, bounded gas limit;
+//   - the flattened message list is capped in count and nesting depth.
+type MessageSecurityDecorator struct {
 	cdc            codec.BinaryCodec
 	evmKeeper      anteinterfaces.EVMKeeper
 	maxTxGasWanted uint64
 }
 
-// NewWasmSecurityDecorator creates a new WasmSecurityDecorator
-func NewWasmSecurityDecorator(cdc codec.BinaryCodec, evmKeeper anteinterfaces.EVMKeeper, maxTxGasWanted uint64) WasmSecurityDecorator {
-	return WasmSecurityDecorator{
+// NewMessageSecurityDecorator creates a new MessageSecurityDecorator
+func NewMessageSecurityDecorator(cdc codec.BinaryCodec, evmKeeper anteinterfaces.EVMKeeper, maxTxGasWanted uint64) MessageSecurityDecorator {
+	return MessageSecurityDecorator{
 		cdc:            cdc,
 		evmKeeper:      evmKeeper,
 		maxTxGasWanted: maxTxGasWanted,
 	}
 }
 
-// AnteHandle inspects CosmWasm messages in the tx to ensure AnteHandler checks are not bypassed
-func (wsd WasmSecurityDecorator) AnteHandle(ctx sdk.Context, tx sdk.Tx, simulate bool, next sdk.AnteHandler) (newCtx sdk.Context, err error) {
+// AnteHandle inspects all messages in the transaction to ensure AnteHandler checks are not bypassed
+func (msd MessageSecurityDecorator) AnteHandle(ctx sdk.Context, tx sdk.Tx, simulate bool, next sdk.AnteHandler) (newCtx sdk.Context, err error) {
 	// Extract all messages from the transaction, including nested messages (e.g., authz.MsgExec)
-	msgs, err := wsd.ExtractMessagesFromTx(ctx, tx)
+	msgs, err := msd.ExtractMessagesFromTx(ctx, tx)
 	if err != nil {
 		return ctx, err
 	}
 
 	// Validate each message
 	for _, msg := range msgs {
-		if err := wsd.validateMessage(msg); err != nil {
+		if err := msd.validateMessage(msg); err != nil {
 			return ctx, err
 		}
 	}
@@ -61,29 +66,29 @@ func (wsd WasmSecurityDecorator) AnteHandle(ctx sdk.Context, tx sdk.Tx, simulate
 }
 
 // validateMessage validates a single sdk.Msg
-func (wsd WasmSecurityDecorator) validateMessage(msg sdk.Msg) error {
+func (msd MessageSecurityDecorator) validateMessage(msg sdk.Msg) error {
 	switch msg := msg.(type) {
 	case *wasmTypes.MsgExecuteContract:
 		// Validate CosmWasm MsgExecuteContract
-		return wsd.validateWasmExecuteContract(msg)
+		return msd.validateWasmExecuteContract(msg)
 
 	case *wasmTypes.MsgInstantiateContract:
 		// Validate MsgInstantiateContract
-		return wsd.validateWasmInstantiateContract(msg)
+		return msd.validateWasmInstantiateContract(msg)
 
 	case *wasmTypes.MsgInstantiateContract2:
 		// Validate MsgInstantiateContract2
-		return wsd.validateWasmInstantiateContract2(msg)
+		return msd.validateWasmInstantiateContract2(msg)
 
 	default:
 		// Check the message type URL to see if it is an EVM message
 		// If it is an EVM message, ensure it goes through the proper AnteHandler
-		return wsd.checkEvmMessage(msg)
+		return msd.checkEvmMessage(msg)
 	}
 }
 
 // validateWasmExecuteContract validates a CosmWasm MsgExecuteContract
-func (wsd WasmSecurityDecorator) validateWasmExecuteContract(msg *wasmTypes.MsgExecuteContract) error {
+func (msd MessageSecurityDecorator) validateWasmExecuteContract(msg *wasmTypes.MsgExecuteContract) error {
 	// Check basic validity of the message
 	if err := msg.ValidateBasic(); err != nil {
 		return sdkerrors.Wrap(err, "invalid wasm execute contract message")
@@ -100,7 +105,7 @@ func (wsd WasmSecurityDecorator) validateWasmExecuteContract(msg *wasmTypes.MsgE
 }
 
 // validateWasmInstantiateContract validates a CosmWasm MsgInstantiateContract
-func (wsd WasmSecurityDecorator) validateWasmInstantiateContract(msg *wasmTypes.MsgInstantiateContract) error {
+func (msd MessageSecurityDecorator) validateWasmInstantiateContract(msg *wasmTypes.MsgInstantiateContract) error {
 	if err := msg.ValidateBasic(); err != nil {
 		return sdkerrors.Wrap(err, "invalid wasm instantiate contract message")
 	}
@@ -118,7 +123,7 @@ func (wsd WasmSecurityDecorator) validateWasmInstantiateContract(msg *wasmTypes.
 }
 
 // validateWasmInstantiateContract2 validates a CosmWasm MsgInstantiateContract2
-func (wsd WasmSecurityDecorator) validateWasmInstantiateContract2(msg *wasmTypes.MsgInstantiateContract2) error {
+func (msd MessageSecurityDecorator) validateWasmInstantiateContract2(msg *wasmTypes.MsgInstantiateContract2) error {
 	if err := msg.ValidateBasic(); err != nil {
 		return sdkerrors.Wrap(err, "invalid wasm instantiate contract2 message")
 	}
@@ -137,13 +142,13 @@ func (wsd WasmSecurityDecorator) validateWasmInstantiateContract2(msg *wasmTypes
 
 // checkEvmMessage checks whether the message is an EVM message and,
 // if so, ensures it goes through the correct AnteHandler
-func (wsd WasmSecurityDecorator) checkEvmMessage(msg sdk.Msg) error {
+func (msd MessageSecurityDecorator) checkEvmMessage(msg sdk.Msg) error {
 	// Check message type URL
 	msgTypeURL := sdk.MsgTypeURL(msg)
 	if msgTypeURL == EvmMsgTypeURL {
 		// If it is an EVM message, validate gas limit
 		if evmMsg, ok := msg.(*evmtypes.MsgEthereumTx); ok {
-			return wsd.validateEvmGasLimit(evmMsg)
+			return msd.validateEvmGasLimit(evmMsg)
 		}
 	}
 
@@ -151,7 +156,7 @@ func (wsd WasmSecurityDecorator) checkEvmMessage(msg sdk.Msg) error {
 }
 
 // validateEvmGasLimit validates the gas limit of an EVM message
-func (wsd WasmSecurityDecorator) validateEvmGasLimit(msg *evmtypes.MsgEthereumTx) error {
+func (msd MessageSecurityDecorator) validateEvmGasLimit(msg *evmtypes.MsgEthereumTx) error {
 	// Get gas limit from the Ethereum transaction
 	tx := msg.AsTransaction()
 	if tx == nil {
@@ -161,12 +166,12 @@ func (wsd WasmSecurityDecorator) validateEvmGasLimit(msg *evmtypes.MsgEthereumTx
 	gasLimit := tx.Gas()
 
 	// Check whether gas limit exceeds the configured maximum
-	if wsd.maxTxGasWanted > 0 && gasLimit > wsd.maxTxGasWanted {
+	if msd.maxTxGasWanted > 0 && gasLimit > msd.maxTxGasWanted {
 		return sdkerrors.Wrapf(
 			errortypes.ErrOutOfGas,
 			"gas limit %d exceeds maximum allowed %d",
 			gasLimit,
-			wsd.maxTxGasWanted,
+			msd.maxTxGasWanted,
 		)
 	}
 
@@ -180,7 +185,7 @@ func (wsd WasmSecurityDecorator) validateEvmGasLimit(msg *evmtypes.MsgEthereumTx
 
 // ExtractMessagesFromTx extracts all messages from a transaction, including
 // nested messages from authz.MsgExec to prevent ante handler bypass attacks.
-func (wsd WasmSecurityDecorator) ExtractMessagesFromTx(ctx sdk.Context, tx sdk.Tx) ([]sdk.Msg, error) {
+func (msd MessageSecurityDecorator) ExtractMessagesFromTx(ctx sdk.Context, tx sdk.Tx) ([]sdk.Msg, error) {
 	type queuedMsg struct {
 		msg   sdk.Msg
 		depth int

@@ -39,8 +39,10 @@ func (msg MsgConvertNFT) ValidateBasic() error {
 	if !common.IsHexAddress(msg.EvmReceiver) {
 		return sdkerrors.Wrapf(errortypes.ErrInvalidAddress, "invalid receiver hex address %s", msg.EvmReceiver)
 	}
-	// 若提供了 EVM 合约地址（空 = 触发模块自动部署 ERC721Uptick），则必须是合法 0x 地址，
-	// 否则会在 keeper 层 ABI 打包时才报“unknown request”，这里提前拦截。
+	// An empty address triggers the module's own ERC721Uptick deployment; a
+	// non-empty one must be a valid 0x address. Reject it here so the failure
+	// is reported as an invalid address instead of surfacing as an opaque
+	// "unknown request" when the keeper packs the ABI call.
 	if msg.EvmContractAddress != "" && !common.IsHexAddress(msg.EvmContractAddress) {
 		return sdkerrors.Wrapf(errortypes.ErrInvalidAddress,
 			"invalid contract hex address '%s'", msg.EvmContractAddress)
@@ -55,8 +57,9 @@ func (msg MsgConvertNFT) ValidateBasic() error {
 		if id == "" {
 			return sdkerrors.Wrap(errortypes.ErrInvalidRequest, "cosmos token id cannot be empty")
 		}
-		// 复用 collection 的 nft id 校验（长度 [3,128]、禁 NUL 和 "/"），
-		// 避免短 id（如 "n1"）发到链上才报错。
+		// Reuse the collection token id rules (length bounds, no NUL or "/")
+		// so an id the keeper would reject fails at ValidateBasic time instead
+		// of after the transaction is accepted.
 		if err := collectiontypes.ValidateTokenID(id); err != nil {
 			return sdkerrors.Wrapf(err, "invalid cosmos token id '%s'", id)
 		}

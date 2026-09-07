@@ -161,6 +161,12 @@ func TestRefundPacketToken_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	k.SetCwAddressByContractTokenId(ctx, contract, "1", owner.String())
+	// An outbound IBC transfer escrows the CW721 in the module account (see
+	// convertWasm2Cosmos); the refund path only applies to an escrowed token.
+	// Leaving the token with the receiver would make a real CW721 contract
+	// reject the module's transfer_nft — the failure that strands the packet.
+	wasm.setOwner(contract, "1", types.AccModuleAddress.String())
+
 	require.NoError(t, k.RefundPacketToken(ctx, ibcnfttransfertypes.NonFungibleTokenPacketData{
 		ClassId:  "kitty",
 		TokenIds: []string{"nft1"},

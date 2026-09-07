@@ -104,11 +104,11 @@ func ValidateTokenURI(tokenURI string) error {
 }
 
 // Modified reports whether an incoming optional field carries a change.
-// Semantics (M-1, 2026-09-04): an empty string and DoNotModify both mean
-// "keep the current value"; only a non-empty value (or the RemoveField
-// sentinel) counts as a modification. This keeps CLI (defaults to
-// DoNotModify) and REST/gRPC (which leave optional fields empty) on the
-// same code path instead of letting empty strings erase metadata.
+// An empty string and DoNotModify both mean "keep the current value"; only a
+// non-empty value (or the RemoveField sentinel) counts as a modification. This
+// keeps CLI (defaults to DoNotModify) and REST/gRPC (which leave optional
+// fields empty) on the same code path instead of letting empty strings erase
+// metadata.
 func Modified(target string) bool {
 	return target != DoNotModify && target != ""
 }
@@ -117,8 +117,8 @@ func Modified(target string) bool {
 // MsgIssueDenom. On top of the base denom rules it rejects the "uptick-"
 // prefix: erc721/cw721 bridging derives class IDs as "uptick-<contract>" and
 // a user pre-minting such a denom would permanently block registration of
-// the matching contract (M-8 griefing). Module paths create derived denoms
-// directly through keeper.SaveDenom and never go through MsgIssueDenom.
+// the matching contract. Module paths create derived denoms directly through
+// keeper.SaveDenom and never go through MsgIssueDenom.
 func ValidateIssueDenomID(denomID string) error {
 	if err := ValidateDenomID(denomID); err != nil {
 		return err
@@ -142,7 +142,7 @@ func ValidateKeywords(denomID string) error {
 // Empty string and DoNotModify keep the origin; RemoveField clears it;
 // anything else replaces it.
 //
-// NOTE (documented limitation, audit follow-up): because the exact string
+// NOTE (documented limitation): because the exact string
 // "[remove]" (RemoveField) is the sentinel for clearing a field, a client
 // CANNOT set a field to the literal value "[remove]" — it will always be
 // interpreted as "clear this field". This applies to token URI, URI hash,

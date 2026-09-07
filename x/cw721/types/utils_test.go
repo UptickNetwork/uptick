@@ -194,7 +194,7 @@ func TestGetNFTFromUID_Invalid(t *testing.T) {
 }
 
 func TestGetNFTFromUID_CommaInFirstField(t *testing.T) {
-	// L-3: the UID is "<content>,<context>"; the context (class id / contract)
+	// The UID is "<content>,<context>"; the context (class id / contract)
 	// never contains a comma, so a comma in the first field is handled by
 	// splitting on the LAST comma.
 	nftID, classID := GetNFTFromUID("a,b,c")

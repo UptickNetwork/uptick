@@ -30,10 +30,10 @@ type GenesisState struct {
 	// registered token pairs
 	TokenPairs []TokenPair `protobuf:"bytes,2,rep,name=token_pairs,json=tokenPairs,proto3" json:"token_pairs"`
 	// per-token conversion bindings between CW721 token UIDs and Cosmos NFT
-	// UIDs. H-02: this runtime state was previously lost on genesis export.
+	// UIDs.
 	NftUidPairs []NFTUIDPair `protobuf:"bytes,3,rep,name=nft_uid_pairs,json=nftUidPairs,proto3" json:"nft_uid_pairs"`
 	// original CW721 owners recorded at IBC send, used for timeout/error
-	// refunds. H-02: this runtime state was previously lost on genesis export.
+	// refunds.
 	RefundReceivers []RefundReceiver `protobuf:"bytes,4,rep,name=refund_receivers,json=refundReceivers,proto3" json:"refund_receivers"`
 }
 
@@ -226,8 +226,6 @@ type Params struct {
 	// ModuleAddress Ethereum address.
 	EnableEVMHook bool `protobuf:"varint,2,opt,name=enable_evm_hook,json=enableEvmHook,proto3" json:"enable_evm_hook,omitempty"`
 	// code ID of the CW721 wasm contract used for auto-instantiation.
-	// H-02: this field existed in the generated Go code but was missing from
-	// the proto source; it is now declared here so proto and code agree.
 	WasmCodeId uint64 `protobuf:"varint,3,opt,name=wasm_code_id,json=wasmCodeId,proto3" json:"wasm_code_id,omitempty"`
 }
 

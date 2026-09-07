@@ -27,7 +27,7 @@ import (
 // the main registry, since it is incomplete and only needed for the v0.3.3 ->
 // v0.4.0 state migration.
 //
-// It returns an error instead of panicking (M-7) so a failing registration —
+// It returns an error instead of panicking so a failing registration —
 // e.g. after an SDK refactor of the interface registry — surfaces as a
 // readable, loggable error at boot rather than an opaque crash.
 func RegisterCompatInterfaces(registry codectypes.InterfaceRegistry) error {

@@ -82,7 +82,7 @@ func (s *KeeperTestSuite) TestMsgServerNFTLifecycleAuthorization() {
 	s.Require().Error(err)
 }
 
-// TestUpdateRestrictedAllowsPureTransfer covers L-1: for an UpdateRestricted
+// TestUpdateRestrictedAllowsPureTransfer verifies that for an UpdateRestricted
 // denom a pure ownership transfer MUST succeed even when the caller echoes the
 // existing metadata, while a real metadata change must remain blocked.
 func (s *KeeperTestSuite) TestUpdateRestrictedAllowsPureTransfer() {

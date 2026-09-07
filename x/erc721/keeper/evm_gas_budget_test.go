@@ -23,7 +23,7 @@ import (
 	"github.com/UptickNetwork/uptick/x/erc721/types"
 )
 
-// H-01 regression: CallEVMWithData must never hand the EVM interpreter a
+// CallEVMWithData must never hand the EVM interpreter a
 // budget larger than the SDK transaction's remaining gas. Before the fix the
 // internal GasLimit was pinned to config.DefaultGasCap (25M) regardless of the
 // tx gas, so a caller-supplied external contract (e.g. name() during

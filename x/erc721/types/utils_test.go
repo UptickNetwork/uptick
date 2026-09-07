@@ -130,7 +130,7 @@ func TestGetNFTFromUID(t *testing.T) {
 	require.Equal(t, "", a)
 	require.Equal(t, "", b)
 
-	// L-3: comma in the first field round-trips by splitting on the last comma.
+	// A comma in the first field round-trips by splitting on the last comma.
 	a, b = GetNFTFromUID("tok,en,0x1234")
 	require.Equal(t, "tok,en", a)
 	require.Equal(t, "0x1234", b)

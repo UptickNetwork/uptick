@@ -30,10 +30,9 @@ type GenesisState struct {
 	// registered token pairs
 	TokenPairs []TokenPair `protobuf:"bytes,2,rep,name=token_pairs,json=tokenPairs,proto3" json:"token_pairs"`
 	// per-token conversion bindings between EVM token UIDs and Cosmos NFT UIDs.
-	// H-02: this runtime state was previously lost on genesis export.
 	NftUidPairs []NFTUIDPair `protobuf:"bytes,3,rep,name=nft_uid_pairs,json=nftUidPairs,proto3" json:"nft_uid_pairs"`
 	// original ERC721 owners recorded at IBC send, used for timeout/error
-	// refunds. H-02: this runtime state was previously lost on genesis export.
+	// refunds.
 	RefundReceivers []RefundReceiver `protobuf:"bytes,4,rep,name=refund_receivers,json=refundReceivers,proto3" json:"refund_receivers"`
 }
 

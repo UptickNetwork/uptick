@@ -11,8 +11,8 @@ import (
 	"github.com/UptickNetwork/uptick/x/cw721/types"
 )
 
-// Genesis export/import for the per-token runtime state that H-02 identified
-// as missing from ExportGenesis: the bidirectional (tokenUID ↔ nftUID)
+// Genesis export/import for the per-token runtime state missing from the
+// collection-level ExportGenesis: the bidirectional (tokenUID ↔ nftUID)
 // conversion index and the IBC refund receivers. Collection-level TokenPairs
 // alone cannot restore this state, so a genesis built from the old export
 // silently broke reverse conversions and refunds.

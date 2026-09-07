@@ -13,10 +13,9 @@ message GenesisState {
   // registered token pairs
   repeated TokenPair token_pairs = 2 [(gogoproto.nullable) = false];
   // per-token conversion bindings between EVM token UIDs and Cosmos NFT UIDs.
-  // H-02: this runtime state was previously lost on genesis export.
   repeated NFTUIDPair nft_uid_pairs = 3 [(gogoproto.nullable) = false];
   // original ERC721 owners recorded at IBC send, used for timeout/error
-  // refunds. H-02: this runtime state was previously lost on genesis export.
+  // refunds.
   repeated RefundReceiver refund_receivers = 4 [(gogoproto.nullable) = false];
 }
 

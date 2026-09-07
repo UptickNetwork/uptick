@@ -78,7 +78,7 @@ func (k Keeper) UpdateNFT(ctx sdk.Context, denomID,
 	if types.Modified(tokenNm) || types.Modified(tokenData) {
 		// A nil-Data record is metadata-less, not invalid: build from an empty
 		// value so owners can attach metadata to such NFTs (same policy as
-		// TransferOwnership, audit follow-up).
+		// TransferOwnership).
 		var nftMetadata types.NFTMetadata
 		if token.Data != nil {
 			nftMetadata, err = types.UnmarshalNFTMetadata(k.cdc, token.Data.GetValue())
@@ -125,7 +125,7 @@ func (k Keeper) TransferOwnership(ctx sdk.Context, denomID,
 	// A field only counts as a real change if the incoming value actually
 	// differs from the stored one. Copying the current URI/URIHash/metadata on a
 	// pure transfer must not be treated as an update, otherwise an
-	// UpdateRestricted denom would block legitimate ownership transfers (L-1).
+	// UpdateRestricted denom would block legitimate ownership transfers.
 	tokenChanged := (types.Modified(tokenURI) && tokenURI != token.Uri) ||
 		(types.Modified(tokenURIHash) && tokenURIHash != token.UriHash)
 
@@ -154,10 +154,10 @@ func (k Keeper) TransferOwnership(ctx sdk.Context, denomID,
 	token.Uri = types.Modify(token.Uri, tokenURI)
 	token.UriHash = types.Modify(token.UriHash, tokenURIHash)
 	if tokenMetadataChanged {
-		// Audit follow-up: a nil Data record is metadata-less, not invalid —
-		// build the metadata from an empty value so users can attach metadata
-		// to such NFTs (and transfers can repair dirty records) instead of
-		// failing with the misleading "has no metadata" error.
+		// A nil Data record is metadata-less, not invalid: build the metadata
+		// from an empty value so users can attach metadata to such NFTs (and
+		// transfers can repair dirty records) instead of failing with the
+		// misleading "has no metadata" error.
 		var nftMetadata types.NFTMetadata
 		if token.Data != nil {
 			nftMetadata, err = types.UnmarshalNFTMetadata(k.cdc, token.Data.GetValue())
@@ -199,7 +199,7 @@ func (k Keeper) GetNFT(ctx sdk.Context, denomID, tokenID string) (nft exported.N
 	var nftMetadata types.NFTMetadata
 	// A legacy / migrated NFT may carry nil Data; degrade to empty metadata so
 	// the single-NFT query matches GetNFTs / ExportGenesis behavior instead of
-	// erroring on the same record (audit follow-up).
+	// erroring on the same record.
 	if token.Data != nil {
 		if err := k.cdc.Unmarshal(token.Data.GetValue(), &nftMetadata); err != nil {
 			return nil, err

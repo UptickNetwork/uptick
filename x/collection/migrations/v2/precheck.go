@@ -38,7 +38,7 @@ func (p Problem) String() string {
 // performs no writes and does not stop on the first bad record: every legacy
 // denom / NFT that would make Migrate fail is collected and reported, so an
 // upgrade operator gets a complete, readable report before any state change
-// instead of an opaque hard stop mid-migration (L-4).
+// instead of an opaque hard stop mid-migration.
 //
 // It must run on the pre-migration store, i.e. before the module's
 // RunMigrations call in the upgrade handler.

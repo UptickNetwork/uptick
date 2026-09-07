@@ -15,6 +15,8 @@ const (
 	EventTypeRegisterNFT           = "register_nft"
 	EventTypeRegisterCW721         = "register_cw721"
 	EventTypeToggleTokenConversion = "toggle_token_conversion" // #nosec
+	EventTypeRefundPacketToken     = "refund_packet_token"
+	EventTypeRefundPacketTokenSkip = "refund_packet_token_skip"
 
 	AttributeKeyNFTClass     = "nft_class"
 	AttributeKeyNFTID        = "nft_ids"

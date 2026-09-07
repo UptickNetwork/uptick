@@ -339,14 +339,54 @@ func (k Keeper) convertCosmos2Wasm(
 	return &types.MsgConvertNFTResponse{}, nil
 }
 
+// refundGroup aggregates the successfully refunded tokens of one
+// (contract, receiver) pair, so the refund event stays accurate when a single
+// packet carries tokens from several contracts or for several receivers.
+type refundGroup struct {
+	contract string
+	receiver string
+	// cw721 token ids refunded to this (contract, receiver) pair
+	tokenIds []string
+	// native NFT ids burned for those tokens
+	nftIds []string
+}
+
+// appendToRefundGroups appends to the group matching (contract, receiver),
+// creating it when it does not exist yet. Groups keep first-seen order so event
+// emission stays deterministic across nodes.
+func appendToRefundGroups(groups []refundGroup, contract, receiver, tokenID, nftID string) []refundGroup {
+	for i := range groups {
+		if groups[i].contract == contract && groups[i].receiver == receiver {
+			groups[i].tokenIds = append(groups[i].tokenIds, tokenID)
+			groups[i].nftIds = append(groups[i].nftIds, nftID)
+			return groups
+		}
+	}
+	return append(groups, refundGroup{
+		contract: contract,
+		receiver: receiver,
+		tokenIds: []string{tokenID},
+		nftIds:   []string{nftID},
+	})
+}
+
 // RefundPacketToken handles the IBC packet timeout/failure for CW721 transfers.
 // It reverses the conversion: returns the CW721 to its original owner, cleans up
 // token pair mappings, and burns the native NFT returned to the module account.
 // This function should be called by the host chain's IBC middleware OnTimeoutPacket handler.
+//
+// The refund is gated on the module account still owning the CW721 token. A token
+// that was already refunded, never escrowed, or moved elsewhere is skipped with an
+// event instead of an error: returning an error here aborts the IBC
+// OnTimeout/OnAcknowledgement callback, and because the relayer's
+// MsgTimeout/MsgAcknowledgement can then never succeed, the packet would be stuck
+// forever. This mirrors x/erc721 and keeps the packet finalisable.
 func (k Keeper) RefundPacketToken(
 	ctx sdk.Context,
 	data ibcnfttransfertypes.NonFungibleTokenPacketData,
 ) error {
+
+	var groups []refundGroup
 
 	for _, tokenId := range data.TokenIds {
 
@@ -360,14 +400,36 @@ func (k Keeper) RefundPacketToken(
 		if cwTokenId == "" || cwContractAddress == "" {
 			return sdkerrors.Wrapf(types.ErrInternalTokenPair, "invalid CW721 uid for class %s token %s", data.ClassId, tokenId)
 		}
-		cwReceiver := k.GetCwAddressByContractTokenId(ctx, cwContractAddress, cwTokenId)
-		if len(cwReceiver) == 0 {
-			return sdkerrors.Wrapf(errortypes.ErrInvalidAddress, "missing CW721 refund receiver for contract %s token %s", cwContractAddress, cwTokenId)
-		}
 
-		_, err := k.TransferCw721(ctx, cwContractAddress, cwTokenId, string(cwReceiver), types.AccModuleAddress.String())
+		owner, err := k.QueryCW721TokenOwner(ctx, cwContractAddress, cwTokenId)
 		if err != nil {
 			return err
+		}
+		shouldRefund := moduleOwnsCW721(owner)
+
+		if !shouldRefund {
+			ctx.EventManager().EmitEvent(
+				sdk.NewEvent(
+					types.EventTypeRefundPacketTokenSkip,
+					sdk.NewAttribute(types.AttributeKeyNFTClass, data.ClassId),
+					sdk.NewAttribute(types.AttributeKeyNFTID, tokenId),
+					sdk.NewAttribute(types.AttributeKeyCW721Token, cwContractAddress),
+					sdk.NewAttribute(types.AttributeKeyCW721TokenID, cwTokenId),
+					sdk.NewAttribute("reason", "owner_is_not_module_account"),
+				),
+			)
+		} else {
+			cwReceiver := k.GetCwAddressByContractTokenId(ctx, cwContractAddress, cwTokenId)
+			if len(cwReceiver) == 0 {
+				return sdkerrors.Wrapf(errortypes.ErrInvalidAddress, "missing CW721 refund receiver for contract %s token %s", cwContractAddress, cwTokenId)
+			}
+
+			_, err := k.TransferCw721(ctx, cwContractAddress, cwTokenId, string(cwReceiver), types.AccModuleAddress.String())
+			if err != nil {
+				return err
+			}
+
+			groups = appendToRefundGroups(groups, cwContractAddress, string(cwReceiver), cwTokenId, tokenId)
 		}
 
 		k.DeleteCwAddressByContractTokenId(ctx, cwContractAddress, cwTokenId)
@@ -379,11 +441,41 @@ func (k Keeper) RefundPacketToken(
 			DenomId: data.ClassId,
 			Sender:  types.AccModuleAddress.String(),
 		}
-		if _, err = k.nftKeeper.BurnNFT(ctx, &burnMsg); err != nil {
+		if _, err := k.nftKeeper.BurnNFT(ctx, &burnMsg); err != nil {
 			return err
 		}
 
 	}
 
+	if len(groups) > 0 {
+		ctx.EventManager().EmitEvents(cw721RefundEvents(data.Sender, data.ClassId, groups))
+	}
+
 	return nil
+}
+
+// cw721RefundEvents builds one refund event per (contract, receiver) pair from
+// the aggregated groups.
+func cw721RefundEvents(sender, classID string, groups []refundGroup) sdk.Events {
+	events := make(sdk.Events, 0, len(groups))
+	for _, group := range groups {
+		events = append(events, sdk.NewEvent(
+			types.EventTypeRefundPacketToken,
+			sdk.NewAttribute(sdk.AttributeKeySender, sender),
+			sdk.NewAttribute(types.AttributeKeyReceiver, group.receiver),
+			sdk.NewAttribute(types.AttributeKeyNFTClass, classID),
+			sdk.NewAttribute(types.AttributeKeyNFTID, strings.Join(group.nftIds, ",")),
+			sdk.NewAttribute(types.AttributeKeyCW721Token, group.contract),
+			sdk.NewAttribute(types.AttributeKeyCW721TokenID, strings.Join(group.tokenIds, ",")),
+		))
+	}
+	return events
+}
+
+// moduleOwnsCW721 reports whether the cw721 module account still escrows the
+// token. It is the gate for the IBC refund: a token that is no longer escrowed
+// must be skipped rather than refunded, otherwise the refund aborts the IBC
+// callback and strands the packet (see RefundPacketToken).
+func moduleOwnsCW721(owner string) bool {
+	return owner == types.AccModuleAddress.String()
 }

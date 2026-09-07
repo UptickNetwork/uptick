@@ -293,9 +293,9 @@ func NewUptick(
 	app.IBCKeeper.ClientKeeper.AddRoute(ibcsolomachine.ModuleName, &smLightClientModule)
 
 	/****  Module Options ****/
-	// Wire the EVM default static precompiles explicitly (M-6 #1): fresh-chain
-	// genesis defaults must activate Uptick's precompile set before the module
-	// manager (and its DefaultGenesis -> evmtypes.DefaultParams) is built.
+	// Wire the EVM default static precompiles explicitly: fresh-chain genesis
+	// defaults must activate Uptick's precompile set before the module manager
+	// (and its DefaultGenesis -> evmtypes.DefaultParams) is built.
 	v041.ConfigureDefaultStaticPrecompiles()
 
 	skipGenesisInvariants := false

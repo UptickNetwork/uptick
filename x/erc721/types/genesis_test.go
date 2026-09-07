@@ -42,7 +42,7 @@ func TestDefaultGenesisState(t *testing.T) {
 
 // TestGenesisState_ValidatePerTokenState: a genesis carrying valid per-token
 // bindings and refund receivers must validate cleanly now that Validate() runs
-// ValidateGenesisPairs (H-02).
+// ValidateGenesisPairs.
 func TestGenesisState_ValidatePerTokenState(t *testing.T) {
 	p := validPair(t, "0x3333333333333333333333333333333333333333", "pair/class/a")
 	gs := NewGenesisState(DefaultParams(), []TokenPair{p})

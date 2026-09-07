@@ -430,6 +430,29 @@ func (k Keeper) convertCosmos2Evm(
 	return &types.MsgConvertNFTResponse{}, nil
 }
 
+// validateNoMappingConflict enforces the one-to-one binding *before* any
+// state-mutating call, mirroring convertCosmos2Evm. SetNFTPairs rejects a
+// conflicting binding too, but only after the NFT has already been minted or
+// transferred; validating up front keeps the failure free of side effects and
+// keeps both conversion directions symmetric.
+func (k Keeper) validateNoMappingConflict(ctx sdk.Context, msg *types.MsgConvertERC721) error {
+	for i, tokenId := range msg.EvmTokenIds {
+		bound := k.GetNFTPairByContractTokenID(ctx, msg.EvmContractAddress, tokenId)
+		if len(bound) == 0 {
+			continue
+		}
+		expectedNFTUID := types.CreateNFTUID(msg.ClassId, msg.CosmosTokenIds[i])
+		if string(bound) != expectedNFTUID {
+			return sdkerrors.Wrapf(
+				types.ErrNFTMappingConflict,
+				"erc721 token %s is already bound to nft %s, not %s",
+				tokenId, string(bound), expectedNFTUID,
+			)
+		}
+	}
+	return nil
+}
+
 // convertEvm2Cosmos handles the erc721 conversion for a native erc721 token
 // pair:
 //   - escrow tokens on module account
@@ -447,6 +470,10 @@ func (k Keeper) convertEvm2Cosmos(
 	}
 	if len(msg.EvmTokenIds) > maxERC721BatchSize {
 		return nil, sdkerrors.Wrapf(errortypes.ErrInvalidRequest, "ERC721 batch size %d exceeds maximum %d", len(msg.EvmTokenIds), maxERC721BatchSize)
+	}
+
+	if err := k.validateNoMappingConflict(ctx, msg); err != nil {
+		return nil, err
 	}
 
 	erc721 := contracts.ERC721UpticksContract.ABI
@@ -545,6 +572,37 @@ func (k Keeper) convertEvm2Cosmos(
 	return msg, nil
 }
 
+// erc721RefundGroup aggregates the successfully refunded tokens of one
+// (contract, receiver) pair, so the refund event stays accurate when a single
+// packet carries tokens from several contracts or for several receivers.
+type erc721RefundGroup struct {
+	contract string
+	receiver string
+	// EVM ERC721 token ids refunded to this (contract, receiver) pair
+	tokenIds []string
+	// native NFT ids burned for those tokens
+	nftIds []string
+}
+
+// appendERC721RefundGroup appends to the group matching (contract, receiver),
+// creating it when it does not exist yet. Groups keep first-seen order so event
+// emission stays deterministic across nodes.
+func appendERC721RefundGroup(groups []erc721RefundGroup, contract, receiver, tokenID, nftID string) []erc721RefundGroup {
+	for i := range groups {
+		if groups[i].contract == contract && groups[i].receiver == receiver {
+			groups[i].tokenIds = append(groups[i].tokenIds, tokenID)
+			groups[i].nftIds = append(groups[i].nftIds, nftID)
+			return groups
+		}
+	}
+	return append(groups, erc721RefundGroup{
+		contract: contract,
+		receiver: receiver,
+		tokenIds: []string{tokenID},
+		nftIds:   []string{nftID},
+	})
+}
+
 // RefundPacketToken handles the erc721 conversion for a native erc721 token
 // pair:
 //   - escrow tokens on module account
@@ -555,9 +613,7 @@ func (k Keeper) RefundPacketToken(
 ) error {
 
 	erc721 := contracts.ERC721UpticksContract.ABI
-	var refundedTokenIds []string
-	var refundedContract string
-	var refundedReceiver common.Address
+	var groups []erc721RefundGroup
 
 	for _, tokenId := range data.TokenIds {
 
@@ -629,27 +685,37 @@ func (k Keeper) RefundPacketToken(
 		}
 
 		if shouldRefundERC721 {
-			refundedTokenIds = append(refundedTokenIds, tokenId)
-			refundedContract = evmContractAddress
-			refundedReceiver = receiver
+			groups = appendERC721RefundGroup(
+				groups,
+				common.HexToAddress(evmContractAddress).Hex(),
+				receiver.Hex(),
+				emvTokenId,
+				tokenId,
+			)
 		}
 	}
 
-	if len(refundedTokenIds) > 0 {
-		ctx.EventManager().EmitEvents(
-			sdk.Events{
-				sdk.NewEvent(
-					types.EventTypeRefundPacketToken,
-					sdk.NewAttribute(sdk.AttributeKeySender, data.Sender),
-					sdk.NewAttribute(types.AttributeKeyReceiver, refundedReceiver.Hex()),
-					sdk.NewAttribute(types.AttributeKeyNFTClass, data.ClassId),
-					sdk.NewAttribute(types.AttributeKeyNFTID, strings.Join(refundedTokenIds, ",")),
-					sdk.NewAttribute(types.AttributeKeyERC721Token, refundedContract),
-					sdk.NewAttribute(types.AttributeKeyERC721TokenID, strings.Join(refundedTokenIds, ",")),
-				),
-			},
-		)
+	if len(groups) > 0 {
+		ctx.EventManager().EmitEvents(erc721RefundEvents(data.Sender, data.ClassId, groups))
 	}
 
 	return nil
+}
+
+// erc721RefundEvents builds one refund event per (contract, receiver) pair from
+// the aggregated groups.
+func erc721RefundEvents(sender, classID string, groups []erc721RefundGroup) sdk.Events {
+	events := make(sdk.Events, 0, len(groups))
+	for _, group := range groups {
+		events = append(events, sdk.NewEvent(
+			types.EventTypeRefundPacketToken,
+			sdk.NewAttribute(sdk.AttributeKeySender, sender),
+			sdk.NewAttribute(types.AttributeKeyReceiver, group.receiver),
+			sdk.NewAttribute(types.AttributeKeyNFTClass, classID),
+			sdk.NewAttribute(types.AttributeKeyNFTID, strings.Join(group.nftIds, ",")),
+			sdk.NewAttribute(types.AttributeKeyERC721Token, group.contract),
+			sdk.NewAttribute(types.AttributeKeyERC721TokenID, strings.Join(group.tokenIds, ",")),
+		))
+	}
+	return events
 }

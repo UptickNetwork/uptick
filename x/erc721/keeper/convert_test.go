@@ -243,7 +243,7 @@ func TestConvertNFT_SuccessMintsERC721(t *testing.T) {
 	require.Equal(t, types.AccModuleAddress.String(), got.GetOwner().String())
 }
 
-// TestConvertNFT_RejectsTokenIDCollision reproduces the C-1 registry-poisoning
+// TestConvertNFT_RejectsTokenIDCollision reproduces the registry-poisoning
 // attack: a caller's own Cosmos NFT must not be allowed to release a
 // module-escrowed ERC721 token already bound to a different NFT. The token id
 // 7 is pre-bound to nft "nft-victim"; supplying the caller's nft1 must fail.
@@ -270,7 +270,7 @@ func TestConvertNFT_RejectsTokenIDCollision(t *testing.T) {
 		k.GetNFTPairByContractTokenID(ctx, contract, "7"))
 }
 
-// TestConvertNFT_MappingCommaIDRoundTrip covers L-3: a Cosmos NFT id containing
+// TestConvertNFT_MappingCommaIDRoundTrip verifies that a Cosmos NFT id containing
 // a comma can be stored in and parsed back out of the NFT mapping (split on the
 // last comma) without corruption or a migration.
 func TestConvertNFT_MappingCommaIDRoundTrip(t *testing.T) {
@@ -294,7 +294,7 @@ func TestConvertNFT_MappingCommaIDRoundTrip(t *testing.T) {
 	require.Equal(t, tokenUID, string(rev))
 }
 
-// TestConvertNFT_RejectsWrongContract covers M-01: a registered class must not
+// TestConvertNFT_RejectsWrongContract verifies that a registered class must not
 // bind to a caller-supplied contract that differs from the canonical pair.
 func TestConvertNFT_RejectsWrongContract(t *testing.T) {
 	k, ctx, owner := setupConvertKeeper(t)

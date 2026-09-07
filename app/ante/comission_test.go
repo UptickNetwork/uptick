@@ -14,8 +14,8 @@ import (
 )
 
 // Tests for the live validation path (validateMsg). The former
-// involvesStakingMsg / involvesAuthzMsg helpers were dead code removed by the
-// audit follow-up (P3-9) — the AnteHandle switch dispatches directly.
+// involvesStakingMsg / involvesAuthzMsg helpers were dead code and have been
+// removed — the AnteHandle switch dispatches directly.
 
 func TestValidatorCommissionDecoratorValidateMsg(t *testing.T) {
 	dec := ValidatorCommissionDecorator{}

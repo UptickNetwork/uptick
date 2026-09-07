@@ -193,7 +193,7 @@ func TestSetNFTPairs_RejectsForwardConflict(t *testing.T) {
 	require.NoError(t, k.SetNFTPairs(ctx, contractAddr, tokenID, classID, "nft-victim"))
 
 	// Binding the SAME (contract, tokenID) to a different NFT must fail, which
-	// blocks the C-1 registry-poisoning attack.
+	// blocks the registry-poisoning attack.
 	err := k.SetNFTPairs(ctx, contractAddr, tokenID, classID, "nft-attacker")
 	require.ErrorIs(t, err, cw721types.ErrNFTMappingConflict)
 

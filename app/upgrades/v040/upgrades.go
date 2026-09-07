@@ -132,7 +132,7 @@ func upgradeHandlerConstructor(
 		sdkCtx := sdk.UnwrapSDKContext(ctx)
 		logger := sdkCtx.Logger()
 
-		// Idempotency guard (M-5): this upgrade is NOT reversible. If the plan
+		// Idempotency guard: this upgrade is NOT reversible. If the plan
 		// was already executed (re-scheduled plan, crash-restart replay), the
 		// one-shot migrations below would run a second time and hard-stop the
 		// chain. Every module already at its current consensus version means
@@ -275,7 +275,7 @@ func upgradeHandlerConstructor(
 			cw721types.ModuleName,
 		)
 
-		// Step 3.9: Precheck the legacy collection store (L-4). The collection
+		// Precheck the legacy collection store before migrating it. The
 		// 1→2 migration below fails fast on a single dirty record; scanning
 		// the store read-only first turns that into a complete, readable
 		// report BEFORE any state change, so an operator can fix or exclude
@@ -518,7 +518,7 @@ func migrateLegacyEVMAccounts(
 	migrated := 0
 
 	// Collected failures: key hex -> reason. We keep scanning after a failure
-	// so that every bad account is reported in a single pass (P2-3).
+	// so that every bad account is reported in a single pass.
 	type authMigrationFailure struct {
 		key    string
 		reason string

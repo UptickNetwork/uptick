@@ -114,7 +114,7 @@ func (m *mockTxWithMsgs) GetTimeoutHeight() (uint64, error)               { retu
 func (m *mockTxWithMsgs) GetSigningTxData() txsigning.TxData              { return txsigning.TxData{} }
 
 // extractMessagesFromTx is a test helper that delegates to the production
-// WasmSecurityDecorator.ExtractMessagesFromTx.
+// MessageSecurityDecorator.ExtractMessagesFromTx.
 func extractMessagesFromTx(tx sdk.Tx) ([]sdk.Msg, error) {
-	return WasmSecurityDecorator{}.ExtractMessagesFromTx(sdk.Context{}, tx)
+	return MessageSecurityDecorator{}.ExtractMessagesFromTx(sdk.Context{}, tx)
 }

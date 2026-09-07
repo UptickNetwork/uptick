@@ -122,7 +122,7 @@ func newCosmosAnteHandler(options HandlerOptions) sdk.AnteHandler {
 		}
 
 		decorators := []sdk.AnteDecorator{
-			NewWasmSecurityDecorator(options.Cdc, options.EvmKeeper, options.MaxTxGasWanted),
+			NewMessageSecurityDecorator(options.Cdc, options.EvmKeeper, options.MaxTxGasWanted),
 			NewValidatorCommissionDecorator(options.Cdc),
 		}
 		if options.TXCounterStoreService != nil {
@@ -177,7 +177,7 @@ func newCosmosAnteHandlerEip712(options HandlerOptions) sdk.AnteHandler {
 		}
 
 		decorators := []sdk.AnteDecorator{
-			NewWasmSecurityDecorator(options.Cdc, options.EvmKeeper, options.MaxTxGasWanted),
+			NewMessageSecurityDecorator(options.Cdc, options.EvmKeeper, options.MaxTxGasWanted),
 			NewValidatorCommissionDecorator(options.Cdc),
 		}
 		if options.TXCounterStoreService != nil {

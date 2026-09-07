@@ -140,7 +140,7 @@ func GetNFTFromUID(uid string) (string, string) {
 	// The UID is "<tokenId>,<contractAddress>" or "<nftId>,<classId>". The second
 	// component (contract address / class id) never contains a comma, so splitting
 	// on the LAST comma makes the round-trip robust to commas inside the first
-	// component (L-3) without a state migration.
+	// component without a state migration.
 	idx := strings.LastIndex(uid, ",")
 	if idx <= 0 || idx == len(uid)-1 {
 		return "", ""

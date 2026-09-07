@@ -151,9 +151,10 @@ func TestGetContractAddressAndTokenIds_MissingCode(t *testing.T) {
 	require.ErrorIs(t, err, cw721types.ErrCW721CodeNotFound)
 }
 
-// TestGetContractAddressAndTokenIds_RejectsTokenIDCollision reproduces the C-1
-// attack for CW721: a caller's unbound NFT must not resolve to a token already
-// bound to a different NFT (which would release the escrowed victim token).
+// TestGetContractAddressAndTokenIds_RejectsTokenIDCollision reproduces the
+// registry-poisoning attack for CW721: a caller's unbound NFT must not resolve
+// to a token already bound to a different NFT (which would release the escrowed
+// victim token).
 func TestGetContractAddressAndTokenIds_RejectsTokenIDCollision(t *testing.T) {
 	k, ctx := setupKeeper(t)
 	contract := sdk.AccAddress([]byte("cw721contractaddrxx")).String()

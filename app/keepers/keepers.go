@@ -617,7 +617,7 @@ func initParamsKeeper(
 	paramsKeeper.Subspace(wasmtypes.ModuleName)
 	// ibcnft-transfer: the Uptick fork (v1.3.0-ibc-v10) removed params entirely
 	// (no types.ParamKeyTable, keeper takes no paramSpace) — dead registration.
-	// x/cw721: never had params — dead registration. Both removed (audit P3-6).
+	// x/cw721: never had params — dead registration. Both removed.
 
 	paramsKeeper.Subspace(icacontrollertypes.SubModuleName).WithKeyTable(icacontrollertypes.ParamKeyTable())
 

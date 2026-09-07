@@ -3,6 +3,7 @@ package keeper
 import (
 	"encoding/json"
 	"strconv"
+	"strings"
 
 	sdkerrors "cosmossdk.io/errors"
 	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
@@ -108,6 +109,24 @@ func (k Keeper) QueryCW721AllNftInfo(
 
 	return allContractInfoResultJson, nil
 
+}
+
+// QueryCW721TokenOwner returns the current owner of a CW721 token.
+//
+// It is used by the IBC refund path to decide whether the module account still
+// escrows the token: a token that is no longer owned by the module must be
+// skipped instead of refunded, otherwise the refund aborts the IBC callback
+// and the packet can never be finalized.
+func (k Keeper) QueryCW721TokenOwner(
+	ctx sdk.Context,
+	contractAddress string,
+	tokenId string,
+) (string, error) {
+	allNftInfo, err := k.QueryCW721AllNftInfo(ctx, contractAddress, tokenId)
+	if err != nil {
+		return "", sdkerrors.Wrap(err, "failed to query cw721 token owner")
+	}
+	return strings.TrimSpace(allNftInfo.Access.Owner), nil
 }
 
 type InstantiateInfo struct {

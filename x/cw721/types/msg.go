@@ -6,6 +6,8 @@ import (
 	sdkerrors "cosmossdk.io/errors"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
+
+	collectiontypes "github.com/UptickNetwork/uptick/x/collection/types"
 )
 
 var (
@@ -48,6 +50,12 @@ func (msg MsgConvertNFT) ValidateBasic() error {
 	for _, id := range msg.NftIds {
 		if id == "" {
 			return sdkerrors.Wrap(errortypes.ErrInvalidRequest, "nft id cannot be empty")
+		}
+		// Reuse the collection nft id validation (length bounds, no NUL or "/")
+		// so ids that the keeper would reject are caught at ValidateBasic time,
+		// matching x/erc721.
+		if err := collectiontypes.ValidateTokenID(id); err != nil {
+			return sdkerrors.Wrapf(err, "invalid nft id '%s'", id)
 		}
 	}
 	for _, id := range msg.TokenIds {
@@ -96,6 +104,17 @@ func (msg MsgConvertCW721) ValidateBasic() error {
 	for _, id := range msg.TokenIds {
 		if id == "" {
 			return sdkerrors.Wrap(errortypes.ErrInvalidRequest, "token id cannot be empty")
+		}
+	}
+	// NftIds is optional (empty means "derive from the token id"), but when the
+	// caller supplies entries they must satisfy the same nft id rules enforced
+	// on the erc721 side.
+	for _, id := range msg.NftIds {
+		if id == "" {
+			return sdkerrors.Wrap(errortypes.ErrInvalidRequest, "nft id cannot be empty")
+		}
+		if err := collectiontypes.ValidateTokenID(id); err != nil {
+			return sdkerrors.Wrapf(err, "invalid nft id '%s'", id)
 		}
 	}
 	return nil
@@ -151,6 +170,9 @@ func (msg MsgTransferCW721) ValidateBasic() error {
 	for _, id := range msg.CosmosTokenIds {
 		if id == "" {
 			return sdkerrors.Wrap(errortypes.ErrInvalidRequest, "cosmos token id cannot be empty")
+		}
+		if err := collectiontypes.ValidateTokenID(id); err != nil {
+			return sdkerrors.Wrapf(err, "invalid cosmos token id '%s'", id)
 		}
 	}
 	if msg.TimeoutHeight.IsZero() && msg.TimeoutTimestamp == 0 {

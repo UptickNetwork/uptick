@@ -58,7 +58,7 @@ func seedPairAndRuntimeState(t *testing.T, k keeper.Keeper, ctx sdk.Context) (to
 	return tokenUID, nftUID
 }
 
-// TestGenesisRoundTripPreservesPerTokenState is the H-02 regression: export
+// TestGenesisRoundTripPreservesPerTokenState is a regression test: export
 // must carry the per-token bindings and refund receivers, and importing that
 // export into a fresh store must restore them exactly. The old export (params
 // + collection pairs only) failed both halves.
@@ -68,10 +68,10 @@ func TestGenesisRoundTripPreservesPerTokenState(t *testing.T) {
 
 	exported := ExportGenesis(ctx, k)
 
-	require.Len(t, exported.NftUidPairs, 1, "per-token binding missing from export (H-02)")
+	require.Len(t, exported.NftUidPairs, 1, "per-token binding missing from export")
 	require.Equal(t, tokenUID, exported.NftUidPairs[0].TokenUid)
 	require.Equal(t, nftUID, exported.NftUidPairs[0].NftUid)
-	require.Len(t, exported.RefundReceivers, 1, "refund receiver missing from export (H-02)")
+	require.Len(t, exported.RefundReceivers, 1, "refund receiver missing from export")
 	require.Equal(t, rtContract, exported.RefundReceivers[0].EvmContractAddress)
 	require.Equal(t, "42", exported.RefundReceivers[0].TokenId)
 	require.Equal(t, rtOwner, exported.RefundReceivers[0].EvmAddress)

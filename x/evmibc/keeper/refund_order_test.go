@@ -58,8 +58,8 @@ func (m *mockCW721) RefundPacketToken(sdk.Context, nfttransfertypes.NonFungibleT
 	return nil
 }
 
-// TestOnAcknowledgementPacket_ERC721ReleasesIBCBeforeRefund reproduces the C-2
-// deadlock: for a failed ERC721 outbound packet the IBC-escrowed NFT MUST be
+// TestOnAcknowledgementPacket_ERC721ReleasesIBCBeforeRefund reproduces the
+// refund deadlock: for a failed ERC721 outbound packet the IBC-escrowed NFT MUST be
 // released to the module account BEFORE RefundPacketToken burns it and returns
 // the ERC721. If RefundPacketToken ran first, the NFT would still be escrowed
 // (owner != module), BurnNFT would fail, and the whole cache-context would roll

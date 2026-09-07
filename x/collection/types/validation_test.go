@@ -90,11 +90,10 @@ func TestValidateKeywordsAndIsIBCDenom(t *testing.T) {
 	require.False(t, IsIBCDenom("denom"))
 }
 
-// TestEditNFTDataRemoveFieldSemantics pins the M-1 explicit-clear path for the
+// TestEditNFTDataRemoveFieldSemantics pins the explicit-clear path for the
 // JSON-valued Data field: the "[remove]" sentinel is not itself valid JSON, so
 // ValidateBasic must exempt it from the JSON check — otherwise clearing Data
-// would be impossible (audit follow-up, evidence recorded in
-// review2/audit_remove_field_test.go.txt).
+// would be impossible.
 func TestEditNFTDataRemoveFieldSemantics(t *testing.T) {
 	sender := sdk.AccAddress([]byte("remove-sender-addr")).String()
 

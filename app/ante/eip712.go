@@ -110,7 +110,7 @@ func (svd Eip712SigVerificationDecorator) AnteHandle(
 		return ctx, errorsmod.Wrap(errortypes.ErrInvalidPubKey, "pubkey on account is not set")
 	}
 
-	// Self-contained signer binding (M-2). Do not rely solely on the SDK
+	// Self-contained signer binding. Do not rely solely on the SDK
 	// IsSigverifyTx gate: if that gate is disabled, or the account has a balance
 	// but no pubkey yet, a tx that swaps in an attacker pubkey must still be
 	// rejected here.

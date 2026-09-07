@@ -31,9 +31,9 @@ func InitGenesis(
 		k.SetCW721Map(ctx, pair.Cw721Address, id)
 	}
 
-	// H-02: restore the per-token conversion bindings and IBC refund
-	// receivers that collection-level TokenPairs cannot represent. Integrity
-	// violations (duplicates, orphans) must abort genesis import, not pass
+	// Restore the per-token conversion bindings and IBC refund receivers that
+	// collection-level TokenPairs cannot represent. Integrity violations
+	// (duplicates, orphans) must abort genesis import, not pass
 	// silently.
 	if err := importPerTokenState(ctx, k, data); err != nil {
 		panic(err)
@@ -61,7 +61,7 @@ func importPerTokenState(ctx sdk.Context, k keeper.Keeper, data types.GenesisSta
 
 // ExportGenesis export module status
 func ExportGenesis(ctx sdk.Context, k keeper.Keeper) *types.GenesisState {
-	// H-02: export the per-token runtime state alongside the collection-level
+	// Export the per-token runtime state alongside the collection-level
 	// pairs. A failure here means the live store violates the invariants the
 	// genesis file must preserve; aborting the export beats writing a
 	// genesis that silently loses conversions or refunds.

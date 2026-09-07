@@ -18,7 +18,7 @@ import (
 	storetypes "cosmossdk.io/store/types"
 )
 
-// M-01 regression: the EIP-712 ante handler's extension pre-check must accept
+// The EIP-712 ante handler's extension pre-check must accept
 // the Web3 extension that Keplr attaches (both the current cosmos.evm type URL
 // and the legacy ethermint one) and reject everything else, in lockstep with
 // the "exactly one Web3Tx option" rule enforced by verifyEip712Signature.
@@ -46,7 +46,7 @@ func TestHasWeb3ExtensionOption(t *testing.T) {
 
 // TestExtensionOptionsDecoratorAcceptsKeplrEip712Tx drives the production
 // decorator installed in newCosmosAnteHandlerEip712 with a fully built,
-// validly signed Keplr EIP-712 tx. Under M-01 this exact combination failed
+// validly signed Keplr EIP-712 tx. This exact combination failed
 // with "unknown extension options" before Eip712SigVerificationDecorator could
 // run, even though the signature itself was fine.
 func TestExtensionOptionsDecoratorAcceptsKeplrEip712Tx(t *testing.T) {

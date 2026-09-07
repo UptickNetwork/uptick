@@ -13,10 +13,10 @@ message GenesisState {
   // registered token pairs
   repeated TokenPair token_pairs = 2 [(gogoproto.nullable) = false];
   // per-token conversion bindings between CW721 token UIDs and Cosmos NFT
-  // UIDs. H-02: this runtime state was previously lost on genesis export.
+  // UIDs.
   repeated NFTUIDPair nft_uid_pairs = 3 [(gogoproto.nullable) = false];
   // original CW721 owners recorded at IBC send, used for timeout/error
-  // refunds. H-02: this runtime state was previously lost on genesis export.
+  // refunds.
   repeated RefundReceiver refund_receivers = 4 [(gogoproto.nullable) = false];
 }
 
@@ -47,7 +47,5 @@ message Params {
   // ModuleAddress Ethereum address.
   bool enable_evm_hook = 2 [(gogoproto.customname) = "EnableEVMHook"];
   // code ID of the CW721 wasm contract used for auto-instantiation.
-  // H-02: this field existed in the generated Go code but was missing from
-  // the proto source; it is now declared here so proto and code agree.
   uint64 wasm_code_id = 3;
 }
