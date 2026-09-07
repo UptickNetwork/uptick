@@ -36,3 +36,21 @@ func TestConfigureDefaultStaticPrecompiles(t *testing.T) {
 	ConfigureDefaultStaticPrecompiles()
 	require.Equal(t, defaultActiveStaticPrecompiles, evmtypes.DefaultStaticPrecompiles)
 }
+
+func TestWithDefaultActiveStaticPrecompiles(t *testing.T) {
+	empty := evmtypes.Params{}
+	filled, changed := withDefaultActiveStaticPrecompiles(empty)
+	require.True(t, changed)
+	require.Equal(t, defaultActiveStaticPrecompiles, filled.ActiveStaticPrecompiles)
+
+	existing := []string{evmtypes.BankPrecompileAddress}
+	params := evmtypes.Params{ActiveStaticPrecompiles: existing}
+	unchanged, changed := withDefaultActiveStaticPrecompiles(params)
+	require.False(t, changed)
+	require.Equal(t, existing, unchanged.ActiveStaticPrecompiles)
+}
+
+func TestShouldEnableICAController(t *testing.T) {
+	require.True(t, shouldEnableICAController(false))
+	require.False(t, shouldEnableICAController(true))
+}

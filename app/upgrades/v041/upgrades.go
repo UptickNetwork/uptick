@@ -69,11 +69,13 @@ func upgradeHandlerConstructor(
 // the origin testnet) store controller_enabled=false; fresh chains already
 // default to true and are left untouched. Host params are not modified.
 func migrateICAControllerParams(ctx sdk.Context, box upgrades.Toolbox) {
-	params := box.ICAControllerKeeper.GetParams(ctx)
-	if params.ControllerEnabled {
+	if !shouldEnableICAController(box.ICAControllerKeeper.GetParams(ctx).ControllerEnabled) {
 		return
 	}
-	params.ControllerEnabled = true
 	box.ICAControllerKeeper.SetParams(ctx, icacontrollertypes.NewParams(true))
 	ctx.Logger().Info("ica controller submodule enabled", "upgrade", upgradeName)
+}
+
+func shouldEnableICAController(currentlyEnabled bool) bool {
+	return !currentlyEnabled
 }

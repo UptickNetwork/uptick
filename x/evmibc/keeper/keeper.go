@@ -5,9 +5,10 @@ import (
 
 	"cosmossdk.io/log"
 
-	"github.com/UptickNetwork/uptick/x/erc721/types"
 	ibcnfttransfertypes "github.com/bianjieai/nft-transfer/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+
+	"github.com/UptickNetwork/uptick/x/evmibc/types"
 )
 
 // Keeper of this module maintains collections of erc721.

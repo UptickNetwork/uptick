@@ -252,12 +252,14 @@ func verifyEip712Signature(
 		return err
 	}
 
-	feePayerSig := extOpt.FeePayerSig
+	feePayerSig := make([]byte, len(extOpt.FeePayerSig))
+	copy(feePayerSig, extOpt.FeePayerSig)
 	if len(feePayerSig) != ethcrypto.SignatureLength {
 		return errorsmod.Wrap(errortypes.ErrorInvalidSigner, "signature length doesn't match typical [R||S||V] signature 65 bytes")
 	}
 
 	// Remove the recovery offset if needed (e.g. MetaMask EIP-712 signature).
+	// Copy first so CheckTx cannot mutate the tx's backing signature bytes.
 	if feePayerSig[ethcrypto.RecoveryIDOffset] == 27 || feePayerSig[ethcrypto.RecoveryIDOffset] == 28 {
 		feePayerSig[ethcrypto.RecoveryIDOffset] -= 27
 	}

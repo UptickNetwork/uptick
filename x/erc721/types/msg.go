@@ -153,6 +153,9 @@ func (msg MsgTransferERC721) ValidateBasic() error {
 	if _, err := sdk.AccAddressFromBech32(msg.CosmosSender); err != nil {
 		return sdkerrors.Wrap(err, "invalid sender address")
 	}
+	if _, err := sdk.AccAddressFromBech32(msg.CosmosReceiver); err != nil {
+		return sdkerrors.Wrap(err, "invalid receiver address")
+	}
 	if len(msg.EvmTokenIds) == 0 {
 		return sdkerrors.Wrap(errortypes.ErrInvalidRequest, "evm token ids cannot be empty")
 	}
@@ -165,6 +168,18 @@ func (msg MsgTransferERC721) ValidateBasic() error {
 		if id == "" {
 			return sdkerrors.Wrap(errortypes.ErrInvalidRequest, "cosmos token id cannot be empty")
 		}
+		if err := collectiontypes.ValidateTokenID(id); err != nil {
+			return sdkerrors.Wrapf(err, "invalid cosmos token id '%s'", id)
+		}
+	}
+	if strings.TrimSpace(msg.SourcePort) == "" {
+		return sdkerrors.Wrap(errortypes.ErrInvalidRequest, "source port cannot be empty")
+	}
+	if strings.TrimSpace(msg.SourceChannel) == "" {
+		return sdkerrors.Wrap(errortypes.ErrInvalidRequest, "source channel cannot be empty")
+	}
+	if msg.TimeoutHeight.IsZero() && msg.TimeoutTimestamp == 0 {
+		return sdkerrors.Wrap(errortypes.ErrInvalidRequest, "timeout height and timeout timestamp cannot both be zero")
 	}
 	return nil
 }

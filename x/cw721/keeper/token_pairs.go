@@ -23,8 +23,9 @@ func (k Keeper) GetTokenPairs(ctx sdk.Context) []types.TokenPair {
 	for ; iterator.Valid(); iterator.Next() {
 		var tokenPair types.TokenPair
 		if err := k.cdc.Unmarshal(iterator.Value(), &tokenPair); err != nil {
-			k.Logger(ctx).Error("failed to unmarshal cw721 token pair", "error", err)
-			continue
+			// Fail loud: skipping a corrupt pair would drop it from ExportGenesis
+			// and orphan UID/refund records, which then panics on the next export.
+			panic(sdkerrors.Wrap(err, "failed to unmarshal cw721 token pair"))
 		}
 
 		tokenPairs = append(tokenPairs, tokenPair)

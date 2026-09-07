@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	clienttypes "github.com/cosmos/ibc-go/v10/modules/core/02-client/types"
 )
 
 func TestMsgConvertNFT_ValidateBasic_ERC721(t *testing.T) {
@@ -200,40 +202,104 @@ func TestMsgConvertERC721_GetSigners_ERC721(t *testing.T) {
 
 func TestMsgTransferERC721_ValidateBasic_ERC721(t *testing.T) {
 	validSender := "cosmos1qypqxpq9qcrsszg2pvxq6rs0zqg3yyc5lzv7xu"
+	timeout := clienttypes.NewHeight(1, 100)
 
 	tests := []struct {
 		name         string
 		sender       string
+		receiver     string
 		contractAddr string
 		tokenIDs     []string
+		port         string
+		channel      string
+		timeout      clienttypes.Height
 		wantErr      bool
 	}{
 		{
 			name:         "valid",
 			sender:       validSender,
+			receiver:     validSender,
 			contractAddr: "0x1234567890123456789012345678901234567890",
 			tokenIDs:     []string{"1"},
+			port:         "nft-transfer",
+			channel:      "channel-0",
+			timeout:      timeout,
 			wantErr:      false,
 		},
 		{
 			name:         "invalid sender",
 			sender:       "bad",
+			receiver:     validSender,
 			contractAddr: "0x1234567890123456789012345678901234567890",
 			tokenIDs:     []string{"1"},
+			port:         "nft-transfer",
+			channel:      "channel-0",
+			timeout:      timeout,
 			wantErr:      true,
 		},
 		{
 			name:         "invalid contract",
 			sender:       validSender,
+			receiver:     validSender,
 			contractAddr: "not-hex",
 			tokenIDs:     []string{"1"},
+			port:         "nft-transfer",
+			channel:      "channel-0",
+			timeout:      timeout,
 			wantErr:      true,
 		},
 		{
 			name:         "empty sender",
 			sender:       "",
+			receiver:     validSender,
 			contractAddr: "0x1234567890123456789012345678901234567890",
 			tokenIDs:     []string{"1"},
+			port:         "nft-transfer",
+			channel:      "channel-0",
+			timeout:      timeout,
+			wantErr:      true,
+		},
+		{
+			name:         "empty port",
+			sender:       validSender,
+			receiver:     validSender,
+			contractAddr: "0x1234567890123456789012345678901234567890",
+			tokenIDs:     []string{"1"},
+			port:         "",
+			channel:      "channel-0",
+			timeout:      timeout,
+			wantErr:      true,
+		},
+		{
+			name:         "empty channel",
+			sender:       validSender,
+			receiver:     validSender,
+			contractAddr: "0x1234567890123456789012345678901234567890",
+			tokenIDs:     []string{"1"},
+			port:         "nft-transfer",
+			channel:      "",
+			timeout:      timeout,
+			wantErr:      true,
+		},
+		{
+			name:         "zero timeout",
+			sender:       validSender,
+			receiver:     validSender,
+			contractAddr: "0x1234567890123456789012345678901234567890",
+			tokenIDs:     []string{"1"},
+			port:         "nft-transfer",
+			channel:      "channel-0",
+			wantErr:      true,
+		},
+		{
+			name:         "invalid receiver",
+			sender:       validSender,
+			receiver:     "bad",
+			contractAddr: "0x1234567890123456789012345678901234567890",
+			tokenIDs:     []string{"1"},
+			port:         "nft-transfer",
+			channel:      "channel-0",
+			timeout:      timeout,
 			wantErr:      true,
 		},
 	}
@@ -242,8 +308,12 @@ func TestMsgTransferERC721_ValidateBasic_ERC721(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			msg := MsgTransferERC721{
 				CosmosSender:       tc.sender,
+				CosmosReceiver:     tc.receiver,
 				EvmContractAddress: tc.contractAddr,
 				EvmTokenIds:        tc.tokenIDs,
+				SourcePort:         tc.port,
+				SourceChannel:      tc.channel,
+				TimeoutHeight:      tc.timeout,
 			}
 			err := msg.ValidateBasic()
 			if tc.wantErr {

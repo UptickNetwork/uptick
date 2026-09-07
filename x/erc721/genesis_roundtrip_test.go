@@ -177,3 +177,46 @@ func TestRefundKeySplitMatchesRegisteredContract(t *testing.T) {
 	require.True(t, strings.EqualFold(rtContract, receivers[0].EvmContractAddress))
 	require.Equal(t, "42", receivers[0].TokenId)
 }
+
+func TestRefundKeySplitMatchesChecksumPair(t *testing.T) {
+	k, ctx := newRoundTripKeeper(t)
+
+	checksum := "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+	pair := types.TokenPair{Erc721Address: checksum, ClassId: "kitty"}
+	k.SetTokenPair(ctx, pair)
+	k.SetEvmAddressByContractTokenId(ctx, strings.ToLower(checksum), "42", rtOwner)
+
+	receivers, err := k.ExportRefundReceivers(ctx)
+	require.NoError(t, err)
+	require.Len(t, receivers, 1)
+	require.Equal(t, "42", receivers[0].TokenId)
+}
+
+func TestDeletePairPerTokenStateClearsOrphans(t *testing.T) {
+	k, ctx := newRoundTripKeeper(t)
+	tokenUID, nftUID := seedPairAndRuntimeState(t, k, ctx)
+	pair := types.NewTokenPair(common.HexToAddress(rtContract), "kitty")
+
+	k.DeletePairPerTokenState(ctx, pair)
+
+	require.Empty(t, k.GetNFTUIDPairByTokenUID(ctx, tokenUID))
+	require.Empty(t, k.GetTokenUIDPairByNFTUID(ctx, nftUID))
+	require.Empty(t, k.GetEvmAddressByContractTokenId(ctx, rtContract, "42"))
+
+	exported := ExportGenesis(ctx, k)
+	require.Empty(t, exported.NftUidPairs)
+	require.Empty(t, exported.RefundReceivers)
+}
+
+func TestGetTokenPairsPanicsOnCorruptValue(t *testing.T) {
+	key := storetypes.NewKVStoreKey(types.StoreKey)
+	tkey := storetypes.NewTransientStoreKey(types.StoreKey + "-t")
+	cdc := codec.NewProtoCodec(codectypes.NewInterfaceRegistry())
+	k := keeper.NewKeeper(key, cdc, nil, nftkeeper.Keeper{}, nil, ibcnfttransferkeeper.Keeper{})
+	ctx := testutil.DefaultContext(key, tkey)
+
+	store := ctx.KVStore(key)
+	store.Set(append(append([]byte{}, types.KeyPrefixTokenPair...), []byte("x")...), []byte("not-a-proto"))
+
+	require.Panics(t, func() { _ = k.GetTokenPairs(ctx) })
+}

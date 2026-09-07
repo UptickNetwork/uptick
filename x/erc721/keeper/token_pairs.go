@@ -23,8 +23,9 @@ func (k Keeper) GetTokenPairs(ctx sdk.Context) []types.TokenPair {
 	for ; iterator.Valid(); iterator.Next() {
 		var tokenPair types.TokenPair
 		if err := k.cdc.Unmarshal(iterator.Value(), &tokenPair); err != nil {
-			k.Logger(ctx).Error("failed to unmarshal token pair", "error", err)
-			continue
+			// Fail loud: skipping a corrupt pair would drop it from ExportGenesis
+			// and orphan UID/refund records, which then panics on the next export.
+			panic(sdkerrors.Wrap(err, "failed to unmarshal erc721 token pair"))
 		}
 
 		tokenPairs = append(tokenPairs, tokenPair)
@@ -259,22 +260,19 @@ func (k Keeper) DeleteNFTUIDPairByNFTUID(ctx sdk.Context, nftUID string) {
 
 // SetEvmAddressByContractTokenId
 func (k Keeper) SetEvmAddressByContractTokenId(ctx sdk.Context, evmContractAddress string, evmTokenId string, evmAddress string) {
-
-	contractAndTokenId := evmContractAddress + evmTokenId
+	contractAndTokenId := strings.ToLower(evmContractAddress) + evmTokenId
 	store := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixEvmAddressByContractTokenId)
 	store.Set([]byte(contractAndTokenId), []byte(evmAddress))
 }
 
 func (k Keeper) GetEvmAddressByContractTokenId(ctx sdk.Context, evmContractAddress string, evmTokenId string) []byte {
-
-	contractAndTokenId := evmContractAddress + evmTokenId
+	contractAndTokenId := strings.ToLower(evmContractAddress) + evmTokenId
 	store := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixEvmAddressByContractTokenId)
 	return store.Get([]byte(contractAndTokenId))
 }
 
 func (k Keeper) DeleteEvmAddressByContractTokenId(ctx sdk.Context, evmContractAddress string, evmTokenId string) {
-
-	contractAndTokenId := evmContractAddress + evmTokenId
+	contractAndTokenId := strings.ToLower(evmContractAddress) + evmTokenId
 	store := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixEvmAddressByContractTokenId)
 	store.Delete([]byte(contractAndTokenId))
 }

@@ -45,15 +45,23 @@ func ConfigureDefaultStaticPrecompiles() {
 // never loads the contract and precompile calls fail.
 func migrateActiveStaticPrecompiles(ctx sdk.Context, box upgrades.Toolbox) error {
 	params := box.EvmKeeper.GetParams(ctx)
-	if len(params.ActiveStaticPrecompiles) != 0 {
-		// Preserve any existing governance / on-chain decision. Overwriting an
-		// already-populated list would silently revert an administrator's choice
-		// (e.g. removing the distribution precompile to mitigate a vulnerability).
+	updated, changed := withDefaultActiveStaticPrecompiles(params)
+	if !changed {
 		return nil
 	}
-	params.ActiveStaticPrecompiles = defaultActiveStaticPrecompiles
-	if err := box.EvmKeeper.SetParams(ctx, params); err != nil {
+	if err := box.EvmKeeper.SetParams(ctx, updated); err != nil {
 		return fmt.Errorf("set evm params: %w", err)
 	}
 	return nil
+}
+
+// withDefaultActiveStaticPrecompiles returns params with the default precompile
+// list filled in when the stored list is empty. An already-populated list is
+// preserved so governance removals are not silently reverted.
+func withDefaultActiveStaticPrecompiles(params evmtypes.Params) (evmtypes.Params, bool) {
+	if len(params.ActiveStaticPrecompiles) != 0 {
+		return params, false
+	}
+	params.ActiveStaticPrecompiles = append([]string(nil), defaultActiveStaticPrecompiles...)
+	return params, true
 }

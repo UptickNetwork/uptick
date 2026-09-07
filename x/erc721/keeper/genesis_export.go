@@ -103,23 +103,39 @@ func (k Keeper) ExportRefundReceivers(ctx sdk.Context) ([]types.RefundReceiver, 
 // store key. The longest registered-contract prefix with a non-empty
 // remainder wins; zero or ambiguous matches are rejected.
 func splitContractTokenKey(contracts []string, key string) (string, string, error) {
-	best := ""
+	match := func(haystack string, candidates []string) string {
+		best := ""
+		for _, c := range candidates {
+			if len(c) == 0 || len(c) <= len(best) {
+				continue
+			}
+			if strings.HasPrefix(haystack, c) && len(haystack) > len(c) {
+				best = c
+			}
+		}
+		return best
+	}
+
+	if best := match(key, contracts); best != "" {
+		return best, key[len(best):], nil
+	}
+
+	// Case-insensitive retry: refund keys are stored lowercased, but a
+	// historical TokenPair.Erc721Address may still be checksum-cased.
+	lowerKey := strings.ToLower(key)
+	lowerContracts := make([]string, 0, len(contracts))
 	for _, c := range contracts {
-		if len(c) == 0 || len(c) <= len(best) {
-			continue
-		}
-		if strings.HasPrefix(key, c) && len(key) > len(c) {
-			best = c
-		}
+		lowerContracts = append(lowerContracts, strings.ToLower(c))
 	}
-	if best == "" {
-		return "", "", errors.Wrapf(
-			types.ErrInternalTokenPair,
-			"refund record key %q does not belong to any registered ERC721 contract (orphaned refund state)",
-			key,
-		)
+	if best := match(lowerKey, lowerContracts); best != "" {
+		return best, key[len(best):], nil
 	}
-	return best, key[len(best):], nil
+
+	return "", "", errors.Wrapf(
+		types.ErrInternalTokenPair,
+		"refund record key %q does not belong to any registered ERC721 contract (orphaned refund state)",
+		key,
+	)
 }
 
 // SetGenesisNFTUIDPair restores one bidirectional conversion binding during
@@ -130,53 +146,69 @@ func (k Keeper) SetGenesisNFTUIDPair(ctx sdk.Context, pair types.NFTUIDPair) {
 }
 
 // SetGenesisRefundReceiver restores one IBC refund receiver during
-// InitGenesis under the exact store key it was exported from.
+// InitGenesis. The contract address is lowercased to match runtime refund keys.
 func (k Keeper) SetGenesisRefundReceiver(ctx sdk.Context, receiver types.RefundReceiver) {
 	k.SetEvmAddressByContractTokenId(ctx, receiver.EvmContractAddress, receiver.TokenId, receiver.EvmAddress)
 }
 
-// ValidateGenesisPairs performs the import-side integrity checks that the
-// audit required: non-empty UIDs and one-to-one uniqueness across the whole
-// batch. It also returns the set of refund contracts for cross-checking
-// against the registered token pairs.
-func ValidateGenesisPairs(pairs []types.NFTUIDPair, receivers []types.RefundReceiver, tokenPairs []types.TokenPair) error {
-	seenToken := make(map[string]struct{}, len(pairs))
-	seenNFT := make(map[string]struct{}, len(pairs))
-	for _, pair := range pairs {
-		if pair.TokenUid == "" || pair.NftUid == "" {
-			return errors.Wrapf(types.ErrInternalTokenPair, "empty NFT UID pair entry (token %q, nft %q)", pair.TokenUid, pair.NftUid)
+// DeletePairPerTokenState removes the bidirectional NFT UID index entries and
+// IBC refund receivers that belong to pair, so a self-destructed (or otherwise
+// deleted) TokenPair cannot leave orphans that make ExportGenesis panic.
+func (k Keeper) DeletePairPerTokenState(ctx sdk.Context, pair types.TokenPair) {
+	tokenStore := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixNFTUIDPairByTokenUID)
+	nftStore := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixNFTUIDPairByNFTUID)
+
+	var tokenUIDs []string
+	iter := tokenStore.Iterator(nil, nil)
+	for ; iter.Valid(); iter.Next() {
+		tokenUID := string(iter.Key())
+		_, contract := types.GetNFTFromUID(tokenUID)
+		if strings.EqualFold(contract, pair.Erc721Address) {
+			tokenUIDs = append(tokenUIDs, tokenUID)
 		}
-		if _, dup := seenToken[pair.TokenUid]; dup {
-			return errors.Wrapf(types.ErrInternalTokenPair, "duplicate token UID %q in genesis NFT UID pairs", pair.TokenUid)
+	}
+	iter.Close()
+
+	for _, tokenUID := range tokenUIDs {
+		nftUID := string(tokenStore.Get([]byte(tokenUID)))
+		tokenStore.Delete([]byte(tokenUID))
+		if nftUID != "" {
+			nftStore.Delete([]byte(nftUID))
 		}
-		if _, dup := seenNFT[pair.NftUid]; dup {
-			return errors.Wrapf(types.ErrInternalTokenPair, "duplicate NFT UID %q in genesis NFT UID pairs", pair.NftUid)
-		}
-		seenToken[pair.TokenUid] = struct{}{}
-		seenNFT[pair.NftUid] = struct{}{}
 	}
 
-	registered := make(map[string]struct{}, len(tokenPairs))
-	for _, tp := range tokenPairs {
-		// Refund keys store the lowercased contract address, so membership is
-		// checked case-insensitively (EVM hex addresses only differ by case).
-		registered[strings.ToLower(tp.Erc721Address)] = struct{}{}
+	var nftUIDs []string
+	reverse := nftStore.Iterator(nil, nil)
+	for ; reverse.Valid(); reverse.Next() {
+		nftUID := string(reverse.Key())
+		_, classID := types.GetNFTFromUID(nftUID)
+		if classID == pair.ClassId {
+			nftUIDs = append(nftUIDs, nftUID)
+		}
+	}
+	reverse.Close()
+
+	for _, nftUID := range nftUIDs {
+		tokenUID := string(nftStore.Get([]byte(nftUID)))
+		nftStore.Delete([]byte(nftUID))
+		if tokenUID != "" {
+			tokenStore.Delete([]byte(tokenUID))
+		}
 	}
 
-	seenRefund := make(map[string]struct{}, len(receivers))
-	for _, r := range receivers {
-		if r.EvmContractAddress == "" || r.TokenId == "" || r.EvmAddress == "" {
-			return errors.Wrapf(types.ErrInternalTokenPair, "incomplete refund receiver entry (contract %q, token %q, address %q)", r.EvmContractAddress, r.TokenId, r.EvmAddress)
+	contract := strings.ToLower(pair.Erc721Address)
+	refundStore := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixEvmAddressByContractTokenId)
+	refundIter := refundStore.Iterator(nil, nil)
+	var refundKeys [][]byte
+	for ; refundIter.Valid(); refundIter.Next() {
+		if strings.HasPrefix(strings.ToLower(string(refundIter.Key())), contract) {
+			keyCopy := make([]byte, len(refundIter.Key()))
+			copy(keyCopy, refundIter.Key())
+			refundKeys = append(refundKeys, keyCopy)
 		}
-		if _, ok := registered[strings.ToLower(r.EvmContractAddress)]; !ok {
-			return errors.Wrapf(types.ErrInternalTokenPair, "refund receiver references unregistered ERC721 contract %q", r.EvmContractAddress)
-		}
-		dedupe := strings.ToLower(r.EvmContractAddress) + r.TokenId
-		if _, dup := seenRefund[dedupe]; dup {
-			return errors.Wrapf(types.ErrInternalTokenPair, "duplicate refund receiver for contract %q token %q", r.EvmContractAddress, r.TokenId)
-		}
-		seenRefund[dedupe] = struct{}{}
 	}
-
-	return nil
+	refundIter.Close()
+	for _, key := range refundKeys {
+		refundStore.Delete(key)
+	}
 }

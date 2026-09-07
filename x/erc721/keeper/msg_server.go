@@ -140,6 +140,7 @@ func (k Keeper) ConvertERC721(
 	erc721 := common.HexToAddress(pair.Erc721Address)
 	acc := k.evmKeeper.GetAccountWithoutBalance(ctx, erc721)
 	if acc == nil || len(acc.CodeHash) == 0 {
+		k.DeletePairPerTokenState(ctx, pair)
 		k.DeleteTokenPair(ctx, pair)
 		k.DeleteERC721Map(ctx, erc721)
 		k.DeleteClassMap(ctx, pair.ClassId)
@@ -228,6 +229,7 @@ func (k Keeper) ConvertNFT(
 	acc := k.evmKeeper.GetAccountWithoutBalance(ctx, erc721)
 
 	if acc == nil || len(acc.CodeHash) == 0 {
+		k.DeletePairPerTokenState(ctx, pair)
 		k.DeleteTokenPair(ctx, pair)
 		k.DeleteERC721Map(ctx, erc721)
 		k.DeleteClassMap(ctx, pair.ClassId)

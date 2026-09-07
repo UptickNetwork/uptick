@@ -71,8 +71,8 @@ func (k Keeper) ExportNFTUIDPairs(ctx sdk.Context) ([]types.NFTUIDPair, error) {
 // store keys are "<contractAddress><tokenID>" concatenations; the contract
 // part is recovered by matching against the registered pair contracts, which
 // is lossless for any address format (the CW721 contract address format is
-// not a fixed-width hex address) and fails loudly on orphaned records
-// instead of silently dropping refund state.
+// not a fixed-width hex address). Matching is exact: bech32 case is
+// significant. Orphaned records fail the export instead of being dropped.
 func (k Keeper) ExportRefundReceivers(ctx sdk.Context) ([]types.RefundReceiver, error) {
 	contracts := make([]string, 0)
 	for _, pair := range k.GetTokenPairs(ctx) {
@@ -102,45 +102,26 @@ func (k Keeper) ExportRefundReceivers(ctx sdk.Context) ([]types.RefundReceiver, 
 
 // splitContractTokenKey recovers the (contract, tokenID) parts of a refund
 // store key. The longest registered-contract prefix with a non-empty
-// remainder wins; zero or ambiguous matches are rejected. When no exact
-// prefix matches, a case-insensitive retry covers hex addresses stored with
-// differing case (bech32 addresses are matched exactly first, since case is
-// significant for them).
+// remainder wins; zero or ambiguous matches are rejected. Matching is exact:
+// CW721 contracts are bech32, so case is significant.
 func splitContractTokenKey(contracts []string, key string) (string, string, error) {
-	match := func(haystack string, candidates []string) string {
-		best := ""
-		for _, c := range candidates {
-			if len(c) == 0 || len(c) <= len(best) {
-				continue
-			}
-			if strings.HasPrefix(haystack, c) && len(haystack) > len(c) {
-				best = c
-			}
-		}
-		return best
-	}
-
-	if best := match(key, contracts); best != "" {
-		return best, key[len(best):], nil
-	}
-
-	// Case-insensitive retry for hex addresses whose case drifted between the
-	// refund key and the registered pair. bech32 addresses are matched exactly
-	// first, since case is significant for them.
-	lowerKey := strings.ToLower(key)
-	lowerContracts := make([]string, 0, len(contracts))
+	best := ""
 	for _, c := range contracts {
-		lowerContracts = append(lowerContracts, strings.ToLower(c))
+		if len(c) == 0 || len(c) <= len(best) {
+			continue
+		}
+		if strings.HasPrefix(key, c) && len(key) > len(c) {
+			best = c
+		}
 	}
-	if best := match(lowerKey, lowerContracts); best != "" {
-		return best, key[len(best):], nil
+	if best == "" {
+		return "", "", errors.Wrapf(
+			types.ErrInternalTokenPair,
+			"refund record key %q does not belong to any registered CW721 contract (orphaned refund state)",
+			key,
+		)
 	}
-
-	return "", "", errors.Wrapf(
-		types.ErrInternalTokenPair,
-		"refund record key %q does not belong to any registered CW721 contract (orphaned refund state)",
-		key,
-	)
+	return best, key[len(best):], nil
 }
 
 // SetGenesisNFTUIDPair restores one bidirectional conversion binding during
@@ -154,61 +135,4 @@ func (k Keeper) SetGenesisNFTUIDPair(ctx sdk.Context, pair types.NFTUIDPair) {
 // InitGenesis under the exact store key it was exported from.
 func (k Keeper) SetGenesisRefundReceiver(ctx sdk.Context, receiver types.RefundReceiver) {
 	k.SetCwAddressByContractTokenId(ctx, receiver.ContractAddress, receiver.TokenId, receiver.Owner)
-}
-
-// ValidateGenesisPairs performs the import-side integrity checks that the
-// audit required: non-empty UIDs, one-to-one uniqueness across the batch, and
-// refund receivers that reference registered token pairs.
-func ValidateGenesisPairs(pairs []types.NFTUIDPair, receivers []types.RefundReceiver, tokenPairs []types.TokenPair) error {
-	seenToken := make(map[string]struct{}, len(pairs))
-	seenNFT := make(map[string]struct{}, len(pairs))
-	for _, pair := range pairs {
-		if pair.TokenUid == "" || pair.NftUid == "" {
-			return errors.Wrapf(types.ErrInternalTokenPair, "empty NFT UID pair entry (token %q, nft %q)", pair.TokenUid, pair.NftUid)
-		}
-		if _, dup := seenToken[pair.TokenUid]; dup {
-			return errors.Wrapf(types.ErrInternalTokenPair, "duplicate token UID %q in genesis NFT UID pairs", pair.TokenUid)
-		}
-		if _, dup := seenNFT[pair.NftUid]; dup {
-			return errors.Wrapf(types.ErrInternalTokenPair, "duplicate NFT UID %q in genesis NFT UID pairs", pair.NftUid)
-		}
-		seenToken[pair.TokenUid] = struct{}{}
-		seenNFT[pair.NftUid] = struct{}{}
-	}
-
-	registered := make(map[string]struct{}, len(tokenPairs))
-	for _, tp := range tokenPairs {
-		registered[tp.Cw721Address] = struct{}{}
-	}
-
-	seenRefund := make(map[string]struct{}, len(receivers))
-	for _, r := range receivers {
-		if r.ContractAddress == "" || r.TokenId == "" || r.Owner == "" {
-			return errors.Wrapf(types.ErrInternalTokenPair, "incomplete refund receiver entry (contract %q, token %q, owner %q)", r.ContractAddress, r.TokenId, r.Owner)
-		}
-		if _, ok := registered[r.ContractAddress]; !ok {
-			// Case-insensitive retry for hex addresses whose case drifted.
-			found := false
-			for c := range registered {
-				if strings.EqualFold(c, r.ContractAddress) {
-					found = true
-					break
-				}
-			}
-			if !found {
-				return errors.Wrapf(types.ErrInternalTokenPair, "refund receiver references unregistered CW721 contract %q", r.ContractAddress)
-			}
-		}
-		// Deduplicate on the exact (contract, tokenID) tuple: the store key
-		// preserves the case of the contract address, so entries whose
-		// contracts differ only by case are distinct store entries, not
-		// duplicates.
-		dedupe := r.ContractAddress + "," + r.TokenId
-		if _, dup := seenRefund[dedupe]; dup {
-			return errors.Wrapf(types.ErrInternalTokenPair, "duplicate refund receiver for contract %q token %q", r.ContractAddress, r.TokenId)
-		}
-		seenRefund[dedupe] = struct{}{}
-	}
-
-	return nil
 }

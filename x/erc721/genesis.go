@@ -45,7 +45,7 @@ func InitGenesis(
 // function so the integrity checks are unit-testable without constructing a
 // full auth AccountKeeper.
 func importPerTokenState(ctx sdk.Context, k keeper.Keeper, data types.GenesisState) error {
-	if err := keeper.ValidateGenesisPairs(data.NftUidPairs, data.RefundReceivers, data.TokenPairs); err != nil {
+	if err := types.ValidateGenesisPairs(data.NftUidPairs, data.RefundReceivers, data.TokenPairs); err != nil {
 		return err
 	}
 

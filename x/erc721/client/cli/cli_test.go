@@ -132,7 +132,7 @@ func TestTransferERC721Cmd_GenerateOnly(t *testing.T) {
 	out, err := clitestutil.ExecTestCLICmd(clientCtx, NewTransferERC721Cmd(), generateOnlyArgs("alice",
 		"0x1111111111111111111111111111111111111111", "1",
 		"nonfungibletokentransfer", "channel-0",
-		"uptick1dest", "class-1", "nft-1",
+		addr.String(), "class-1", "nft-1",
 		fmt.Sprintf("--%s=true", flagAbsoluteTimeouts),
 		fmt.Sprintf("--%s=1-100", flagPacketTimeoutHeight),
 		fmt.Sprintf("--%s=1", flagPacketTimeoutTimestamp),
@@ -143,7 +143,7 @@ func TestTransferERC721Cmd_GenerateOnly(t *testing.T) {
 	msg := firstMsg[*types.MsgTransferERC721](t, clientCtx, out.Bytes())
 	require.Equal(t, "nonfungibletokentransfer", msg.SourcePort)
 	require.Equal(t, "channel-0", msg.SourceChannel)
-	require.Equal(t, "uptick1dest", msg.CosmosReceiver)
+	require.Equal(t, addr.String(), msg.CosmosReceiver)
 	require.Equal(t, addr.String(), msg.CosmosSender)
 	require.Equal(t, `{"convert_to":"erc721"}`, msg.Memo)
 	require.Equal(t, uint64(1), msg.TimeoutHeight.RevisionNumber)

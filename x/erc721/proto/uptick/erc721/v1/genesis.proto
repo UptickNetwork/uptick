@@ -7,11 +7,37 @@ import "uptick/erc721/v1/erc721.proto";
 option go_package = "github.com/UptickNetwork/evm-nft-convert/types";
 
 // GenesisState defines the module's genesis state.
+// Keep this file in sync with proto/uptick/erc721/v1/genesis.proto — that
+// path is the source of truth used by `make proto-gen`.
 message GenesisState {
   // module parameters
   Params params = 1 [(gogoproto.nullable) = false];
   // registered token pairs
   repeated TokenPair token_pairs = 2 [(gogoproto.nullable) = false];
+  // per-token conversion bindings between EVM token UIDs and Cosmos NFT UIDs.
+  // H-02: this runtime state was previously lost on genesis export.
+  repeated NFTUIDPair nft_uid_pairs = 3 [(gogoproto.nullable) = false];
+  // original ERC721 owners recorded at IBC send, used for timeout/error
+  // refunds. H-02: this runtime state was previously lost on genesis export.
+  repeated RefundReceiver refund_receivers = 4 [(gogoproto.nullable) = false];
+}
+
+// NFTUIDPair binds an EVM token UID ("<tokenID>,<contractAddress>") to a
+// Cosmos NFT UID ("<nftID>,<classID>"). Import rebuilds both directions of
+// the runtime bidirectional index from this single entry.
+message NFTUIDPair {
+  string token_uid = 1;
+  string nft_uid = 2;
+}
+
+// RefundReceiver records the original ERC721 owner of a converted token so an
+// IBC timeout/error refund can return the token to the right address.
+message RefundReceiver {
+  // lowercased ERC721 contract address (0x + 40 hex)
+  string evm_contract_address = 1;
+  string token_id = 2;
+  // EVM address of the original owner (0x + 40 hex)
+  string evm_address = 3;
 }
 
 // Params defines the erc721 module params

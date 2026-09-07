@@ -98,6 +98,7 @@ import (
 	evmtypes "github.com/cosmos/evm/x/vm/types"
 	ibctransfertypes "github.com/cosmos/ibc-go/v10/modules/apps/transfer/types"
 	ibc "github.com/cosmos/ibc-go/v10/modules/core"
+	ibcclienttypes "github.com/cosmos/ibc-go/v10/modules/core/02-client/types"
 	ibckeeper "github.com/cosmos/ibc-go/v10/modules/core/keeper"
 	ibcsolomachine "github.com/cosmos/ibc-go/v10/modules/light-clients/06-solomachine"
 	ibctm "github.com/cosmos/ibc-go/v10/modules/light-clients/07-tendermint"
@@ -617,6 +618,10 @@ func NewUptick(
 			sdk.MsgTypeURL(&govv1.MsgVote{}),
 			sdk.MsgTypeURL(&govv1.MsgVoteWeighted{}),
 			sdk.MsgTypeURL(&govv1.MsgDeposit{}),
+			sdk.MsgTypeURL(&upgradetypes.MsgSoftwareUpgrade{}),
+			sdk.MsgTypeURL(&upgradetypes.MsgCancelUpgrade{}),
+			sdk.MsgTypeURL(&ibcclienttypes.MsgUpdateClient{}),
+			sdk.MsgTypeURL(&ibcclienttypes.MsgUpgradeClient{}),
 		},
 	}
 
