@@ -177,6 +177,52 @@ func TestRefundPacketToken_Success(t *testing.T) {
 	require.Empty(t, k.GetTokenUIDPairByNFTUID(ctx, types.CreateNFTUID("kitty", "nft1")))
 }
 
+func TestConvertNFT_ClassIdEqualToContractDoesNotHijack(t *testing.T) {
+	k, ctx, owner, contract, wasm := setupConvertKeeper(t)
+
+	require.NoError(t, k.nftKeeper.SaveDenom(ctx, contract, "Collide", "", "COL", owner, false, false, "", "", "", ""))
+	require.NoError(t, k.nftKeeper.SaveNFT(ctx, contract, "nftx", "X", "", "", "", owner))
+
+	_, err := k.ConvertNFT(ctx, &types.MsgConvertNFT{
+		ClassId:         contract,
+		NftIds:          []string{"nftx"},
+		ContractAddress: contract,
+		TokenIds:        []string{"99"},
+		Sender:          owner.String(),
+		Receiver:        owner.String(),
+	})
+	require.ErrorIs(t, err, types.ErrContractAddressNotCorrect)
+
+	pair, err := k.GetPairByCW721(ctx, contract)
+	require.NoError(t, err)
+	require.Equal(t, "kitty", pair.ClassId)
+	require.Empty(t, wasm.ownerOf(contract, "99"))
+}
+
+func TestGetPairByClass_IgnoresContractMap(t *testing.T) {
+	k, ctx, _, contract, _ := setupConvertKeeper(t)
+
+	_, err := k.GetPairByClass(ctx, contract)
+	require.ErrorIs(t, err, types.ErrTokenPairNotFound)
+
+	pair, err := k.GetPairByCW721(ctx, contract)
+	require.NoError(t, err)
+	require.Equal(t, "kitty", pair.ClassId)
+}
+
+func TestRegisterNFT_RejectsAlreadyRegisteredContract(t *testing.T) {
+	k, ctx, owner, contract, _ := setupConvertKeeper(t)
+
+	_, err := k.RegisterNFT(ctx, &types.MsgConvertNFT{
+		ClassId:         "otherclass",
+		ContractAddress: contract,
+		NftIds:          []string{"nft1"},
+		Sender:          owner.String(),
+		Receiver:        owner.String(),
+	})
+	require.ErrorIs(t, err, types.ErrTokenPairAlreadyExists)
+}
+
 func bytes20(fill byte) []byte {
 	b := make([]byte, 20)
 	for i := range b {

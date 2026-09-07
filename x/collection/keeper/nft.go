@@ -144,7 +144,7 @@ func (k Keeper) TransferOwnership(ctx sdk.Context, denomID,
 	}
 
 	if denom.UpdateRestricted && (tokenChanged || tokenMetadataChanged) {
-		return sdkerrors.Wrapf(errortypes.ErrUnauthorized, "It is restricted to update NFT under this denom %s", denom.Id)
+		return sdkerrors.Wrapf(errortypes.ErrUnauthorized, "it is restricted to update NFT under this denom %s", denom.Id)
 	}
 
 	if !tokenChanged && !tokenMetadataChanged {

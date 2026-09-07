@@ -8,7 +8,6 @@ import (
 	sdkerrors "cosmossdk.io/errors"
 	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/UptickNetwork/uptick/x/cw721/types"
 )
@@ -319,37 +318,4 @@ func (k Keeper) QueryWasmState(
 	req *wasmtypes.QuerySmartContractStateRequest) (*wasmtypes.QuerySmartContractStateResponse, error) {
 	return k.wasmKeeper.SmartContractState(ctx, req)
 
-}
-
-// ---------------------------------------------------------------------------------------------------------------------
-
-// QueryClassEnhance returns the data of a deployed CW721 contract
-// TODO
-func (k Keeper) QueryClassEnhance(
-	ctx sdk.Context,
-	contract common.Address,
-) (types.ClassEnhance, error) {
-
-	return types.ClassEnhance{}, nil
-}
-
-// QueryNFTEnhance returns the data of a deployed CW721 contract
-// TODO
-func (k Keeper) QueryNFTEnhance(
-	ctx sdk.Context,
-	contract common.Address,
-	tokenID string,
-) (types.NFTEnhance, error) {
-
-	return types.NFTEnhance{}, nil
-}
-
-// QueryCW721Token returns the data of a CW721 token
-// TODO
-func (k Keeper) QueryCW721Token(
-	ctx sdk.Context,
-	contract common.Address,
-) (types.CW721TokenData, error) {
-
-	return types.CW721TokenData{}, nil
 }

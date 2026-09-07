@@ -19,6 +19,11 @@ func (k Keeper) RegisterNFT(ctx sdk.Context, msg *types.MsgConvertNFT) (*types.T
 			types.ErrTokenPairAlreadyExists, "class ID already registered: %s", msg.ClassId,
 		)
 	}
+	if k.IsCW721Registered(ctx, msg.ContractAddress) {
+		return nil, sdkerrors.Wrapf(
+			types.ErrTokenPairAlreadyExists, "token CW721 contract already registered: %s", msg.ContractAddress,
+		)
+	}
 
 	// Validate the CW721 contract address. CW721 contracts are CosmWasm
 	// contracts, so the address must be a valid bech32 account address (not a
@@ -37,7 +42,9 @@ func (k Keeper) RegisterNFT(ctx sdk.Context, msg *types.MsgConvertNFT) (*types.T
 
 	pair := types.NewTokenPair(msg.ContractAddress, msg.ClassId)
 	k.Logger(ctx).Info("RegisterNFT ", "ClassId", pair.ClassId, "Cw721Address", pair.Cw721Address)
-	k.SetTokenPair(ctx, pair)
+	if err := k.SetTokenPair(ctx, pair); err != nil {
+		return nil, err
+	}
 	k.SetClassMap(ctx, pair.ClassId, pair.GetID())
 	k.SetCW721Map(ctx, pair.Cw721Address, pair.GetID())
 
@@ -72,7 +79,9 @@ func (k Keeper) RegisterCW721(ctx sdk.Context, msg *types.MsgConvertCW721) (*typ
 	}
 
 	pair := types.NewTokenPair(msg.ContractAddress, msg.ClassId)
-	k.SetTokenPair(ctx, pair)
+	if err := k.SetTokenPair(ctx, pair); err != nil {
+		return nil, err
+	}
 	k.SetClassMap(ctx, pair.ClassId, pair.GetID())
 	k.SetCW721Map(ctx, pair.Cw721Address, pair.GetID())
 
@@ -126,6 +135,8 @@ func (k Keeper) ToggleConversion(ctx sdk.Context, token string) (types.TokenPair
 		)
 	}
 
-	k.SetTokenPair(ctx, pair)
+	if err := k.SetTokenPair(ctx, pair); err != nil {
+		return types.TokenPair{}, err
+	}
 	return pair, nil
 }

@@ -21,7 +21,9 @@ func (k Keeper) RegisterNFT(ctx sdk.Context, msg *types.MsgConvertNFT) (*types.T
 	}
 
 	pair := types.NewTokenPair(common.HexToAddress(msg.EvmContractAddress), msg.ClassId)
-	k.SetTokenPair(ctx, pair)
+	if err := k.SetTokenPair(ctx, pair); err != nil {
+		return nil, err
+	}
 	k.SetClassMap(ctx, pair.ClassId, pair.GetID())
 	k.SetERC721Map(ctx, common.HexToAddress(pair.Erc721Address), pair.GetID())
 
@@ -58,7 +60,9 @@ func (k Keeper) RegisterERC721(ctx sdk.Context, msg *types.MsgConvertERC721) (*t
 	}
 
 	pair := types.NewTokenPair(contract, msg.ClassId)
-	k.SetTokenPair(ctx, pair)
+	if err := k.SetTokenPair(ctx, pair); err != nil {
+		return nil, err
+	}
 	k.SetClassMap(ctx, pair.ClassId, pair.GetID())
 	k.SetERC721Map(ctx, common.HexToAddress(pair.Erc721Address), pair.GetID())
 
@@ -121,6 +125,8 @@ func (k Keeper) ToggleConversion(ctx sdk.Context, token string) (types.TokenPair
 		)
 	}
 
-	k.SetTokenPair(ctx, pair)
+	if err := k.SetTokenPair(ctx, pair); err != nil {
+		return types.TokenPair{}, err
+	}
 	return pair, nil
 }

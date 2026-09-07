@@ -81,6 +81,56 @@ func TestValidateIssueDenomID_ReservedPrefix(t *testing.T) {
 	require.Error(t, ValidateIssueDenomID("ibc-token"))
 	require.Error(t, ValidateIssueDenomID("a,b"))
 	require.Error(t, ValidateIssueDenomID("A-!"))
+	require.Error(t, ValidateIssueDenomID("ibc/ABCDEF0123"))
+	sdk.GetConfig().SetBech32PrefixForAccount("uptick", "uptickpub")
+	bech32 := sdk.AccAddress([]byte("cw721contractaddrxx")).String()
+	require.Error(t, ValidateIssueDenomID(bech32))
+}
+
+func TestValidateDenomID_AllowsICS721Voucher(t *testing.T) {
+	require.NoError(t, ValidateDenomID("ibc/ABCDEF0123456789"))
+	require.Error(t, ValidateDenomID("ibc/"))
+	require.Error(t, ValidateDenomID("ibc-token"))
+}
+
+func TestValidateTokenIDForDenom_IBCAllowsShortID(t *testing.T) {
+	require.NoError(t, ValidateTokenIDForDenom("ibc/ABCDEF", "1"))
+	require.Error(t, ValidateTokenID("1"))
+	require.NoError(t, ValidateTokenIDForDenom("kitty", "nft1"))
+}
+
+func TestMsgTransferNFT_AllowsIBCVoucher(t *testing.T) {
+	sender := sdk.AccAddress([]byte("remove-sender-addr")).String()
+	recipient := sdk.AccAddress([]byte("remove-recipi-addr")).String()
+	msg := &MsgTransferNFT{
+		Id:        "1",
+		DenomId:   "ibc/ABCDEF0123456789",
+		Sender:    sender,
+		Recipient: recipient,
+	}
+	require.NoError(t, msg.ValidateBasic())
+}
+
+func TestMsgMintNFT_RejectsIBCVoucher(t *testing.T) {
+	sender := sdk.AccAddress([]byte("remove-sender-addr")).String()
+	msg := &MsgMintNFT{
+		Id:        "nft1",
+		DenomId:   "ibc/ABCDEF0123456789",
+		Name:      "n",
+		Sender:    sender,
+		Recipient: sender,
+	}
+	require.Error(t, msg.ValidateBasic())
+}
+
+func TestMsgTransferDenom_RejectsIBCVoucher(t *testing.T) {
+	sender := sdk.AccAddress([]byte("remove-sender-addr")).String()
+	msg := &MsgTransferDenom{
+		Id:        "ibc/ABCDEF0123456789",
+		Sender:    sender,
+		Recipient: sender,
+	}
+	require.Error(t, msg.ValidateBasic())
 }
 
 func TestValidateKeywordsAndIsIBCDenom(t *testing.T) {

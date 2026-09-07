@@ -34,7 +34,7 @@ func ValidateGenesis(data GenesisState) error {
 				return sdkerrors.Wrap(errortypes.ErrInvalidAddress, "missing owner")
 			}
 
-			if err := ValidateTokenID(nft.GetID()); err != nil {
+			if err := ValidateTokenIDForDenom(c.Denom.Id, nft.GetID()); err != nil {
 				return err
 			}
 			if _, ok := seenTokenIDs[nft.GetID()]; ok {

@@ -186,6 +186,58 @@ func TestConvertNFT_SelfDestructedPinnedClassIsTerminal(t *testing.T) {
 	require.True(t, found)
 }
 
+// TestConvertNFT_SelfDestructedEmptyCodeHashHeals covers the production
+// self-destruct signal: the Cosmos account still exists and CodeHash is the
+// 32-byte EmptyCodeHash (keccak256(nil)), not a zero-length slice. The old
+// len(CodeHash)==0 check missed this and never healed.
+func TestConvertNFT_SelfDestructedEmptyCodeHashHeals(t *testing.T) {
+	k, ctx, owner := setupConvertKeeper(t)
+	old := common.HexToAddress("0x1111111111111111111111111111111111111111")
+	evm := &redeployEVMKeeper{fakeEVMKeeper: &fakeEVMKeeper{
+		accounts: map[common.Address]*statedb.Account{
+			old: {CodeHash: evmtypes.EmptyCodeHash},
+		},
+	}}
+	k.evmKeeper = evm
+
+	res, err := k.ConvertNFT(ctx, &types.MsgConvertNFT{
+		ClassId:            "kitty",
+		CosmosTokenIds:     []string{"nft1"},
+		EvmContractAddress: old.Hex(),
+		EvmTokenIds:        []string{"1"},
+		CosmosSender:       owner.String(),
+		EvmReceiver:        "0x2222222222222222222222222222222222222222",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, res)
+	require.Empty(t, k.GetTokenPairID(ctx, old.Hex()))
+	pair, err := k.GetPair(ctx, "kitty")
+	require.NoError(t, err)
+	require.Equal(t, strings.ToLower(evm.deployed().Hex()), pair.Erc721Address)
+}
+
+func TestConvertERC721_SelfDestructedEmptyCodeHashLeavesStateUntouched(t *testing.T) {
+	k, ctx, owner := setupConvertKeeper(t)
+	dead := common.HexToAddress("0x1111111111111111111111111111111111111111")
+	k.evmKeeper = &fakeEVMKeeper{accounts: map[common.Address]*statedb.Account{
+		dead: {CodeHash: evmtypes.EmptyCodeHash},
+	}}
+
+	_, err := k.ConvertERC721(ctx, &types.MsgConvertERC721{
+		ClassId:            "kitty",
+		CosmosTokenIds:     []string{"nft1"},
+		EvmContractAddress: dead.Hex(),
+		EvmTokenIds:        []string{"1"},
+		CosmosSender:       owner.String(),
+		CosmosReceiver:     owner.String(),
+	})
+	require.ErrorIs(t, err, types.ErrInternalTokenPair)
+	id := k.GetTokenPairID(ctx, dead.Hex())
+	require.NotEmpty(t, id)
+	_, found := k.GetTokenPair(ctx, id)
+	require.True(t, found)
+}
+
 func TestConvertERC721_SelfDestructedPairLeavesStateUntouched(t *testing.T) {
 	k, ctx, owner := setupConvertKeeper(t)
 	k.evmKeeper = &fakeEVMKeeper{accounts: map[common.Address]*statedb.Account{}}

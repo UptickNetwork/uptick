@@ -106,7 +106,7 @@ func (k Keeper) ConvertCW721(
 		}
 	}
 
-	pair, err := k.GetPair(ctx, msg.ContractAddress)
+	pair, err := k.GetPairByCW721(ctx, msg.ContractAddress)
 	if err != nil {
 		return nil, err
 	}
@@ -245,12 +245,20 @@ func (k Keeper) ConvertNFT(
 		}
 	}
 
-	_, err = k.GetPair(ctx, msg.ClassId)
+	pair, err := k.GetPairByClass(ctx, msg.ClassId)
 	if err != nil {
 		return nil, err
 	}
+	if msg.ClassId != pair.ClassId {
+		return nil, sdkerrors.Wrapf(
+			types.ErrClassIdNotCorrect,
+			"class id is not correct, expect %s got %s",
+			pair.ClassId, msg.ClassId,
+		)
+	}
+	msg.ContractAddress = pair.Cw721Address
 
-	return k.convertCosmos2Wasm(ctx, msg) //
+	return k.convertCosmos2Wasm(ctx, msg)
 }
 
 // convertCosmos2Wasm handles the nft conversion for a native CW721 token

@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
 	"testing"
 	"time"
 
+	"cosmossdk.io/math"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 	"github.com/stretchr/testify/require"
@@ -33,10 +35,37 @@ import (
 )
 
 const (
-	e2eChainID    = "uptick_1170-1"
-	e2eEVMChainID = uint64(1170)
-	e2eDenom      = "auptick"
+	e2eDefaultChainID    = "uptick_1170-1"
+	e2eDefaultEVMChainID = uint64(1170)
+	e2eDefaultDenom      = "auptick"
+	e2eDefaultFee        = int64(1000000000000000)
 )
+
+// Overridable so the suite can run against local test chains whose
+// chain-id/denom differ from the shared testnet defaults.
+var (
+	e2eChainID    = envOr("UPTICK_E2E_CHAIN_ID", e2eDefaultChainID)
+	e2eEVMChainID = uint64(envIntOr("UPTICK_E2E_EVM_CHAIN_ID", int64(e2eDefaultEVMChainID)))
+	e2eDenom      = envOr("UPTICK_E2E_DENOM", e2eDefaultDenom)
+	e2eFeeAmount  = math.NewInt(envIntOr("UPTICK_E2E_FEE", e2eDefaultFee))
+)
+
+func envOr(key, def string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return def
+}
+
+func envIntOr(key string, def int64) int64 {
+	if v := os.Getenv(key); v != "" {
+		n, err := strconv.ParseInt(v, 10, 64)
+		if err == nil {
+			return n
+		}
+	}
+	return def
+}
 
 func init() {
 	cmdcfg.SetBech32Prefixes(sdk.GetConfig())
@@ -85,7 +114,7 @@ func TestKeplrEip712TransferEndToEnd(t *testing.T) {
 	fee := legacytx.StdFee{
 		// The local feemarket base fee is 1e9 auptick, so provide a gas price
 		// comfortably above it.
-		Amount: sdk.NewCoins(sdk.NewInt64Coin(e2eDenom, 1000000000000000)),
+		Amount: sdk.NewCoins(sdk.NewCoin(e2eDenom, e2eFeeAmount)),
 		Gas:    200000,
 	}
 
@@ -140,7 +169,7 @@ func TestKeplrDirectTransferEndToEnd(t *testing.T) {
 		},
 	}
 	fee := legacytx.StdFee{
-		Amount: sdk.NewCoins(sdk.NewInt64Coin(e2eDenom, 1000000000000000)),
+		Amount: sdk.NewCoins(sdk.NewCoin(e2eDenom, e2eFeeAmount)),
 		Gas:    200000,
 	}
 

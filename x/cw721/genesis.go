@@ -26,7 +26,10 @@ func InitGenesis(
 
 	for _, pair := range data.TokenPairs {
 		id := pair.GetID()
-		k.SetTokenPair(ctx, pair)
+		if err := k.SetTokenPair(ctx, pair); err != nil {
+			// genesis import must not silently drop a token pair
+			panic(err)
+		}
 		k.SetClassMap(ctx, pair.ClassId, id)
 		k.SetCW721Map(ctx, pair.Cw721Address, id)
 	}

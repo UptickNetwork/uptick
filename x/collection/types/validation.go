@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	sdkerrors "cosmossdk.io/errors"
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
 )
 
@@ -68,10 +69,52 @@ func ValidateDenomID(denomID string) error {
 		}
 		return ValidateKeywords(denomID)
 	}
+	if IsIBCDenom(denomID) {
+		return validateIBCClassID(denomID)
+	}
 	if !regexpID(denomID) {
 		return sdkerrors.Wrapf(ErrInvalidDenom, "denomID can only accept characters that match the regular expression: (%s),but got (%s)", idString, denomID)
 	}
 	return ValidateKeywords(denomID)
+}
+
+// validateIBCClassID accepts ICS-721 voucher class ids of the form ibc/{hash}.
+// User issuance still goes through ValidateIssueDenomID, which rejects this prefix.
+func validateIBCClassID(denomID string) error {
+	suffix := strings.TrimPrefix(denomID, "ibc/")
+	if suffix == "" {
+		return sdkerrors.Wrapf(ErrInvalidDenom, "invalid ICS-721 class id (%s)", denomID)
+	}
+	if len(denomID) > MaxDenomLen {
+		return sdkerrors.Wrapf(ErrInvalidDenom, "denomID length exceeds %d (%s)", MaxDenomLen, denomID)
+	}
+	for _, r := range suffix {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '/' || r == '.' || r == '_' || r == '-' {
+			continue
+		}
+		return sdkerrors.Wrapf(ErrInvalidDenom, "invalid ICS-721 class id (%s)", denomID)
+	}
+	return nil
+}
+
+// ValidateTokenIDForDenom validates a token id in the context of its class.
+// ICS-721 tokens are frequently short ("1"); user-minted collection tokens
+// keep the [3,128] bound.
+func ValidateTokenIDForDenom(denomID, tokenID string) error {
+	if IsIBCDenom(denomID) {
+		return validateIBCTokenID(tokenID)
+	}
+	return ValidateTokenID(tokenID)
+}
+
+func validateIBCTokenID(tokenID string) error {
+	if tokenID == "" || len(tokenID) > MaxDenomLen {
+		return sdkerrors.Wrapf(ErrInvalidTokenID, "the length of nft id(%s) only accepts value [1, %d]", tokenID, MaxDenomLen)
+	}
+	if strings.ContainsRune(tokenID, 0) || strings.Contains(tokenID, "/") {
+		return sdkerrors.Wrapf(ErrInvalidTokenID, "nft id(%s) contains illegal characters", tokenID)
+	}
+	return nil
 }
 
 // ValidateTokenID verify that the tokenID is legal
@@ -126,6 +169,17 @@ func ValidateIssueDenomID(denomID string) error {
 	if strings.HasPrefix(denomID, "uptick-") {
 		return sdkerrors.Wrapf(ErrInvalidDenom,
 			"denomID prefix \"uptick-\" is reserved for module-derived NFT classes and cannot be issued via MsgIssueDenom (%s)", denomID)
+	}
+	if IsIBCDenom(denomID) {
+		return sdkerrors.Wrapf(ErrInvalidDenom,
+			"denomID prefix \"ibc/\" is reserved for ICS-721 voucher classes and cannot be issued via MsgIssueDenom (%s)", denomID)
+	}
+	// A user denom whose id is a valid bech32 account address would collide
+	// with CW721 contract keys. Module-created classes never go through
+	// MsgIssueDenom.
+	if _, err := sdk.AccAddressFromBech32(denomID); err == nil {
+		return sdkerrors.Wrapf(ErrInvalidDenom,
+			"denomID cannot be a bech32 account address (%s)", denomID)
 	}
 	return nil
 }

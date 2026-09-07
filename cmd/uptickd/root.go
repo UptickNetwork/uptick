@@ -105,7 +105,9 @@ func NewRootCmd() *cobra.Command {
 			if err := server.InterceptConfigsPreRunHandler(cmd, customAppTemplate, customAppConfig, customTMConfig); err != nil {
 				return err
 			}
-			applyEVMChainID(cmd)
+			if err := applyEVMChainID(cmd); err != nil {
+				return err
+			}
 			return nil
 		},
 		SilenceUsage: true,
@@ -125,7 +127,7 @@ func NewRootCmd() *cobra.Command {
 		AddGenesisAccountCmd(app.DefaultNodeHome),
 		tmcli.NewCompletionCmd(rootCmd, true),
 		NewTestnetCmd(tempApplication.BasicManager(), banktypes.GenesisBalancesIterator{}),
-		AddIbcCaclulateCommand(debug.Cmd()),
+		AddIBCDenomCommand(debug.Cmd()),
 		debug.Cmd(),
 		confixcmd.ConfigCommand(),
 		pruning.Cmd(ac.newApp, app.DefaultNodeHome),

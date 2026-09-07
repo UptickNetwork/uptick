@@ -55,15 +55,18 @@ func (k Keeper) GetTokenPair(ctx sdk.Context, id []byte) (types.TokenPair, bool)
 }
 
 // SetTokenPair stores a token pair
-func (k Keeper) SetTokenPair(ctx sdk.Context, tokenPair types.TokenPair) {
+// SetTokenPair stores a token pair. A protobuf marshal failure is surfaced to
+// the caller instead of being swallowed: silently dropping the write would
+// leave the token pair unregistered while later lookups assume it exists.
+func (k Keeper) SetTokenPair(ctx sdk.Context, tokenPair types.TokenPair) error {
 	store := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixTokenPair)
 	key := tokenPair.GetID()
 	bz, err := k.cdc.Marshal(&tokenPair)
 	if err != nil {
-		k.Logger(ctx).Error("failed to marshal cw721 token pair", "id", string(key), "error", err)
-		return
+		return sdkerrors.Wrapf(err, "failed to marshal cw721 token pair %s", string(key))
 	}
 	store.Set(key, bz)
+	return nil
 }
 
 // SetWasmCode stores a WasmCode
@@ -171,12 +174,14 @@ func (k Keeper) SetNFTPairs(ctx sdk.Context, contractAddress string, tokenID str
 	return nil
 }
 
-// GetTokenPairID returns the pair id from either of the registered tokens.
+// GetTokenPairID returns the pair id from a class id or a CW721 contract.
+// The maps are distinct namespaces: class is tried first so a denom whose id
+// equals a contract address cannot steal that contract's pair on the class path.
 func (k Keeper) GetTokenPairID(ctx sdk.Context, token string) []byte {
-	if id := k.GetCW721Map(ctx, token); len(id) != 0 {
+	if id := k.GetClassMap(ctx, token); len(id) != 0 {
 		return id
 	}
-	return k.GetClassMap(ctx, token)
+	return k.GetCW721Map(ctx, token)
 }
 
 func (k Keeper) SetNFTPairByContractTokenID(ctx sdk.Context, contractAddress string, tokenID string, classID string, nftID string) {

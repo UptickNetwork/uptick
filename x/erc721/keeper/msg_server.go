@@ -149,7 +149,11 @@ func (k Keeper) ConvertERC721(
 
 	erc721 := common.HexToAddress(pair.Erc721Address)
 	acc := k.evmKeeper.GetAccountWithoutBalance(ctx, erc721)
-	if acc == nil || len(acc.CodeHash) == 0 {
+	// cosmos/evm stores keccak256(nil) (EmptyCodeHash, 32 bytes) when the
+	// account exists but has no code. len==0 only matches a missing hash
+	// field; self-destructed contracts still have EmptyCodeHash. Match
+	// upstream x/erc20: HasCodeHash is false for nil, empty, and EmptyCodeHash.
+	if acc == nil || !acc.HasCodeHash() {
 		// ERC721 -> Cosmos conversion requires minting/metadata calls against the
 		// pair contract, so a contract without code is terminal for this
 		// direction: the module cannot re-create an externally-owned contract and
@@ -256,7 +260,7 @@ func (k Keeper) ConvertNFT(
 	erc721 := common.HexToAddress(pair.Erc721Address)
 	acc := k.evmKeeper.GetAccountWithoutBalance(ctx, erc721)
 
-	if acc == nil || len(acc.CodeHash) == 0 {
+	if acc == nil || !acc.HasCodeHash() {
 		if !k.pairContractRedeployable(msg.ClassId) {
 			// External-contract class: the module cannot re-create the contract
 			// and the caller's ERC721 tokens are gone with it. Report the

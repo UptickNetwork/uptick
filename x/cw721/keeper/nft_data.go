@@ -60,7 +60,7 @@ func (k Keeper) GetContractAddressAndTokenIds(ctx sdk.Context, msg *types.MsgCon
 		err                error
 	)
 
-	pair, err := k.GetPair(ctx, msg.ClassId)
+	pair, err := k.GetPairByClass(ctx, msg.ClassId)
 	if err != nil {
 		// No registered pair: generate token IDs, then use the provided
 		// contract or instantiate a new CW721 (module as minter).

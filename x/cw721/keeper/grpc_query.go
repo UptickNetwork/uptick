@@ -96,7 +96,7 @@ func (k Keeper) WasmContract(
 	}
 	ctx := sdk.UnwrapSDKContext(c)
 
-	id := k.GetTokenPairID(ctx, req.ClassId)
+	id := k.GetClassMap(ctx, req.ClassId)
 	if len(id) == 0 {
 		return nil, status.Errorf(codes.NotFound, "no token pair registered for class '%s'", req.ClassId)
 	}

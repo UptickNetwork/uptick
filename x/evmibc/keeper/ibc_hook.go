@@ -102,6 +102,7 @@ func (k Keeper) OnRecvPacket(
 	}
 
 	write()
+	msg = "ok"
 	ctx.EventManager().EmitEvent(
 		sdk.NewEvent("ibc_nft_convert",
 			sdk.NewAttribute("status", "2"), // SUCCESS

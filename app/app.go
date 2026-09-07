@@ -80,7 +80,6 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/gov"
 	govclient "github.com/cosmos/cosmos-sdk/x/gov/client"
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
-	govv1 "github.com/cosmos/cosmos-sdk/x/gov/types/v1"
 	"github.com/cosmos/cosmos-sdk/x/mint"
 	minttypes "github.com/cosmos/cosmos-sdk/x/mint/types"
 	"github.com/cosmos/cosmos-sdk/x/params"
@@ -98,7 +97,6 @@ import (
 	evmtypes "github.com/cosmos/evm/x/vm/types"
 	ibctransfertypes "github.com/cosmos/ibc-go/v10/modules/apps/transfer/types"
 	ibc "github.com/cosmos/ibc-go/v10/modules/core"
-	ibcclienttypes "github.com/cosmos/ibc-go/v10/modules/core/02-client/types"
 	ibckeeper "github.com/cosmos/ibc-go/v10/modules/core/keeper"
 	ibcsolomachine "github.com/cosmos/ibc-go/v10/modules/light-clients/06-solomachine"
 	ibctm "github.com/cosmos/ibc-go/v10/modules/light-clients/07-tendermint"
@@ -610,19 +608,7 @@ func NewUptick(
 		WasmKeeper:            &app.WasmKeeper,
 		WasmNodeConfig:        &app.WasmConfig,
 		TXCounterStoreService: runtime.NewKVStoreService(app.GetKey(wasm.StoreKey)),
-		DisabledAuthzMsgs: []string{
-			sdk.MsgTypeURL(&evmtypes.MsgEthereumTx{}),
-			sdk.MsgTypeURL(&vestingtypes.MsgCreateVestingAccount{}),
-			// Governance messages: prevent delegation of governance actions via authz
-			sdk.MsgTypeURL(&govv1.MsgSubmitProposal{}),
-			sdk.MsgTypeURL(&govv1.MsgVote{}),
-			sdk.MsgTypeURL(&govv1.MsgVoteWeighted{}),
-			sdk.MsgTypeURL(&govv1.MsgDeposit{}),
-			sdk.MsgTypeURL(&upgradetypes.MsgSoftwareUpgrade{}),
-			sdk.MsgTypeURL(&upgradetypes.MsgCancelUpgrade{}),
-			sdk.MsgTypeURL(&ibcclienttypes.MsgUpdateClient{}),
-			sdk.MsgTypeURL(&ibcclienttypes.MsgUpgradeClient{}),
-		},
+		DisabledAuthzMsgs:     ante.DisabledAuthzMsgTypeURLs(),
 	}
 
 	if err := options.Validate(); err != nil {

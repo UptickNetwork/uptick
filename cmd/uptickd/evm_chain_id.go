@@ -20,10 +20,10 @@ var evmChainIDLine = regexp.MustCompile(`(?m)^evm-chain-id\s*=\s*\d+`)
 // applyEVMChainID overlays viper's evm.evm-chain-id with the EIP-155 id
 // parsed from genesis / --chain-id. JSON-RPC eth_chainId reads this config,
 // not the keeper's process-wide ChainConfig.
-func applyEVMChainID(cmd *cobra.Command) {
+func applyEVMChainID(cmd *cobra.Command) error {
 	serverCtx := server.GetServerContextFromCmd(cmd)
 	if serverCtx == nil || serverCtx.Viper == nil {
-		return
+		return nil
 	}
 	home := serverCtx.Viper.GetString(flags.FlagHome)
 	if home == "" {
@@ -35,10 +35,13 @@ func applyEVMChainID(cmd *cobra.Command) {
 	}
 	evmID := upticktypes.ResolveEVMChainID(serverCtx.Viper, chainID)
 	if evmID == 0 || evmID == evmtypes.DefaultEVMChainID {
-		return
+		return nil
 	}
 	serverCtx.Viper.Set(srvflags.EVMChainID, evmID)
-	_ = cmd.Flags().Set(srvflags.EVMChainID, strconv.FormatUint(evmID, 10))
+	if err := cmd.Flags().Set(srvflags.EVMChainID, strconv.FormatUint(evmID, 10)); err != nil {
+		return err
+	}
+	return nil
 }
 
 func writeAppTomlEVMChainID(home string, id uint64) error {

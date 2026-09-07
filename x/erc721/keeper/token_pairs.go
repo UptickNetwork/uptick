@@ -72,16 +72,18 @@ func (k Keeper) GetTokenPair(ctx sdk.Context, id []byte) (types.TokenPair, bool)
 	return tokenPair, true
 }
 
-// SetTokenPair stores a token pair
-func (k Keeper) SetTokenPair(ctx sdk.Context, tokenPair types.TokenPair) {
+// SetTokenPair stores a token pair. A protobuf marshal failure is surfaced to
+// the caller instead of being swallowed: silently dropping the write would
+// leave the token pair unregistered while later lookups assume it exists.
+func (k Keeper) SetTokenPair(ctx sdk.Context, tokenPair types.TokenPair) error {
 	store := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixTokenPair)
 	key := tokenPair.GetID()
 	bz, err := k.cdc.Marshal(&tokenPair)
 	if err != nil {
-		k.Logger(ctx).Error("failed to marshal token pair", "id", string(key), "error", err)
-		return
+		return sdkerrors.Wrapf(err, "failed to marshal erc721 token pair %s", string(key))
 	}
 	store.Set(key, bz)
+	return nil
 }
 
 // DeleteTokenPair removes a token pair.

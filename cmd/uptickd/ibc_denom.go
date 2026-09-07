@@ -18,7 +18,7 @@ func IBCDenom(port, channel, denom string) (string, error) {
 	return denomTrace.IBCDenom(), nil
 }
 
-func AddIbcCaclulateCommand(debug *cobra.Command) *cobra.Command {
+func AddIBCDenomCommand(debug *cobra.Command) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "ibc-denom [port] [channel] [denom]",
 		Short: "Generate ibc denom name",

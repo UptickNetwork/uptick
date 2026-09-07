@@ -155,7 +155,7 @@ func (msg MsgTransferNFT) ValidateBasic() error {
 	if len(msg.Data) != 0 && Modified(msg.Data) && msg.Data != RemoveField && !gjson.Valid(msg.Data) {
 		return sdkerrors.Wrap(errortypes.ErrJSONUnmarshal, "invalid data, must be a JSON string or empty")
 	}
-	return ValidateTokenID(msg.Id)
+	return ValidateTokenIDForDenom(msg.DenomId, msg.Id)
 }
 
 // GetSignBytes Implements Msg.
@@ -220,7 +220,7 @@ func (msg MsgEditNFT) ValidateBasic() error {
 	if len(msg.Data) != 0 && Modified(msg.Data) && msg.Data != RemoveField && !gjson.Valid(msg.Data) {
 		return sdkerrors.Wrap(errortypes.ErrJSONUnmarshal, "invalid data, must be a JSON string or empty")
 	}
-	return ValidateTokenID(msg.Id)
+	return ValidateTokenIDForDenom(msg.DenomId, msg.Id)
 }
 
 // GetSignBytes Implements Msg.
@@ -267,6 +267,9 @@ func (msg MsgMintNFT) ValidateBasic() error {
 	}
 	if _, err := sdk.AccAddressFromBech32(msg.Recipient); err != nil {
 		return sdkerrors.Wrapf(errortypes.ErrInvalidAddress, "invalid receipt address (%s)", err)
+	}
+	if IsIBCDenom(msg.DenomId) {
+		return sdkerrors.Wrap(ErrInvalidDenom, "cannot mint into an ICS-721 voucher class")
 	}
 	if err := ValidateDenomID(msg.DenomId); err != nil {
 		return err
@@ -318,7 +321,7 @@ func (msg MsgBurnNFT) ValidateBasic() error {
 	if err := ValidateDenomID(msg.DenomId); err != nil {
 		return err
 	}
-	return ValidateTokenID(msg.Id)
+	return ValidateTokenIDForDenom(msg.DenomId, msg.Id)
 }
 
 // GetSignBytes Implements Msg.
@@ -358,6 +361,9 @@ func (msg MsgTransferDenom) ValidateBasic() error {
 	}
 	if _, err := sdk.AccAddressFromBech32(msg.Recipient); err != nil {
 		return sdkerrors.Wrapf(errortypes.ErrInvalidAddress, "invalid recipient address (%s)", err)
+	}
+	if IsIBCDenom(msg.Id) {
+		return sdkerrors.Wrap(ErrInvalidDenom, "cannot transfer an ICS-721 voucher class")
 	}
 	if err := ValidateDenomID(msg.Id); err != nil {
 		return err
