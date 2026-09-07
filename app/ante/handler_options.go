@@ -193,10 +193,11 @@ func newCosmosAnteHandlerEip712(options HandlerOptions) sdk.AnteHandler {
 			cosmosante.NewAuthzLimiterDecorator(options.disabledAuthzMsgs()...),
 			ante.NewSetUpContextDecorator(),
 			wasmkeeper.NewLimitSimulationGasDecorator(simGasLimit),
-			// Keep parity with newCosmosAnteHandler: EIP-712 (Keplr) txs may
-			// carry the dynamic-fee Web3 extension option, so it must be
-			// accepted here instead of falling through to an opaque rejection.
-			ante.NewExtensionOptionsDecorator(antetypes.HasDynamicFeeExtensionOption),
+			// M-01: accept exactly the Web3 extension the EIP-712 signature
+			// verifier requires. The previous DynamicFee-only checker rejected
+			// valid Keplr txs with "unknown extension options" before they
+			// could reach Eip712SigVerificationDecorator below.
+			ante.NewExtensionOptionsDecorator(HasWeb3ExtensionOption),
 			ante.NewValidateBasicDecorator(),
 			ante.NewTxTimeoutHeightDecorator(),
 			ante.NewValidateMemoDecorator(options.AccountKeeper),

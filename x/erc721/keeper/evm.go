@@ -325,7 +325,20 @@ func (k Keeper) CallEVMWithData(
 	// SetBalanceWithLocked module-account guard ("not allowed to receive funds").
 	// Deployment / mint / transfer all use the module account as sender with
 	// zero value, so a fixed gas cap (DefaultGasCap) is sufficient.
+	//
+	// H-01: the internal budget must also be capped at the SDK transaction's
+	// remaining gas. A fixed 25M cap lets a caller-supplied external contract
+	// (e.g. name() during RegisterERC721) burn the full budget inside the EVM
+	// interpreter before the post-hoc ConsumeGas below ever runs — the SDK gas
+	// meter only panics afterwards, and CPU already spent cannot be rolled
+	// back. min(remaining, DefaultGasCap) bounds execution to what the tx
+	// actually paid for. Infinite gas meters (queries, genesis, simulation)
+	// report math.MaxUint64 from GasRemaining and keep the full cap, so there
+	// is no unsigned underflow and no special casing needed.
 	gasCap := config.DefaultGasCap
+	if remaining := ctx.GasMeter().GasRemaining(); remaining < gasCap {
+		gasCap = remaining
+	}
 
 	msg := core.Message{
 		From:            from,
