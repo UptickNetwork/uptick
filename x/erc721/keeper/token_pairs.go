@@ -59,6 +59,13 @@ func (k Keeper) GetTokenPair(ctx sdk.Context, id []byte) (types.TokenPair, bool)
 	}
 
 	if err := k.cdc.Unmarshal(bz, &tokenPair); err != nil {
+		// A single corrupt pair must not take down a live node: this lookup runs
+		// from query and message-handler paths where a panic escapes to ABCI and
+		// could crash the process, so it degrades to "not found" (callers return
+		// an ordinary error) and logs at Error level for operator visibility.
+		// This is a deliberate asymmetry with GetTokenPairs, which panics —
+		// that one is only reachable from genesis export, where failing loudly
+		// prevents baking corruption into a genesis file.
 		k.Logger(ctx).Error("failed to unmarshal token pair", "id", string(id), "error", err)
 		return types.TokenPair{}, false
 	}

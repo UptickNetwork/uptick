@@ -31,6 +31,16 @@ func parseERC721TokenID(tokenID string) (*big.Int, error) {
 	return n, nil
 }
 
+// pairContractRedeployable reports whether a class whose pair contract lost its
+// code can be healed by deploying a fresh module-owned contract. Plain native
+// classes (whose contract was deployed by the module and whose id does not
+// encode a contract address) are re-deployable. Classes derived from a
+// contract address ("uptick-<addr>") are pinned to that external contract —
+// the class id IS the contract identity — and cannot be re-deployed.
+func (k Keeper) pairContractRedeployable(classID string) bool {
+	return !strings.HasPrefix(classID, types.DefaultPrefix+"-")
+}
+
 // TransferERC721 converts ERC721 tokens into native Cosmos nft for both
 // Cosmos-native and ERC721 TokenPair Owners and transfer through IBC
 func (k Keeper) TransferERC721(
@@ -140,12 +150,18 @@ func (k Keeper) ConvertERC721(
 	erc721 := common.HexToAddress(pair.Erc721Address)
 	acc := k.evmKeeper.GetAccountWithoutBalance(ctx, erc721)
 	if acc == nil || len(acc.CodeHash) == 0 {
-		k.DeletePairPerTokenState(ctx, pair)
-		k.DeleteTokenPair(ctx, pair)
-		k.DeleteERC721Map(ctx, erc721)
-		k.DeleteClassMap(ctx, pair.ClassId)
-		k.Logger(ctx).Debug(
-			"deleting self destructed token pair from state",
+		// ERC721 -> Cosmos conversion requires minting/metadata calls against the
+		// pair contract, so a contract without code is terminal for this
+		// direction: the module cannot re-create an externally-owned contract and
+		// the caller's ERC721 tokens are gone with it. Note that this handler
+		// must NOT attempt to purge the pair here -- the SDK rolls back every
+		// write made on a handler path that returns an error, so the purge would
+		// silently never commit and only mislead readers. Recovery for the class
+		// happens through ConvertNFT, which purges the stale pair and re-deploys
+		// a fresh module contract in a succeeding transaction (see below).
+		k.Logger(ctx).Warn(
+			"erc721 pair contract self-destructed; conversion is terminal, state left untouched",
+			"class", pair.ClassId,
 			"contract", pair.Erc721Address,
 		)
 		return nil, sdkerrors.Wrapf(types.ErrInternalTokenPair, "erc721 contract %s is self-destructed", pair.Erc721Address)
@@ -224,20 +240,62 @@ func (k Keeper) ConvertNFT(
 		return nil, err
 	}
 
-	// Remove token pair if contract is suicided
+	// Self-heal a pair whose ERC721 contract no longer has code (self-destructed
+	// or otherwise lost). SDK state is per-transaction: every write performed on
+	// a handler path that later returns an error is rolled back (baseapp only
+	// commits the tx cache when the whole tx succeeds), so a stale pair can
+	// never be purged from inside a failing call.
+	//
+	// For classes the module can re-materialize (plain native classes whose
+	// contract was deployed by the module), purge the stale pair and deploy a
+	// fresh contract in the SAME successful transaction: the purge then commits
+	// together with the new pair and the conversion, which is the only way the
+	// cleanup can persist. Classes pinned to an external contract (class id
+	// derived from the contract address, "uptick-<addr>") cannot be re-deployed
+	// — the class↔contract identity is fixed — so those remain a terminal error.
 	erc721 := common.HexToAddress(pair.Erc721Address)
 	acc := k.evmKeeper.GetAccountWithoutBalance(ctx, erc721)
 
 	if acc == nil || len(acc.CodeHash) == 0 {
-		k.DeletePairPerTokenState(ctx, pair)
-		k.DeleteTokenPair(ctx, pair)
-		k.DeleteERC721Map(ctx, erc721)
-		k.DeleteClassMap(ctx, pair.ClassId)
-		k.Logger(ctx).Debug(
-			"deleting selfdestructed token pair from state",
-			"contract", pair.Erc721Address,
+		if !k.pairContractRedeployable(msg.ClassId) {
+			// External-contract class: the module cannot re-create the contract
+			// and the caller's ERC721 tokens are gone with it. Report the
+			// terminal condition without touching state (a write here would be
+			// rolled back by the SDK when the handler returns this error).
+			k.Logger(ctx).Warn(
+				"erc721 pair contract self-destructed; class pinned to an external contract and cannot be re-deployed",
+				"class", pair.ClassId,
+				"contract", pair.Erc721Address,
+			)
+			return nil, sdkerrors.Wrapf(types.ErrInternalTokenPair, "erc721 contract %s is self-destructed", pair.Erc721Address)
+		}
+
+		// Purge the stale pair and every per-token binding / refund record tied
+		// to it, then deploy a fresh module-owned contract and continue the
+		// conversion. This branch only succeeds when the whole tx commits, so
+		// the purge is not rolled back.
+		k.PurgeTokenPair(ctx, pair)
+		k.Logger(ctx).Info(
+			"purged self-destructed erc721 token pair; re-deploying a fresh contract",
+			"class", pair.ClassId,
+			"old_contract", pair.Erc721Address,
 		)
-		return nil, sdkerrors.Wrapf(types.ErrInternalTokenPair, "erc721 contract %s is self-destructed", pair.Erc721Address)
+
+		contractAddress, tokenIds, err = k.GetContractAddressAndTokenIds(ctx, msg)
+		if err != nil {
+			return nil, sdkerrors.Wrapf(err, "failed to re-deploy erc721 contract for class %s after purging self-destructed pair", msg.ClassId)
+		}
+		msg.EvmContractAddress = strings.ToLower(contractAddress)
+		msg.EvmTokenIds = tokenIds
+
+		if _, err = k.RegisterNFT(ctx, msg); err != nil {
+			return nil, sdkerrors.Wrapf(err, "failed to re-register erc721 token pair for class %s", msg.ClassId)
+		}
+
+		pair, err = k.GetPair(ctx, msg.ClassId)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return k.convertCosmos2Evm(ctx, pair, msg, receiver) // case 2.2
 }

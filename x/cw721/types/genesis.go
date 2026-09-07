@@ -2,6 +2,7 @@ package types
 
 import (
 	"fmt"
+	"strings"
 
 	"cosmossdk.io/errors"
 )
@@ -29,7 +30,10 @@ func (gs GenesisState) Validate() error {
 	seenClass := make(map[string]bool)
 
 	for _, b := range gs.TokenPairs {
-		if seencw721[b.Cw721Address] {
+		// CW721 contracts are bech32: character case is not significant, so the
+		// duplicate check is case-insensitive.
+		key := strings.ToLower(b.Cw721Address)
+		if seencw721[key] {
 			return fmt.Errorf("token CW721 contract duplicated on genesis '%s'", b.Cw721Address)
 		}
 		if seenClass[b.ClassId] {
@@ -38,7 +42,7 @@ func (gs GenesisState) Validate() error {
 		if err := b.Validate(); err != nil {
 			return err
 		}
-		seencw721[b.Cw721Address] = true
+		seencw721[key] = true
 		seenClass[b.ClassId] = true
 	}
 
@@ -55,8 +59,9 @@ func (gs GenesisState) Validate() error {
 // ValidateGenesisPairs performs the import/validate-side integrity checks that
 // the audit required: non-empty UIDs, one-to-one uniqueness across the batch,
 // UID membership in a registered token pair, and refund receivers that
-// reference registered token pairs. CW721 contracts are bech32: matching is
-// exact (case is significant), unlike ERC721 hex addresses.
+// reference registered token pairs. CW721 contracts are bech32: membership
+// matching is case-insensitive (character case is not significant), mirroring
+// the EqualFold comparisons the runtime conversion code uses.
 func ValidateGenesisPairs(pairs []NFTUIDPair, receivers []RefundReceiver, tokenPairs []TokenPair) error {
 	seenToken := make(map[string]struct{}, len(pairs))
 	seenNFT := make(map[string]struct{}, len(pairs))
@@ -83,7 +88,7 @@ func ValidateGenesisPairs(pairs []NFTUIDPair, receivers []RefundReceiver, tokenP
 
 	registered := make(map[string]struct{}, len(tokenPairs))
 	for _, tp := range tokenPairs {
-		registered[tp.Cw721Address] = struct{}{}
+		registered[strings.ToLower(tp.Cw721Address)] = struct{}{}
 	}
 
 	seenRefund := make(map[string]struct{}, len(receivers))
@@ -91,10 +96,10 @@ func ValidateGenesisPairs(pairs []NFTUIDPair, receivers []RefundReceiver, tokenP
 		if r.ContractAddress == "" || r.TokenId == "" || r.Owner == "" {
 			return errors.Wrapf(ErrInternalTokenPair, "incomplete refund receiver entry (contract %q, token %q, owner %q)", r.ContractAddress, r.TokenId, r.Owner)
 		}
-		if _, ok := registered[r.ContractAddress]; !ok {
+		if _, ok := registered[strings.ToLower(r.ContractAddress)]; !ok {
 			return errors.Wrapf(ErrInternalTokenPair, "refund receiver references unregistered CW721 contract %q", r.ContractAddress)
 		}
-		dedupe := r.ContractAddress + "," + r.TokenId
+		dedupe := strings.ToLower(r.ContractAddress) + "," + r.TokenId
 		if _, dup := seenRefund[dedupe]; dup {
 			return errors.Wrapf(ErrInternalTokenPair, "duplicate refund receiver for contract %q token %q", r.ContractAddress, r.TokenId)
 		}
@@ -105,7 +110,8 @@ func ValidateGenesisPairs(pairs []NFTUIDPair, receivers []RefundReceiver, tokenP
 }
 
 // uidBelongsToRegisteredPair reports whether the token UID's contract and the
-// NFT UID's class resolve to the same registered TokenPair.
+// NFT UID's class resolve to the same registered TokenPair. Contract matching
+// is case-insensitive (bech32).
 func uidBelongsToRegisteredPair(tokenUID, nftUID string, tokenPairs []TokenPair) bool {
 	_, contract := GetNFTFromUID(tokenUID)
 	_, classID := GetNFTFromUID(nftUID)
@@ -113,7 +119,7 @@ func uidBelongsToRegisteredPair(tokenUID, nftUID string, tokenPairs []TokenPair)
 		return false
 	}
 	for _, tp := range tokenPairs {
-		if tp.Cw721Address == contract && tp.ClassId == classID {
+		if strings.EqualFold(tp.Cw721Address, contract) && tp.ClassId == classID {
 			return true
 		}
 	}

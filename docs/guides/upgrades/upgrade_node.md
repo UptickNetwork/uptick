@@ -35,6 +35,60 @@ cp $(which uptickd) $DAEMON_HOME/cosmovisor/upgrades/v0.4.0/bin/
 
 The on-chain upgrade name is `v0.4.0` (e.g. `uptickd tx gov submit-proposal software-upgrade v0.4.0 ...`).
 
+## Upgrading to v0.4.1
+
+The `v0.4.1` upgrade is **state-machine compatible with v0.4.0**: it bumps no module
+consensus version and performs no store deletion. The one-shot repairs the handler runs are
+idempotent and safe to re-apply:
+
+- **Activates the EVM static precompiles** (`ActiveStaticPrecompiles`): v0.4.0 introduced the
+  param but left it empty, so every custom precompile (bank, staking, distribution, ICS20, gov,
+  slashing, bech32, p256) was inactive. The upgrade fills the list only when it is empty, so
+  governance removals are preserved.
+- **Enables the ICA controller submodule**: genesis templates derived from legacy `x/params`
+  defaults carry `controller_enabled=false`, which blocks every ICA register. Only a
+  `false -> true` flip is performed.
+- Runtime-only compatibility (no migration): Keplr EIP-712 support (legacy ethermint pubkey and
+  `ExtensionOptionsWeb3Tx` type-URL mapping) and the EIP-2 low-s signature check live in the
+  binary's codec and ante handler.
+
+### Two-step upgrade from v0.3.x (mandatory)
+
+A chain on v0.3.x **cannot jump straight to a `v0.4.1` plan**: the one-shot migrations that make
+v0.3.x state readable by the cosmos/evm stack — legacy `EthAccount` → `BaseAccount` rewriting,
+legacy `ethsecp256k1` pubkey `Any` migration, `capability` store deletion, EVM `ChainConfig`
+Block→Time migration, legacy erc20/params cleanup — only exist in the `v0.4.0` handler.
+
+Upgrade in two sequential governance steps:
+
+1. Submit and execute the **`v0.4.0`** software-upgrade plan first.
+2. After the chain restarts on v0.4.0 state, submit and execute the **`v0.4.1`** plan.
+
+Both names are registered in the same binary, and `x/upgrade` allows only one pending plan at a
+time, so the two plans must be proposed and executed in order.
+
+When using Cosmovisor, place the new binary under:
+
+```bash
+mkdir -p $DAEMON_HOME/cosmovisor/upgrades/v0.4.1/bin
+cp $(which uptickd) $DAEMON_HOME/cosmovisor/upgrades/v0.4.1/bin/
+```
+
+The on-chain upgrade name is `v0.4.1` (e.g. `uptickd tx gov submit-proposal software-upgrade v0.4.1 ...`).
+
+### Operator checklist
+
+- **Export rehearsal**: the v0.4.x `erc721`/`cw721` genesis export fails loudly on inconsistent
+  per-token bindings, orphaned refund records or corrupt token pairs instead of silently dropping
+  them. Before the upgrade, run `uptickd export` against a state snapshot and confirm it succeeds;
+  if it reports orphaned state, fix it **before** the upgrade height.
+- `uptickd migrate` performs **no** legacy offline genesis migration — upgrade chain state only
+  through the in-app software-upgrade handler above.
+- Client-breaking behavior changes shipped with v0.4.1: collection `MsgEditNFT`/`MsgTransferNFT`
+  now treat an empty string as "keep the current value" (use the new `[remove]` sentinel to clear
+  a field), `MsgIssueDenom` rejects the reserved `uptick-` prefix, and EIP-712 signatures must
+  satisfy EIP-2 (low-s). See the changelog for details.
+
 ## Software Upgrade
 
 These instructions are for full nodes that have ran on previous versions of and would like to upgrade to the latest testnet.

@@ -81,7 +81,12 @@ func (k Keeper) Params(
 	return &types.QueryParamsResponse{Params: params}, nil
 }
 
-// WasmContract returns the cw721 module params.
+// WasmContract returns the registered token pair (and therefore the CW721
+// contract) for the given class id. Port and channel are accepted for API /
+// IBC-voucher compatibility, but the pair registry is keyed by class id, so
+// the lookup resolves on ClassId alone. A missing pair is reported as NotFound
+// — it must never return an empty "success" response, which used to silently
+// hide the contract address from clients.
 func (k Keeper) WasmContract(
 	c context.Context,
 	req *types.QueryWasmAddressRequest,
@@ -89,15 +94,19 @@ func (k Keeper) WasmContract(
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "empty request")
 	}
+	ctx := sdk.UnwrapSDKContext(c)
 
-	// from the ibc info derive the wasm contract info
-	ClassId := req.ClassId
-	Port := req.Port
-	Channel := req.Channel
+	id := k.GetTokenPairID(ctx, req.ClassId)
+	if len(id) == 0 {
+		return nil, status.Errorf(codes.NotFound, "no token pair registered for class '%s'", req.ClassId)
+	}
 
-	_ = Port
-	_ = Channel
-	_ = ClassId
+	pair, found := k.GetTokenPair(ctx, id)
+	if !found {
+		return nil, status.Errorf(codes.NotFound, "token pair for class '%s'", req.ClassId)
+	}
 
-	return &types.QueryWasmContractResponse{}, nil
+	return &types.QueryWasmContractResponse{
+		TokenPair: pair,
+	}, nil
 }

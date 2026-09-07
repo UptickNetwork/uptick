@@ -132,8 +132,6 @@ func (am AppModule) QuerierRoute() string {
 func (am AppModule) RegisterServices(cfg module.Configurator) {
 	types.RegisterMsgServer(cfg.MsgServer(), am.keeper)
 	types.RegisterQueryServer(cfg.QueryServer(), am.keeper)
-
-	_ = keeper.NewMigrator(am.keeper)
 }
 
 func (am AppModule) BeginBlock(_ sdk.Context) {}

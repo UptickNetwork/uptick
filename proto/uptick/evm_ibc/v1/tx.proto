@@ -8,7 +8,17 @@ import "ibc/core/client/v1/client.proto";
 
 option go_package = "github.com/UptickNetwork/uptick/x/evmibc/types";
 
-// Msg defines the erc721 Msg service.
+// NOTE (legacy surface): x/evmibc no longer runs as a Cosmos module with its
+// own Msg/Query servers. Since the v0.4.0 IBC v10 rework it is wired purely as
+// an IBC middleware (app/keepers -> evmibc.NewIBCMiddleware) on top of
+// x/erc721 / x/cw721, whose own messages (MsgConvertNFT, MsgTransferERC721,
+// ...) perform the transfers. The Msg service and messages below are therefore
+// NOT registered anywhere: no codec registers them, no msg server is wired and
+// this REST annotation is never served. They are retained only for ABI
+// documentation of the historical transfer surface. Do not rely on them for
+// new clients; removing them requires a proto regeneration.
+//
+// Msg defines the (legacy, unregistered) evmibc Msg service.
 service Msg {
   option (cosmos.msg.v1.service) = true;
   // TransferERC721 defines a method to transfer ERC721 tokens between chains via IBC

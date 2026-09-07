@@ -168,3 +168,107 @@ func TestRefundKeySplitMatchesRegisteredContract(t *testing.T) {
 	require.True(t, strings.EqualFold(rtContract, receivers[0].ContractAddress))
 	require.Equal(t, "42", receivers[0].TokenId)
 }
+
+// TestRefundExportCaseInsensitivePreservesStoredCase: refund keys are written
+// with the caller-supplied casing; export must match registered contracts
+// case-insensitively (bech32) while returning the exact stored prefix so a
+// re-import reproduces the original key.
+func TestRefundExportCaseInsensitivePreservesStoredCase(t *testing.T) {
+	k, ctx := newRoundTripKeeper(t)
+
+	// Register the pair in lowercase...
+	pair := types.NewTokenPair(strings.ToLower(rtContract), "kitty")
+	k.SetTokenPair(ctx, pair)
+	k.SetClassMap(ctx, pair.ClassId, pair.GetID())
+	k.SetCW721Map(ctx, pair.Cw721Address, pair.GetID())
+
+	// ...but store a refund key under the UPPERCASE encoding of the same
+	// address (same bech32 address, different character case).
+	stored := strings.ToUpper(rtContract)
+	k.SetCwAddressByContractTokenId(ctx, stored, "42", rtOwner)
+
+	receivers, err := k.ExportRefundReceivers(ctx)
+	require.NoError(t, err)
+	require.Len(t, receivers, 1)
+	require.Equal(t, stored, receivers[0].ContractAddress, "stored-case prefix must be preserved for exact re-import")
+	require.Equal(t, "42", receivers[0].TokenId)
+	require.Equal(t, rtOwner, receivers[0].Owner)
+}
+
+// TestGenesisPairsCaseInsensitiveRefundContract: genesis validation accepts a
+// refund receiver whose contract is a case-variant of a registered pair
+// (bech32: all-lowercase and all-uppercase encodings are the same address).
+func TestGenesisPairsCaseInsensitiveRefundContract(t *testing.T) {
+	sdk.GetConfig().SetBech32PrefixForAccount("uptick", "uptickpub")
+	bz := make([]byte, 20)
+	for i := range bz {
+		bz[i] = byte(i + 1)
+	}
+	lower := sdk.AccAddress(bz).String()
+	upper := strings.ToUpper(lower)
+
+	pair := types.NewTokenPair(lower, "kitty")
+	gs := types.GenesisState{
+		Params:     types.DefaultParams(),
+		TokenPairs: []types.TokenPair{pair},
+		RefundReceivers: []types.RefundReceiver{
+			{ContractAddress: upper, TokenId: "42", Owner: rtOwner},
+		},
+	}
+	require.NoError(t, gs.Validate())
+}
+
+// TestGetTokenPairsPanicsOnCorruptValue pins the fail-loud contract of the
+// plural pair iterator (mirrors the erc721 test): a corrupt stored pair must
+// panic on the genesis-export path rather than being silently dropped.
+func TestGetTokenPairsPanicsOnCorruptValue(t *testing.T) {
+	key := storetypes.NewKVStoreKey(types.StoreKey)
+	tkey := storetypes.NewTransientStoreKey(types.StoreKey + "-t")
+	cdc := codec.NewProtoCodec(codectypes.NewInterfaceRegistry())
+	k := keeper.NewKeeper(key, cdc, nil, collectionkeeper.Keeper{}, nil, nil)
+	ctx := testutil.DefaultContext(key, tkey)
+
+	store := ctx.KVStore(key)
+	store.Set(append(append([]byte{}, types.KeyPrefixTokenPair...), []byte("x")...), []byte("not-a-proto"))
+
+	require.Panics(t, func() { _ = k.GetTokenPairs(ctx) })
+}
+
+// TestDeletePairPerTokenStateClearsOrphans is the cw721 twin of the erc721
+// cleanup test: removing a pair's per-token state must clear the bidirectional
+// UID bindings and refund receivers for that contract/class only, leaving an
+// unrelated pair's state intact.
+func TestDeletePairPerTokenStateClearsOrphans(t *testing.T) {
+	k, ctx := newRoundTripKeeper(t)
+
+	// Pair A with bindings + refund record...
+	pairA := types.NewTokenPair(rtContract, "kitty")
+	k.SetTokenPair(ctx, pairA)
+	tokenA := types.CreateTokenUID(rtContract, "42")
+	nftA := types.CreateNFTUID("kitty", "custom-nft")
+	k.SetNFTUIDPairByTokenUID(ctx, tokenA, nftA)
+	k.SetNFTUIDPairByNFTUID(ctx, nftA, tokenA)
+	k.SetCwAddressByContractTokenId(ctx, rtContract, "42", rtOwner)
+
+	// ...and an unrelated pair B that must survive untouched.
+	otherContract := "uptick1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq"
+	pairB := types.NewTokenPair(otherContract, "dogs")
+	k.SetTokenPair(ctx, pairB)
+	tokenB := types.CreateTokenUID(otherContract, "7")
+	nftB := types.CreateNFTUID("dogs", "rex")
+	k.SetNFTUIDPairByTokenUID(ctx, tokenB, nftB)
+	k.SetNFTUIDPairByNFTUID(ctx, nftB, tokenB)
+	k.SetCwAddressByContractTokenId(ctx, otherContract, "7", rtOwner)
+
+	k.DeletePairPerTokenState(ctx, pairA)
+
+	// Pair A state is gone...
+	require.Empty(t, k.GetNFTUIDPairByTokenUID(ctx, tokenA))
+	require.Empty(t, k.GetTokenUIDPairByNFTUID(ctx, nftA))
+	require.Empty(t, k.GetCwAddressByContractTokenId(ctx, rtContract, "42"))
+
+	// ...pair B state remains.
+	require.Equal(t, []byte(nftB), k.GetNFTUIDPairByTokenUID(ctx, tokenB))
+	require.Equal(t, []byte(tokenB), k.GetTokenUIDPairByNFTUID(ctx, nftB))
+	require.Equal(t, []byte(rtOwner), k.GetCwAddressByContractTokenId(ctx, otherContract, "7"))
+}

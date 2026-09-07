@@ -1,8 +1,6 @@
 package keeper
 
 import (
-	"encoding/binary"
-
 	"cosmossdk.io/log"
 	storetypes "cosmossdk.io/store/types"
 
@@ -62,14 +60,4 @@ func (k Keeper) GetNFTKeeper() collectionkeeper.Keeper {
 // GetWasmKeeper returns the CosmWasm surface used by this module.
 func (k Keeper) GetWasmKeeper() types.WasmKeeper {
 	return k.wasmKeeper
-}
-
-func Uint64ToBytes(n uint64) []byte {
-	byteArr := make([]byte, 8)
-	binary.BigEndian.PutUint64(byteArr, n)
-	return byteArr
-}
-
-func BytesToUint64(byteArr []byte) uint64 {
-	return binary.BigEndian.Uint64(byteArr)
 }

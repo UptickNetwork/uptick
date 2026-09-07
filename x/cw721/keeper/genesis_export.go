@@ -70,9 +70,11 @@ func (k Keeper) ExportNFTUIDPairs(ctx sdk.Context) ([]types.NFTUIDPair, error) {
 // ExportRefundReceivers returns every recorded IBC refund receiver. Refund
 // store keys are "<contractAddress><tokenID>" concatenations; the contract
 // part is recovered by matching against the registered pair contracts, which
-// is lossless for any address format (the CW721 contract address format is
-// not a fixed-width hex address). Matching is exact: bech32 case is
-// significant. Orphaned records fail the export instead of being dropped.
+// is lossless for any address format. CW721 contracts are bech32: matching is
+// case-insensitive (all-lowercase and all-uppercase encodings are the same
+// address), and the exact stored prefix bytes are returned so re-import
+// reproduces the original key. Orphaned records fail the export instead of
+// being dropped.
 func (k Keeper) ExportRefundReceivers(ctx sdk.Context) ([]types.RefundReceiver, error) {
 	contracts := make([]string, 0)
 	for _, pair := range k.GetTokenPairs(ctx) {
@@ -101,27 +103,29 @@ func (k Keeper) ExportRefundReceivers(ctx sdk.Context) ([]types.RefundReceiver, 
 }
 
 // splitContractTokenKey recovers the (contract, tokenID) parts of a refund
-// store key. The longest registered-contract prefix with a non-empty
-// remainder wins; zero or ambiguous matches are rejected. Matching is exact:
-// CW721 contracts are bech32, so case is significant.
+// store key. The longest registered-contract prefix with a non-empty remainder
+// wins; zero or ambiguous matches are rejected. Matching is case-insensitive
+// because CW721 contracts are bech32 (character case is not significant), and
+// the matched prefix is returned with its ORIGINAL stored casing so that
+// SetGenesisRefundReceiver reconstructs the exact key on import.
 func splitContractTokenKey(contracts []string, key string) (string, string, error) {
-	best := ""
+	best := 0
 	for _, c := range contracts {
-		if len(c) == 0 || len(c) <= len(best) {
+		if len(c) <= best || len(c) >= len(key) {
 			continue
 		}
-		if strings.HasPrefix(key, c) && len(key) > len(c) {
-			best = c
+		if strings.EqualFold(key[:len(c)], c) {
+			best = len(c)
 		}
 	}
-	if best == "" {
+	if best == 0 {
 		return "", "", errors.Wrapf(
 			types.ErrInternalTokenPair,
 			"refund record key %q does not belong to any registered CW721 contract (orphaned refund state)",
 			key,
 		)
 	}
-	return best, key[len(best):], nil
+	return key[:best], key[best:], nil
 }
 
 // SetGenesisNFTUIDPair restores one bidirectional conversion binding during
@@ -135,4 +139,81 @@ func (k Keeper) SetGenesisNFTUIDPair(ctx sdk.Context, pair types.NFTUIDPair) {
 // InitGenesis under the exact store key it was exported from.
 func (k Keeper) SetGenesisRefundReceiver(ctx sdk.Context, receiver types.RefundReceiver) {
 	k.SetCwAddressByContractTokenId(ctx, receiver.ContractAddress, receiver.TokenId, receiver.Owner)
+}
+
+// DeletePairPerTokenState removes the bidirectional NFT UID index entries and
+// IBC refund receivers that belong to pair, so a removed token pair cannot
+// leave orphans that make ExportGenesis fail (mirrors the erc721 keeper).
+//
+// Symmetry note: unlike erc721 there is currently no production path that
+// removes a cw721 token pair (CW721 contracts cannot self-destruct and no
+// message deletes a pair), so today this helper has no live caller. It exists
+// so any future pair-removal path (or governance purge message) cleans the
+// per-token state in exactly the same way as erc721 instead of leaving
+// orphaned UID/refund records behind.
+//
+// Commit semantics: Cosmos SDK state is per-transaction — a write made on a
+// handler path that returns an error is rolled back by baseapp. Callers must
+// therefore only invoke this on paths that end in success.
+func (k Keeper) DeletePairPerTokenState(ctx sdk.Context, pair types.TokenPair) {
+	tokenStore := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixNFTUIDPairByTokenUID)
+	nftStore := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixNFTUIDPairByNFTUID)
+
+	var tokenUIDs []string
+	iter := tokenStore.Iterator(nil, nil)
+	for ; iter.Valid(); iter.Next() {
+		tokenUID := string(iter.Key())
+		_, contract := types.GetNFTFromUID(tokenUID)
+		if strings.EqualFold(contract, pair.Cw721Address) {
+			tokenUIDs = append(tokenUIDs, tokenUID)
+		}
+	}
+	iter.Close()
+
+	for _, tokenUID := range tokenUIDs {
+		nftUID := string(tokenStore.Get([]byte(tokenUID)))
+		tokenStore.Delete([]byte(tokenUID))
+		if nftUID != "" {
+			nftStore.Delete([]byte(nftUID))
+		}
+	}
+
+	var nftUIDs []string
+	reverse := nftStore.Iterator(nil, nil)
+	for ; reverse.Valid(); reverse.Next() {
+		nftUID := string(reverse.Key())
+		_, classID := types.GetNFTFromUID(nftUID)
+		if classID == pair.ClassId {
+			nftUIDs = append(nftUIDs, nftUID)
+		}
+	}
+	reverse.Close()
+
+	for _, nftUID := range nftUIDs {
+		tokenUID := string(nftStore.Get([]byte(nftUID)))
+		nftStore.Delete([]byte(nftUID))
+		if tokenUID != "" {
+			tokenStore.Delete([]byte(tokenUID))
+		}
+	}
+
+	contract := strings.ToLower(pair.Cw721Address)
+	refundStore := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixCwAddressByContractTokenId)
+	refundIter := refundStore.Iterator(nil, nil)
+	var refundKeys [][]byte
+	for ; refundIter.Valid(); refundIter.Next() {
+		key := refundIter.Key()
+		// bech32 is case-insensitive at the character level, so compare
+		// lowercased. The contract part is the full registered address; slicing
+		// on its length keeps the token-id remainder intact.
+		if len(key) > len(contract) && strings.EqualFold(string(key[:len(contract)]), pair.Cw721Address) {
+			keyCopy := make([]byte, len(key))
+			copy(keyCopy, key)
+			refundKeys = append(refundKeys, keyCopy)
+		}
+	}
+	refundIter.Close()
+	for _, key := range refundKeys {
+		refundStore.Delete(key)
+	}
 }

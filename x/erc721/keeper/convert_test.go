@@ -23,8 +23,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/tracing"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
+	"strings"
 
 	collectionkeeper "github.com/UptickNetwork/uptick/x/collection/keeper"
 	collectiontypes "github.com/UptickNetwork/uptick/x/collection/types"
@@ -112,19 +114,98 @@ func TestConvertERC721_Disabled(t *testing.T) {
 	require.ErrorIs(t, err, types.ErrERC721Disabled)
 }
 
-func TestConvertNFT_SelfDestructedPair(t *testing.T) {
+// TestConvertNFT_SelfDestructedPairHealsWithRedeploy pins the Medium finding
+// that the old dead-pair branch wrote deletions the SDK rolls back on its error
+// return (cleanup never persisted, the class stayed stuck). For a
+// module-deployable native class the handler now purges the stale pair and
+// re-deploys a fresh module-owned contract in the SAME successful transaction,
+// so the purge commits together with the new pair and the conversion.
+func TestConvertNFT_SelfDestructedPairHealsWithRedeploy(t *testing.T) {
+	k, ctx, owner := setupConvertKeeper(t)
+	evm := &redeployEVMKeeper{fakeEVMKeeper: &fakeEVMKeeper{accounts: map[common.Address]*statedb.Account{}}}
+	k.evmKeeper = evm
+
+	oldContract := "0x1111111111111111111111111111111111111111"
+	res, err := k.ConvertNFT(ctx, &types.MsgConvertNFT{
+		ClassId:            "kitty",
+		CosmosTokenIds:     []string{"nft1"},
+		EvmContractAddress: oldContract,
+		EvmTokenIds:        []string{"1"},
+		CosmosSender:       owner.String(),
+		EvmReceiver:        "0x2222222222222222222222222222222222222222",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, res)
+
+	// The stale pair (and its lookups) must be gone, and a fresh pair must now
+	// be registered against the re-deployed module contract.
+	require.Empty(t, k.GetTokenPairID(ctx, oldContract))
+	pair, err := k.GetPair(ctx, "kitty")
+	require.NoError(t, err)
+	require.Equal(t, strings.ToLower(evm.deployed().Hex()), pair.Erc721Address)
+	require.NotEqual(t, strings.ToLower(oldContract), pair.Erc721Address)
+
+	// The converted NFT is escrowed on the module account and bound to the
+	// newly deployed contract (one-to-one binding re-established post-purge).
+	got, err := k.nftKeeper.GetNFT(ctx, "kitty", "nft1")
+	require.NoError(t, err)
+	require.Equal(t, types.AccModuleAddress.String(), got.GetOwner().String())
+	require.NotEmpty(t, k.GetNFTPairByContractTokenID(ctx, pair.Erc721Address, "1"))
+}
+
+// TestConvertNFT_SelfDestructedPinnedClassIsTerminal covers classes pinned to
+// an external contract (id "uptick-<addr>"): the module cannot re-deploy that
+// contract, so the conversion is terminal and state is left untouched.
+func TestConvertNFT_SelfDestructedPinnedClassIsTerminal(t *testing.T) {
 	k, ctx, owner := setupConvertKeeper(t)
 	k.evmKeeper = &fakeEVMKeeper{accounts: map[common.Address]*statedb.Account{}}
 
+	pinnedContract := "0x1234567890abcdef1234567890abcdef12345678"
+	pinnedClass := types.CreateClassIDFromContractAddress(pinnedContract)
+	pair := types.NewTokenPair(common.HexToAddress(pinnedContract), pinnedClass)
+	k.SetTokenPair(ctx, pair)
+	k.SetClassMap(ctx, pair.ClassId, pair.GetID())
+	k.SetERC721Map(ctx, pair.GetERC721Contract(), pair.GetID())
+	// A saved binding makes ConvertNFT resolve the canonical contract to the
+	// pair (0x-form) instead of the class-derived (0x-less) form, so the flow
+	// reaches the self-destructed contract check.
+	require.NoError(t, k.SetNFTPairs(ctx, pair.Erc721Address, "1", pinnedClass, "nft1"))
+
 	_, err := k.ConvertNFT(ctx, &types.MsgConvertNFT{
+		ClassId:        pinnedClass,
+		CosmosTokenIds: []string{"nft1"},
+		EvmTokenIds:    []string{"1"},
+		CosmosSender:   owner.String(),
+		EvmReceiver:    "0x2222222222222222222222222222222222222222",
+	})
+	require.ErrorIs(t, err, types.ErrInternalTokenPair)
+
+	// Terminal condition must not mutate any state.
+	require.NotEmpty(t, k.GetTokenPairID(ctx, pinnedContract))
+	_, found := k.GetTokenPair(ctx, k.GetTokenPairID(ctx, pinnedContract))
+	require.True(t, found)
+}
+
+func TestConvertERC721_SelfDestructedPairLeavesStateUntouched(t *testing.T) {
+	k, ctx, owner := setupConvertKeeper(t)
+	k.evmKeeper = &fakeEVMKeeper{accounts: map[common.Address]*statedb.Account{}}
+
+	_, err := k.ConvertERC721(ctx, &types.MsgConvertERC721{
 		ClassId:            "kitty",
 		CosmosTokenIds:     []string{"nft1"},
 		EvmContractAddress: "0x1111111111111111111111111111111111111111",
 		EvmTokenIds:        []string{"1"},
 		CosmosSender:       owner.String(),
-		EvmReceiver:        "0x2222222222222222222222222222222222222222",
+		CosmosReceiver:     owner.String(),
 	})
 	require.ErrorIs(t, err, types.ErrInternalTokenPair)
+
+	// A failing handler cannot commit cleanup, so the stale pair and its
+	// lookups must remain in state (nothing may pretend otherwise).
+	id := k.GetTokenPairID(ctx, "0x1111111111111111111111111111111111111111")
+	require.NotEmpty(t, id)
+	_, found := k.GetTokenPair(ctx, id)
+	require.True(t, found)
 }
 
 func TestRegisterERC721_RejectsExistingNativeClass(t *testing.T) {
@@ -138,21 +219,6 @@ func TestRegisterERC721_RejectsExistingNativeClass(t *testing.T) {
 		ClassId:            "kitty",
 	})
 	require.Error(t, err)
-}
-
-func TestConvertERC721_SelfDestructedPair(t *testing.T) {
-	k, ctx, owner := setupConvertKeeper(t)
-	k.evmKeeper = &fakeEVMKeeper{accounts: map[common.Address]*statedb.Account{}}
-
-	_, err := k.ConvertERC721(ctx, &types.MsgConvertERC721{
-		ClassId:            "kitty",
-		CosmosTokenIds:     []string{"nft1"},
-		EvmContractAddress: "0x1111111111111111111111111111111111111111",
-		EvmTokenIds:        []string{"1"},
-		CosmosSender:       owner.String(),
-		CosmosReceiver:     owner.String(),
-	})
-	require.ErrorIs(t, err, types.ErrInternalTokenPair)
 }
 
 func TestConvertNFT_SuccessMintsERC721(t *testing.T) {
@@ -405,6 +471,41 @@ func (f *fakeEVMKeeper) ApplyMessage(
 	f.lastStateDB = stateDB
 	f.applyCalls++
 	return &evmtypes.MsgEthereumTxResponse{GasUsed: f.gasUsed}, nil
+}
+
+// redeployEVMKeeper wraps fakeEVMKeeper and simulates contract deployment: an
+// EVM CREATE (To == nil with payload) records code at the address the module
+// derives from its nonce, so the post-deploy code-presence check in ConvertNFT
+// sees a live contract. deployed() returns that derived address.
+type redeployEVMKeeper struct {
+	*fakeEVMKeeper
+	deploys int
+}
+
+func (r *redeployEVMKeeper) ApplyMessage(
+	ctx sdk.Context,
+	stateDB *statedb.StateDB,
+	msg core.Message,
+	hooks *tracing.Hooks,
+	commit bool,
+	_ bool,
+	_ bool,
+) (*evmtypes.MsgEthereumTxResponse, error) {
+	if msg.To == nil && len(msg.Data) > 0 {
+		r.deploys++
+		addr := crypto.CreateAddress(common.BytesToAddress(msg.From.Bytes()), msg.Nonce)
+		if r.accounts == nil {
+			r.accounts = map[common.Address]*statedb.Account{}
+		}
+		r.accounts[addr] = &statedb.Account{CodeHash: []byte{1}}
+	}
+	return r.fakeEVMKeeper.ApplyMessage(ctx, stateDB, msg, hooks, commit, false, false)
+}
+
+// deployed returns the address the module derives for its next CREATE from the
+// test account keeper's constant nonce (convertAccountKeeper.GetSequence == 1).
+func (r *redeployEVMKeeper) deployed() common.Address {
+	return crypto.CreateAddress(common.BytesToAddress(types.ModuleAddress.Bytes()), 1)
 }
 
 type stateDBKeeperStub struct{}

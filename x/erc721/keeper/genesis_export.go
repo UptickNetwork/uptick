@@ -212,3 +212,20 @@ func (k Keeper) DeletePairPerTokenState(ctx sdk.Context, pair types.TokenPair) {
 		refundStore.Delete(key)
 	}
 }
+
+// PurgeTokenPair removes a token pair and every piece of state that refers to
+// it: the per-token bidirectional index entries, the IBC refund receivers, and
+// both lookup maps (contract -> pair id, class -> pair id). It is idempotent.
+//
+// IMPORTANT — commit semantics: Cosmos SDK state is transactional per
+// message-execution. Any write performed on a handler path that eventually
+// returns an error is rolled back by baseapp, so PurgeTokenPair must only be
+// invoked from a path that ends in success (or from tests / a future
+// governance message), otherwise the purge silently never persists. See
+// Keeper.ConvertNFT for the one production caller that uses it this way.
+func (k Keeper) PurgeTokenPair(ctx sdk.Context, pair types.TokenPair) {
+	k.DeletePairPerTokenState(ctx, pair)
+	k.DeleteTokenPair(ctx, pair)
+	k.DeleteERC721Map(ctx, pair.GetERC721Contract())
+	k.DeleteClassMap(ctx, pair.ClassId)
+}

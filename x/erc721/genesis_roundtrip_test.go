@@ -220,3 +220,42 @@ func TestGetTokenPairsPanicsOnCorruptValue(t *testing.T) {
 
 	require.Panics(t, func() { _ = k.GetTokenPairs(ctx) })
 }
+
+// TestGenesisRoundTripPreservesDualKeyRefundReceivers covers the runtime
+// refund store writing TWO keys per receiver (cosmos NFT id and EVM token id)
+// and requires export -> import to preserve both, not just the first one.
+func TestGenesisRoundTripPreservesDualKeyRefundReceivers(t *testing.T) {
+	k, ctx := newRoundTripKeeper(t)
+	pair := types.NewTokenPair(common.HexToAddress(rtContract), "kitty")
+	k.SetTokenPair(ctx, pair)
+	k.SetClassMap(ctx, pair.ClassId, pair.GetID())
+	k.SetERC721Map(ctx, common.HexToAddress(rtContract), pair.GetID())
+
+	// cosmos NFT id "42" and EVM token id "99" for the same owner.
+	k.SetEvmAddressByContractTokenId(ctx, rtContract, "42", rtOwner)
+	k.SetEvmAddressByContractTokenId(ctx, rtContract, "99", rtOwner)
+
+	exported := ExportGenesis(ctx, k)
+	require.Len(t, exported.RefundReceivers, 2, "both refund keys must be exported")
+
+	k2, ctx2 := newRoundTripKeeper(t)
+	importedPair := types.NewTokenPair(common.HexToAddress(rtContract), "kitty")
+	k2.SetTokenPair(ctx2, importedPair)
+	k2.SetClassMap(ctx2, importedPair.ClassId, importedPair.GetID())
+	k2.SetERC721Map(ctx2, common.HexToAddress(rtContract), importedPair.GetID())
+	require.NoError(t, importPerTokenState(ctx2, k2, *exported))
+
+	require.Equal(t, []byte(rtOwner), k2.GetEvmAddressByContractTokenId(ctx2, rtContract, "42"))
+	require.Equal(t, []byte(rtOwner), k2.GetEvmAddressByContractTokenId(ctx2, rtContract, "99"))
+	// The runtime lookup helper checks the cosmos-id key first, then the EVM
+	// token-id key — both must resolve after the round trip.
+	require.Equal(t, []byte(rtOwner), k2.GetEvmRefundReceiver(ctx2, rtContract, "42", "99"))
+
+	// Re-export must reproduce the first export byte-for-byte.
+	reExported := ExportGenesis(ctx2, k2)
+	first, err := exported.Marshal()
+	require.NoError(t, err)
+	second, err := reExported.Marshal()
+	require.NoError(t, err)
+	require.Equal(t, first, second, "dual-key refund state must round-trip losslessly")
+}

@@ -4,7 +4,7 @@ package uptick.erc721.v1;
 import "gogoproto/gogo.proto";
 import "uptick/erc721/v1/erc721.proto";
 
-option go_package = "github.com/UptickNetwork/evm-nft-convert/types";
+option go_package = "github.com/UptickNetwork/uptick/x/erc721/types";
 
 // GenesisState defines the module's genesis state.
 // Keep this file in sync with proto/uptick/erc721/v1/genesis.proto — that

@@ -42,11 +42,45 @@ Ref: https://keepachangelog.com/en/1.0.0/
 * (security) Enforce a strict one-to-one NFT mapping for ERC721/CW721 conversions so a caller's own NFT can no longer release a module-escrowed token bound to a different NFT (C-1).
 * (security) Fix the ERC721 IBC refund ordering: release the IBC-escrowed NFT to the module account before reversing the conversion, eliminating a permanent fund lock on error/timeout (C-2).
 * (security) Pin the resolved class ID and contract address to the registered token pair, blocking minting into arbitrary third-party denoms or external compatible contracts (H-1 / M-01).
+* (erc721) Heal a self-destructed token pair on the native→ERC721 conversion path: the stale pair and its per-token bindings/refund records are purged and a fresh module contract is deployed in the same successful transaction (the previous cleanup ran inside an erroring handler, where the SDK rolls all writes back, so the pair stayed stuck forever). Classes pinned to an external contract (`uptick-<addr>`) remain a terminal error.
+* (erc721/cw721) Export and import the per-token conversion bindings and IBC refund receivers in genesis (`nft_uid_pairs`, `refund_receivers`) so reverse conversions and refunds survive an export/import round-trip (H-02).
+* (collection) Empty optional fields now mean "keep the current value"; the new `[remove]` sentinel explicitly clears a field (M-1). `[remove]` is a reserved literal.
+* (collection) Reserve the `uptick-` denom prefix for module-derived NFT classes; `MsgIssueDenom` rejects it (M-8 griefing protection).
+* (ante) Reject malleable high-s EIP-712 signatures (EIP-2 low-s requirement).
+
+### Client Breaking
+
+* (collection) `MsgEditNFT` / `MsgUpdateNFT` / `MsgTransferNFT` treat an empty string as "do not modify"; clients that previously cleared a field by sending `""` must send `[remove]` instead (M-1).
+* (collection) `MsgIssueDenom` no longer accepts `uptick-`-prefixed denom ids (M-8).
+
+### Features
+
+* (evm) Activate the EVM static precompiles (bank, staking, distribution, ICS20, gov, slashing, bech32, p256) on upgrade and for fresh chains — v0.4.0 shipped the `ActiveStaticPrecompiles` param empty (M-6 #1).
+* (ibc) Enable the ICA controller submodule on upgrade (legacy genesis templates default it to disabled).
+* (keplr) Accept Keplr Web3-extension EIP-712 transactions: legacy `/ethermint.types.v1.ExtensionOptionsWeb3Tx` and `/ethermint.crypto.v1.ethsecp256k1.PubKey` type URLs map onto the complete cosmos/evm types at runtime (v0.4.1 Keplr compatibility).
+* (erc721/cw721) Reject commas in denom ids and make the NFT-mapping UID parser split on the last comma, keeping NFT UID round-trips safe (L-3).
 
 ### Improvements
 
-* (ci) Run CI on push to any `release/**` branch.
+* (ante) EIP-712 signature verification copies the fee-payer signature before recovery-offset normalization so CheckTx can no longer mutate a shared mempool transaction; bind the signer pubkey self-containedly (M-2); scan every tx extension option for routing (P3-10).
+* (ante/authz) Disallow authorizing software-upgrade, cancel-upgrade and IBC client update/upgrade messages through authz `MsgExec` (nested `MsgExec` cannot bypass the limiter).
+* (erc721) Cap the internal EVM gas budget of conversion calls to the SDK transaction's remaining gas and meter used EVM gas back to the SDK gas meter (H-01/L-6).
+* (upgrade) v0.4.0 handler: fail loudly with a complete report instead of an opaque halt when the legacy collection store contains records that would abort the 1→2 migration (L-4); collect every failing legacy auth account in one pass (P2-3).
+* (upgrade) Register legacy `EthAccount` and erc20 proposal types for genesis bootstrap/export and legacy pubkey retention (M-7/P2-8).
+* (genesis) erc721/cw721 genesis validation rejects empty, duplicated, or pair-unrelated per-token bindings and refund receivers instead of panicking in `InitGenesis` (H-02 follow-up).
+* (contracts) Pin OpenZeppelin and solc; add checksums and deterministic recompile + artifact-integrity verification to CI (L-11, R-NEW-3).
+* (ci) golangci-lint v2.13.2 (v2 config schema); run CI on every `release/**` push; drop the flaky e2e-keplr-eip712 job; contract bytecode reproducibility job.
 * (cli) Default `uptickd testnet --print-mnemonic` to `false`.
+* (docker) Run as a non-root user and add a healthcheck.
+* (build) Add the `ledger` build tag to goreleaser artifacts.
+* (erc721/cw721) Document the per-transaction commit semantics of pair/per-token cleanup; give CW721 a symmetric `DeletePairPerTokenState` and case-insensitive (bech32) refund-key handling in genesis export/validation; make the `WasmContract` query return the registered pair or `NotFound` instead of an empty success.
+* (cli) `uptickd migrate` explains that offline genesis migration is unsupported (upgrade in-app) instead of reporting an opaque "unknown migration function".
+
+### Bug Fixes
+
+* (erc721) Register a legacy alias so `MsgConvertERC721CustomGetSigner`-style signing keeps working; normalise token ids as base-10 uint256; document CLI semantics for `convert-nft` (81bfd1d).
+* (collection) Tolerate nil-`Data` NFTs during genesis export; reject NUL/comma and over-length schema/data inputs with bounded limits.
+* (ante) Reject an empty/blank NFT name only when a non-empty value was supplied (M-1).
 
 ## v0.4.0 - Unreleased
 
