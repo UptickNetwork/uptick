@@ -23,15 +23,13 @@ import (
 	"github.com/UptickNetwork/uptick/x/erc721/types"
 )
 
-// CallEVMWithData must never hand the EVM interpreter a
-// budget larger than the SDK transaction's remaining gas. Before the fix the
-// internal GasLimit was pinned to config.DefaultGasCap (25M) regardless of the
-// tx gas, so a caller-supplied external contract (e.g. name() during
-// RegisterERC721) could burn the full 25M inside the EVM before the post-hoc
-// ConsumeGas ever ran — and consumed CPU cannot be rolled back with the state.
+// CallEVMWithData must never hand the EVM interpreter a gas budget larger than
+// the SDK transaction's remaining gas: a caller-supplied external contract
+// (e.g. name() during RegisterERC721) could otherwise burn the full gas cap
+// inside the EVM, and consumed CPU cannot be rolled back with the state.
 //
-// The mock EVM keeper captures the core.Message actually delivered to
-// ApplyMessage; the fix is correct only if the captured GasLimit equals
+// The mock EVM keeper captures the core.Message delivered to ApplyMessage;
+// the captured GasLimit must equal
 // min(ctx.GasMeter().GasRemaining(), config.DefaultGasCap) in every scenario.
 type gasBudgetEvmKeeper struct {
 	types.EVMKeeper // embedded (nil) — unused methods are never reached

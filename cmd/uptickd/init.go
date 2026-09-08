@@ -121,8 +121,8 @@ func InitCmd(mbm module.BasicManager, defaultNodeHome string) *cobra.Command {
 			defaultDenom, _ := cmd.Flags().GetString(genutilcli.FlagDefaultBondDenom)
 
 			// use os.Stat to check if the file exists
-			_, err = os.Stat(genFile)
-			if !overwrite && !os.IsNotExist(err) {
+			_, statErr := os.Stat(genFile)
+			if !overwrite && !os.IsNotExist(statErr) {
 				return fmt.Errorf("genesis.json file already exists: %v", genFile)
 			}
 
@@ -139,15 +139,15 @@ func InitCmd(mbm module.BasicManager, defaultNodeHome string) *cobra.Command {
 			}
 
 			appGenesis := &types.AppGenesis{}
-			if _, err := os.Stat(genFile); err != nil {
-				if !os.IsNotExist(err) {
-					return err
-				}
-			} else {
+			if statErr == nil {
+				// Reuse the stat result above: a stat error here means the file is
+				// missing/unreadable, so start from a fresh AppGenesis.
 				appGenesis, err = types.AppGenesisFromFile(genFile)
 				if err != nil {
 					return errors.Wrap(err, "Failed to read genesis doc from file")
 				}
+			} else if !os.IsNotExist(statErr) {
+				return statErr
 			}
 
 			// Get initial height

@@ -122,7 +122,7 @@ func newCosmosAnteHandler(options HandlerOptions) sdk.AnteHandler {
 		}
 
 		decorators := []sdk.AnteDecorator{
-			NewMessageSecurityDecorator(options.Cdc, options.EvmKeeper, options.MaxTxGasWanted),
+			NewMessageSecurityDecorator(options.Cdc, options.MaxTxGasWanted),
 			NewValidatorCommissionDecorator(options.Cdc),
 		}
 		if options.TXCounterStoreService != nil {
@@ -177,7 +177,7 @@ func newCosmosAnteHandlerEip712(options HandlerOptions) sdk.AnteHandler {
 		}
 
 		decorators := []sdk.AnteDecorator{
-			NewMessageSecurityDecorator(options.Cdc, options.EvmKeeper, options.MaxTxGasWanted),
+			NewMessageSecurityDecorator(options.Cdc, options.MaxTxGasWanted),
 			NewValidatorCommissionDecorator(options.Cdc),
 		}
 		if options.TXCounterStoreService != nil {
@@ -193,7 +193,7 @@ func newCosmosAnteHandlerEip712(options HandlerOptions) sdk.AnteHandler {
 			cosmosante.NewAuthzLimiterDecorator(options.disabledAuthzMsgs()...),
 			ante.NewSetUpContextDecorator(),
 			wasmkeeper.NewLimitSimulationGasDecorator(simGasLimit),
-			// M-01: accept exactly the Web3 extension the EIP-712 signature
+			// accept exactly the Web3 extension the EIP-712 signature
 			// verifier requires. The previous DynamicFee-only checker rejected
 			// valid Keplr txs with "unknown extension options" before they
 			// could reach Eip712SigVerificationDecorator below.

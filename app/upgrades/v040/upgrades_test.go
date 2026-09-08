@@ -90,13 +90,8 @@ func TestMigrateLegacyEVMAccounts(t *testing.T) {
 	require.Equal(t, uint64(3), baseAccount.Sequence)
 }
 
-// TestMigrateLegacyEVMAccountsSkipsVesting ensures the account migration
-// iterating over the auth store can decode (and safely skip) vesting accounts
-// such as PeriodicVestingAccount. Without registering the vesting types in
-// newLegacyAccountCodec, replay of an upgrade on a chain holding vesting
-// accounts fails with "no concrete type registered for type URL
-// /cosmos.vesting.v1beta1.PeriodicVestingAccount against interface
-// *types.AccountI".
+// TestMigrateLegacyEVMAccountsSkipsVesting ensures the account migration can
+// decode (and safely skip) vesting accounts such as PeriodicVestingAccount.
 func TestMigrateLegacyEVMAccountsSkipsVesting(t *testing.T) {
 	reg := codectypes.NewInterfaceRegistry()
 	authtypes.RegisterInterfaces(reg)
@@ -145,11 +140,9 @@ func TestMigrateLegacyEVMAccountsSkipsVesting(t *testing.T) {
 }
 
 // TestMigrateLegacyEVMAccountsAggregatesFailures ensures the auth migration
-// (audit P2-3) scans the FULL auth store and reports every undecodable account
-// in one aggregated error, instead of aborting at the first bad record. A
-// rehearsal on a state snapshot therefore surfaces all problem accounts at
-// once. The error must still be returned (fail-closed) because a skipped
-// legacy EthAccount would be unreadable after the upgrade.
+// scans the full store and reports every undecodable account in one aggregated
+// error (fail-closed: a skipped legacy EthAccount would be unreadable after
+// the upgrade) instead of aborting at the first bad record.
 func TestMigrateLegacyEVMAccountsAggregatesFailures(t *testing.T) {
 	cdc := codec.NewProtoCodec(codectypes.NewInterfaceRegistry())
 	authtypes.RegisterInterfaces(cdc.InterfaceRegistry())

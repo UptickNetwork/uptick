@@ -67,13 +67,12 @@ func TestValidateNoMappingConflict_RejectsAnyConflictingBatchEntry(t *testing.T)
 	require.True(t, errorsmod.IsOf(err, types.ErrNFTMappingConflict), "got %v", err)
 }
 
-// Regression for the "validate before mutate" fix: convertEvm2Cosmos must reject
-// a conflicting binding before it mints or transfers the NFT. Without the guard
-// the conversion reaches the EVM/nft keepers first, and the conflict only
-// surfaces in SetNFTPairs after the side effects exist.
+// convertEvm2Cosmos must reject a conflicting binding before it mints or
+// transfers the NFT — the conflict must not surface only after side effects
+// exist.
 //
-// The minimal harness leaves the EVM keeper nil, so reaching any EVM call panics
-// — a clean pass therefore also proves the guard runs before those calls.
+// The minimal harness leaves the EVM keeper nil, so reaching any EVM call
+// panics; a clean pass also proves the guard runs before those calls.
 func TestConvertEvm2Cosmos_RejectsConflictBeforeAnySideEffect(t *testing.T) {
 	t.Parallel()
 

@@ -106,9 +106,14 @@ func (k Keeper) Collection(c context.Context, request *types.QueryCollectionRequ
 	for _, token := range result.Nfts {
 		owner := k.nk.GetOwner(ctx, request.DenomId, token.Id)
 
-		nftMetadata, err := types.UnmarshalNFTMetadata(k.cdc, token.Data.GetValue())
-		if err != nil {
-			return nil, err
+		// A legacy / migrated NFT may carry nil Data or undecodable metadata.
+		// Match GetNFTs: downgrade to empty metadata so every minted NFT
+		// shows up in the Collection query.
+		nftMetadata, mdErr := types.UnmarshalNFTMetadata(k.cdc, token.Data.GetValue())
+		if mdErr != nil {
+			ctx.Logger().Debug("Collection: NFT with undecodable metadata; substituting empty",
+				"denom", request.DenomId, "token_id", token.Id, "err", mdErr.Error())
+			nftMetadata = types.NFTMetadata{}
 		}
 
 		nfts = append(nfts, types.BaseNFT{
@@ -157,9 +162,11 @@ func (k Keeper) Denoms(c context.Context, req *types.QueryDenomsRequest) (*types
 
 	var denoms []types.Denom
 	for _, class := range result.Classes {
+		// GetDenomInfo now tolerates nil Data (post M-C fix); only real
+		// errors (e.g. class vanished between iterations) bubble up.
 		d, err := k.GetDenomInfo(ctx, class.Id)
 		if err != nil {
-			return nil, err
+			return nil, status.Errorf(codes.NotFound, "denom %s: %s", class.Id, err.Error())
 		}
 		denoms = append(denoms, *d)
 	}

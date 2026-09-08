@@ -10,14 +10,10 @@ import (
 	"github.com/UptickNetwork/uptick/x/cw721/types"
 )
 
-// Regression for M-01: bech32 addresses decode identically from their
-// all-lowercase and all-uppercase spellings. The keeper used to key every
-// map by the raw string, so the uppercase alias of an already-registered
-// contract was treated as unregistered and created a second token pair —
-// which then failed genesis validation (its duplicate check is
-// case-insensitive). After the fix the keeper canonicalizes the address, so
-// both spellings resolve to the same pair and the second registration is
-// rejected.
+// Bech32 addresses decode identically from their all-lowercase and
+// all-uppercase spellings; the keeper canonicalizes the address, so a second
+// registration using the uppercase alias of an already-registered contract
+// is rejected.
 func TestAudit_CW721CaseAliasCannotRegisterTwice(t *testing.T) {
 	k, ctx, owner, _, _ := setupConvertKeeper(t)
 

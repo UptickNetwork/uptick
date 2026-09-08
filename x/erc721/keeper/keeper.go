@@ -63,6 +63,11 @@ func (k *Keeper) SetICS4Wrapper(ics4Wrapper porttypes.ICS4Wrapper) error {
 	return nil
 }
 
+// GetVoucherClassID returns the canonical IBC voucher class ID for a given
+// (port, channel, originalClassID) tuple.
+//
+// KEEP-IN-SYNC: duplicated in x/evmibc/keeper/keeper.go (the keepers cannot
+// import each other). Bodies MUST stay byte-identical.
 func (k *Keeper) GetVoucherClassID(port string, channel string, classId string) string {
 	// since SendPacket did not prefix the classID, we must prefix classID here
 	classPrefix := ibcnfttransfertypes.GetClassPrefix(port, channel)

@@ -82,10 +82,10 @@ func TestKeplrEip712TransferEndToEnd(t *testing.T) {
 		rest = "http://127.0.0.1:1317"
 	}
 	if !restReachable(rest) {
-		// Audit CI-gap: in the dedicated e2e job (UPTICK_E2E_STRICT=1) a
-		// missing node is a failure, not a skip — `go test ./...` passing
+		// In the dedicated e2e job (UPTICK_E2E_STRICT=1) a missing
+		// node is a failure, not a skip — `go test ./...` passing
 		// locally with this suite skipped proves nothing about real
-		// Keplr broadcast paths (see M-01).
+		// Keplr broadcast paths.
 		if os.Getenv("UPTICK_E2E_STRICT") == "1" {
 			t.Fatalf("no uptick node reachable at %s; the CI e2e job must never skip", rest)
 		}

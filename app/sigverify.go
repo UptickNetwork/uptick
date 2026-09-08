@@ -38,7 +38,7 @@ func SigVerificationGasConsumer(
 	switch pubkey := pubkey.(type) {
 
 	case *ethsecp256k1.PubKey, *secp256k1.PubKey:
-		// Ethereum keys
+		// Same secp256k1 curve, same ecrecover cost; both types share this case.
 		meter.ConsumeGas(secp256k1VerifyCost, "ante verify: eth_secp256k1")
 		return nil
 	case *ed25519.PubKey:

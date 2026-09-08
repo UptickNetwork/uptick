@@ -50,7 +50,10 @@ func MigrateGenesisCmd() *cobra.Command {
 		Short: "Migrate genesis to a specified target version",
 		Long:  "Migrate the source genesis into the target version and print to STDOUT.",
 		Example: fmt.Sprintf(
-			"%s migrate v3 /path/to/genesis.json --chain-id=uptick_117-1 --genesis-time=2022-04-01T17:00:00Z",
+			// v0.4.x upgrades run in place via the on-chain x/upgrade handler,
+			// not offline genesis migration; the command returns an error.
+			"%s migrate v3 /path/to/genesis.json --chain-id=uptick_117-1 --genesis-time=2022-04-01T17:00:00Z\n"+
+				"# offline migration is disabled in this build; use MsgSoftwareUpgrade instead",
 			version.AppName,
 		),
 		Args: cobra.ExactArgs(2),
@@ -60,12 +63,9 @@ func MigrateGenesisCmd() *cobra.Command {
 			target := args[0]
 			importGenesis := args[1]
 
-			// No legacy genesis migrations are registered for the v0.4.x line:
-			// state upgrades are performed in place through the on-chain
-			// x/upgrade handler (see docs/guides/upgrades), not by re-writing a
-			// genesis file offline. Fail early with clear guidance instead of
-			// making the operator read the whole file and then hit an opaque
-			// "unknown migration function" error.
+			// v0.4.x registers no offline genesis migrations; state upgrades run
+			// in place through the on-chain x/upgrade handler. Fail early with
+			// clear guidance.
 			if len(migrationMap) == 0 {
 				return fmt.Errorf(
 					"offline genesis migration is not supported: %s registers no legacy genesis migration callbacks. "+

@@ -74,11 +74,8 @@ func TestRefundPacketToken_MissingReceiver(t *testing.T) {
 	require.ErrorIs(t, err, errortypes.ErrInvalidAddress)
 }
 
-// Regression: when the module account no longer owns the
-// CW721 the refund must be skipped instead of returning an error. An error here
-// propagates out of the IBC OnTimeout/OnAcknowledgement callback, so the
-// relayer's MsgTimeout/MsgAcknowledgement can never succeed and the packet is
-// stranded forever.
+// When the module account no longer owns the CW721 the refund must be skipped
+// instead of returning an error (an error would strand the IBC packet).
 func TestRefundPacketToken_SkipsWhenModuleDoesNotOwnToken(t *testing.T) {
 	k, ctx, owner, contract, wasm := setupConvertKeeper(t)
 
@@ -174,6 +171,66 @@ func TestModuleOwnsCW721(t *testing.T) {
 	require.True(t, moduleOwnsCW721(cw721types.AccModuleAddress.String()))
 	require.False(t, moduleOwnsCW721("uptick1someoneelse"))
 	require.False(t, moduleOwnsCW721(""))
+}
+
+// Defense-in-depth: if the native NFT is already gone when the refund runs,
+// the burn step must be skipped instead of returning an error.
+func TestRefundPacketToken_SkipsWhenNativeNFTAlreadyGone(t *testing.T) {
+	k, ctx, owner, contract, wasm := setupConvertKeeper(t)
+
+	require.NoError(t, k.SetNFTPairs(ctx, contract, "1", "kitty", "nft1"))
+	moveNFTToModule(t, k, ctx, owner, "kitty", "nft1")
+	wasm.setOwner(contract, "1", cw721types.AccModuleAddress.String())
+	k.SetCwAddressByContractTokenId(ctx, contract, "1", owner.String())
+
+	// Simulate the NFT being gone before the burn step. The cw721 side
+	// still thinks the module escrows it; only the native side is empty.
+	require.NoError(t, k.nftKeeper.NFTkeeper().Burn(ctx, "kitty", "nft1"))
+
+	err := k.RefundPacketToken(ctx, ibcnfttransfertypes.NonFungibleTokenPacketData{
+		ClassId:  "kitty",
+		TokenIds: []string{"nft1"},
+	})
+	require.NoError(t, err, "a missing NFT must skip the burn, not abort the IBC callback")
+
+	// The skip event carries the reason so operators can distinguish this
+	// case from the cw721-side skip.
+	skip := findEvent(ctx.EventManager().Events(), cw721types.EventTypeRefundPacketTokenSkip)
+	require.NotNil(t, skip)
+	require.Equal(t, "nft_already_gone", refundAttr(*skip)["reason"])
+}
+
+// Defense-in-depth: the native NFT exists but is owned by a
+// non-module address (e.g. already refunded on a parallel path). Burn must
+// be skipped instead of returning an error from BurnNFT.
+func TestRefundPacketToken_SkipsWhenNativeNFTOwnerIsNotModule(t *testing.T) {
+	k, ctx, owner, contract, wasm := setupConvertKeeper(t)
+
+	require.NoError(t, k.SetNFTPairs(ctx, contract, "1", "kitty", "nft1"))
+	moveNFTToModule(t, k, ctx, owner, "kitty", "nft1")
+	// cw721 side happy; the native NFT moved elsewhere (a parallel refund path).
+	wasm.setOwner(contract, "1", cw721types.AccModuleAddress.String())
+	k.SetCwAddressByContractTokenId(ctx, contract, "1", owner.String())
+	// Re-acquire from module and re-issue to a fresh user via the underlying
+	// nft keeper so the collection-level state is updated without going
+	// through the message-server path.
+	require.NoError(t, k.nftKeeper.NFTkeeper().Transfer(ctx, "kitty", "nft1", owner))
+
+	err := k.RefundPacketToken(ctx, ibcnfttransfertypes.NonFungibleTokenPacketData{
+		ClassId:  "kitty",
+		TokenIds: []string{"nft1"},
+	})
+	require.NoError(t, err, "an NFT not held by module must skip the burn")
+
+	sk := findEvent(ctx.EventManager().Events(), cw721types.EventTypeRefundPacketTokenSkip)
+	require.NotNil(t, sk)
+	require.Equal(t, "nft_owner_not_module", refundAttr(*sk)["reason"])
+	require.Equal(t, owner.String(), refundAttr(*sk)[cw721types.AttributeKeyNFTOwner])
+
+	// The recipient is not double-burned: it still owns the NFT.
+	curr, err := k.nftKeeper.GetNFT(ctx, "kitty", "nft1")
+	require.NoError(t, err)
+	require.NotEmpty(t, curr.GetID())
 }
 
 func TestQueryCW721TokenOwner(t *testing.T) {

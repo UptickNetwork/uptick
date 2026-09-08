@@ -16,10 +16,9 @@ func (f fakeCVModule) ConsensusVersion() uint64 { return f.v }
 // ConsensusVersion.
 type fakeNoCVModule struct{}
 
-// Regression for P2-1: the guard used to `return false` when ANY module in
-// the manager lacked ConsensusVersion. Because the manager always contains
-// two such light-client modules, the guard could never return true and the
-// v040 skip-branch was dead code. It must now skip those modules instead.
+// UpgradeAlreadyApplied must return true even when the module manager contains
+// modules without a ConsensusVersion (light-client / genesis-only AppModules);
+// those modules are skipped rather than blocking the guard.
 func TestAudit_UpgradeGuardReachable(t *testing.T) {
 	b := Toolbox{
 		ModuleManager: &module.Manager{Modules: map[string]any{

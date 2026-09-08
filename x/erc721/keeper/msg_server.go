@@ -31,12 +31,10 @@ func parseERC721TokenID(tokenID string) (*big.Int, error) {
 	return n, nil
 }
 
-// pairContractRedeployable reports whether a class whose pair contract lost its
-// code can be healed by deploying a fresh module-owned contract. Plain native
-// classes (whose contract was deployed by the module and whose id does not
-// encode a contract address) are re-deployable. Classes derived from a
-// contract address ("uptick-<addr>") are pinned to that external contract —
-// the class id IS the contract identity — and cannot be re-deployed.
+// pairContractRedeployable reports whether a class whose pair contract lost
+// its code can be healed by deploying a fresh module-owned contract. Classes
+// derived from a contract address ("uptick-<addr>") are pinned to that
+// external contract and cannot be re-deployed.
 func (k Keeper) pairContractRedeployable(classID string) bool {
 	return !strings.HasPrefix(classID, types.DefaultPrefix+"-")
 }
@@ -133,7 +131,11 @@ func (k Keeper) ConvertERC721(
 	}
 	sender := common.BytesToAddress(bech32Address.Bytes())
 
-	id := k.GetTokenPairID(ctx, msg.EvmContractAddress)
+	// Probe the EVM contract map directly rather than routing through
+	// GetTokenPairID: that helper dispatches by string shape and a caller that
+	// reuses an already-canonical lowercase hex address here would always
+	// resolve via the contract map anyway.
+	id := k.GetERC721Map(ctx, common.HexToAddress(msg.EvmContractAddress))
 	if len(id) == 0 {
 
 		_, err := k.RegisterERC721(ctx, msg)
@@ -154,15 +156,10 @@ func (k Keeper) ConvertERC721(
 	// field; self-destructed contracts still have EmptyCodeHash. Match
 	// upstream x/erc20: HasCodeHash is false for nil, empty, and EmptyCodeHash.
 	if acc == nil || !acc.HasCodeHash() {
-		// ERC721 -> Cosmos conversion requires minting/metadata calls against the
-		// pair contract, so a contract without code is terminal for this
-		// direction: the module cannot re-create an externally-owned contract and
-		// the caller's ERC721 tokens are gone with it. Note that this handler
-		// must NOT attempt to purge the pair here -- the SDK rolls back every
-		// write made on a handler path that returns an error, so the purge would
-		// silently never commit and only mislead readers. Recovery for the class
-		// happens through ConvertNFT, which purges the stale pair and re-deploys
-		// a fresh module contract in a succeeding transaction (see below).
+		// ERC721 -> Cosmos conversion requires a live pair contract; a contract
+		// without code is terminal for this direction. Do NOT purge the pair
+		// here — writes on a failing handler path are rolled back by the SDK.
+		// Recovery happens through ConvertNFT (purge + re-deploy).
 		k.Logger(ctx).Warn(
 			"erc721 pair contract self-destructed; conversion is terminal, state left untouched",
 			"class", pair.ClassId,
@@ -171,11 +168,9 @@ func (k Keeper) ConvertERC721(
 		return nil, sdkerrors.Wrapf(types.ErrInternalTokenPair, "erc721 contract %s is self-destructed", pair.Erc721Address)
 	}
 
-	// Pin the resolved class ID to the pair's canonical class. If the caller
-	// supplied a ClassId that differs from the registered pair (e.g. minting an
-	// NFT into an arbitrary third-party denom), reject it. This binds the
-	// conversion to the registered token pair and blocks minting into
-	// non-canonical / attacker-controlled denoms.
+	// Pin the conversion to the pair's canonical class: a caller-supplied
+	// ClassId that differs from the registered pair is rejected so NFTs
+	// cannot be minted into arbitrary third-party denoms.
 	if msg.ClassId != "" && msg.ClassId != pair.ClassId {
 		return nil, sdkerrors.Wrapf(
 			types.ErrClassIdNotCorrect,
@@ -231,7 +226,10 @@ func (k Keeper) ConvertNFT(
 
 	// Error checked during msg validation
 	receiver := common.HexToAddress(msg.EvmReceiver)
-	id := k.GetTokenPairID(ctx, msg.EvmContractAddress)
+	// Probe the EVM contract map directly rather than routing through
+	// GetTokenPairID: that helper dispatches by string shape and the address
+	// here is already canonical lowercase hex.
+	id := k.GetERC721Map(ctx, common.HexToAddress(msg.EvmContractAddress))
 	if len(id) == 0 {
 		_, err := k.RegisterNFT(ctx, msg)
 		if err != nil {
@@ -244,12 +242,9 @@ func (k Keeper) ConvertNFT(
 		return nil, err
 	}
 
-	// Pin the resolved class ID to the pair's canonical class. Resolving the
-	// pair from msg.ClassId through the class-id map must stay consistent:
-	// if the pair's canonical class differs (e.g. the class id is a
-	// hex-address-shaped denom colliding with a registered contract), reject
-	// the conversion instead of minting into the wrong namespace. This mirrors
-	// the symmetric check in ConvertERC721.
+	// Pin the conversion to the pair's canonical class (mirrors ConvertERC721):
+	// a mismatch, e.g. a hex-address-shaped denom colliding with a registered
+	// contract, must be rejected instead of minting into the wrong namespace.
 	if msg.ClassId != pair.ClassId {
 		return nil, sdkerrors.Wrapf(
 			types.ErrClassIdNotCorrect,
@@ -258,19 +253,11 @@ func (k Keeper) ConvertNFT(
 		)
 	}
 
-	// Self-heal a pair whose ERC721 contract no longer has code (self-destructed
-	// or otherwise lost). SDK state is per-transaction: every write performed on
-	// a handler path that later returns an error is rolled back (baseapp only
-	// commits the tx cache when the whole tx succeeds), so a stale pair can
-	// never be purged from inside a failing call.
-	//
-	// For classes the module can re-materialize (plain native classes whose
-	// contract was deployed by the module), purge the stale pair and deploy a
-	// fresh contract in the SAME successful transaction: the purge then commits
-	// together with the new pair and the conversion, which is the only way the
-	// cleanup can persist. Classes pinned to an external contract (class id
-	// derived from the contract address, "uptick-<addr>") cannot be re-deployed
-	// — the class↔contract identity is fixed — so those remain a terminal error.
+	// Self-heal a pair whose ERC721 contract no longer has code. SDK writes
+	// made on a failing handler path are rolled back, so a stale pair can
+	// never be purged from inside a failing call: for module-redeployable
+	// classes the purge + fresh deploy must happen in THIS successful
+	// transaction. Classes pinned to an external contract stay terminal.
 	erc721 := common.HexToAddress(pair.Erc721Address)
 	acc := k.evmKeeper.GetAccountWithoutBalance(ctx, erc721)
 
@@ -395,10 +382,8 @@ func (k Keeper) convertCosmos2Evm(
 			}
 		} else {
 			// Enforce a strict one-to-one NFT mapping before releasing the
-			// module-escrowed ERC721. The user-supplied (classID, nftID) MUST
-			// equal the persisted binding for this (contract, tokenID). If it
-			// does not, an attacker could pair their own Cosmos NFT with a
-			// victim's already-escrowed ERC721 token id and drain it.
+			// module-escrowed ERC721: a mismatched (classID, nftID) would let an
+			// attacker pair their own NFT with a victim's escrowed token and drain it.
 			expectedNFTUID := types.CreateNFTUID(msg.ClassId, msg.CosmosTokenIds[i])
 			if string(nftPair) != expectedNFTUID {
 				return nil, sdkerrors.Wrapf(
@@ -448,11 +433,9 @@ func (k Keeper) convertCosmos2Evm(
 	return &types.MsgConvertNFTResponse{}, nil
 }
 
-// validateNoMappingConflict enforces the one-to-one binding *before* any
-// state-mutating call, mirroring convertCosmos2Evm. SetNFTPairs rejects a
-// conflicting binding too, but only after the NFT has already been minted or
-// transferred; validating up front keeps the failure free of side effects and
-// keeps both conversion directions symmetric.
+// validateNoMappingConflict enforces the one-to-one binding before any
+// state-mutating call, mirroring convertCosmos2Evm (SetNFTPairs also rejects
+// conflicts, but only after the NFT has been minted/transferred).
 func (k Keeper) validateNoMappingConflict(ctx sdk.Context, msg *types.MsgConvertERC721) error {
 	for i, tokenId := range msg.EvmTokenIds {
 		bound := k.GetNFTPairByContractTokenID(ctx, msg.EvmContractAddress, tokenId)
@@ -652,6 +635,24 @@ func (k Keeper) RefundPacketToken(
 
 		contract := common.HexToAddress(evmContractAddress)
 
+		// Defense-in-depth: if the native NFT is already gone when the refund
+		// runs, skip BOTH the native burn and the EVM-side refund — a divergence
+		// implies a partial prior refund, and re-running the EVM refund would
+		// risk double payment. Checked before the EVM owner query to save gas.
+		if !k.nftKeeper.HasNFT(ctx, data.ClassId, tokenId) {
+			ctx.EventManager().EmitEvent(
+				sdk.NewEvent(
+					types.EventTypeRefundPacketTokenSkip,
+					sdk.NewAttribute(types.AttributeKeyNFTClass, data.ClassId),
+					sdk.NewAttribute(types.AttributeKeyNFTID, tokenId),
+					sdk.NewAttribute(types.AttributeKeyERC721Token, evmContractAddress),
+					sdk.NewAttribute(types.AttributeKeyERC721TokenID, emvTokenId),
+					sdk.NewAttribute("reason", "nft_already_gone"),
+				),
+			)
+			continue
+		}
+
 		// Check if token has already been refunded
 		owner, err := k.QueryERC721TokenOwner(ctx, contract, bigTokenId)
 		if err != nil {
@@ -692,6 +693,33 @@ func (k Keeper) RefundPacketToken(
 		}
 		k.DeleteNFTPairByNFTID(ctx, data.ClassId, tokenId)
 		k.DeleteNFTPairByTokenID(ctx, evmContractAddress, emvTokenId)
+
+		// Defense-in-depth: if the native NFT is owned by a non-module address
+		// (e.g. already refunded on a parallel path), skip the burn; the ERC721
+		// refund proceeds independently below.
+		if ownerAddr := k.nftKeeper.NFTkeeper().GetOwner(ctx, data.ClassId, tokenId); ownerAddr.String() != types.AccModuleAddress.String() {
+			ctx.EventManager().EmitEvent(
+				sdk.NewEvent(
+					types.EventTypeRefundPacketTokenSkip,
+					sdk.NewAttribute(types.AttributeKeyNFTClass, data.ClassId),
+					sdk.NewAttribute(types.AttributeKeyNFTID, tokenId),
+					sdk.NewAttribute(types.AttributeKeyERC721Token, evmContractAddress),
+					sdk.NewAttribute(types.AttributeKeyERC721TokenID, emvTokenId),
+					sdk.NewAttribute(types.AttributeKeyNFTOwner, ownerAddr.String()),
+					sdk.NewAttribute("reason", "nft_owner_not_module"),
+				),
+			)
+			if shouldRefundERC721 {
+				groups = appendERC721RefundGroup(
+					groups,
+					common.HexToAddress(evmContractAddress).Hex(),
+					receiver.Hex(),
+					emvTokenId,
+					tokenId,
+				)
+			}
+			continue
+		}
 
 		burnMsg := nftTypes.MsgBurnNFT{
 			Id:      tokenId,

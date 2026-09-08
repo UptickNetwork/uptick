@@ -13,11 +13,8 @@ import (
 
 const (
 	DoNotModify = "[do-not-modify]"
-	// RemoveField is the explicit sentinel for CLEARING an optional field.
-	// M-1 decision (2026-09-04): an empty string means "do not modify" so
-	// REST/gRPC clients that only fill the required fields can no longer
-	// silently wipe on-chain metadata. Callers that truly want a field
-	// emptied must send this sentinel.
+	// RemoveField is the sentinel for CLEARING an optional field: an empty
+	// string means "do not modify", so removing a field requires this value.
 	RemoveField = "[remove]"
 	MinDenomLen = 3
 	MaxDenomLen = 128
@@ -52,13 +49,10 @@ func ValidateDenomID(denomID string) error {
 	if strings.ContainsRune(denomID, 0) {
 		return sdkerrors.Wrapf(ErrInvalidDenom, "denomID contains NUL")
 	}
-	// A denom ID becomes the classId component of NFT UIDs once the denom is
-	// bridged to ERC721/CW721 (CreateNFTUID -> "<nftId>,<classId>"). The UID
-	// parser (GetNFTFromUID) splits on the LAST comma because only the second
-	// component is guaranteed comma-free; a comma inside the classId would
-	// corrupt the round-trip and strand the reverse mapping. The regex branch
-	// below already excludes commas, but the "uptick-" prefixed branch does
-	// not -- reject commas for every denom ID.
+	// Commas are rejected for every denom ID: a bridged denom becomes the
+	// classId component of NFT UIDs ("<nftId>,<classId>"), which are parsed
+	// by splitting on the last comma, so a comma inside a classId would
+	// corrupt the round-trip.
 	if strings.Contains(denomID, ",") {
 		return sdkerrors.Wrapf(ErrInvalidDenom, "denomID cannot contain comma (%s)", denomID)
 	}
@@ -148,29 +142,22 @@ func ValidateTokenURI(tokenURI string) error {
 
 // Modified reports whether an incoming optional field carries a change.
 // An empty string and DoNotModify both mean "keep the current value"; only a
-// non-empty value (or the RemoveField sentinel) counts as a modification. This
-// keeps CLI (defaults to DoNotModify) and REST/gRPC (which leave optional
-// fields empty) on the same code path instead of letting empty strings erase
-// metadata.
+// non-empty value (or the RemoveField sentinel) counts as a modification.
 func Modified(target string) bool {
 	return target != DoNotModify && target != ""
 }
 
 // ValidateIssueDenomID validates a denom ID for user-facing issuance via
-// MsgIssueDenom. On top of the base denom rules it rejects the "uptick-"
-// prefix: erc721/cw721 bridging derives class IDs as "uptick-<contract>" and
-// a user pre-minting such a denom would permanently block registration of
-// the matching contract. Module paths create derived denoms directly through
-// keeper.SaveDenom and never go through MsgIssueDenom.
+// MsgIssueDenom. On top of the base denom rules it rejects reserved shapes:
+// the "uptick-" prefix (module-derived class IDs), "ibc/" (ICS-721 vouchers),
+// bech32 addresses (CW721 key collision) and hex addresses (ERC721 key
+// collision). Module paths bypass this and go through keeper.SaveDenom.
 func ValidateIssueDenomID(denomID string) error {
-	if err := ValidateDenomID(denomID); err != nil {
-		return err
-	}
 	if strings.HasPrefix(denomID, "uptick-") {
 		return sdkerrors.Wrapf(ErrInvalidDenom,
 			"denomID prefix \"uptick-\" is reserved for module-derived NFT classes and cannot be issued via MsgIssueDenom (%s)", denomID)
 	}
-	if IsIBCDenom(denomID) {
+	if strings.HasPrefix(denomID, "ibc/") {
 		return sdkerrors.Wrapf(ErrInvalidDenom,
 			"denomID prefix \"ibc/\" is reserved for ICS-721 voucher classes and cannot be issued via MsgIssueDenom (%s)", denomID)
 	}
@@ -183,17 +170,20 @@ func ValidateIssueDenomID(denomID string) error {
 	}
 	// A user denom whose id is a 40-nibble hex address string (optionally
 	// 0x-prefixed) would collide with ERC721 contract keys in the erc721
-	// module's pair lookup. The base denom regex cannot express this rule, so
-	// it is enforced here alongside the other reserved shapes.
+	// module's pair lookup.
 	if isHexAddressShape(denomID) {
 		return sdkerrors.Wrapf(ErrInvalidDenom,
 			"denomID cannot be a hex address shape reserved for ERC721 contract keys (%s)", denomID)
 	}
-	return nil
+	// Reserved-shape checks passed; defer to the base validation for the
+	// remaining rules (NUL, comma, regex, length, keywords).
+	return ValidateDenomID(denomID)
 }
 
 // hexAddressShapeRe matches EVM address-shaped strings: an optional 0x prefix
-// followed by exactly 40 hexadecimal nibbles, any case.
+// plus exactly 40 hex nibbles, any case (the bare-hex form is what the pair
+// lookup faces). Pure shape check; semantic validation belongs to the EVM
+// helper package.
 var hexAddressShapeRe = regexp.MustCompile(`^(0x)?[0-9a-fA-F]{40}$`)
 
 func isHexAddressShape(s string) bool {
@@ -210,14 +200,8 @@ func ValidateKeywords(denomID string) error {
 
 // Modify merges an incoming optional field into the stored value.
 // Empty string and DoNotModify keep the origin; RemoveField clears it;
-// anything else replaces it.
-//
-// NOTE (documented limitation): because the exact string
-// "[remove]" (RemoveField) is the sentinel for clearing a field, a client
-// CANNOT set a field to the literal value "[remove]" — it will always be
-// interpreted as "clear this field". This applies to token URI, URI hash,
-// metadata name and data fields in MsgUpdateNFT / MsgTransferNFT. There is no
-// escape sequence by design; treat "[remove]" as a reserved value in clients.
+// anything else replaces it. Note: the literal value "[remove]" is reserved —
+// clients cannot set a field to that exact string.
 func Modify(origin, target string) string {
 	switch target {
 	case DoNotModify, "":

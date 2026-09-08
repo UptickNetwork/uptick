@@ -3,8 +3,59 @@ package internft
 import (
 	"testing"
 
+	"cosmossdk.io/log"
+	"cosmossdk.io/store"
+	"cosmossdk.io/store/metrics"
+	storetypes "cosmossdk.io/store/types"
+	tmproto "github.com/cometbft/cometbft/proto/tendermint/types"
+	dbm "github.com/cosmos/cosmos-db"
+	sdk "github.com/cosmos/cosmos-sdk/types"
+
 	"github.com/stretchr/testify/require"
 )
+
+// newBurnCtx builds a minimal sdk.Context with an event manager wired
+// up. The internft.Burn guard only reads/writes through ctx.EventManager
+// and ctx.Logger, so an in-memory store is enough.
+func newBurnCtx(t *testing.T) sdk.Context {
+	t.Helper()
+	memDB := store.NewCommitMultiStore(dbm.NewMemDB(), log.NewNopLogger(), metrics.NewNoOpMetrics())
+	memDB.MountStoreWithDB(storetypes.NewKVStoreKey("dummy"), storetypes.StoreTypeIAVL, nil)
+	require.NoError(t, memDB.LoadLatestVersion())
+	return sdk.NewContext(memDB, tmproto.Header{}, false, log.NewNopLogger()).
+		WithKVGasConfig(storetypes.KVGasConfig())
+}
+
+// findEvent returns the first event of the given type.
+func findBurnEvent(ctx sdk.Context, eventType string) (sdk.Event, bool) {
+	for _, e := range ctx.EventManager().Events() {
+		if e.Type == eventType {
+			return e, true
+		}
+	}
+	return sdk.Event{}, false
+}
+
+// TestInterNftKeeper_BurnSkipOnMissingNFT verifies the no-panic + skip-event
+// contract of Burn when the NFT is absent (production path is exercised by
+// the nft-transfer module's own suite).
+func TestInterNftKeeper_BurnSkipOnMissingNFT(t *testing.T) {
+	ik := InterNftKeeper{} // zero-value: nk is nil; the guard must not touch it
+	ctx := newBurnCtx(t)
+
+	// Must complete without panicking and without returning an error,
+	// even though the underlying nft keeper is nil (which would
+	// definitely panic if reached).
+	require.NotPanics(t, func() {
+		err := ik.Burn(ctx, "class-1", "token-1")
+		require.NoError(t, err)
+	})
+
+	ev, ok := findBurnEvent(ctx, "inter_nft_burn_skip")
+	require.True(t, ok, "Burn must emit inter_nft_burn_skip when NFT is missing")
+	require.Equal(t, "class-1", string(ev.Attributes[0].Value),
+		"first attribute should be class_id")
+}
 
 func TestInterClass_Getters(t *testing.T) {
 	c := InterClass{

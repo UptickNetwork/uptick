@@ -11,7 +11,10 @@ import (
 	"github.com/UptickNetwork/uptick/x/collection/types"
 )
 
-// SaveNFT mints an NFT and manages the NFT's existence within Collections and Owners
+// SaveNFT mints an NFT and manages the NFT's existence within Collections and Owners.
+//
+// Empty inputs are rejected up front: they would write a corrupt state entry
+// (empty key / zero address) and break downstream iteration.
 func (k Keeper) SaveNFT(ctx sdk.Context, denomID,
 	tokenID,
 	tokenNm,
@@ -20,6 +23,15 @@ func (k Keeper) SaveNFT(ctx sdk.Context, denomID,
 	tokenData string,
 	receiver sdk.AccAddress,
 ) error {
+	if denomID == "" {
+		return sdkerrors.Wrap(errortypes.ErrInvalidRequest, "denom ID cannot be empty")
+	}
+	if tokenID == "" {
+		return sdkerrors.Wrap(errortypes.ErrInvalidRequest, "token ID cannot be empty")
+	}
+	if receiver == nil || receiver.Empty() {
+		return sdkerrors.Wrap(errortypes.ErrInvalidAddress, "receiver cannot be empty")
+	}
 	nftMetadata := &types.NFTMetadata{
 		Name: tokenNm,
 		Data: tokenData,
@@ -218,15 +230,18 @@ func (k Keeper) GetNFT(ctx sdk.Context, denomID, tokenID string) (nft exported.N
 }
 
 // GetNFTs returns all NFTs by the specified denom ID
+//
+// An NFT with corrupt Data is logged and downgraded to empty metadata instead
+// of aborting the whole query (matches GetCollections / GetDenomInfo).
 func (k Keeper) GetNFTs(ctx sdk.Context, denom string) (nfts []exported.NFT, err error) {
 	tokens := k.nk.GetNFTsOfClass(ctx, denom)
 	for _, token := range tokens {
 		var nftMetadata types.NFTMetadata
-		// A legacy / migrated NFT may carry nil Data; treat it as empty metadata
-		// instead of failing genesis export or collection queries.
 		if token.Data != nil {
-			if err := k.cdc.Unmarshal(token.Data.GetValue(), &nftMetadata); err != nil {
-				return nil, err
+			if uerr := k.cdc.Unmarshal(token.Data.GetValue(), &nftMetadata); uerr != nil {
+				ctx.Logger().Debug("GetNFTs: skipping NFT with undecodable metadata",
+					"denom", denom, "token_id", token.GetId(), "err", uerr.Error())
+				nftMetadata = types.NFTMetadata{}
 			}
 		}
 		nfts = append(nfts, types.BaseNFT{

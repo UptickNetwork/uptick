@@ -43,6 +43,11 @@ func (k *Keeper) SetErc721Keeper(crc721keeper ERC721Converter) {
 	k.erc721keeper = crc721keeper
 }
 
+// GetVoucherClassID returns the canonical IBC voucher class ID for a given
+// (port, channel, originalClassID) tuple.
+//
+// KEEP-IN-SYNC: duplicated in x/erc721/keeper/keeper.go (the keepers cannot
+// import each other). Bodies MUST stay byte-identical.
 func (k *Keeper) GetVoucherClassID(port string, channel string, classId string) string {
 	// since SendPacket did not prefix the classID, we must prefix classID here
 	classPrefix := ibcnfttransfertypes.GetClassPrefix(port, channel)

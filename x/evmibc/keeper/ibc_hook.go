@@ -164,7 +164,7 @@ func (k Keeper) OnAcknowledgementPacket(ctx sdk.Context, packet channeltypes.Pac
 	case *channeltypes.Acknowledgement_Error:
 		switch evmibctypes.OutboundConvertKind(data) {
 		case evmibctypes.ConvertKindERC721:
-			classID, err := k.getRefundClassId(packet, data)
+			classID, err := k.getRefundClassId(ctx, packet, data)
 			if err != nil {
 				return err
 			}
@@ -173,20 +173,17 @@ func (k Keeper) OnAcknowledgementPacket(ctx sdk.Context, packet channeltypes.Pac
 			// does not receive both the ERC721 and the NFT (double refund).
 			nftData := data
 			nftData.Sender = erc721types.AccModuleAddress.String()
-			// Release the IBC-escrowed NFT back to the module account FIRST, then
-			// reverse the ERC721 conversion. RefundPacketToken burns the native NFT
-			// and transfers the ERC721 back to the sender, both of which require the
-			// NFT to be owned by the module account. Doing the escrow release after
-			// RefundPacketToken would leave the NFT in escrow (owner != module), so
-			// BurnNFT fails, the whole cache-context rolls back and the escrow is
-			// never released -- permanently locking both the ERC721 and the NFT.
-			// This instruction order mirrors the CW721 branch below.
+			// Release the IBC-escrowed NFT to the module account FIRST:
+			// RefundPacketToken burns the native NFT, which requires the
+			// module account to own it. Reversed order would roll back the
+			// whole cache context and strand both assets. Mirrors the CW721
+			// branch below.
 			if err := k.ibcKeeper.OnAcknowledgementPacket(ctx, packet, nftData, ack); err != nil {
 				return err
 			}
 			return k.erc721keeper.RefundPacketToken(ctx, data)
 		case evmibctypes.ConvertKindCW721:
-			classID, err := k.getRefundClassId(packet, data)
+			classID, err := k.getRefundClassId(ctx, packet, data)
 			if err != nil {
 				return err
 			}
@@ -211,7 +208,7 @@ func (k Keeper) OnTimeoutPacket(ctx sdk.Context, packet channeltypes.Packet, dat
 
 	switch evmibctypes.OutboundConvertKind(data) {
 	case evmibctypes.ConvertKindERC721:
-		classID, err := k.getRefundClassId(packet, data)
+		classID, err := k.getRefundClassId(ctx, packet, data)
 		if err != nil {
 			return err
 		}
@@ -226,7 +223,7 @@ func (k Keeper) OnTimeoutPacket(ctx sdk.Context, packet channeltypes.Packet, dat
 		}
 		return k.erc721keeper.RefundPacketToken(ctx, data)
 	case evmibctypes.ConvertKindCW721:
-		classID, err := k.getRefundClassId(packet, data)
+		classID, err := k.getRefundClassId(ctx, packet, data)
 		if err != nil {
 			return err
 		}
@@ -241,14 +238,53 @@ func (k Keeper) OnTimeoutPacket(ctx sdk.Context, packet channeltypes.Packet, dat
 	return nil
 }
 
-func (k Keeper) getRefundClassId(packet channeltypes.Packet, data types.NonFungibleTokenPacketData) (string, error) {
-	if !strings.HasPrefix(data.ClassId, packet.GetSourcePort()+"/") {
+// getRefundClassId resolves the class id to feed into the downstream IBC
+// nft-transfer refund path on acknowledgement-error / timeout. It never
+// derives a class id not already present in `data.ClassId`:
+//
+//  1. Bare class id (no "/"): original NFT is native to this chain — return as-is.
+//  2. Voucher matching this packet's (port, channel) prefix: strip and return
+//     the canonical ibc/<hash> form (single-hop).
+//     3/4. Voucher with a different channel or unrelated port prefix: multi-hop
+//     ICS-721 (or unrelated string) — emit `cross_channel_refund` and pass
+//     through; the downstream nft-transfer refund is fail-closed and no-ops
+//     when this chain holds no matching escrow.
+func (k Keeper) getRefundClassId(ctx sdk.Context, packet channeltypes.Packet, data types.NonFungibleTokenPacketData) (string, error) {
+	// Shape 1: bare class id (no "/" anywhere). Nothing to rewrite.
+	if !strings.Contains(data.ClassId, "/") {
 		return data.ClassId, nil
 	}
 
-	orgClass, err := types.RemoveClassPrefix(packet.GetSourcePort(), packet.GetSourceChannel(), data.ClassId)
-	if err != nil {
-		return "", err
+	expectedPrefix := types.GetClassPrefix(packet.GetSourcePort(), packet.GetSourceChannel())
+
+	// Shape 2: voucher prefix matches this packet's (port, channel).
+	// Strip the prefix and return the canonical ibc/<hash> voucher.
+	if strings.HasPrefix(data.ClassId, expectedPrefix) {
+		orgClass, err := types.RemoveClassPrefix(packet.GetSourcePort(), packet.GetSourceChannel(), data.ClassId)
+		if err != nil {
+			return "", err
+		}
+		return k.GetVoucherClassID(packet.GetSourcePort(), packet.GetSourceChannel(), orgClass), nil
 	}
-	return k.GetVoucherClassID(packet.GetSourcePort(), packet.GetSourceChannel(), orgClass), nil
+
+	// Shape 3 / 4: voucher prefix does not match this packet's (port,
+	// channel) — multi-hop ICS-721 or unrelated string. Emit for
+	// observability and pass through unchanged.
+	k.Logger(ctx).Info(
+		"getRefundClassId: cross-channel or non-matching voucher prefix, passing through",
+		"class_id", data.ClassId,
+		"packet_source_port", packet.GetSourcePort(),
+		"packet_source_channel", packet.GetSourceChannel(),
+		"sequence", packet.Sequence,
+	)
+	ctx.EventManager().EmitEvent(
+		sdk.NewEvent(
+			"cross_channel_refund",
+			sdk.NewAttribute("class_id", data.ClassId),
+			sdk.NewAttribute("source_port", packet.GetSourcePort()),
+			sdk.NewAttribute("source_channel", packet.GetSourceChannel()),
+			sdk.NewAttribute("sequence", fmt.Sprintf("%d", packet.Sequence)),
+		),
+	)
+	return data.ClassId, nil
 }

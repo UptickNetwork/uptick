@@ -87,18 +87,25 @@ func (k Keeper) TransferDenomOwner(
 }
 
 // GetDenomInfo return the denom information
+//
+// A legacy / migrated class may carry nil Data; return zero-value metadata
+// instead of an error so callers like ExportGenesis and the query endpoints
+// never abort on a single corrupt record.
 func (k Keeper) GetDenomInfo(ctx sdk.Context, denomID string) (*types.Denom, error) {
 	class, has := k.nk.GetClass(ctx, denomID)
 	if !has {
 		return nil, sdkerrors.Wrapf(types.ErrInvalidDenom, "denom ID %s not exists", denomID)
 	}
 
+	// A nil Data means the on-chain class was created before the metadata
+	// wrapper existed (pre-migration snapshot, ICS-721 voucher, etc.). Fall
+	// back to zero-value DenomMetadata rather than failing the whole call --
+	// this matches GetNFT/GetNFTs behavior.
 	var denomMetadata types.DenomMetadata
-	if class.Data == nil {
-		return nil, sdkerrors.Wrapf(types.ErrInvalidDenom, "denom ID %s has no metadata", denomID)
-	}
-	if err := k.cdc.Unmarshal(class.Data.GetValue(), &denomMetadata); err != nil {
-		return nil, err
+	if class.Data != nil {
+		if err := k.cdc.Unmarshal(class.Data.GetValue(), &denomMetadata); err != nil {
+			return nil, err
+		}
 	}
 	return &types.Denom{
 		Id:               class.Id,

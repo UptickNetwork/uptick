@@ -92,6 +92,23 @@ func TestExtractMessagesFromTxCountLimit(t *testing.T) {
 	require.Contains(t, err.Error(), "message count exceeds maximum")
 }
 
+// ExtractMessagesFromTx must tolerate nil messages in
+// the top-level slice (degenerate txs) without panicking. Such messages
+// are silently skipped rather than validated.
+func TestExtractMessagesFromTxNilMsg(t *testing.T) {
+	bankMsg := banktypes.NewMsgSend(
+		sdk.AccAddress([]byte("from")),
+		sdk.AccAddress([]byte("to")),
+		sdk.NewCoins(sdk.NewInt64Coin("stake", 1000)),
+	)
+
+	mockTx := &mockTxWithMsgs{msgs: []sdk.Msg{nil, bankMsg, nil}}
+	msgs, err := extractMessagesFromTx(mockTx)
+	require.NoError(t, err)
+	require.Len(t, msgs, 1)
+	require.IsType(t, &banktypes.MsgSend{}, msgs[0])
+}
+
 // mockTxWithMsgs implements the sdk.Tx interface with configurable messages
 type mockTxWithMsgs struct {
 	msgs     []sdk.Msg

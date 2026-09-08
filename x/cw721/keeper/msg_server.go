@@ -397,14 +397,11 @@ func appendToRefundGroups(groups []refundGroup, contract, receiver, tokenID, nft
 // RefundPacketToken handles the IBC packet timeout/failure for CW721 transfers.
 // It reverses the conversion: returns the CW721 to its original owner, cleans up
 // token pair mappings, and burns the native NFT returned to the module account.
-// This function should be called by the host chain's IBC middleware OnTimeoutPacket handler.
 //
-// The refund is gated on the module account still owning the CW721 token. A token
-// that was already refunded, never escrowed, or moved elsewhere is skipped with an
-// event instead of an error: returning an error here aborts the IBC
-// OnTimeout/OnAcknowledgement callback, and because the relayer's
-// MsgTimeout/MsgAcknowledgement can then never succeed, the packet would be stuck
-// forever. This mirrors x/erc721 and keeps the packet finalisable.
+// The refund is gated on the module account still owning the CW721 token; a
+// token that was already refunded, never escrowed, or moved elsewhere is
+// skipped with an event instead of an error (an error would abort the IBC
+// callback and strand the packet forever). Mirrors x/erc721.
 func (k Keeper) RefundPacketToken(
 	ctx sdk.Context,
 	data ibcnfttransfertypes.NonFungibleTokenPacketData,
@@ -459,6 +456,37 @@ func (k Keeper) RefundPacketToken(
 		k.DeleteCwAddressByContractTokenId(ctx, cwContractAddress, cwTokenId)
 		k.DeleteNFTPairByTokenID(ctx, cwContractAddress, cwTokenId)
 		k.DeleteNFTPairByNFTID(ctx, data.ClassId, tokenId)
+
+		// Defense-in-depth: only burn the native NFT if the module account
+		// still holds it. If it is already gone (parallel refund, migration,
+		// race), an error would stall the IBC packet forever — skip and emit.
+		if !k.nftKeeper.HasNFT(ctx, data.ClassId, tokenId) {
+			ctx.EventManager().EmitEvent(
+				sdk.NewEvent(
+					types.EventTypeRefundPacketTokenSkip,
+					sdk.NewAttribute(types.AttributeKeyNFTClass, data.ClassId),
+					sdk.NewAttribute(types.AttributeKeyNFTID, tokenId),
+					sdk.NewAttribute(types.AttributeKeyCW721Token, cwContractAddress),
+					sdk.NewAttribute(types.AttributeKeyCW721TokenID, cwTokenId),
+					sdk.NewAttribute("reason", "nft_already_gone"),
+				),
+			)
+			continue
+		}
+		if ownerAddr := k.nftKeeper.NFTkeeper().GetOwner(ctx, data.ClassId, tokenId); !moduleOwnsCW721(ownerAddr.String()) {
+			ctx.EventManager().EmitEvent(
+				sdk.NewEvent(
+					types.EventTypeRefundPacketTokenSkip,
+					sdk.NewAttribute(types.AttributeKeyNFTClass, data.ClassId),
+					sdk.NewAttribute(types.AttributeKeyNFTID, tokenId),
+					sdk.NewAttribute(types.AttributeKeyCW721Token, cwContractAddress),
+					sdk.NewAttribute(types.AttributeKeyCW721TokenID, cwTokenId),
+					sdk.NewAttribute(types.AttributeKeyNFTOwner, ownerAddr.String()),
+					sdk.NewAttribute("reason", "nft_owner_not_module"),
+				),
+			)
+			continue
+		}
 
 		burnMsg := nftTypes.MsgBurnNFT{
 			Id:      tokenId,

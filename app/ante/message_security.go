@@ -9,7 +9,6 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/cosmos/cosmos-sdk/x/authz"
-	anteinterfaces "github.com/cosmos/evm/ante/interfaces"
 	evmtypes "github.com/cosmos/evm/x/vm/types"
 )
 
@@ -34,15 +33,13 @@ const (
 //   - the flattened message list is capped in count and nesting depth.
 type MessageSecurityDecorator struct {
 	cdc            codec.BinaryCodec
-	evmKeeper      anteinterfaces.EVMKeeper
 	maxTxGasWanted uint64
 }
 
 // NewMessageSecurityDecorator creates a new MessageSecurityDecorator
-func NewMessageSecurityDecorator(cdc codec.BinaryCodec, evmKeeper anteinterfaces.EVMKeeper, maxTxGasWanted uint64) MessageSecurityDecorator {
+func NewMessageSecurityDecorator(cdc codec.BinaryCodec, maxTxGasWanted uint64) MessageSecurityDecorator {
 	return MessageSecurityDecorator{
 		cdc:            cdc,
-		evmKeeper:      evmKeeper,
 		maxTxGasWanted: maxTxGasWanted,
 	}
 }
@@ -185,6 +182,10 @@ func (msd MessageSecurityDecorator) validateEvmGasLimit(msg *evmtypes.MsgEthereu
 
 // ExtractMessagesFromTx extracts all messages from a transaction, including
 // nested messages from authz.MsgExec to prevent ante handler bypass attacks.
+// BFS traversal deduplicates revisits of the same in-memory message via a
+// pointer-based key; messages with equal content but distinct pointers are
+// intentionally validated independently. The result-size cap is checked after
+// dedup so a single duplicated message cannot trip the limit.
 func (msd MessageSecurityDecorator) ExtractMessagesFromTx(ctx sdk.Context, tx sdk.Tx) ([]sdk.Msg, error) {
 	type queuedMsg struct {
 		msg   sdk.Msg
@@ -198,18 +199,23 @@ func (msd MessageSecurityDecorator) ExtractMessagesFromTx(ctx sdk.Context, tx sd
 		msgQueue = append(msgQueue, queuedMsg{msg: msg, depth: 0})
 	}
 
-	processed := make(map[string]bool)
+	processed := make(map[string]struct{})
 
 	for len(msgQueue) > 0 {
 		item := msgQueue[0]
 		msgQueue = msgQueue[1:]
 		msg := item.msg
 
-		msgKey := fmt.Sprintf("%s:%p", sdk.MsgTypeURL(msg), msg)
-		if processed[msgKey] {
+		// Nil is silently skipped to avoid panics on degenerate txs.
+		if msg == nil {
 			continue
 		}
-		processed[msgKey] = true
+
+		msgKey := msgDedupKey(msg)
+		if _, seen := processed[msgKey]; seen {
+			continue
+		}
+		processed[msgKey] = struct{}{}
 
 		if len(allMsgs) >= MaxExtractedMessages {
 			return nil, sdkerrors.Wrapf(
@@ -237,4 +243,11 @@ func (msd MessageSecurityDecorator) ExtractMessagesFromTx(ctx sdk.Context, tx sd
 	}
 
 	return allMsgs, nil
+}
+
+// msgDedupKey returns the per-call dedup key. TypeURL scopes the key
+// namespace so two distinct sdk.Msg types never collide on pointer value
+// alone. See ExtractMessagesFromTx for the full semantic justification.
+func msgDedupKey(msg sdk.Msg) string {
+	return fmt.Sprintf("%s|%p", sdk.MsgTypeURL(msg), msg)
 }

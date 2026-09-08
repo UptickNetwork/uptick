@@ -35,6 +35,11 @@ func (k Keeper) GetTokenPairs(ctx sdk.Context) []types.TokenPair {
 }
 
 // GetTokenPairID returns the pair id from either of the registered tokens.
+//
+// DEPRECATED: dispatches by string shape, which is unsafe for hex-shaped
+// class ids. Kept only for backwards compatibility with the gRPC TokenPair
+// read query. Handlers and write paths MUST use GetPairByClass /
+// GetPairByEVM instead.
 func (k Keeper) GetTokenPairID(ctx sdk.Context, token string) []byte {
 
 	if common.IsHexAddress(token) {
@@ -59,13 +64,10 @@ func (k Keeper) GetTokenPair(ctx sdk.Context, id []byte) (types.TokenPair, bool)
 	}
 
 	if err := k.cdc.Unmarshal(bz, &tokenPair); err != nil {
-		// A single corrupt pair must not take down a live node: this lookup runs
-		// from query and message-handler paths where a panic escapes to ABCI and
-		// could crash the process, so it degrades to "not found" (callers return
-		// an ordinary error) and logs at Error level for operator visibility.
-		// This is a deliberate asymmetry with GetTokenPairs, which panics —
-		// that one is only reachable from genesis export, where failing loudly
-		// prevents baking corruption into a genesis file.
+		// A single corrupt pair must not crash the node: this lookup runs from
+		// query and message-handler paths, so it degrades to "not found" and logs
+		// at Error level. (GetTokenPairs, only reachable from genesis export,
+		// panics deliberately to keep corruption out of a genesis file.)
 		k.Logger(ctx).Error("failed to unmarshal token pair", "id", string(id), "error", err)
 		return types.TokenPair{}, false
 	}
@@ -158,17 +160,10 @@ func (k Keeper) IsClassRegistered(ctx sdk.Context, classID string) bool {
 }
 
 // SetNFTPairs atomically binds an EVM (contract, tokenID) to a Cosmos NFT
-// (classID, nftID) in both directions. It enforces a strict one-to-one
-// invariant forward[x]=y ⟺ reverse[y]=x:
-//   - if the forward mapping already exists it MUST equal the new NFT UID,
-//     otherwise the ERC721 token is already bound to a different NFT;
-//   - if the reverse mapping already exists it MUST equal the new token UID,
-//     otherwise the Cosmos NFT is already bound to a different ERC721 token.
-//
-// Binding the same (contract, tokenID) to a different Cosmos NFT would let an
-// attacker use their own NFT id to release a module-escrowed victim token
-// (registry poisoning / mapping collision). This returns ErrNFTMappingConflict
-// so the conversion is rolled back instead of corrupting state.
+// (classID, nftID) in both directions, enforcing the one-to-one invariant
+// forward[x]=y ⟺ reverse[y]=x. A conflicting binding would let an attacker
+// release a module-escrowed victim token (registry poisoning) and is rejected
+// with ErrNFTMappingConflict so the conversion rolls back.
 func (k Keeper) SetNFTPairs(ctx sdk.Context, contractAddress string, tokenID string, classID string, nftID string) error {
 	tokenUID := types.CreateTokenUID(contractAddress, tokenID)
 	nftUID := types.CreateNFTUID(classID, nftID)

@@ -114,12 +114,11 @@ func TestConvertERC721_Disabled(t *testing.T) {
 	require.ErrorIs(t, err, types.ErrERC721Disabled)
 }
 
-// TestConvertNFT_SelfDestructedPairHealsWithRedeploy pins the Medium finding
-// that the old dead-pair branch wrote deletions the SDK rolls back on its error
-// return (cleanup never persisted, the class stayed stuck). For a
-// module-deployable native class the handler now purges the stale pair and
-// re-deploys a fresh module-owned contract in the SAME successful transaction,
-// so the purge commits together with the new pair and the conversion.
+// TestConvertNFT_SelfDestructedPairHealsWithRedeploy pins the purge/re-deploy
+// contract: for a module-deployable native class whose contract lost its code,
+// the handler purges the stale pair and re-deploys a fresh module-owned
+// contract in the SAME successful transaction, so the cleanup commits together
+// with the new pair.
 func TestConvertNFT_SelfDestructedPairHealsWithRedeploy(t *testing.T) {
 	k, ctx, owner := setupConvertKeeper(t)
 	evm := &redeployEVMKeeper{fakeEVMKeeper: &fakeEVMKeeper{accounts: map[common.Address]*statedb.Account{}}}
@@ -363,9 +362,10 @@ func TestConvertNFT_RejectsWrongContract(t *testing.T) {
 	require.ErrorIs(t, err, types.ErrContractAddressNotCorrect)
 }
 
-// TestConvertERC721_RejectsWrongClassId covers H-1: for a registered token pair,
-// a caller-supplied ClassId differing from the pair's canonical class must be
-// rejected instead of minting an NFT into an arbitrary third-party denom.
+// TestConvertERC721_RejectsWrongClassId verifies that for a registered
+// token pair, a caller-supplied ClassId differing from the pair's
+// canonical class is rejected instead of minting an NFT into an
+// arbitrary third-party denom.
 func TestConvertERC721_RejectsWrongClassId(t *testing.T) {
 	k, ctx, owner := setupConvertKeeper(t)
 
@@ -387,6 +387,37 @@ func TestRefundPacketToken_MissingPair(t *testing.T) {
 		TokenIds: []string{"nft1"},
 	})
 	require.ErrorIs(t, err, types.ErrTokenPairNotFound)
+}
+
+// Defense-in-depth: if the native NFT is already gone when the
+// refund runs, the burn step must be skipped instead of returning an
+// error that strands the IBC packet. Mirrors the same pattern in x/cw721.
+func TestRefundPacketToken_SkipsWhenNativeNFTAlreadyGone(t *testing.T) {
+	k, ctx, _ := setupConvertKeeper(t)
+	require.NoError(t, k.SetNFTPairs(ctx,
+		"0x1111111111111111111111111111111111111111", "1", "kitty", "nft1"))
+
+	// Burn the NFT that the default setup minted, simulating a prior
+	// parallel refund / migration. Without the defense-in-depth check the
+	// burn step would call BurnNFT on an absent NFT and surface an error
+	// to the IBC callback.
+	require.NoError(t, k.nftKeeper.NFTkeeper().Burn(ctx, "kitty", "nft1"))
+
+	err := k.RefundPacketToken(ctx, ibcnfttransfertypes.NonFungibleTokenPacketData{
+		ClassId:  "kitty",
+		TokenIds: []string{"nft1"},
+	})
+	require.NoError(t, err, "a missing NFT must skip the burn, not abort the IBC callback")
+
+	var skipEv *sdk.Event
+	for i := range ctx.EventManager().Events() {
+		if ctx.EventManager().Events()[i].Type == types.EventTypeRefundPacketTokenSkip {
+			skipEv = &ctx.EventManager().Events()[i]
+			break
+		}
+	}
+	require.NotNil(t, skipEv, "expected a refund skip event")
+	require.Equal(t, "nft_already_gone", attributeMap(*skipEv)["reason"])
 }
 
 func TestQueryERC721DataByTokenID_DoesNotCommit(t *testing.T) {

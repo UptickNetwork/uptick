@@ -20,6 +20,7 @@ const (
 
 	AttributeKeyNFTClass     = "nft_class"
 	AttributeKeyNFTID        = "nft_ids"
+	AttributeKeyNFTOwner     = "nft_owner"
 	AttributeKeyCW721Token   = "cw721_token"     // #nosec
 	AttributeKeyCW721TokenID = "cw721_token_ids" // #nosec
 	AttributeKeyReceiver     = "receiver"

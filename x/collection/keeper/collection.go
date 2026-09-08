@@ -25,11 +25,6 @@ func (k Keeper) SaveCollection(ctx sdk.Context, collection types.Collection) err
 	return nil
 }
 
-// SetCollection saves all NFTs and returns an error if there already exists
-func (k Keeper) SetCollection(ctx sdk.Context, collection types.Collection) error {
-	return k.SaveCollection(ctx, collection)
-}
-
 // GetCollection returns the collection by the specified denom ID
 func (k Keeper) GetCollection(ctx sdk.Context, denomID string) (types.Collection, error) {
 	denom, err := k.GetDenomInfo(ctx, denomID)
@@ -44,17 +39,24 @@ func (k Keeper) GetCollection(ctx sdk.Context, denomID string) (types.Collection
 	return types.NewCollection(*denom, nfts), nil
 }
 
-// GetCollections returns all the collections
+// GetCollections returns all the collections.
+//
+// Skip-and-warn on per-class errors: a single corrupt / metadata-less class
+// must not abort the whole iteration (it would crash genesis export).
 func (k Keeper) GetCollections(ctx sdk.Context) (cs []types.Collection, err error) {
 	for _, class := range k.nk.GetClasses(ctx) {
-		nfts, err := k.GetNFTs(ctx, class.Id)
-		if err != nil {
-			return nil, err
+		nfts, nftErr := k.GetNFTs(ctx, class.Id)
+		if nftErr != nil {
+			k.Logger(ctx).Warn("GetCollections: skipping class with NFT error",
+				"classID", class.Id, "err", nftErr.Error())
+			continue
 		}
 
-		denom, err := k.GetDenomInfo(ctx, class.Id)
-		if err != nil {
-			return nil, err
+		denom, denomErr := k.GetDenomInfo(ctx, class.Id)
+		if denomErr != nil {
+			k.Logger(ctx).Warn("GetCollections: skipping class with denom error",
+				"classID", class.Id, "err", denomErr.Error())
+			continue
 		}
 
 		cs = append(cs, types.NewCollection(*denom, nfts))

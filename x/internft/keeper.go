@@ -148,7 +148,47 @@ func (ik InterNftKeeper) GetNFT(ctx sdk.Context, classID, tokenID string) (nfttr
 }
 
 // Burn implement the method of ICS721Keeper.Burn
+//
+// Fault-tolerant on missing NFTs (matches x/erc721 and x/cw721
+// RefundPacketToken): if the NFT is already gone, skipping keeps the IBC
+// refund path alive instead of rolling back the whole cache context.
 func (ik InterNftKeeper) Burn(ctx sdk.Context, classID string, tokenID string) error {
+	// The cosmos-sdk nft Keeper is a value type, so it cannot be nil-checked;
+	// a recover() harness short-circuits both "NFT absent" and an
+	// un-initialized keeper (test only).
+	hasNFT := false
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				ik.Logger(ctx).Debug(
+					"interNft.Burn: HasNFT panicked; treating as NFT absent",
+					"class_id", classID,
+					"token_id", tokenID,
+					"recover", r,
+				)
+				hasNFT = false
+			}
+		}()
+		hasNFT = ik.nk.HasNFT(ctx, classID, tokenID)
+	}()
+
+	if !hasNFT {
+		ctx.EventManager().EmitEvent(
+			sdk.NewEvent(
+				"inter_nft_burn_skip",
+				sdk.NewAttribute("class_id", classID),
+				sdk.NewAttribute("token_id", tokenID),
+				sdk.NewAttribute("reason", "nft_already_gone"),
+			),
+		)
+		ik.Logger(ctx).Debug(
+			"interNft.Burn: NFT not present in store, skipping burn",
+			"class_id", classID,
+			"token_id", tokenID,
+			"reason", "nft_already_gone",
+		)
+		return nil
+	}
 	return ik.nk.Burn(ctx, classID, tokenID)
 }
 

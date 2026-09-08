@@ -200,6 +200,118 @@ func (s *KeeperTestSuite) TestExportGenesisNilData() {
 	s.Require().Len(gs.Collections[0].NFTs, 1)
 }
 
+// legacy / migrated classes with nil Data must not crash
+// GetDenomInfo. The expected behavior is to return zero-value metadata rather
+// than a "has no metadata" error.
+func (s *KeeperTestSuite) TestGetDenomInfoNilData() {
+	// Save a class directly via the underlying nft keeper with nil Data.
+	// GetDenomInfo will then encounter the nil Data on read.
+	s.Require().NoError(s.nftKpr.SaveClass(s.ctx, nft.Class{
+		Id:     "denom-c",
+		Name:   "Class C",
+		Symbol: "C",
+	}))
+
+	d, err := s.keeper.GetDenomInfo(s.ctx, "denom-c")
+	s.Require().NoError(err)
+	s.Require().NotNil(d)
+	s.Require().Equal("denom-c", d.Id)
+	s.Require().Equal("Class C", d.Name)
+	s.Require().Empty(d.Creator)
+	s.Require().Empty(d.Schema)
+}
+
+// A legacy / migrated class with nil Data must not abort GetCollections: the
+// call succeeds and the nil-data class yields a valid entry with zero-value
+// metadata.
+func (s *KeeperTestSuite) TestGetCollectionsIncludesNilDataClass() {
+	creator := sdk.AccAddress([]byte("creator"))
+	s.Require().NoError(s.keeper.SaveDenom(s.ctx, "good", "Good", "", "G", creator, false, false, "", "", "", ""))
+	s.Require().NoError(s.keeper.SaveDenom(s.ctx, "good2", "Good2", "", "G2", creator, false, false, "", "", "", ""))
+
+	// Insert a class with nil Data directly via the underlying keeper -- the
+	// only path that produces a nil-Data class on chain (SaveDenom always
+	// wraps metadata).
+	s.Require().NoError(s.nftKpr.SaveClass(s.ctx, nft.Class{
+		Id:     "nildataclass",
+		Name:   "NilData",
+		Symbol: "ND",
+	}))
+
+	cs, err := s.keeper.GetCollections(s.ctx)
+	s.Require().NoError(err)
+	// All three classes are returned. The nil-data one survives the loop
+	// with zero-value metadata instead of crashing genesis export.
+	s.Require().Len(cs, 3)
+	ids := make(map[string]types.Denom, 3)
+	for _, c := range cs {
+		ids[c.Denom.Id] = c.Denom
+	}
+	s.Require().Contains(ids, "good")
+	s.Require().Contains(ids, "good2")
+	s.Require().Contains(ids, "nildataclass")
+	// The nil-data class is exposed with empty Creator / Schema -- this is
+	// the post-M-C contract that downstream queries (Collection, Denom)
+	// rely on.
+	s.Require().Empty(ids["nildataclass"].Creator)
+	s.Require().Empty(ids["nildataclass"].Schema)
+}
+
+// Defense-in-depth: SaveNFT must reject empty inputs rather than
+// silently writing a corrupt state entry (empty key / zero address).
+func (s *KeeperTestSuite) TestSaveNFTRejectsEmptyInputs() {
+	creator := sdk.AccAddress([]byte("creator-empty"))
+	s.Require().NoError(s.keeper.SaveDenom(s.ctx, "denom", "D", "", "D", creator, false, false, "", "", "", ""))
+
+	// Empty denom ID.
+	s.Require().ErrorContains(s.keeper.SaveNFT(s.ctx, "", "1", "n", "", "", "", creator),
+		"denom ID cannot be empty")
+
+	// Empty token ID.
+	s.Require().ErrorContains(s.keeper.SaveNFT(s.ctx, "denom", "", "n", "", "", "", creator),
+		"token ID cannot be empty")
+
+	// Empty / nil receiver.
+	s.Require().ErrorContains(s.keeper.SaveNFT(s.ctx, "denom", "1", "n", "", "", "", nil),
+		"receiver cannot be empty")
+	s.Require().ErrorContains(s.keeper.SaveNFT(s.ctx, "denom", "1", "n", "", "", "", sdk.AccAddress{}),
+		"receiver cannot be empty")
+
+	// No state was written on any of these failures.
+	s.Require().False(s.keeper.HasNFT(s.ctx, "denom", "1"))
+}
+
+// GetNFTs must downgrade a single NFT with undecodable metadata to empty
+// metadata rather than aborting the whole query (matches GetCollections
+// behavior). The bad record stays in the result so callers iterating the
+// chain state see the same shape they would have seen before the bug.
+func (s *KeeperTestSuite) TestGetNFTsSkipsUndecodableNFT() {
+	creator := sdk.AccAddress([]byte("creator-undec"))
+	s.Require().NoError(s.keeper.SaveDenom(s.ctx, "denom-un", "U", "", "U", creator, false, false, "", "", "", ""))
+	// Mint a clean NFT first.
+	s.Require().NoError(s.keeper.SaveNFT(s.ctx, "denom-un", "good", "Good", "", "", "", creator))
+
+	// Mint a second NFT, then poison its Data so Unmarshal fails.
+	s.Require().NoError(s.keeper.SaveNFT(s.ctx, "denom-un", "bad", "Bad", "", "", "", creator))
+	bad, ok := s.nftKpr.GetNFT(s.ctx, "denom-un", "bad")
+	s.Require().True(ok)
+	bad.Data = &codectypes.Any{TypeUrl: "/cosmos.bad.Type", Value: []byte{0xff, 0xfe}}
+	s.Require().NoError(s.nftKpr.Update(s.ctx, bad))
+
+	nfts, err := s.keeper.GetNFTs(s.ctx, "denom-un")
+	s.Require().NoError(err, "undecodable NFT must not abort the whole query")
+	s.Require().Len(nfts, 2)
+
+	got := make(map[string]types.BaseNFT, 2)
+	for _, n := range nfts {
+		got[n.GetID()] = n.(types.BaseNFT)
+	}
+	// The clean NFT keeps its real metadata.
+	s.Require().Equal("Good", got["good"].Name)
+	// The poisoned NFT is downgraded to empty metadata.
+	s.Require().Empty(got["bad"].Name)
+}
+
 // ============================================================================
 // Invariant tests
 // ============================================================================

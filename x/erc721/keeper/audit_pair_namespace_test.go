@@ -10,13 +10,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Regression for P0-1: erc721 pair resolution used to route by string shape
-// (common.IsHexAddress) instead of by call semantics. A denom whose id is a
-// 40-nibble hex string ("aaaa...aa", allowed by the denom regex and
-// permissionlessly issuable via MsgIssueDenom) was routed into the
-// contract-address map, so converting that denom resolved — and minted into —
-// the VICTIM pair's contract. The semantics-specific lookups below must keep
-// the two namespaces strictly separated.
+// Pair resolution must route by call semantics, not string shape: a denom
+// whose id is a 40-nibble hex string (issuable via MsgIssueDenom) would
+// otherwise resolve into the contract-address namespace and mint into another
+// pair's contract. The lookups below must keep the two namespaces separated.
 func TestAudit_PairNamespaceSeparation(t *testing.T) {
 	t.Parallel()
 
@@ -62,7 +59,7 @@ func TestAudit_PairNamespaceSeparation(t *testing.T) {
 	})
 }
 
-// Regression: MsgIssueDenom must reject denom ids shaped like an EVM address.
+// MsgIssueDenom must reject denom ids shaped like an EVM address.
 func TestAudit_IssueDenomRejectsHexAddressShape(t *testing.T) {
 	t.Parallel()
 
@@ -90,4 +87,50 @@ func TestAudit_IssueDenomRejectsHexAddressShape(t *testing.T) {
 
 func isNotFound(err error) bool {
 	return errorsmod.IsOf(err, erc721types.ErrTokenPairNotFound)
+}
+
+// RegisterNFT must reject a contract that is already registered under another
+// class: a duplicate binding would overwrite the first pair's ERC721Map entry
+// and orphan its class.
+func TestAudit_RegisterNFTRejectsExistingContract(t *testing.T) {
+	t.Parallel()
+
+	k, ctx := setupKeeperContext(t)
+
+	contract := common.HexToAddress("0x3333333333333333333333333333333333333333")
+	first := "first-class"
+	second := "different-class-same-contract"
+
+	// First registration with (contract, first) must succeed.
+	_, err := k.RegisterNFT(ctx, &erc721types.MsgConvertNFT{
+		ClassId:            first,
+		EvmContractAddress: contract.Hex(),
+	})
+	require.NoError(t, err)
+	require.True(t, k.IsERC721Registered(ctx, contract))
+	require.True(t, k.IsClassRegistered(ctx, first))
+	require.False(t, k.IsClassRegistered(ctx, second),
+		"second class must not be registered at this point")
+
+	// A SECOND pair that tries to bind the SAME contract under a different
+	// class must be rejected.
+	_, err = k.RegisterNFT(ctx, &erc721types.MsgConvertNFT{
+		ClassId:            second,
+		EvmContractAddress: contract.Hex(),
+	})
+	require.Error(t, err)
+	require.True(t, errorsmod.IsOf(err, erc721types.ErrTokenPairAlreadyExists),
+		"contract collision must surface ErrTokenPairAlreadyExists, got %v", err)
+
+	// The second class must still NOT be registered (state must not be
+	// partially mutated by the failed registration).
+	require.False(t, k.IsClassRegistered(ctx, second),
+		"rejected registration must not create a partial state")
+
+	// The first pair must remain intact and lookup-able through the
+	// contract axis (no overwrite).
+	boundClass := k.GetClassMap(ctx, first)
+	require.NotEmpty(t, boundClass)
+	boundID := k.GetERC721Map(ctx, contract)
+	require.Equal(t, boundClass, boundID)
 }

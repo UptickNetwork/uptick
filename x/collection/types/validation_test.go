@@ -24,7 +24,7 @@ func TestValidateDenomID(t *testing.T) {
 func TestValidateDenomID_RejectsComma(t *testing.T) {
 	// regex branch (already rejected by the charset, pinned here explicitly)
 	require.Error(t, ValidateDenomID("a,b"))
-	// uptick- prefixed branch: previously accepted, must now be rejected
+	// uptick- prefixed branch must reject commas
 	require.Error(t, ValidateDenomID("uptick-a,b"))
 	require.Error(t, ValidateDenomID("uptick-denom,with,commas"))
 	// the UID parser round-trips only comma-free classIds
@@ -67,7 +67,7 @@ func TestModifyAndModified_EmptyStringKeepsOrigin(t *testing.T) {
 	require.Equal(t, " ", Modify("origin", " "))
 }
 
-// M-8 (2026-09-04): MsgIssueDenom must reject the "uptick-" prefix, which is
+// MsgIssueDenom must reject the "uptick-" prefix, which is
 // reserved for module-derived class IDs (erc721/cw721 bridging derives class
 // IDs as "uptick-<contract>"). A user pre-minting such a denom would
 // permanently block registration of the matching contract.

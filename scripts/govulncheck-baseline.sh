@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
 #
-# govulncheck 基线过滤脚本。
+# govulncheck baseline filter.
 #
-# govulncheck 官方不支持 baseline，本脚本实现：
-#   1. 全量扫描 ./...；
-#   2. 提取影响本代码的漏洞 ID；
-#   3. 与 scripts/vuln-baseline.txt 对比：
-#      - 出现基线之外的新漏洞 -> 非零退出，CI 失败；
-#      - 仅剩基线内漏洞       -> 通过（提示性输出）。
+# govulncheck has no official baseline support, so this script:
+#   1. scans ./... in full;
+#   2. extracts the vulnerability IDs that affect this code;
+#   3. compares them against scripts/vuln-baseline.txt:
+#      - new vulnerabilities outside the baseline -> non-zero exit, CI fails;
+#      - only baseline entries remain             -> pass (informational output).
 #
-# 维护规则：
-#   - 基线内条目出现修复版本（govulncheck 输出不再报它）时，应尽快
-#     升级依赖并从基线中删除对应 ID；
-#   - 严禁把"新出现的漏洞"直接加进基线，必须先完成人工评估并在
-#     基线文件注释中记录理由。
+# Maintenance rules:
+#   - when a baseline entry gets a fixed version (govulncheck stops reporting
+#     it), upgrade the dependency and remove the ID from the baseline;
+#   - NEVER add newly found vulnerabilities to the baseline directly: a manual
+#     assessment with a justification comment in the baseline file is required.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -33,12 +33,25 @@ fi
 LOG="$(mktemp)"
 trap 'rm -f "$LOG"' EXIT
 
-# govulncheck 发现漏洞时退出码为 3，不能让 set -e 直接终止。
-govulncheck ./... >"$LOG" 2>&1 || true
+# govulncheck exits with 3 when it finds vulnerabilities; build/network errors
+# return other non-zero codes. Keep set -e from terminating early while
+# preserving the original exit code for the validity checks below.
+govulncheck_rc=0
+govulncheck ./... >"$LOG" 2>&1 || govulncheck_rc=$?
 
-# Sanity check: make sure the scan actually ran. Otherwise a broken
-# environment (go missing, network error, govulncheck crash) would
-# silently produce an empty result and falsely pass.
+# Triple validity check to avoid a silent false PASS from a broken environment:
+#   1) govulncheck must have actually run (zero output must not pass);
+#   2) exit code must be 0 (clean) or 3 (vulnerabilities) — anything else is a
+#      build/network/toolchain error;
+#   3) the report must contain govulncheck's signature section
+#      (Symbol Results / No vulnerabilities found).
+if [[ "$govulncheck_rc" -ne 0 && "$govulncheck_rc" -ne 3 ]]; then
+  echo "FAIL: govulncheck exited with unexpected code $govulncheck_rc (build/network/tooling error)." >&2
+  echo "Treating this as a CI failure to avoid silently passing on a broken environment." >&2
+  cat "$LOG" >&2
+  exit 2
+fi
+
 if ! grep -qE '^(=== Symbol Results ===|No vulnerabilities found)' "$LOG"; then
   echo "FAIL: govulncheck did not produce a valid report. Raw output:" >&2
   cat "$LOG" >&2
@@ -62,8 +75,11 @@ if [[ -n "$new" ]]; then
   echo "$new" >&2
   echo >&2
   echo "Details:" >&2
-  grep -E '^Vulnerability #|More info:|Found in:|Fixed in:' "$LOG" |
-    grep -A3 -B1 "$(echo "$new" | head -1)" >&2 || sed -n '1,40p' "$LOG" >&2
+  # Print detailed context for EVERY new vulnerability, not just the first.
+  for v in $new; do
+    echo "--- $v ---" >&2
+    grep -A3 -B1 "$v" "$LOG" >&2 || sed -n '1,40p' "$LOG" >&2
+  done
   echo >&2
   echo "If (and only if) these are confirmed unfixable/accepted, add the IDs to" >&2
   echo "$BASELINE_FILE with a justification comment." >&2

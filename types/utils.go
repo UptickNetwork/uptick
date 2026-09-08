@@ -19,6 +19,10 @@ const prefix = "uptick"
 // IsSupportedKey returns true if the pubkey type is supported by the chain
 // (i.e eth_secp256k1, amino multisig, ed25519).
 // NOTE: Nested multisigs are not supported.
+//
+// Deprecated: not wired into signature verification; app/sigverify.go's
+// SigVerificationGasConsumer is the source of truth (and rejects ed25519).
+// Kept only for the existing unit test; do not call from production code.
 func IsSupportedKey(pubkey cryptotypes.PubKey) bool {
 	switch pubkey := pubkey.(type) {
 	case *ethsecp256k1.PubKey, *ed25519.PubKey:

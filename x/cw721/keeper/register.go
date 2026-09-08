@@ -74,13 +74,14 @@ func (k Keeper) RegisterCW721(ctx sdk.Context, msg *types.MsgConvertCW721) (*typ
 	}
 
 	derivedClassID := types.CreateClassIDFromContractAddress(msg.ContractAddress)
-	if strings.TrimSpace(msg.ClassId) == "" {
+	trimmedClassID := strings.TrimSpace(msg.ClassId)
+	if trimmedClassID == "" {
 		msg.ClassId = derivedClassID
-	} else if msg.ClassId != derivedClassID {
+	} else if trimmedClassID != derivedClassID {
 		return nil, sdkerrors.Wrapf(
 			types.ErrTokenPairNotFound,
 			"class ID %s does not match CW721 contract derived class ID %s",
-			msg.ClassId,
+			trimmedClassID,
 			derivedClassID,
 		)
 	}
