@@ -7,9 +7,11 @@
 EMBEDDED_DIR := ../x/erc721/contracts/compiled_contracts
 
 # Verify the committed artifacts' integrity against checksums.txt.
+# NOTE: this target only compares committed files against checksums.txt — it
+# does NOT rebuild anything. The actual recompile-and-compare gate is
+# verify-contracts-reproducible below (CI runs both).
 verify-contracts:
-	@echo "verify-contracts: (CI job) rebuild with solc 0.8.28 + OZ 4.9.6, then"
-	@echo "compare each compiled_contracts/*.json against checksums.txt."
+	@echo "verify-contracts: comparing compiled_contracts/*.json against checksums.txt (checksum-only, no rebuild)"
 	@for f in compiled_contracts/*.json; do \
 		h=$$(shasum -a 256 "$$f" | awk '{print $$1}'); \
 		p=$$(awk -v f="$$f" '$$2 == f {print $$1}' checksums.txt); \

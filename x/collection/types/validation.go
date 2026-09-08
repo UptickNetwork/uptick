@@ -181,7 +181,23 @@ func ValidateIssueDenomID(denomID string) error {
 		return sdkerrors.Wrapf(ErrInvalidDenom,
 			"denomID cannot be a bech32 account address (%s)", denomID)
 	}
+	// A user denom whose id is a 40-nibble hex address string (optionally
+	// 0x-prefixed) would collide with ERC721 contract keys in the erc721
+	// module's pair lookup. The base denom regex cannot express this rule, so
+	// it is enforced here alongside the other reserved shapes.
+	if isHexAddressShape(denomID) {
+		return sdkerrors.Wrapf(ErrInvalidDenom,
+			"denomID cannot be a hex address shape reserved for ERC721 contract keys (%s)", denomID)
+	}
 	return nil
+}
+
+// hexAddressShapeRe matches EVM address-shaped strings: an optional 0x prefix
+// followed by exactly 40 hexadecimal nibbles, any case.
+var hexAddressShapeRe = regexp.MustCompile(`^(0x)?[0-9a-fA-F]{40}$`)
+
+func isHexAddressShape(s string) bool {
+	return hexAddressShapeRe.MatchString(s)
 }
 
 // ValidateKeywords checks if the given denomID begins with `DenomKeywords`

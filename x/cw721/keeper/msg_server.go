@@ -28,6 +28,13 @@ func (k Keeper) TransferCW721(
 ) {
 
 	ctx := sdk.UnwrapSDKContext(goCtx)
+	// Canonicalize before building the convert message and the refund keys.
+	cw721Addr, err := NormalizeCW721Address(msg.CwContractAddress)
+	if err != nil {
+		return nil, err
+	}
+	msg.CwContractAddress = cw721Addr
+
 	convertMsg := types.MsgConvertCW721{
 		ContractAddress: msg.CwContractAddress,
 		TokenIds:        msg.CwTokenIds,
@@ -81,7 +88,16 @@ func (k Keeper) ConvertCW721(
 		return nil, types.ErrCW721Disabled
 	}
 
-	// classId, nftId
+	// Canonicalize the contract address so every downstream key (token UID,
+	// CW721 map, refund receiver) uses the single canonical bech32 form and
+	// case aliases cannot bypass duplicate detection.
+	cw721Addr, err := NormalizeCW721Address(msg.ContractAddress)
+	if err != nil {
+		return nil, err
+	}
+	msg.ContractAddress = cw721Addr
+
+	// classId, nftIds
 	classId, nftIds, err := k.GetClassIDAndNFTID(ctx, msg)
 	if err != nil {
 		return nil, err

@@ -93,13 +93,13 @@ func (k Keeper) DeleteTokenPair(ctx sdk.Context, tokenPair types.TokenPair) {
 // SetCW721Map sets the token pair id for the given address
 func (k Keeper) SetCW721Map(ctx sdk.Context, cw721 string, id []byte) {
 	store := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixTokenPairByCW721)
-	store.Set([]byte(cw721), id)
+	store.Set([]byte(canonicalCW721Key(cw721)), id)
 }
 
 // GetCW721Map returns the token pair id for the given address
 func (k Keeper) GetCW721Map(ctx sdk.Context, cw721 string) []byte {
 	store := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixTokenPairByCW721)
-	return store.Get([]byte(cw721))
+	return store.Get([]byte(canonicalCW721Key(cw721)))
 }
 
 // GetClassMap returns the token pair id for the given class
@@ -111,7 +111,7 @@ func (k Keeper) GetClassMap(ctx sdk.Context, classID string) []byte {
 // DeleteCW721Map deletes the token pair id for the given address
 func (k Keeper) DeleteCW721Map(ctx sdk.Context, cw721 string) {
 	store := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixTokenPairByCW721)
-	store.Delete([]byte(cw721))
+	store.Delete([]byte(canonicalCW721Key(cw721)))
 }
 
 // SetClassMap sets the token pair id for the classID
@@ -130,7 +130,7 @@ func (k Keeper) IsTokenPairRegistered(ctx sdk.Context, id []byte) bool {
 func (k Keeper) IsCW721Registered(ctx sdk.Context, cw721 string) bool {
 
 	store := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixTokenPairByCW721)
-	return store.Has([]byte(cw721))
+	return store.Has([]byte(canonicalCW721Key(cw721)))
 }
 
 // IsClassRegistered check if registered nft class is registered

@@ -1,0 +1,49 @@
+name: Security
+# govulncheck with baseline filtering: fails only on vulnerabilities that are
+# NOT listed in scripts/vuln-baseline.txt (known no-fix-available advisories).
+# When an upstream fix becomes available, remove the ID from the baseline and
+# upgrade the dependency — this workflow will then enforce the upgrade.
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  govulncheck:
+    name: govulncheck (baseline filtered)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: "go.mod"
+
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+
+      - name: Run govulncheck with baseline
+        run: bash scripts/govulncheck-baseline.sh
+
+      - name: Verify baseline is minimal
+        # Every ID in the baseline must still appear in the scan output.
+        # If govulncheck no longer reports an ID, the baseline entry is stale
+        # (a fix was published) and this step fails to force its removal.
+        run: |
+          set -euo pipefail
+          log="$(mktemp)"
+          govulncheck ./... >"$log" 2>&1 || true
+          stale=0
+          while IFS= read -r id; do
+            [[ -z "$id" ]] && continue
+            if ! grep -q "$id" "$log"; then
+              echo "STALE BASELINE ENTRY: $id no longer reported (upstream fix available) — remove it and upgrade."
+              stale=1
+            fi
+          done < <(grep -E '^GO-[0-9]{4}-[0-9]+' scripts/vuln-baseline.txt)
+          exit "$stale"

@@ -13,6 +13,14 @@ import (
 // RegisterNFT deploys an cw721 contract and creates the token pair for the existing cosmos coin
 func (k Keeper) RegisterNFT(ctx sdk.Context, msg *types.MsgConvertNFT) (*types.TokenPair, error) {
 
+	// Canonicalize the contract address before any key is derived from it so
+	// case aliases of the same bech32 address cannot create duplicate pairs.
+	cw721Addr, err := NormalizeCW721Address(msg.ContractAddress)
+	if err != nil {
+		return nil, err
+	}
+	msg.ContractAddress = cw721Addr
+
 	// Check if class is already registered
 	if k.IsClassRegistered(ctx, msg.ClassId) {
 		return nil, sdkerrors.Wrapf(
@@ -28,11 +36,7 @@ func (k Keeper) RegisterNFT(ctx sdk.Context, msg *types.MsgConvertNFT) (*types.T
 	// Validate the CW721 contract address. CW721 contracts are CosmWasm
 	// contracts, so the address must be a valid bech32 account address (not a
 	// 0x hex address); it is passed directly to the wasm querier/executor below.
-	if _, err := sdk.AccAddressFromBech32(msg.ContractAddress); err != nil {
-		return nil, sdkerrors.Wrapf(
-			types.ErrInternalTokenPair, "invalid CW721 contract address: %s", msg.ContractAddress,
-		)
-	}
+	// Validation already happened in NormalizeCW721Address above.
 
 	if len(strings.TrimSpace(msg.ClassId)) == 0 {
 		return nil, sdkerrors.Wrapf(
@@ -54,6 +58,15 @@ func (k Keeper) RegisterNFT(ctx sdk.Context, msg *types.MsgConvertNFT) (*types.T
 // RegisterCW721 creates a Cosmos coin and registers the token pair between the nft and the CW721
 func (k Keeper) RegisterCW721(ctx sdk.Context, msg *types.MsgConvertCW721) (*types.TokenPair, error) {
 
+	// Canonicalize the contract address before the duplicate check, class ID
+	// derivation and pair creation so case aliases of the same bech32 address
+	// cannot create duplicate pairs.
+	cw721Addr, err := NormalizeCW721Address(msg.ContractAddress)
+	if err != nil {
+		return nil, err
+	}
+	msg.ContractAddress = cw721Addr
+
 	// Check if CW721 is already registered
 	if k.IsCW721Registered(ctx, msg.ContractAddress) {
 		return nil, sdkerrors.Wrapf(types.ErrTokenPairAlreadyExists,
@@ -72,7 +85,7 @@ func (k Keeper) RegisterCW721(ctx sdk.Context, msg *types.MsgConvertCW721) (*typ
 		)
 	}
 
-	err := k.CreateNFTClass(ctx, msg)
+	err = k.CreateNFTClass(ctx, msg)
 	if err != nil {
 		return nil, sdkerrors.Wrap(err,
 			"failed to create wrapped coin denom metadata for CW721")

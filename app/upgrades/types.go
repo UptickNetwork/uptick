@@ -83,6 +83,13 @@ func (r *UpgradeRouter) UpgradeInfo(planName string) Upgrade {
 // A module missing from vm (newly added by this upgrade) means the first run
 // has not completed, so the result is false.
 //
+// Modules that do not expose a ConsensusVersion (IBC light clients such as
+// 06-solomachine and 07-tendermint, plus other genesis-only / legacy modules)
+// carry no migratable consensus state and are SKIPPED. Returning false for
+// them — as an earlier revision did — made the guard unreachable on any
+// manager that contains such a module, silently disabling idempotency
+// protection for every upgrade handler relying on it.
+//
 // PRECONDITION: the guard is only sound for upgrades that bump at least one
 // module's ConsensusVersion (or add/remove modules). For an upgrade that
 // changes no consensus versions, a chain coming from the previous release
@@ -97,10 +104,10 @@ func (b Toolbox) UpgradeAlreadyApplied(vm module.VersionMap) bool {
 	for name, mod := range b.ModuleManager.Modules {
 		cv, ok := mod.(interface{ ConsensusVersion() uint64 })
 		if !ok {
-			// Module does not expose a consensus version (legacy or
-			// genesis-only module) — treat as not-yet-migrated so the
-			// handler stays conservative and re-runs.
-			return false
+			// Module does not expose a consensus version (light client,
+			// legacy or genesis-only module) — it has no consensus version
+			// to compare and must not block the guard.
+			continue
 		}
 		from, ok := vm[name]
 		if !ok || from != cv.ConsensusVersion() {

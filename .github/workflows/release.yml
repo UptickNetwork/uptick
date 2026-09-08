@@ -5,6 +5,18 @@ on:
     tags:
       - "v*"
 
+# Least privilege: the release job builds artifacts locally and uploads them
+# via goreleaser; it never talks to a Docker daemon.
+permissions:
+  contents: write
+
+env:
+  # goreleaser-cross image pinned by immutable digest (tag v1.25.8 at the
+  # time of pinning). Pinning by mutable tag allowed a compromised or
+  # re-pushed image to obtain the release token and tamper with artifacts.
+  # To update: verify the new image, then replace the digest below.
+  GORELEASER_CROSS_IMAGE: ghcr.io/goreleaser/goreleaser-cross@sha256:75b288263cf8ac2cabb10bd464acd0792dcaec99ca0d3d0eae42ca7106e55355
+
 jobs:
   goreleaser:
     runs-on: ubuntu-latest
@@ -12,23 +24,30 @@ jobs:
       contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4 # v4.2.2
         with:
           fetch-depth: 0
 
       # Run goreleaser inside the goreleaser-cross image so the cgo cross
       # compilers required by .goreleaser.yml (osxcross, aarch64 gcc) are
       # available for darwin/linux/linux-arm64 builds.
+      #
+      # Hardened vs. the previous revision:
+      #   - image pinned by digest, not a mutable tag;
+      #   - no --privileged and no /var/run/docker.sock (nothing in
+      #     .goreleaser.yml builds or publishes container images, so the
+      #     container never needs a Docker daemon);
+      #   - the container only mounts the workspace, and GITHUB_TOKEN is
+      #     scoped to contents: write.
       - name: Release
         run: |
-          docker run --rm --privileged \
+          docker run --rm \
             -e CGO_ENABLED=1 \
             -e GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}" \
             -e GIT_CONFIG_COUNT=1 \
             -e GIT_CONFIG_KEY_0=safe.directory \
             -e GIT_CONFIG_VALUE_0=/go/src/github.com/UptickNetwork/uptick \
-            -v /var/run/docker.sock:/var/run/docker.sock \
             -v "$GITHUB_WORKSPACE":/go/src/github.com/UptickNetwork/uptick \
             -w /go/src/github.com/UptickNetwork/uptick \
-            ghcr.io/goreleaser/goreleaser-cross:v1.25.8 \
+            "$GORELEASER_CROSS_IMAGE" \
             release --clean

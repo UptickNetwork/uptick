@@ -1,0 +1,21 @@
+# govulncheck 基线：已确认、当前无上游修复（Fixed in: N/A）的告警。
+# 处理策略见 scripts/govulncheck-baseline.sh 头部注释。
+# 出现修复版本后，从基线移除对应 ID 并升级依赖即可消除。
+#
+# ID            模块                          问题                          消除条件
+# GO-2026-5932  golang.org/x/crypto           openpgp 包弃用               无修复；armor 仅编码用途，跟踪上游
+# GO-2026-4740  shamaton/msgpack/v2           反序列化 DoS                 等 wasmd/wasmvm 上游升级
+# GO-2026-4513  shamaton/msgpack/v2           反序列化 DoS                 等 wasmd/wasmvm 上游升级
+# GO-2026-4479  pion/dtls/v2                  AES-GCM nonce 泄露风险       等 cosmos/evm + geth 上游升级
+# GO-2025-3684  cosmos/evm                    预编译部分状态写入(共识层)   跟踪 cosmos/evm 修复版本，纳入下次链升级
+# GO-2024-2584  cosmos/cosmos-sdk             slashing 规避                SDK 官方 won't fix
+# GO-2023-1881  cosmos/cosmos-sdk             crisis 不收 ConstantFee      SDK 官方 won't fix
+# GO-2023-1821  cosmos/cosmos-sdk             crisis 不停链                SDK 官方 won't fix
+GO-2026-5932
+GO-2026-4740
+GO-2026-4513
+GO-2026-4479
+GO-2025-3684
+GO-2024-2584
+GO-2023-1881
+GO-2023-1821

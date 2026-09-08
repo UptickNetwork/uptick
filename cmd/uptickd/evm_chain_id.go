@@ -38,8 +38,15 @@ func applyEVMChainID(cmd *cobra.Command) error {
 		return nil
 	}
 	serverCtx.Viper.Set(srvflags.EVMChainID, evmID)
-	if err := cmd.Flags().Set(srvflags.EVMChainID, strconv.FormatUint(evmID, 10)); err != nil {
-		return err
+	// The evm.evm-chain-id flag is registered by the EVM server command family
+	// (start) only. Other commands (init, status, query, tx, keys, ...) do not
+	// own it: writing viper alone is enough for the JSON-RPC server, and
+	// attempting to set a missing cobra flag here used to hard-fail every
+	// non-start command with "no such flag -evm.evm-chain-id".
+	if f := cmd.Flags().Lookup(srvflags.EVMChainID); f != nil {
+		if err := cmd.Flags().Set(srvflags.EVMChainID, strconv.FormatUint(evmID, 10)); err != nil {
+			return err
+		}
 	}
 	return nil
 }

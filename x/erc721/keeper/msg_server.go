@@ -142,7 +142,7 @@ func (k Keeper) ConvertERC721(
 		}
 	}
 
-	pair, err := k.GetPair(ctx, msg.EvmContractAddress)
+	pair, err := k.GetPairByEVM(ctx, msg.EvmContractAddress)
 	if err != nil {
 		return nil, sdkerrors.Wrap(err, "failed to GetPair")
 	}
@@ -239,9 +239,23 @@ func (k Keeper) ConvertNFT(
 		}
 	}
 
-	pair, err := k.GetPair(ctx, msg.ClassId)
+	pair, err := k.GetPairByClass(ctx, msg.ClassId)
 	if err != nil {
 		return nil, err
+	}
+
+	// Pin the resolved class ID to the pair's canonical class. Resolving the
+	// pair from msg.ClassId through the class-id map must stay consistent:
+	// if the pair's canonical class differs (e.g. the class id is a
+	// hex-address-shaped denom colliding with a registered contract), reject
+	// the conversion instead of minting into the wrong namespace. This mirrors
+	// the symmetric check in ConvertERC721.
+	if msg.ClassId != pair.ClassId {
+		return nil, sdkerrors.Wrapf(
+			types.ErrClassIdNotCorrect,
+			"class id is not correct, expect %s got %s",
+			pair.ClassId, msg.ClassId,
+		)
 	}
 
 	// Self-heal a pair whose ERC721 contract no longer has code (self-destructed
@@ -296,7 +310,7 @@ func (k Keeper) ConvertNFT(
 			return nil, sdkerrors.Wrapf(err, "failed to re-register erc721 token pair for class %s", msg.ClassId)
 		}
 
-		pair, err = k.GetPair(ctx, msg.ClassId)
+		pair, err = k.GetPairByClass(ctx, msg.ClassId)
 		if err != nil {
 			return nil, err
 		}

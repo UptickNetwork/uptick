@@ -71,7 +71,7 @@ func (k Keeper) GetContractAddressAndTokenIds(ctx sdk.Context, msg *types.MsgCon
 		err                error
 	)
 
-	pair, err := k.GetPair(ctx, msg.ClassId)
+	pair, err := k.GetPairByClass(ctx, msg.ClassId)
 	if err != nil {
 		msg.EvmTokenIds, err = getNftDatas(msg.EvmTokenIds, msg.CosmosTokenIds, nil, 2)
 		if err != nil {

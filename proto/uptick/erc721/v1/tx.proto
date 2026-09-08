@@ -5,6 +5,7 @@ import "cosmos/msg/v1/msg.proto";
 import "gogoproto/gogo.proto";
 import "google/api/annotations.proto";
 import "ibc/core/client/v1/client.proto";
+import "uptick/erc721/v1/genesis.proto";
 
 option go_package = "github.com/UptickNetwork/uptick/x/erc721/types";
 
@@ -26,6 +27,11 @@ service Msg {
   rpc TransferERC721(MsgTransferERC721) returns (MsgTransferERC721Response) {
     option (google.api.http).get = "/uptick/erc721/v1/transfer_erc721";
   }
+  // UpdateParams updates the module parameters. Since the erc721 module has
+  // no authority account, this RPC is registered for interface completeness
+  // and is only callable by the governance authority.
+  rpc UpdateParams(MsgUpdateParams) returns (MsgUpdateParamsResponse);
+
 }
 
 // MsgConvertNFT defines a Msg to convert a native Cosmos nft to a ERC721 token
@@ -113,3 +119,18 @@ message MsgTransferERC721 {
 
 //MsgTransferERC721Response defines the response type for Transfer erc721 RPC
 message MsgTransferERC721Response {}
+
+// MsgUpdateParams is the Msg/UpdateParams request type.
+message MsgUpdateParams {
+  option (cosmos.msg.v1.signer) = "authority";
+
+  // authority is the address of the governance account.
+  string authority = 1;
+  // params defines the x/erc721 module parameters to update.
+  //
+  // Since: v0.4.1
+  Params params = 2 [(gogoproto.nullable) = false];
+}
+
+// MsgUpdateParamsResponse is the Msg/UpdateParams response type.
+message MsgUpdateParamsResponse {}

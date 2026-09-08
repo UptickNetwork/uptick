@@ -33,13 +33,13 @@ const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 
 // MsgConvertNFT defines a Msg to convert a native Cosmos nft to a CW721 token
 type MsgConvertNFT struct {
-	// class_id to convert to CW721
+	// nft classID to convert to CW721
 	ClassId string `protobuf:"bytes,1,opt,name=class_id,json=classId,proto3" json:"class_id,omitempty"`
-	// nft_ids to convert to CW721
+	// nftID to convert to CW721
 	NftIds []string `protobuf:"bytes,2,rep,name=nft_ids,json=nftIds,proto3" json:"nft_ids,omitempty"`
 	// recipient hex address to receive CW721 token
 	Receiver string `protobuf:"bytes,3,opt,name=receiver,proto3" json:"receiver,omitempty"`
-	// cosmos bech32 address from the owner of the given Cosmos coins
+	// cosmos bech32 address from the owner of the given Cosmos NFTs
 	Sender string `protobuf:"bytes,4,opt,name=sender,proto3" json:"sender,omitempty"`
 	// CW721 token contract address registered in a token pair
 	ContractAddress string `protobuf:"bytes,5,opt,name=contract_address,json=contractAddress,proto3" json:"contract_address,omitempty"`
@@ -159,19 +159,20 @@ func (m *MsgConvertNFTResponse) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_MsgConvertNFTResponse proto.InternalMessageInfo
 
-// MsgConvertCW721 defines a Msg to convert a CW721 token to a native Cosmos nft
+// MsgConvertCW721 defines a Msg to convert a CW721 token to a native Cosmos
+// nft.
 type MsgConvertCW721 struct {
 	// CW721 token contract address registered in a token pair
 	ContractAddress string `protobuf:"bytes,1,opt,name=contract_address,json=contractAddress,proto3" json:"contract_address,omitempty"`
-	// token_ids to convert
+	// tokenID to convert
 	TokenIds []string `protobuf:"bytes,2,rep,name=token_ids,json=tokenIds,proto3" json:"token_ids,omitempty"`
-	// bech32 address to receive native Cosmos coins
+	// bech32 address to receive native Cosmos NFTs
 	Receiver string `protobuf:"bytes,3,opt,name=receiver,proto3" json:"receiver,omitempty"`
 	// sender hex address from the owner of the given CW721 tokens
 	Sender string `protobuf:"bytes,4,opt,name=sender,proto3" json:"sender,omitempty"`
-	// class_id to convert to CW721
+	// nft classID to convert to CW721
 	ClassId string `protobuf:"bytes,5,opt,name=class_id,json=classId,proto3" json:"class_id,omitempty"`
-	// nft_ids to convert to CW721
+	// nftID to convert to CW721
 	NftIds []string `protobuf:"bytes,6,rep,name=nft_ids,json=nftIds,proto3" json:"nft_ids,omitempty"`
 }
 
@@ -254,15 +255,15 @@ func (m *MsgConvertCW721) GetNftIds() []string {
 type MsgConvertCW721Response struct {
 	// CW721 token contract address registered in a token pair
 	ContractAddress string `protobuf:"bytes,1,opt,name=contract_address,json=contractAddress,proto3" json:"contract_address,omitempty"`
-	// token_ids to convert
+	// tokenID to convert
 	TokenIds []string `protobuf:"bytes,2,rep,name=token_ids,json=tokenIds,proto3" json:"token_ids,omitempty"`
 	// bech32 address to receive native Cosmos coins
 	Receiver string `protobuf:"bytes,3,opt,name=receiver,proto3" json:"receiver,omitempty"`
 	// sender hex address from the owner of the given CW721 tokens
 	Sender string `protobuf:"bytes,4,opt,name=sender,proto3" json:"sender,omitempty"`
-	// class_id to convert to CW721
+	// nft classID to convert to CW721
 	ClassId string `protobuf:"bytes,5,opt,name=class_id,json=classId,proto3" json:"class_id,omitempty"`
-	// nft_ids to convert to CW721
+	// nftID to convert to CW721
 	NftIds []string `protobuf:"bytes,6,rep,name=nft_ids,json=nftIds,proto3" json:"nft_ids,omitempty"`
 }
 
@@ -341,31 +342,69 @@ func (m *MsgConvertCW721Response) GetNftIds() []string {
 	return nil
 }
 
-// MsgTransferCW721 defines a message for transferring CW721 tokens through IBC
+// MsgConvertCW721Response returns no fields
+type MsgConvertC721Response struct {
+}
+
+func (m *MsgConvertC721Response) Reset()         { *m = MsgConvertC721Response{} }
+func (m *MsgConvertC721Response) String() string { return proto.CompactTextString(m) }
+func (*MsgConvertC721Response) ProtoMessage()    {}
+func (*MsgConvertC721Response) Descriptor() ([]byte, []int) {
+	return fileDescriptor_7eed5155f32633f2, []int{4}
+}
+func (m *MsgConvertC721Response) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *MsgConvertC721Response) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_MsgConvertC721Response.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *MsgConvertC721Response) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_MsgConvertC721Response.Merge(m, src)
+}
+func (m *MsgConvertC721Response) XXX_Size() int {
+	return m.Size()
+}
+func (m *MsgConvertC721Response) XXX_DiscardUnknown() {
+	xxx_messageInfo_MsgConvertC721Response.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_MsgConvertC721Response proto.InternalMessageInfo
+
+// MsgTransferCW721 defines a message to transfer CW721 tokens between chains via IBC
+// It contains information about the source and destination of the transfer,
+// token identifiers, timeout parameters and optional memo
 type MsgTransferCW721 struct {
-	// cw_contract_address is the CW721 token contract address
 	CwContractAddress string `protobuf:"bytes,1,opt,name=cw_contract_address,json=cwContractAddress,proto3" json:"cw_contract_address,omitempty"`
-	// cw_token_ids are the token IDs to transfer
+	// tokenID to convert
 	CwTokenIds []string `protobuf:"bytes,2,rep,name=cw_token_ids,json=cwTokenIds,proto3" json:"cw_token_ids,omitempty"`
-	// source_port is the port on which the packet will be sent
+	// the port on which the packet will be sent
 	SourcePort string `protobuf:"bytes,3,opt,name=source_port,json=sourcePort,proto3" json:"source_port,omitempty"`
-	// source_channel is the channel by which the packet will be sent
+	// the channel by which the packet will be sent
 	SourceChannel string `protobuf:"bytes,4,opt,name=source_channel,json=sourceChannel,proto3" json:"source_channel,omitempty"`
-	// class_id is the class ID of tokens to be transferred
+	// the class_id of tokens to be transferred
 	ClassId string `protobuf:"bytes,5,opt,name=class_id,json=classId,proto3" json:"class_id,omitempty"`
-	// cosmos_token_ids are the non fungible tokens to be transferred
+	// the non fungible tokens to be transferred
 	CosmosTokenIds []string `protobuf:"bytes,6,rep,name=cosmos_token_ids,json=cosmosTokenIds,proto3" json:"cosmos_token_ids,omitempty"`
-	// cw_sender is the sender address
+	// the sender address
 	CwSender string `protobuf:"bytes,7,opt,name=cw_sender,json=cwSender,proto3" json:"cw_sender,omitempty"`
-	// cosmos_receiver is the recipient address on the destination chain
+	// the recipient address on the destination chain
 	CosmosReceiver string `protobuf:"bytes,8,opt,name=cosmos_receiver,json=cosmosReceiver,proto3" json:"cosmos_receiver,omitempty"`
-	// timeout_height is the timeout height relative to the current block height
-	// The timeout is disabled when set to 0
+	// Timeout height relative to the current block height.
+	// The timeout is disabled when set to 0.
 	TimeoutHeight types.Height `protobuf:"bytes,9,opt,name=timeout_height,json=timeoutHeight,proto3" json:"timeout_height"`
-	// timeout_timestamp is the timeout timestamp in absolute nanoseconds since unix epoch
-	// The timeout is disabled when set to 0
+	// Timeout timestamp in absolute nanoseconds since unix epoch.
+	// The timeout is disabled when set to 0.
 	TimeoutTimestamp uint64 `protobuf:"varint,10,opt,name=timeout_timestamp,json=timeoutTimestamp,proto3" json:"timeout_timestamp,omitempty"`
-	// memo is an optional memo field
+	// optional memo
 	Memo string `protobuf:"bytes,11,opt,name=memo,proto3" json:"memo,omitempty"`
 }
 
@@ -373,7 +412,7 @@ func (m *MsgTransferCW721) Reset()         { *m = MsgTransferCW721{} }
 func (m *MsgTransferCW721) String() string { return proto.CompactTextString(m) }
 func (*MsgTransferCW721) ProtoMessage()    {}
 func (*MsgTransferCW721) Descriptor() ([]byte, []int) {
-	return fileDescriptor_7eed5155f32633f2, []int{4}
+	return fileDescriptor_7eed5155f32633f2, []int{5}
 }
 func (m *MsgTransferCW721) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -410,7 +449,7 @@ func (m *MsgTransferCW721Response) Reset()         { *m = MsgTransferCW721Respon
 func (m *MsgTransferCW721Response) String() string { return proto.CompactTextString(m) }
 func (*MsgTransferCW721Response) ProtoMessage()    {}
 func (*MsgTransferCW721Response) Descriptor() ([]byte, []int) {
-	return fileDescriptor_7eed5155f32633f2, []int{5}
+	return fileDescriptor_7eed5155f32633f2, []int{6}
 }
 func (m *MsgTransferCW721Response) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -439,68 +478,170 @@ func (m *MsgTransferCW721Response) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_MsgTransferCW721Response proto.InternalMessageInfo
 
+// MsgUpdateParams is the Msg/UpdateParams request type.
+type MsgUpdateParams struct {
+	// authority is the address of the governance account.
+	Authority string `protobuf:"bytes,1,opt,name=authority,proto3" json:"authority,omitempty"`
+	// params defines the x/cw721 module parameters to update.
+	//
+	// Since: v0.4.1
+	Params Params `protobuf:"bytes,2,opt,name=params,proto3" json:"params"`
+}
+
+func (m *MsgUpdateParams) Reset()         { *m = MsgUpdateParams{} }
+func (m *MsgUpdateParams) String() string { return proto.CompactTextString(m) }
+func (*MsgUpdateParams) ProtoMessage()    {}
+func (*MsgUpdateParams) Descriptor() ([]byte, []int) {
+	return fileDescriptor_7eed5155f32633f2, []int{7}
+}
+func (m *MsgUpdateParams) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *MsgUpdateParams) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_MsgUpdateParams.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *MsgUpdateParams) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_MsgUpdateParams.Merge(m, src)
+}
+func (m *MsgUpdateParams) XXX_Size() int {
+	return m.Size()
+}
+func (m *MsgUpdateParams) XXX_DiscardUnknown() {
+	xxx_messageInfo_MsgUpdateParams.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_MsgUpdateParams proto.InternalMessageInfo
+
+func (m *MsgUpdateParams) GetAuthority() string {
+	if m != nil {
+		return m.Authority
+	}
+	return ""
+}
+
+func (m *MsgUpdateParams) GetParams() Params {
+	if m != nil {
+		return m.Params
+	}
+	return Params{}
+}
+
+// MsgUpdateParamsResponse is the Msg/UpdateParams response type.
+type MsgUpdateParamsResponse struct {
+}
+
+func (m *MsgUpdateParamsResponse) Reset()         { *m = MsgUpdateParamsResponse{} }
+func (m *MsgUpdateParamsResponse) String() string { return proto.CompactTextString(m) }
+func (*MsgUpdateParamsResponse) ProtoMessage()    {}
+func (*MsgUpdateParamsResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_7eed5155f32633f2, []int{8}
+}
+func (m *MsgUpdateParamsResponse) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *MsgUpdateParamsResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_MsgUpdateParamsResponse.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *MsgUpdateParamsResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_MsgUpdateParamsResponse.Merge(m, src)
+}
+func (m *MsgUpdateParamsResponse) XXX_Size() int {
+	return m.Size()
+}
+func (m *MsgUpdateParamsResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_MsgUpdateParamsResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_MsgUpdateParamsResponse proto.InternalMessageInfo
+
 func init() {
 	proto.RegisterType((*MsgConvertNFT)(nil), "uptick.cw721.v1.MsgConvertNFT")
 	proto.RegisterType((*MsgConvertNFTResponse)(nil), "uptick.cw721.v1.MsgConvertNFTResponse")
 	proto.RegisterType((*MsgConvertCW721)(nil), "uptick.cw721.v1.MsgConvertCW721")
 	proto.RegisterType((*MsgConvertCW721Response)(nil), "uptick.cw721.v1.MsgConvertCW721Response")
+	proto.RegisterType((*MsgConvertC721Response)(nil), "uptick.cw721.v1.MsgConvertC721Response")
 	proto.RegisterType((*MsgTransferCW721)(nil), "uptick.cw721.v1.MsgTransferCW721")
 	proto.RegisterType((*MsgTransferCW721Response)(nil), "uptick.cw721.v1.MsgTransferCW721Response")
+	proto.RegisterType((*MsgUpdateParams)(nil), "uptick.cw721.v1.MsgUpdateParams")
+	proto.RegisterType((*MsgUpdateParamsResponse)(nil), "uptick.cw721.v1.MsgUpdateParamsResponse")
 }
 
 func init() { proto.RegisterFile("uptick/cw721/v1/tx.proto", fileDescriptor_7eed5155f32633f2) }
 
 var fileDescriptor_7eed5155f32633f2 = []byte{
-	// 776 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xd4, 0x55, 0xc1, 0x6a, 0xdb, 0x48,
-	0x18, 0xb6, 0x62, 0xc7, 0xb1, 0xc7, 0x71, 0x9c, 0xcc, 0xee, 0xc6, 0x5a, 0x65, 0xb1, 0x1d, 0x2f,
-	0x9b, 0x38, 0x59, 0x2c, 0x61, 0xef, 0x21, 0x90, 0xdb, 0xc6, 0xd0, 0xd6, 0x87, 0x84, 0xe2, 0xba,
-	0x14, 0x7a, 0x11, 0xf2, 0x68, 0x2c, 0x8b, 0x58, 0x33, 0x46, 0x33, 0xb6, 0xda, 0x43, 0xa1, 0x04,
-	0x0a, 0xbd, 0x14, 0x0a, 0x7d, 0x81, 0x40, 0x5f, 0x20, 0x8f, 0x91, 0x42, 0x29, 0x81, 0x5e, 0xda,
-	0x4b, 0x29, 0x49, 0x21, 0x7d, 0x8c, 0xa2, 0x91, 0xec, 0xc4, 0x6e, 0xe2, 0x94, 0xde, 0x7a, 0xd2,
-	0xcc, 0xf7, 0x7f, 0xf3, 0xcf, 0xf7, 0xfd, 0x33, 0xff, 0x08, 0xc8, 0xfd, 0x1e, 0xb7, 0xd1, 0xbe,
-	0x86, 0xbc, 0xad, 0x6a, 0x45, 0x1b, 0x54, 0x34, 0xfe, 0x48, 0xed, 0xb9, 0x94, 0x53, 0x98, 0x09,
-	0x22, 0xaa, 0x88, 0xa8, 0x83, 0x8a, 0x92, 0x45, 0x94, 0x39, 0x94, 0x69, 0x0e, 0xb3, 0x7c, 0xa2,
-	0xc3, 0xac, 0x80, 0xa9, 0xfc, 0x6e, 0x51, 0x8b, 0x8a, 0xa1, 0xe6, 0x8f, 0x42, 0xf4, 0x2f, 0x8b,
-	0x52, 0xab, 0x8b, 0x35, 0xa3, 0x67, 0x6b, 0x06, 0x21, 0x94, 0x1b, 0xdc, 0xa6, 0x84, 0x85, 0xd1,
-	0xbc, 0xdd, 0x42, 0x1a, 0xa2, 0x2e, 0xd6, 0x50, 0xd7, 0xc6, 0x84, 0xfb, 0x19, 0x83, 0x51, 0x40,
-	0x28, 0xbe, 0x95, 0x40, 0x7a, 0x97, 0x59, 0x35, 0x4a, 0x06, 0xd8, 0xe5, 0x7b, 0xb7, 0x9a, 0xf0,
-	0x4f, 0x90, 0x40, 0x5d, 0x83, 0x31, 0xdd, 0x36, 0x65, 0xa9, 0x20, 0x95, 0x92, 0x8d, 0x39, 0x31,
-	0xaf, 0x9b, 0x30, 0x0b, 0xe6, 0x48, 0x9b, 0xeb, 0xb6, 0xc9, 0xe4, 0x99, 0x42, 0xb4, 0x94, 0x6c,
-	0xc4, 0x49, 0x9b, 0xd7, 0x4d, 0x06, 0x15, 0x90, 0x70, 0x31, 0xc2, 0xf6, 0x00, 0xbb, 0x72, 0x54,
-	0xac, 0x19, 0xcd, 0xe1, 0x32, 0x88, 0x33, 0x4c, 0x4c, 0xec, 0xca, 0x31, 0x11, 0x09, 0x67, 0x70,
-	0x03, 0x2c, 0x22, 0x4a, 0xb8, 0x6b, 0x20, 0xae, 0x1b, 0xa6, 0xe9, 0x62, 0xc6, 0xe4, 0x59, 0xc1,
-	0xc8, 0x0c, 0xf1, 0xff, 0x03, 0x18, 0xae, 0x80, 0x24, 0xa7, 0xfb, 0x98, 0x88, 0x9d, 0xe3, 0x62,
-	0xe7, 0x84, 0x00, 0xea, 0x26, 0xdb, 0x4e, 0x1d, 0x9c, 0x1f, 0x6d, 0x86, 0x49, 0x8b, 0x59, 0xf0,
-	0xc7, 0x98, 0x9b, 0x06, 0x66, 0x3d, 0x4a, 0x18, 0x2e, 0xbe, 0x93, 0x40, 0xe6, 0x22, 0x52, 0x7b,
-	0xb0, 0x55, 0xad, 0x5c, 0xa9, 0x40, 0xfa, 0x01, 0x05, 0x33, 0xe3, 0x0a, 0x7e, 0xca, 0xfd, 0xe5,
-	0x2a, 0xcf, 0x5e, 0x5b, 0xe5, 0xf8, 0xe5, 0x2a, 0x8f, 0x3b, 0x7d, 0x23, 0x81, 0xec, 0x84, 0xa1,
-	0xa1, 0xd9, 0x5f, 0xcd, 0x58, 0xf1, 0x63, 0x14, 0x2c, 0xee, 0x32, 0xab, 0xe9, 0x1a, 0x84, 0xb5,
-	0xb1, 0x1b, 0x9c, 0x8e, 0x0a, 0x7e, 0x43, 0x9e, 0x7e, 0x8d, 0x8f, 0x25, 0xe4, 0xd5, 0x26, 0x9c,
-	0x14, 0xc0, 0x3c, 0xf2, 0xf4, 0x49, 0x33, 0x00, 0x79, 0xcd, 0xa1, 0x9d, 0x3c, 0x48, 0x31, 0xda,
-	0x77, 0x11, 0xd6, 0x7b, 0xd4, 0xe5, 0xa1, 0x23, 0x10, 0x40, 0x77, 0xa9, 0xcb, 0xe1, 0x3f, 0x60,
-	0x21, 0x24, 0xa0, 0x8e, 0x41, 0x08, 0xee, 0x86, 0xde, 0xd2, 0x01, 0x5a, 0x0b, 0xc0, 0x69, 0x16,
-	0x4b, 0x7e, 0xe5, 0xfd, 0xf6, 0xd5, 0x27, 0x2f, 0xec, 0x42, 0x80, 0x8f, 0xc4, 0xac, 0x80, 0x24,
-	0xf2, 0xf4, 0xb0, 0x84, 0x73, 0x41, 0x71, 0x91, 0x77, 0x2f, 0x28, 0xe2, 0x3a, 0xc8, 0x84, 0x69,
-	0x46, 0xf5, 0x4f, 0x08, 0x4a, 0x98, 0xa5, 0x31, 0x3c, 0x85, 0xdb, 0x60, 0x81, 0xdb, 0x0e, 0xa6,
-	0x7d, 0xae, 0x77, 0xb0, 0x6d, 0x75, 0xb8, 0x9c, 0x2c, 0x48, 0xa5, 0x54, 0x55, 0x51, 0xed, 0x16,
-	0x52, 0xfd, 0xc6, 0x57, 0xc3, 0x76, 0x1f, 0x54, 0xd4, 0x3b, 0x82, 0xb1, 0x13, 0x3b, 0xfe, 0x94,
-	0x8f, 0x34, 0xd2, 0xe1, 0xba, 0x00, 0x84, 0xff, 0x82, 0xa5, 0x61, 0x22, 0xff, 0xcb, 0xb8, 0xe1,
-	0xf4, 0x64, 0x50, 0x90, 0x4a, 0xb1, 0xc6, 0x62, 0x18, 0x68, 0x0e, 0x71, 0x08, 0x41, 0xcc, 0xc1,
-	0x0e, 0x95, 0x53, 0x42, 0x93, 0x18, 0x6f, 0x2f, 0x3f, 0x3f, 0xcc, 0x47, 0xbe, 0x1e, 0xe6, 0x23,
-	0xfe, 0x25, 0xbd, 0xb0, 0x56, 0x54, 0x80, 0x3c, 0x79, 0xb4, 0xc3, 0x7b, 0x5a, 0x7d, 0x1d, 0x05,
-	0xd1, 0x5d, 0x66, 0xc1, 0x27, 0x00, 0x5c, 0x7a, 0x80, 0x72, 0xea, 0xc4, 0x93, 0xa8, 0x8e, 0xb5,
-	0xb4, 0xb2, 0x36, 0x3d, 0x3e, 0x6a, 0xf9, 0xf5, 0x83, 0xf7, 0x5f, 0x5e, 0xcd, 0xac, 0xc2, 0xbc,
-	0xf6, 0xfd, 0xe3, 0xab, 0xa1, 0x80, 0xaf, 0x93, 0x36, 0x87, 0xcf, 0x24, 0x30, 0x3f, 0xf6, 0x30,
-	0x14, 0xa6, 0xec, 0x20, 0x18, 0x4a, 0xe9, 0x26, 0xc6, 0x48, 0xc5, 0x86, 0x50, 0xf1, 0x37, 0x5c,
-	0x9d, 0xa6, 0x42, 0x60, 0xf0, 0x85, 0x04, 0xd2, 0xe3, 0x3d, 0xb0, 0x7a, 0xd5, 0x36, 0x63, 0x14,
-	0x65, 0xe3, 0x46, 0xca, 0x48, 0x8a, 0x2a, 0xa4, 0x94, 0xe0, 0xda, 0x55, 0x52, 0xec, 0x16, 0x2a,
-	0xf3, 0x70, 0x59, 0x59, 0x04, 0x94, 0xd9, 0xa7, 0xe7, 0x47, 0x9b, 0xd2, 0x4e, 0xfd, 0xf8, 0x34,
-	0x27, 0x9d, 0x9c, 0xe6, 0xa4, 0xcf, 0xa7, 0x39, 0xe9, 0xe5, 0x59, 0x2e, 0x72, 0x72, 0x96, 0x8b,
-	0x7c, 0x38, 0xcb, 0x45, 0x1e, 0x6a, 0x96, 0xcd, 0x3b, 0xfd, 0x96, 0x8a, 0xa8, 0xa3, 0xdd, 0x17,
-	0x29, 0xf7, 0x30, 0xf7, 0xa8, 0xbb, 0xaf, 0x79, 0x06, 0x73, 0xca, 0xa4, 0xcd, 0xcb, 0xa1, 0x43,
-	0x8d, 0x3f, 0xee, 0x61, 0xd6, 0x8a, 0x8b, 0x9f, 0xce, 0x7f, 0xdf, 0x02, 0x00, 0x00, 0xff, 0xff,
-	0x9a, 0x5c, 0x80, 0xf6, 0x0f, 0x07, 0x00, 0x00,
+	// 862 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xd4, 0x55, 0x5f, 0x6b, 0xdb, 0x56,
+	0x14, 0xb7, 0xe2, 0xc4, 0x89, 0x4f, 0xfe, 0xf6, 0x6e, 0x8b, 0x55, 0xb5, 0xb3, 0x1d, 0x8f, 0xb5,
+	0x4e, 0x47, 0x24, 0x9c, 0x31, 0x0a, 0x79, 0x5b, 0x03, 0xeb, 0xf2, 0x90, 0x52, 0xbc, 0x94, 0x41,
+	0x5f, 0x84, 0x7c, 0x75, 0x23, 0x8b, 0x44, 0xf7, 0x8a, 0x7b, 0xaf, 0xad, 0xf6, 0x61, 0x30, 0x0a,
+	0x83, 0xbd, 0x0c, 0x06, 0xfb, 0x02, 0xfd, 0x08, 0xfd, 0x18, 0x7d, 0x18, 0xa3, 0x30, 0x18, 0xdb,
+	0xcb, 0x18, 0xc9, 0xa0, 0xfb, 0x16, 0x1b, 0xba, 0xba, 0x52, 0x2c, 0xd7, 0x4d, 0xc6, 0xde, 0xf6,
+	0xe4, 0xab, 0xdf, 0xf9, 0xdd, 0x73, 0x7e, 0xbf, 0x73, 0xac, 0x23, 0x30, 0x47, 0xb1, 0x0c, 0xf1,
+	0x89, 0x83, 0x93, 0xbb, 0xbb, 0x3d, 0x67, 0xdc, 0x73, 0xe4, 0x13, 0x3b, 0xe6, 0x4c, 0x32, 0xb4,
+	0x9e, 0x45, 0x6c, 0x15, 0xb1, 0xc7, 0x3d, 0xab, 0x81, 0x99, 0x88, 0x98, 0x70, 0x22, 0x11, 0xa4,
+	0xc4, 0x48, 0x04, 0x19, 0xd3, 0x7a, 0x37, 0x60, 0x01, 0x53, 0x47, 0x27, 0x3d, 0x69, 0xf4, 0x66,
+	0xc0, 0x58, 0x70, 0x4a, 0x1c, 0x2f, 0x0e, 0x1d, 0x8f, 0x52, 0x26, 0x3d, 0x19, 0x32, 0x2a, 0x74,
+	0xb4, 0x15, 0x0e, 0xb0, 0x83, 0x19, 0x27, 0x0e, 0x3e, 0x0d, 0x09, 0x95, 0x69, 0xc6, 0xec, 0xa4,
+	0x09, 0xef, 0x4f, 0x0b, 0x0b, 0x08, 0x25, 0x22, 0xd4, 0xf7, 0x3b, 0x3f, 0x1a, 0xb0, 0x7a, 0x28,
+	0x82, 0x7d, 0x46, 0xc7, 0x84, 0xcb, 0x07, 0x9f, 0x1d, 0xa1, 0xeb, 0xb0, 0x84, 0x4f, 0x3d, 0x21,
+	0xdc, 0xd0, 0x37, 0x8d, 0xb6, 0xd1, 0xad, 0xf7, 0x17, 0xd5, 0xf3, 0x81, 0x8f, 0x1a, 0xb0, 0x48,
+	0x8f, 0xa5, 0x1b, 0xfa, 0xc2, 0x9c, 0x6b, 0x57, 0xbb, 0xf5, 0x7e, 0x8d, 0x1e, 0xcb, 0x03, 0x5f,
+	0x20, 0x0b, 0x96, 0x38, 0xc1, 0x24, 0x1c, 0x13, 0x6e, 0x56, 0xd5, 0x9d, 0xe2, 0x19, 0x6d, 0x42,
+	0x4d, 0x10, 0xea, 0x13, 0x6e, 0xce, 0xab, 0x88, 0x7e, 0x42, 0xdb, 0xb0, 0x81, 0x19, 0x95, 0xdc,
+	0xc3, 0xd2, 0xf5, 0x7c, 0x9f, 0x13, 0x21, 0xcc, 0x05, 0xc5, 0x58, 0xcf, 0xf1, 0x4f, 0x33, 0x18,
+	0xdd, 0x80, 0xba, 0x64, 0x27, 0x84, 0xaa, 0xca, 0x35, 0x55, 0x79, 0x49, 0x01, 0x07, 0xbe, 0xd8,
+	0x5b, 0x7e, 0xf6, 0xfa, 0xc5, 0x1d, 0x9d, 0xb4, 0xd3, 0x80, 0xf7, 0x4a, 0x6e, 0xfa, 0x44, 0xc4,
+	0x8c, 0x0a, 0xd2, 0xf9, 0xc9, 0x80, 0xf5, 0x8b, 0xc8, 0xfe, 0x97, 0x77, 0x77, 0x7b, 0x33, 0x15,
+	0x18, 0xff, 0x42, 0xc1, 0x5c, 0x59, 0xc1, 0x7f, 0x72, 0x3f, 0xd9, 0xe5, 0x85, 0xb7, 0x76, 0xb9,
+	0x36, 0xd9, 0xe5, 0xb2, 0xd3, 0x5f, 0x0c, 0x68, 0x4c, 0x19, 0xca, 0xcd, 0xfe, 0xbf, 0x8d, 0x99,
+	0xb0, 0x39, 0xe1, 0x6b, 0xc2, 0x56, 0xe7, 0xb7, 0x2a, 0x6c, 0x1c, 0x8a, 0xe0, 0x88, 0x7b, 0x54,
+	0x1c, 0x13, 0x9e, 0x0d, 0xd1, 0x86, 0x77, 0x70, 0xe2, 0xbe, 0xc5, 0xee, 0x35, 0x9c, 0xec, 0x4f,
+	0x19, 0x6e, 0xc3, 0x0a, 0x4e, 0xdc, 0x69, 0xcf, 0x80, 0x93, 0xa3, 0xdc, 0x75, 0x0b, 0x96, 0x05,
+	0x1b, 0x71, 0x4c, 0xdc, 0x98, 0x71, 0xa9, 0x8d, 0x43, 0x06, 0x3d, 0x64, 0x5c, 0xa2, 0x0f, 0x61,
+	0x4d, 0x13, 0xf0, 0xd0, 0xa3, 0x94, 0x9c, 0xea, 0x16, 0xac, 0x66, 0xe8, 0x7e, 0x06, 0x5e, 0xd6,
+	0x89, 0x6e, 0x3a, 0xa0, 0x74, 0x09, 0xb8, 0xd3, 0xff, 0xeb, 0xb5, 0x0c, 0x2f, 0xc4, 0xdc, 0x80,
+	0x3a, 0x4e, 0x5c, 0xdd, 0xe9, 0xc5, 0x6c, 0x06, 0x38, 0xf9, 0x22, 0xeb, 0xf5, 0x6d, 0x58, 0xd7,
+	0x69, 0x8a, 0x31, 0x2d, 0x29, 0x8a, 0xce, 0xd2, 0xcf, 0x87, 0x75, 0x1f, 0xd6, 0x64, 0x18, 0x11,
+	0x36, 0x92, 0xee, 0x90, 0x84, 0xc1, 0x50, 0x9a, 0xf5, 0xb6, 0xd1, 0x5d, 0xde, 0xb5, 0xec, 0x70,
+	0x80, 0xed, 0x74, 0x7d, 0xd8, 0x7a, 0x69, 0x8c, 0x7b, 0xf6, 0xe7, 0x8a, 0x71, 0x6f, 0xfe, 0xe5,
+	0xef, 0xad, 0x4a, 0x7f, 0x55, 0xdf, 0xcb, 0x40, 0xf4, 0x11, 0x5c, 0xcb, 0x13, 0xa5, 0xbf, 0x42,
+	0x7a, 0x51, 0x6c, 0x42, 0xdb, 0xe8, 0xce, 0xf7, 0x37, 0x74, 0xe0, 0x28, 0xc7, 0x11, 0x82, 0xf9,
+	0x88, 0x44, 0xcc, 0x5c, 0x56, 0x9a, 0xd4, 0x79, 0x6f, 0xf3, 0xdb, 0xe7, 0xad, 0xca, 0x5f, 0xcf,
+	0x5b, 0x95, 0x74, 0xe4, 0x17, 0xd6, 0x3a, 0x16, 0x98, 0xd3, 0xa3, 0x2d, 0xe6, 0x3e, 0x56, 0xaf,
+	0xee, 0xa3, 0xd8, 0xf7, 0x24, 0x79, 0xe8, 0x71, 0x2f, 0x12, 0xe8, 0x26, 0xd4, 0xbd, 0x91, 0x1c,
+	0x32, 0x1e, 0xca, 0xa7, 0x7a, 0xd6, 0x17, 0x00, 0xfa, 0x04, 0x6a, 0xb1, 0xe2, 0x99, 0x73, 0xca,
+	0x66, 0xc3, 0x9e, 0xda, 0xc1, 0x76, 0x96, 0x46, 0x7b, 0xd4, 0xe4, 0xbd, 0x35, 0xa5, 0xa9, 0x48,
+	0xd3, 0xb9, 0xae, 0xde, 0xb0, 0xc9, 0xba, 0xb9, 0xa4, 0xdd, 0xbf, 0xab, 0x50, 0x3d, 0x14, 0x01,
+	0xfa, 0x0a, 0x60, 0x62, 0x75, 0x36, 0xdf, 0xa8, 0x53, 0x5a, 0x46, 0xd6, 0xad, 0xcb, 0xe3, 0x85,
+	0xe1, 0xdb, 0xcf, 0x7e, 0xfe, 0xf3, 0x87, 0xb9, 0x2d, 0xd4, 0x72, 0xde, 0xfc, 0xaa, 0x38, 0x38,
+	0xe3, 0xbb, 0xf4, 0x58, 0xa2, 0x6f, 0x0c, 0x58, 0x29, 0xad, 0xb4, 0xf6, 0x25, 0x15, 0x14, 0xc3,
+	0xea, 0x5e, 0xc5, 0x28, 0x54, 0x6c, 0x2b, 0x15, 0x1f, 0xa0, 0xad, 0xcb, 0x54, 0x28, 0x0c, 0x7d,
+	0x67, 0xc0, 0x6a, 0xf9, 0xb5, 0xdc, 0x9a, 0x55, 0xa6, 0x44, 0xb1, 0xb6, 0xaf, 0xa4, 0x14, 0x52,
+	0x6c, 0x25, 0xa5, 0x8b, 0x6e, 0xcd, 0x92, 0x12, 0x0e, 0xf0, 0x8e, 0xd4, 0xd7, 0x76, 0x32, 0x3d,
+	0x8f, 0x61, 0xa5, 0xf4, 0x77, 0x99, 0xd9, 0x96, 0x49, 0xc6, 0xec, 0xb6, 0xcc, 0x1a, 0xbd, 0xb5,
+	0xf0, 0xf5, 0xeb, 0x17, 0x77, 0x8c, 0x7b, 0xf7, 0x5f, 0x9e, 0x35, 0x8d, 0x57, 0x67, 0x4d, 0xe3,
+	0x8f, 0xb3, 0xa6, 0xf1, 0xfd, 0x79, 0xb3, 0xf2, 0xea, 0xbc, 0x59, 0xf9, 0xf5, 0xbc, 0x59, 0x79,
+	0xbc, 0x13, 0x84, 0x72, 0x38, 0x1a, 0xd8, 0x98, 0x45, 0xce, 0x23, 0x95, 0xf4, 0x01, 0x91, 0x09,
+	0xe3, 0x27, 0xb9, 0xf8, 0x27, 0x5a, 0xbe, 0x7c, 0x1a, 0x13, 0x31, 0xa8, 0xa9, 0x0f, 0xf1, 0xc7,
+	0xff, 0x04, 0x00, 0x00, 0xff, 0xff, 0x15, 0x8c, 0xfe, 0x44, 0x42, 0x08, 0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -521,8 +662,12 @@ type MsgClient interface {
 	// ConvertCW721 mints a native Cosmos coin representation of the CW721 token
 	// contract that is registered on the token mapping.
 	ConvertCW721(ctx context.Context, in *MsgConvertCW721, opts ...grpc.CallOption) (*MsgConvertCW721Response, error)
-	// TransferCW721 transfers a CW721 token from one chain to another chain through IBC
+	// TransferCW721 defines a method to transfer CW721 tokens between chains via IBC
 	TransferCW721(ctx context.Context, in *MsgTransferCW721, opts ...grpc.CallOption) (*MsgTransferCW721Response, error)
+	// UpdateParams updates the module parameters. Since the cw721 module has
+	// no authority account, this RPC is registered for interface completeness
+	// and is only callable by the governance authority.
+	UpdateParams(ctx context.Context, in *MsgUpdateParams, opts ...grpc.CallOption) (*MsgUpdateParamsResponse, error)
 }
 
 type msgClient struct {
@@ -560,6 +705,15 @@ func (c *msgClient) TransferCW721(ctx context.Context, in *MsgTransferCW721, opt
 	return out, nil
 }
 
+func (c *msgClient) UpdateParams(ctx context.Context, in *MsgUpdateParams, opts ...grpc.CallOption) (*MsgUpdateParamsResponse, error) {
+	out := new(MsgUpdateParamsResponse)
+	err := c.cc.Invoke(ctx, "/uptick.cw721.v1.Msg/UpdateParams", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // MsgServer is the server API for Msg service.
 type MsgServer interface {
 	// ConvertNFT mints a CW721 representation of the native Cosmos nft
@@ -568,9 +722,11 @@ type MsgServer interface {
 	// ConvertCW721 mints a native Cosmos coin representation of the CW721 token
 	// contract that is registered on the token mapping.
 	ConvertCW721(context.Context, *MsgConvertCW721) (*MsgConvertCW721Response, error)
-	// TransferCW721 transfers a CW721 token from one chain to another chain through IBC
+	// TransferCW721 defines a method to transfer CW721 tokens between chains via IBC
 	TransferCW721(context.Context, *MsgTransferCW721) (*MsgTransferCW721Response, error)
-	// UpdateParams defines a governance operation for updating the module parameters.
+	// UpdateParams updates the module parameters. Since the cw721 module has
+	// no authority account, this RPC is registered for interface completeness
+	// and is only callable by the governance authority.
 	UpdateParams(context.Context, *MsgUpdateParams) (*MsgUpdateParamsResponse, error)
 }
 
@@ -667,6 +823,7 @@ func _Msg_UpdateParams_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
+var Msg_serviceDesc = _Msg_serviceDesc
 var _Msg_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "uptick.cw721.v1.Msg",
 	HandlerType: (*MsgServer)(nil),
@@ -682,6 +839,10 @@ var _Msg_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "TransferCW721",
 			Handler:    _Msg_TransferCW721_Handler,
+		},
+		{
+			MethodName: "UpdateParams",
+			Handler:    _Msg_UpdateParams_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
@@ -918,6 +1079,29 @@ func (m *MsgConvertCW721Response) MarshalToSizedBuffer(dAtA []byte) (int, error)
 	return len(dAtA) - i, nil
 }
 
+func (m *MsgConvertC721Response) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *MsgConvertC721Response) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *MsgConvertC721Response) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	return len(dAtA) - i, nil
+}
+
 func (m *MsgTransferCW721) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -1039,6 +1223,69 @@ func (m *MsgTransferCW721Response) MarshalTo(dAtA []byte) (int, error) {
 }
 
 func (m *MsgTransferCW721Response) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	return len(dAtA) - i, nil
+}
+
+func (m *MsgUpdateParams) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *MsgUpdateParams) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *MsgUpdateParams) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	{
+		size, err := m.Params.MarshalToSizedBuffer(dAtA[:i])
+		if err != nil {
+			return 0, err
+		}
+		i -= size
+		i = encodeVarintTx(dAtA, i, uint64(size))
+	}
+	i--
+	dAtA[i] = 0x12
+	if len(m.Authority) > 0 {
+		i -= len(m.Authority)
+		copy(dAtA[i:], m.Authority)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.Authority)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *MsgUpdateParamsResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *MsgUpdateParamsResponse) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *MsgUpdateParamsResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	i := len(dAtA)
 	_ = i
 	var l int
@@ -1177,6 +1424,15 @@ func (m *MsgConvertCW721Response) Size() (n int) {
 	return n
 }
 
+func (m *MsgConvertC721Response) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	return n
+}
+
 func (m *MsgTransferCW721) Size() (n int) {
 	if m == nil {
 		return 0
@@ -1232,6 +1488,30 @@ func (m *MsgTransferCW721) Size() (n int) {
 }
 
 func (m *MsgTransferCW721Response) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	return n
+}
+
+func (m *MsgUpdateParams) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Authority)
+	if l > 0 {
+		n += 1 + l + sovTx(uint64(l))
+	}
+	l = m.Params.Size()
+	n += 1 + l + sovTx(uint64(l))
+	return n
+}
+
+func (m *MsgUpdateParamsResponse) Size() (n int) {
 	if m == nil {
 		return 0
 	}
@@ -2022,6 +2302,56 @@ func (m *MsgConvertCW721Response) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+func (m *MsgConvertC721Response) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowTx
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: MsgConvertC721Response: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: MsgConvertC721Response: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		default:
+			iNdEx = preIndex
+			skippy, err := skipTx(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthTx
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
 func (m *MsgTransferCW721) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -2439,6 +2769,171 @@ func (m *MsgTransferCW721Response) Unmarshal(dAtA []byte) error {
 		}
 		if fieldNum <= 0 {
 			return fmt.Errorf("proto: MsgTransferCW721Response: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		default:
+			iNdEx = preIndex
+			skippy, err := skipTx(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthTx
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *MsgUpdateParams) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowTx
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: MsgUpdateParams: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: MsgUpdateParams: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Authority", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Authority = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Params", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.Params.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipTx(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthTx
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *MsgUpdateParamsResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowTx
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: MsgUpdateParamsResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: MsgUpdateParamsResponse: illegal tag %d (wire type %d)", fieldNum, wire)
 		}
 		switch fieldNum {
 		default:

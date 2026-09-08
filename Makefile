@@ -337,6 +337,12 @@ build-docs-versioned:
 
 test: test-unit
 test-all: test-unit test-race
+
+# Run govulncheck and fail only on vulnerabilities not present in
+# scripts/vuln-baseline.txt (known no-fix-available advisories).
+# Remove IDs from the baseline once upstream publishes a fixed version.
+vulncheck:
+	@bash scripts/govulncheck-baseline.sh
 PACKAGES_UNIT=$(shell go list ./...)
 TEST_PACKAGES=./...
 TEST_TARGETS := test-unit test-unit-cover test-race

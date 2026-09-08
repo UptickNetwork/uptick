@@ -56,7 +56,16 @@ func (k Keeper) TokenPair(
 	}
 	ctx := sdk.UnwrapSDKContext(c)
 
-	id := k.GetTokenPairID(ctx, req.Token)
+	// Normalize a bech32-shaped token so case aliases resolve to the same
+	// stored (canonical) key.
+	token := req.Token
+	if _, err := sdk.AccAddressFromBech32(token); err == nil {
+		if canonical, err := NormalizeCW721Address(token); err == nil {
+			token = canonical
+		}
+	}
+
+	id := k.GetTokenPairID(ctx, token)
 	if len(id) == 0 {
 		return nil, status.Errorf(codes.NotFound, "token pair with token '%s'", req.Token)
 	}
