@@ -200,6 +200,42 @@ func (s *KeeperTestSuite) TestExportGenesisNilData() {
 	s.Require().Len(gs.Collections[0].NFTs, 1)
 }
 
+// TestGetNFTCorruptDataDegradesToEmpty pins the round-10 G-6 fix (regression
+// guard added in round 11, F-1): an NFT whose Data Any carries bytes that do
+// not unmarshal into NFTMetadata must NOT make GetNFT fail. GetNFT degrades
+// to empty metadata with a Warn log instead — and because conversion paths
+// (x/erc721 / x/cw721) feed this result into TransferNFT, a write path, a
+// regression that turns the degrade back into an error (or drops the
+// zero-value reset) would corrupt or stall conversions without any test
+// noticing. This test is that guard.
+func (s *KeeperTestSuite) TestGetNFTCorruptDataDegradesToEmpty() {
+	creator := sdk.AccAddress([]byte("creator-corrupt"))
+	s.Require().NoError(s.keeper.SaveDenom(s.ctx, "denomcorrupt", "Corrupt", "", "COR", creator, false, false, "", "", "", ""))
+
+	// Mint via the underlying nft keeper with a Data Any whose Value bytes
+	// are not valid NFTMetadata protobuf. Mint stores the Any as-is, so the
+	// corrupt bytes reach GetNFT's Unmarshal.
+	s.Require().NoError(s.nftKpr.Mint(s.ctx, nft.NFT{
+		ClassId: "denomcorrupt",
+		Id:      "nft-corrupt",
+		Uri:     "ipfs://corrupt",
+		Data: &codectypes.Any{
+			TypeUrl: "/uptick.collection.NFTMetadata",
+			Value:   []byte{0xde, 0xad, 0xbe, 0xef},
+		},
+	}, creator))
+
+	token, err := s.keeper.GetNFT(s.ctx, "denomcorrupt", "nft-corrupt")
+	s.Require().NoError(err, "corrupt Data must degrade, not error")
+	s.Require().NotNil(token)
+	// Degrade means empty metadata — the record is still readable, the owner
+	// is still resolvable, only the unreadable fields are zeroed.
+	s.Require().Empty(token.GetName())
+	s.Require().Empty(token.GetData())
+	s.Require().Equal("nft-corrupt", token.GetID())
+	s.Require().Equal(creator.String(), token.GetOwner().String())
+}
+
 // legacy / migrated classes with nil Data must not crash
 // GetDenomInfo. The expected behavior is to return zero-value metadata rather
 // than a "has no metadata" error.

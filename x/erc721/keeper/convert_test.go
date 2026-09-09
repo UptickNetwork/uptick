@@ -380,13 +380,31 @@ func TestConvertERC721_RejectsWrongClassId(t *testing.T) {
 	require.ErrorIs(t, err, types.ErrClassIdNotCorrect)
 }
 
+// Round 10 (N-1): a missing pair used to return ErrTokenPairNotFound, which
+// aborted the IBC callback and stranded every other token in the packet. It
+// must now be skipped with a distinguishable event instead (mirrors x/cw721).
 func TestRefundPacketToken_MissingPair(t *testing.T) {
 	k, ctx, _ := setupConvertKeeper(t)
 	err := k.RefundPacketToken(ctx, ibcnfttransfertypes.NonFungibleTokenPacketData{
 		ClassId:  "kitty",
 		TokenIds: []string{"nft1"},
 	})
-	require.ErrorIs(t, err, types.ErrTokenPairNotFound)
+	require.NoError(t, err, "a missing pair must be skipped, not returned as an error")
+
+	skips := ctx.EventManager().Events()
+	require.NotEmpty(t, skips)
+	var seen bool
+	for i := range skips {
+		if skips[i].Type != types.EventTypeRefundPacketTokenSkip {
+			continue
+		}
+		for _, attr := range skips[i].Attributes {
+			if attr.Key == "reason" && attr.Value == "erc721_pair_not_found" {
+				seen = true
+			}
+		}
+	}
+	require.True(t, seen, "expected an erc721_pair_not_found skip event")
 }
 
 // Defense-in-depth: if the native NFT is already gone when the

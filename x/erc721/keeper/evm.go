@@ -172,12 +172,37 @@ func (k Keeper) QueryClassEnhance(
 		)
 	}
 
-	// Comma-ok type assertions: the values come from an external
-	// (user-registered) ERC721 contract's ABI-unpacked return. A type mismatch
-	// is anomalous (e.g. a contract implementing getClassEnhanceInfo with a
-	// different signature, or an ABI-library edge case), and panicking the node
-	// on it is unacceptable. Degrade the offending field to its zero value and
-	// log; the class is still created with sparse enhance metadata.
+	return k.classEnhanceFromReturn(ctx, contract, ret)
+}
+
+// classEnhanceFromReturn maps an ABI-unpacked getClassEnhanceInfo return onto a
+// ClassEnhance. The caller guarantees len(ret) == 7.
+//
+// This is a separate method purely so the type-mismatch policy below is unit
+// testable: abi.Unpack against the canonical signature always yields the
+// declared types, so a contract answering with an unexpected type in one slot
+// can only be reproduced by calling this with hand-built values (see
+// evm_enhance_test.go). Kept inline, that behaviour would be both unreachable
+// and untested.
+//
+// Policy (round 10, G-3) — the two field kinds are treated deliberately
+// DIFFERENTLY:
+//   - string fields (data/description/schema/uri/uriHash) degrade to "" and log
+//     at Warn. Losing metadata is not a safety problem and the string zero
+//     value carries no privilege. Warn rather than Debug because this silently
+//     discards contract-declared data.
+//   - bool fields (mintRestricted/updateRestricted) must NOT degrade. Their zero
+//     value `false` means "NOT restricted" — the permissive end of the scale.
+//     They reach the denom through CreateNFTClass and gate x/collection's mint
+//     path, so degrading would silently switch an authorization OFF. Ambiguity
+//     here therefore surfaces ErrClassEnhanceRestrictions instead.
+func (k Keeper) classEnhanceFromReturn(
+	ctx sdk.Context,
+	contract common.Address,
+	ret []interface{},
+) (types.ClassEnhance, error) {
+	// Comma-ok assertions: these values come from an external, user-registered
+	// contract, so a mismatch must never panic the validating node.
 	data, ok0 := ret[0].(string)
 	description, ok1 := ret[1].(string)
 	mintRestricted, ok2 := ret[2].(bool)
@@ -185,11 +210,22 @@ func (k Keeper) QueryClassEnhance(
 	updateRestricted, ok4 := ret[4].(bool)
 	uri, ok5 := ret[5].(string)
 	uriHash, ok6 := ret[6].(string)
-	if !ok0 || !ok1 || !ok2 || !ok3 || !ok4 || !ok5 || !ok6 {
-		k.Logger(ctx).Debug(
-			"QueryClassEnhance: unexpected type in getClassEnhanceInfo return",
+
+	if !ok0 || !ok1 || !ok3 || !ok5 || !ok6 {
+		// Warn, not Debug: this is silently discarding contract-declared
+		// metadata, and Debug is invisible at the default log level.
+		k.Logger(ctx).Warn(
+			"QueryClassEnhance: unexpected string field type in getClassEnhanceInfo return, degrading to empty",
 			"contract", contract.String(),
-			"ok", []bool{ok0, ok1, ok2, ok3, ok4, ok5, ok6},
+			"ok", []bool{ok0, ok1, ok3, ok5, ok6},
+		)
+	}
+
+	if !ok2 || !ok4 {
+		return types.ClassEnhance{}, sdkerrors.Wrapf(
+			types.ErrClassEnhanceRestrictions,
+			"cannot decode restriction flags from getClassEnhanceInfo (mint ok=%v, update ok=%v), contract %s",
+			ok2, ok4, contract.String(),
 		)
 	}
 

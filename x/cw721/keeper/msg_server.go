@@ -438,12 +438,38 @@ func (k Keeper) RefundPacketToken(
 		uNftID := types.CreateNFTUID(data.ClassId, tokenId)
 		pairUID := k.GetTokenUIDPairByNFTUID(ctx, uNftID)
 		if len(pairUID) == 0 {
-			return sdkerrors.Wrapf(types.ErrTokenPairNotFound, "missing CW721 pair for class %s token %s", data.ClassId, tokenId)
+			// No recorded pair means this token never entered the CW721 escrow
+			// flow (or its mapping was already cleaned up), so there is nothing
+			// to refund and no contract/token id to refund it to. Returning
+			// here would abort the whole IBC callback and strand every other
+			// token in the packet, so skip with a distinguishable event —
+			// consistent with the owner-query and transfer skips below.
+			ctx.EventManager().EmitEvent(
+				sdk.NewEvent(
+					types.EventTypeRefundPacketTokenSkip,
+					sdk.NewAttribute(types.AttributeKeyNFTClass, data.ClassId),
+					sdk.NewAttribute(types.AttributeKeyNFTID, tokenId),
+					sdk.NewAttribute("reason", "cw721_pair_not_found"),
+				),
+			)
+			continue
 		}
 
 		cwTokenId, cwContractAddress := types.GetNFTFromUID(string(pairUID))
 		if cwTokenId == "" || cwContractAddress == "" {
-			return sdkerrors.Wrapf(types.ErrInternalTokenPair, "invalid CW721 uid for class %s token %s", data.ClassId, tokenId)
+			// A stored pair that cannot be split into (contract, token) is
+			// broken module state. Same rationale — never let one corrupt
+			// record abort the refund for the rest of the packet. Emit its own
+			// reason so it can be triaged and repaired out of band.
+			ctx.EventManager().EmitEvent(
+				sdk.NewEvent(
+					types.EventTypeRefundPacketTokenSkip,
+					sdk.NewAttribute(types.AttributeKeyNFTClass, data.ClassId),
+					sdk.NewAttribute(types.AttributeKeyNFTID, tokenId),
+					sdk.NewAttribute("reason", "cw721_pair_uid_invalid"),
+				),
+			)
+			continue
 		}
 
 		owner, err := k.QueryCW721TokenOwner(ctx, cwContractAddress, cwTokenId)
@@ -512,6 +538,14 @@ func (k Keeper) RefundPacketToken(
 		// Defense-in-depth: only burn the native NFT if the module account
 		// still holds it. If it is already gone (parallel refund, migration,
 		// race), an error would stall the IBC packet forever — skip and emit.
+		//
+		// NOTE (round 11, F-5): the pair mappings are already cleaned up above
+		// (before this check), which is deliberate and DIFFERENT from
+		// x/erc721: by the time we get here the EVM side has either been
+		// refunded (owner was module) or confirmed non-module-owned, so the
+		// mapping no longer protects any escrowed asset and deleting it
+		// converges the state. erc721 checks HasNFT BEFORE its EVM owner query
+		// and keeps its mappings — see its nft_already_gone comment.
 		if !k.nftKeeper.HasNFT(ctx, data.ClassId, tokenId) {
 			ctx.EventManager().EmitEvent(
 				sdk.NewEvent(

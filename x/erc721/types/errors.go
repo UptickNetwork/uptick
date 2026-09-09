@@ -23,4 +23,11 @@ var (
 	ErrContractAddressNotCorrect = sdkerrors.Register(ModuleName, 16, "contract address is not correct")
 	ErrTokenIdNotCorrect         = sdkerrors.Register(ModuleName, 17, "token id is not correct")
 	ErrNFTMappingConflict        = sdkerrors.Register(ModuleName, 18, "erc721/nft token pair mapping is not one-to-one")
+	// ErrClassEnhanceRestrictions is returned when a contract DOES expose
+	// getClassEnhanceInfo but the mint/update restriction fields cannot be
+	// decoded. It must not be swallowed: their zero value means "unrestricted",
+	// so guessing would silently disable an authorization check. Distinct from
+	// a plain call failure (contract without the method), which is expected and
+	// handled with empty metadata defaults.
+	ErrClassEnhanceRestrictions = sdkerrors.Register(ModuleName, 19, "unreadable class restriction flags")
 )

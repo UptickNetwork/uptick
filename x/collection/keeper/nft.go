@@ -214,13 +214,19 @@ func (k Keeper) GetNFT(ctx sdk.Context, denomID, tokenID string) (nft exported.N
 		return nil, sdkerrors.Wrapf(types.ErrUnknownNFT, "not found NFT %s from collection %s", tokenID, denomID)
 	}
 
-	var nftMetadata types.NFTMetadata
 	// A legacy / migrated NFT may carry nil Data; degrade to empty metadata so
 	// the single-NFT query matches GetNFTs / ExportGenesis behavior instead of
 	// erroring on the same record.
+	//
+	// Consumers include STATE-MUTATING paths, not just queries: x/cw721 and
+	// x/erc721 read this during conversion and feed Name/Data straight into
+	// TransferNFT, which rewrites the record. So an unreadable Data field is
+	// silently replaced with empty metadata on that write — the log level below
+	// therefore has to be observable in production, not Debug.
+	var nftMetadata types.NFTMetadata
 	if token.Data != nil {
 		if err := k.cdc.Unmarshal(token.Data.GetValue(), &nftMetadata); err != nil {
-			k.Logger(ctx).Debug("failed to unmarshal nft data",
+			k.Logger(ctx).Warn("unreadable NFT data, degrading to empty metadata",
 				"denom", denomID, "token", tokenID, "err", err)
 			nftMetadata = types.NFTMetadata{}
 		}

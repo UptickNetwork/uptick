@@ -1,8 +1,6 @@
 package types
 
 import (
-	"encoding/hex"
-	"fmt"
 	"strings"
 
 	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
@@ -13,10 +11,12 @@ import (
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/cosmos/cosmos-sdk/crypto/types/multisig"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/ethereum/go-ethereum/common"
 )
 
-const prefix = "uptick"
+// The ConvertAddressCosmos2Evm / ConvertAddressEvm2Cosmos helpers were removed
+// (round 10, O-1): they had zero callers anywhere in this repository, including
+// tests — address conversion is done inline by the modules that need it. The
+// `uptick` bech32 `prefix` constant they relied on went away with them.
 
 // IsSupportedKey returns true if the pubkey type is supported by the chain
 // (i.e eth_secp256k1, amino multisig, ed25519).
@@ -75,39 +75,4 @@ func GetUptickAddressFromBech32(address string) (sdk.AccAddress, error) {
 	}
 
 	return sdk.AccAddress(addressBz), nil
-}
-
-func ConvertAddressCosmos2Evm(cosmosAddress string) (string, error) {
-
-	rawBytes, err := sdk.GetFromBech32(cosmosAddress, prefix)
-	if err != nil {
-		return "", err
-	}
-	if len(rawBytes) != common.AddressLength {
-		return "", fmt.Errorf("invalid address length: %d", len(rawBytes))
-	}
-	evmAddress := "0x" + hex.EncodeToString(rawBytes)
-	return evmAddress, nil
-}
-
-func ConvertAddressEvm2Cosmos(evmAddress string) (string, error) {
-	if !strings.HasPrefix(evmAddress, "0x") {
-		return "", fmt.Errorf("invalid evm address: %s", evmAddress)
-	}
-
-	rawBytes, err := hex.DecodeString(evmAddress[2:])
-	if err != nil {
-		return "", err
-	}
-	if len(rawBytes) != common.AddressLength {
-		return "", fmt.Errorf("invalid address length: %d", len(rawBytes))
-	}
-
-	cosmosAddress, err := sdk.Bech32ifyAddressBytes(prefix, rawBytes)
-	if err != nil {
-		return "", err
-	}
-
-	return cosmosAddress, nil
-
 }

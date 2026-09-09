@@ -50,13 +50,63 @@ func moveNFTToModule(t *testing.T, k Keeper, ctx sdk.Context, from sdk.AccAddres
 	require.NoError(t, err)
 }
 
-func TestRefundPacketToken_MissingPair(t *testing.T) {
+// A token with no recorded pair has nothing to refund and no contract/token id
+// to refund it to. Returning an error here aborts the whole IBC callback and
+// strands every remaining token in the packet (round 10, G-4), so the token is
+// skipped with a distinguishable event instead.
+func TestRefundPacketToken_SkipsWhenPairMissing(t *testing.T) {
 	k, ctx := setupKeeper(t)
+
 	err := k.RefundPacketToken(ctx, ibcnfttransfertypes.NonFungibleTokenPacketData{
 		ClassId:  "kitty",
 		TokenIds: []string{"nft1"},
 	})
-	require.ErrorIs(t, err, cw721types.ErrTokenPairNotFound)
+	require.NoError(t, err, "a missing pair must be skipped, not abort the IBC callback")
+
+	skip := findEvent(ctx.EventManager().Events(), cw721types.EventTypeRefundPacketTokenSkip)
+	require.NotNil(t, skip, "expected a %s event", cw721types.EventTypeRefundPacketTokenSkip)
+	require.Equal(t, "cw721_pair_not_found", refundAttr(*skip)["reason"])
+	require.Equal(t, "nft1", refundAttr(*skip)[cw721types.AttributeKeyNFTID])
+	require.Equal(t, "kitty", refundAttr(*skip)[cw721types.AttributeKeyNFTClass])
+}
+
+// The point of the skip behaviour: one unrefundable token must not stop the
+// rest of the packet from being refunded. Before the fix, a missing pair
+// aborted the callback and every other token in the batch was stranded.
+func TestRefundPacketToken_MissingPairDoesNotStrandOtherTokens(t *testing.T) {
+	k, ctx, owner, contract, wasm := setupConvertKeeper(t)
+
+	// Only nft1 has a pair; nft2 deliberately has none.
+	require.NoError(t, k.SetNFTPairs(ctx, contract, "1", "kitty", "nft1"))
+	moveNFTToModule(t, k, ctx, owner, "kitty", "nft1")
+	wasm.setOwner(contract, "1", cw721types.AccModuleAddress.String())
+	k.SetCwAddressByContractTokenId(ctx, contract, "1", owner.String())
+
+	err := k.RefundPacketToken(ctx, ibcnfttransfertypes.NonFungibleTokenPacketData{
+		ClassId:  "kitty",
+		TokenIds: []string{"nft1", "nft2"},
+	})
+	require.NoError(t, err)
+
+	// The refundable token was still refunded.
+	refund := findEvent(ctx.EventManager().Events(), cw721types.EventTypeRefundPacketToken)
+	require.NotNil(t, refund, "nft1 must be refunded even though nft2 has no pair")
+	require.Equal(t, owner.String(), wasm.ownerOf(contract, "1"))
+
+	// And the unrefundable one is reported separately.
+	skips := ctx.EventManager().Events()
+	var seen bool
+	for i := range skips {
+		if skips[i].Type != cw721types.EventTypeRefundPacketTokenSkip {
+			continue
+		}
+		attrs := refundAttr(skips[i])
+		if attrs[cw721types.AttributeKeyNFTID] == "nft2" {
+			seen = true
+			require.Equal(t, "cw721_pair_not_found", attrs["reason"])
+		}
+	}
+	require.True(t, seen, "expected a cw721_pair_not_found skip event for nft2")
 }
 
 func TestRefundPacketToken_MissingReceiver(t *testing.T) {

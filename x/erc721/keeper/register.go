@@ -1,6 +1,7 @@
 package keeper
 
 import (
+	"errors"
 	"strings"
 
 	sdkerrors "cosmossdk.io/errors"
@@ -89,9 +90,52 @@ func (k Keeper) CreateNFTClass(ctx sdk.Context, msg *types.MsgConvertERC721) err
 		return err
 	}
 
+	// Pure state checks run BEFORE the enhance-metadata query (round 11, F-2):
+	// both are deterministic reads of module state, so "already registered"
+	// must return ErrTokenPairAlreadyExists (code 7) and "native denom without
+	// a pair" must return ErrInternalTokenPair (code 5) regardless of how
+	// healthy the external contract is. Kept AFTER QueryERC721 and BEFORE
+	// QueryClassEnhance — the exact same position x/cw721 uses, so an operator
+	// sees identical error codes for identical conditions on both modules.
+
+	// A class that is already registered as an ERC721 pair is a plain
+	// user-facing conflict: the caller asked for something that exists.
+	// ErrTokenPairAlreadyExists (code 7) is the correct signal here;
+	// ErrInternalTokenPair is reserved for broken module state.
+	//
+	// Kept symmetric with x/cw721 CreateNFTClass (round 10, G-1): the two
+	// modules expose the same conceptual conditions to operators, so they must
+	// surface identical error codes. This also matches this file's own
+	// RegisterNFT entry point above.
+	if k.IsClassRegistered(ctx, msg.ClassId) {
+		return sdkerrors.Wrapf(types.ErrTokenPairAlreadyExists, "nft class already registered: %s", msg.ClassId)
+	}
+
+	// A native collection denom that exists WITHOUT an ERC721 pair
+	// registration means the two namespaces have drifted apart (e.g. the denom
+	// was issued natively, or a pair was deleted without cleaning up the
+	// denom). That is an inconsistent-state condition, not a normal "already
+	// exists" conflict, so it surfaces as ErrInternalTokenPair (code 5).
+	_, err = k.nftKeeper.GetDenomInfo(ctx, msg.ClassId)
+	if err == nil {
+		return sdkerrors.Wrapf(types.ErrInternalTokenPair, "native NFT class %s already exists but is not registered as an erc721 pair", msg.ClassId)
+	}
+
 	classEnhance, err := k.QueryClassEnhance(ctx, contract)
 	if err != nil {
-		// normal logic
+		// The contract DOES expose enhance metadata but its restriction flags
+		// could not be decoded. Do NOT fall through to the permissive defaults
+		// below: `false` means "unrestricted", so guessing would silently turn
+		// off the class-level restriction that x/collection enforces on mint.
+		// Reject the registration instead — fail closed, not open.
+		if errors.Is(err, types.ErrClassEnhanceRestrictions) {
+			return err
+		}
+
+		// Any other failure means the contract simply does not expose enhance
+		// metadata (many ERC721s implement neither getClassEnhanceInfo nor the
+		// surrounding calls). That IS the normal case, so fall back to empty
+		// metadata rather than blocking every such conversion.
 		classEnhance.Uri = ""
 		classEnhance.Data = ""
 		classEnhance.Schema = ""
@@ -99,15 +143,6 @@ func (k Keeper) CreateNFTClass(ctx sdk.Context, msg *types.MsgConvertERC721) err
 		classEnhance.Description = ""
 		classEnhance.UpdateRestricted = false
 		classEnhance.MintRestricted = false
-	}
-
-	if k.IsClassRegistered(ctx, msg.ClassId) {
-		return sdkerrors.Wrapf(types.ErrInternalTokenPair, "nft class already registered: %s", msg.ClassId)
-	}
-
-	_, err = k.nftKeeper.GetDenomInfo(ctx, msg.ClassId)
-	if err == nil {
-		return sdkerrors.Wrapf(types.ErrTokenPairAlreadyExists, "native NFT class already exists: %s", msg.ClassId)
 	}
 
 	err = k.nftKeeper.SaveDenom(ctx, msg.ClassId, erc721Data.Name, classEnhance.Schema,

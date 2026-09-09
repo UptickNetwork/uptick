@@ -654,16 +654,56 @@ func (k Keeper) RefundPacketToken(
 		uNftID := types.CreateNFTUID(data.ClassId, tokenId)
 		pairUID := k.GetTokenUIDPairByNFTUID(ctx, uNftID)
 		if len(pairUID) == 0 {
-			return sdkerrors.Wrapf(types.ErrTokenPairNotFound, "missing ERC721 pair for class %s token %s", data.ClassId, tokenId)
+			// No recorded pair means this token never entered the ERC721
+			// escrow flow (or its mapping was already cleaned up), so there
+			// is nothing to refund and no contract/token id to refund it to.
+			// Returning here would abort the whole IBC callback and strand
+			// every other token in the packet, so skip with a distinguishable
+			// event — consistent with the owner-query and transfer skips below
+			// and symmetric with x/cw721 (round 10, N-1).
+			ctx.EventManager().EmitEvent(
+				sdk.NewEvent(
+					types.EventTypeRefundPacketTokenSkip,
+					sdk.NewAttribute(types.AttributeKeyNFTClass, data.ClassId),
+					sdk.NewAttribute(types.AttributeKeyNFTID, tokenId),
+					sdk.NewAttribute("reason", "erc721_pair_not_found"),
+				),
+			)
+			continue
 		}
 		evmTokenId, evmContractAddress := types.GetNFTFromUID(string(pairUID))
 		if evmTokenId == "" || evmContractAddress == "" {
-			return sdkerrors.Wrapf(types.ErrInternalTokenPair, "invalid ERC721 uid for class %s token %s", data.ClassId, tokenId)
+			// A stored pair that cannot be split into (contract, token) is
+			// broken module state. Same rationale — never let one corrupt
+			// record abort the refund for the rest of the packet. Emit its
+			// own reason so it can be triaged and repaired out of band.
+			ctx.EventManager().EmitEvent(
+				sdk.NewEvent(
+					types.EventTypeRefundPacketTokenSkip,
+					sdk.NewAttribute(types.AttributeKeyNFTClass, data.ClassId),
+					sdk.NewAttribute(types.AttributeKeyNFTID, tokenId),
+					sdk.NewAttribute("reason", "erc721_pair_uid_invalid"),
+				),
+			)
+			continue
 		}
 
 		bigTokenId, err := parseERC721TokenID(evmTokenId)
 		if err != nil {
-			return err
+			// A stored EVM token id that is not a valid uint256 is the same
+			// class of corrupt-state problem as the invalid UID above: skip
+			// it and keep the rest of the packet refundable.
+			ctx.EventManager().EmitEvent(
+				sdk.NewEvent(
+					types.EventTypeRefundPacketTokenSkip,
+					sdk.NewAttribute(types.AttributeKeyNFTClass, data.ClassId),
+					sdk.NewAttribute(types.AttributeKeyNFTID, tokenId),
+					sdk.NewAttribute(types.AttributeKeyERC721Token, evmContractAddress),
+					sdk.NewAttribute(types.AttributeKeyERC721TokenID, evmTokenId),
+					sdk.NewAttribute("reason", "erc721_token_id_invalid"),
+				),
+			)
+			continue
 		}
 
 		contract := common.HexToAddress(evmContractAddress)
@@ -672,6 +712,14 @@ func (k Keeper) RefundPacketToken(
 		// runs, skip BOTH the native burn and the EVM-side refund — a divergence
 		// implies a partial prior refund, and re-running the EVM refund would
 		// risk double payment. Checked before the EVM owner query to save gas.
+		//
+		// NOTE (round 11, F-5): this branch deliberately does NOT clean up the
+		// pair mappings, unlike x/cw721 (whose nft_already_gone check sits
+		// after its mapping cleanup). Here the check fires before the EVM owner
+		// query, so deleting the mapping would leave an escrowed ERC721 token
+		// with no on-chain record of where it lives — undiscoverable and
+		// unrecoverable. Keeping the mapping makes the residue triageable; the
+		// skip is idempotent, so retries just re-emit this event.
 		if !k.nftKeeper.HasNFT(ctx, data.ClassId, tokenId) {
 			ctx.EventManager().EmitEvent(
 				sdk.NewEvent(
@@ -689,7 +737,21 @@ func (k Keeper) RefundPacketToken(
 		// Check if token has already been refunded
 		owner, err := k.QueryERC721TokenOwner(ctx, contract, bigTokenId)
 		if err != nil {
-			return err
+			// Mirror of cw721_owner_query_failed: one unreachable or
+			// misbehaving contract must not abort the refund of the remaining
+			// tokens in the packet. Skipped tokens keep their pair mappings so
+			// a later retry can still refund them.
+			ctx.EventManager().EmitEvent(
+				sdk.NewEvent(
+					types.EventTypeRefundPacketTokenSkip,
+					sdk.NewAttribute(types.AttributeKeyNFTClass, data.ClassId),
+					sdk.NewAttribute(types.AttributeKeyNFTID, tokenId),
+					sdk.NewAttribute(types.AttributeKeyERC721Token, evmContractAddress),
+					sdk.NewAttribute(types.AttributeKeyERC721TokenID, evmTokenId),
+					sdk.NewAttribute("reason", "erc721_owner_query_failed"),
+				),
+			)
+			continue
 		}
 		shouldRefundERC721 := owner == types.ModuleAddress
 		var receiver common.Address
@@ -707,6 +769,12 @@ func (k Keeper) RefundPacketToken(
 		} else {
 			evmReceiver := k.GetEvmRefundReceiver(ctx, evmContractAddress, tokenId, evmTokenId)
 			if len(evmReceiver) == 0 {
+				// Deliberately kept as an error, symmetric with x/cw721
+				// (msg_server.go, "missing CW721 refund receiver") which has a
+				// pinned test for it: without a recorded receiver there is no
+				// address to refund to at all. Every skip-able failure mode
+				// above continues; this one aborts the callback so the whole
+				// packet retries once the receiver record is repaired.
 				return sdkerrors.Wrapf(errortypes.ErrInvalidAddress, "missing ERC721 refund receiver for contract %s token %s", evmContractAddress, tokenId)
 			}
 			receiver = common.HexToAddress(string(evmReceiver))
@@ -715,7 +783,22 @@ func (k Keeper) RefundPacketToken(
 				ctx, erc721, types.ModuleAddress, contract, true,
 				"safeTransferFrom", types.ModuleAddress, receiver, bigTokenId)
 			if err != nil {
-				return err
+				// Mirror of cw721_transfer_failed. The EVM transfer did NOT
+				// happen, so the mapping cleanup and native burn below must
+				// not run either (burning the native NFT without the EVM
+				// refund completing would destroy the user's asset) — skip
+				// the whole token and leave it retryable.
+				ctx.EventManager().EmitEvent(
+					sdk.NewEvent(
+						types.EventTypeRefundPacketTokenSkip,
+						sdk.NewAttribute(types.AttributeKeyNFTClass, data.ClassId),
+						sdk.NewAttribute(types.AttributeKeyNFTID, tokenId),
+						sdk.NewAttribute(types.AttributeKeyERC721Token, evmContractAddress),
+						sdk.NewAttribute(types.AttributeKeyERC721TokenID, evmTokenId),
+						sdk.NewAttribute("reason", "erc721_transfer_failed"),
+					),
+				)
+				continue
 			}
 		}
 

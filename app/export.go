@@ -123,7 +123,7 @@ func (app *Uptick) prepForZeroHeightGenesis(ctx sdk.Context, jailAllowedAddrs []
 	ctx = ctx.WithBlockHeight(0)
 
 	// reinitialize all validators
-	_ = app.StakingKeeper.IterateValidators(ctx, func(_ int64, val stakingtypes.ValidatorI) (stop bool) {
+	if err := app.StakingKeeper.IterateValidators(ctx, func(_ int64, val stakingtypes.ValidatorI) (stop bool) {
 		// donate any unwithdrawn outstanding reward fraction tokens to the community pool
 		valBz, err := app.StakingKeeper.ValidatorAddressCodec().StringToBytes(val.GetOperator())
 		if err != nil {
@@ -150,7 +150,9 @@ func (app *Uptick) prepForZeroHeightGenesis(ctx sdk.Context, jailAllowedAddrs []
 			panic(err)
 		}
 		return false
-	})
+	}); err != nil {
+		return fmt.Errorf("failed to iterate validators: %w", err)
+	}
 
 	// reinitialize all delegations
 	for _, del := range dels {
@@ -176,7 +178,7 @@ func (app *Uptick) prepForZeroHeightGenesis(ctx sdk.Context, jailAllowedAddrs []
 	/* Handle staking state. */
 
 	// iterate through redelegations, reset creation height
-	_ = app.StakingKeeper.IterateRedelegations(ctx, func(_ int64, red stakingtypes.Redelegation) (stop bool) {
+	if err := app.StakingKeeper.IterateRedelegations(ctx, func(_ int64, red stakingtypes.Redelegation) (stop bool) {
 		for i := range red.Entries {
 			red.Entries[i].CreationHeight = 0
 		}
@@ -184,10 +186,12 @@ func (app *Uptick) prepForZeroHeightGenesis(ctx sdk.Context, jailAllowedAddrs []
 			ctx.Logger().Error("SetRedelegation failed", "delegator", red.DelegatorAddress, "validator", red.ValidatorSrcAddress, "err", err)
 		}
 		return false
-	})
+	}); err != nil {
+		return fmt.Errorf("failed to iterate redelegations: %w", err)
+	}
 
 	// iterate through unbonding delegations, reset creation height
-	_ = app.StakingKeeper.IterateUnbondingDelegations(ctx, func(_ int64, ubd stakingtypes.UnbondingDelegation) (stop bool) {
+	if err := app.StakingKeeper.IterateUnbondingDelegations(ctx, func(_ int64, ubd stakingtypes.UnbondingDelegation) (stop bool) {
 		for i := range ubd.Entries {
 			ubd.Entries[i].CreationHeight = 0
 		}
@@ -195,7 +199,9 @@ func (app *Uptick) prepForZeroHeightGenesis(ctx sdk.Context, jailAllowedAddrs []
 			ctx.Logger().Error("SetUnbondingDelegation failed", "delegator", ubd.DelegatorAddress, "validator", ubd.ValidatorAddress, "err", err)
 		}
 		return false
-	})
+	}); err != nil {
+		return fmt.Errorf("failed to iterate unbonding delegations: %w", err)
+	}
 
 	// Iterate through validators by power descending, reset bond heights, and
 	// update bond intra-tx counters.
@@ -230,7 +236,7 @@ func (app *Uptick) prepForZeroHeightGenesis(ctx sdk.Context, jailAllowedAddrs []
 	/* Handle slashing state. */
 
 	// reset start height on signing infos
-	_ = app.SlashingKeeper.IterateValidatorSigningInfos(
+	if err := app.SlashingKeeper.IterateValidatorSigningInfos(
 		ctx,
 		func(addr sdk.ConsAddress, info slashingtypes.ValidatorSigningInfo) (stop bool) {
 			info.StartHeight = 0
@@ -239,6 +245,8 @@ func (app *Uptick) prepForZeroHeightGenesis(ctx sdk.Context, jailAllowedAddrs []
 			}
 			return false
 		},
-	)
+	); err != nil {
+		return fmt.Errorf("failed to iterate validator signing infos: %w", err)
+	}
 	return nil
 }

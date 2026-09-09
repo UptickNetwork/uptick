@@ -198,3 +198,54 @@ func TestQueryNFTEnhance_ValidRetReturnsEnhance(t *testing.T) {
 	require.Equal(t, "urihash-val", ne.UriHash)
 	require.Equal(t, 1, evm.applyCalls)
 }
+
+// The restriction flags are authorization-bearing: their zero value `false`
+// means "NOT restricted", i.e. the permissive end. They reach the denom via
+// CreateNFTClass and gate x/collection's mint path, so a type mismatch must
+// fail CLOSED (reject the conversion) rather than silently degrade.
+//
+// These cases are exercised against classEnhanceFromReturn directly because
+// abi.Unpack against the canonical signature always produces the declared
+// types — the mismatch simply cannot be produced through legal ABI encoding.
+func TestClassEnhanceFromReturn_RestrictionFlagsFailClosed(t *testing.T) {
+	k, ctx, _ := setupConvertKeeper(t)
+	contract := common.HexToAddress(testEnhanceContract)
+
+	cases := []struct {
+		name string
+		ret  []interface{}
+	}{
+		{"mint flag not a bool", []interface{}{"d", "desc", int64(1), "schema", true, "uri", "hash"}},
+		{"update flag not a bool", []interface{}{"d", "desc", true, "schema", "yes", "uri", "hash"}},
+		{"both flags not bools", []interface{}{"d", "desc", nil, "schema", nil, "uri", "hash"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ce, err := k.classEnhanceFromReturn(ctx, contract, tc.ret)
+			require.ErrorIs(t, err, types.ErrClassEnhanceRestrictions)
+			require.Equal(t, types.ClassEnhance{}, ce,
+				"no partial enhance must escape when the restriction flags are ambiguous")
+		})
+	}
+}
+
+// String metadata may be lost — it carries no privilege — but it must degrade
+// loudly (Warn) rather than quietly (Debug).
+func TestClassEnhanceFromReturn_StringFieldsDegradeButFlagsSurvive(t *testing.T) {
+	k, ctx, _ := setupConvertKeeper(t)
+	contract := common.HexToAddress(testEnhanceContract)
+
+	// data and schema are not strings; both bools are valid and must survive.
+	ret := []interface{}{int64(42), "desc", true, nil, false, "ipfs://uri", "hash"}
+
+	ce, err := k.classEnhanceFromReturn(ctx, contract, ret)
+	require.NoError(t, err)
+	require.Empty(t, ce.Data)
+	require.Empty(t, ce.Schema)
+	require.Equal(t, "desc", ce.Description)
+	require.Equal(t, "ipfs://uri", ce.Uri)
+	require.Equal(t, "hash", ce.UriHash)
+	// The authorization-bearing fields keep their real values.
+	require.True(t, ce.MintRestricted)
+	require.False(t, ce.UpdateRestricted)
+}
