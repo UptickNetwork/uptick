@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	txsigning "cosmossdk.io/x/tx/signing"
+	wasmTypes "github.com/CosmWasm/wasmd/x/wasm/types"
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	signing "github.com/cosmos/cosmos-sdk/types/tx/signing"
@@ -129,6 +130,46 @@ func (m *mockTxWithMsgs) GetFee() (sdk.Coins, error)                      { retu
 func (m *mockTxWithMsgs) GetMemo() (string, error)                        { return "", nil }
 func (m *mockTxWithMsgs) GetTimeoutHeight() (uint64, error)               { return 0, nil }
 func (m *mockTxWithMsgs) GetSigningTxData() txsigning.TxData              { return txsigning.TxData{} }
+
+// TestValidateMessage_MsgStoreCode guards the O-3 fix: oversized wasm binaries
+// must be rejected before signature verification runs. Without this test the
+// ante chain would happily continue into SetUpContext / sig verification, and
+// a regression here would silently relax the size cap.
+func TestValidateMessage_MsgStoreCode(t *testing.T) {
+	msd := MessageSecurityDecorator{}
+
+	t.Run("small valid wasm bytecode passes", func(t *testing.T) {
+		msg := &wasmTypes.MsgStoreCode{
+			Sender:       sdk.AccAddress("sender").String(),
+			WASMByteCode: []byte{0x00, 0x61, 0x73, 0x6d},
+		}
+		require.NoError(t, msd.validateMessage(msg))
+	})
+
+	t.Run("empty wasm bytecode rejected by ValidateBasic", func(t *testing.T) {
+		msg := &wasmTypes.MsgStoreCode{
+			Sender:       sdk.AccAddress("sender").String(),
+			WASMByteCode: []byte{},
+		}
+		err := msd.validateMessage(msg)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "invalid wasm store code message")
+	})
+
+	t.Run("oversized wasm bytecode rejected before signature verification", func(t *testing.T) {
+		// wasmtypes.MaxWasmSize = 800 * 1024 bytes. Anything larger must trip
+		// MsgStoreCode.ValidateBasic; the decorator re-runs it explicitly so
+		// the rejection happens at the ante layer.
+		oversized := make([]byte, wasmTypes.MaxWasmSize+1)
+		msg := &wasmTypes.MsgStoreCode{
+			Sender:       sdk.AccAddress("sender").String(),
+			WASMByteCode: oversized,
+		}
+		err := msd.validateMessage(msg)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "wasm store code message")
+	})
+}
 
 // extractMessagesFromTx is a test helper that delegates to the production
 // MessageSecurityDecorator.ExtractMessagesFromTx.

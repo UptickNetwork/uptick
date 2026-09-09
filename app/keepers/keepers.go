@@ -135,7 +135,6 @@ type AppKeepers struct {
 	// wasm keepers
 	WasmKeeper           wasmkeeper.Keeper
 	WasmConfig           wasmtypes.NodeConfig
-	ContractKeeper       *wasmkeeper.PermissionedKeeper
 	TransferModule       transfer.AppModule
 	ICAModule            ica.AppModule
 	IBCNftTransferModule nfttransfer.AppModule
@@ -496,7 +495,6 @@ func New(
 		authtypes.NewModuleAddress(govtypes.ModuleName).String(),
 		wasmOpts...,
 	)
-	appKeepers.ContractKeeper = wasmkeeper.NewDefaultPermissionKeeper(appKeepers.WasmKeeper)
 
 	appKeepers.Cw721Keeper = cw721keeper.NewKeeper(
 		appKeepers.keys[cw721types.StoreKey],

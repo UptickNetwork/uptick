@@ -4,6 +4,7 @@ import (
 	wasmkeeper "github.com/CosmWasm/wasmd/x/wasm/keeper"
 	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
 	"github.com/cosmos/cosmos-sdk/codec"
+	codectypes "github.com/cosmos/cosmos-sdk
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/cosmos/cosmos-sdk/types/tx/signing"
@@ -14,6 +15,7 @@ import (
 	evmevm "github.com/cosmos/evm/ante/evm"
 	anteinterfaces "github.com/cosmos/evm/ante/interfaces"
 	antetypes "github.com/cosmos/evm/ante/types"
+	feemarkettypes "github.com/cosmos/evm/x/feemarket/types"
 	ibcante "github.com/cosmos/ibc-go/v10/modules/core/ante"
 	ibckeeper "github.com/cosmos/ibc-go/v10/modules/core/keeper"
 
@@ -112,52 +114,84 @@ func newEthAnteHandler(options HandlerOptions) sdk.AnteHandler {
 //
 // cosmos/evm v0.6.1's NewAuthzLimiterDecorator recursively descends into
 // authz.MsgExec (see ante/cosmos/authz.go), so nested MsgExec is not a bypass.
+// cosmosAnteDecorators returns the AnteDecorator chain shared by
+// newCosmosAnteHandler and newCosmosAnteHandlerEip712. Extracting the chain
+// here (rather than inlining it in each handler) serves two purposes:
+//
+//  1. The two handlers must stay in lock-step on every decorator they have in
+//     common; refactors to one without the other would otherwise silently
+//     regress on one transaction path.
+//  2. Tests can pin the relative order of decorators (e.g. SetUpContext before
+//     CountTX) by reflecting over the returned slice.
+//
+// SetUpContext is intentionally placed BEFORE the wasm CountTX / GasRegister /
+// TxContracts decorators so their KV writes are metered by the tx gas meter
+// rather than the infinite meter BaseApp presets before ante. LimitSimulationGas
+// must run after SetUpContext so the simulation gas meter is not overwritten.
+//
+// cosmos/evm v0.6.1's NewAuthzLimiterDecorator recursively descends into
+// authz.MsgExec (see ante/cosmos/authz.go), so nested MsgExec is not a bypass.
+func cosmosAnteDecorators(
+	options HandlerOptions,
+	feemarketParams *feemarkettypes.Params,
+	extChecker func(*codectypes.Any) bool,
+	sigVerify sdk.AnteDecorator,
+	txFeeChecker ante.TxFeeChecker,
+) []sdk.AnteDecorator {
+	var simGasLimit *storetypes.Gas
+	if options.WasmNodeConfig != nil {
+		simGasLimit = options.WasmNodeConfig.SimulationGasLimit
+	}
+
+	decorators := []sdk.AnteDecorator{
+		NewMessageSecurityDecorator(options.Cdc, options.MaxTxGasWanted),
+		NewValidatorCommissionDecorator(options.Cdc),
+		// SetUpContext must precede the wasm decorators so their KV writes
+		// (CountTX counter) are metered by the tx gas meter, not the
+		// infinite meter BaseApp presets before ante.
+		ante.NewSetUpContextDecorator(),
+	}
+	if options.TXCounterStoreService != nil {
+		decorators = append(decorators, wasmkeeper.NewCountTXDecorator(options.TXCounterStoreService))
+	}
+	if options.WasmKeeper != nil {
+		decorators = append(decorators, wasmkeeper.NewGasRegisterDecorator(options.WasmKeeper.GetGasRegister()))
+	}
+
+	decorators = append(decorators,
+		wasmkeeper.NewTxContractsDecorator(),
+		cosmosante.NewRejectMessagesDecorator(),
+		cosmosante.NewAuthzLimiterDecorator(options.disabledAuthzMsgs()...),
+		wasmkeeper.NewLimitSimulationGasDecorator(simGasLimit),
+		ante.NewExtensionOptionsDecorator(extChecker),
+		ante.NewValidateBasicDecorator(),
+		ante.NewTxTimeoutHeightDecorator(),
+		ante.NewValidateMemoDecorator(options.AccountKeeper),
+		cosmosante.NewMinGasPriceDecorator(feemarketParams),
+		ante.NewConsumeGasForTxSizeDecorator(options.AccountKeeper),
+		ante.NewDeductFeeDecorator(options.AccountKeeper, options.BankKeeper, options.FeegrantKeeper, txFeeChecker),
+		ante.NewSetPubKeyDecorator(options.AccountKeeper),
+		ante.NewValidateSigCountDecorator(options.AccountKeeper),
+		ante.NewSigGasConsumeDecorator(options.AccountKeeper, options.SigGasConsumer),
+		sigVerify,
+		ante.NewIncrementSequenceDecorator(options.AccountKeeper),
+		ibcante.NewRedundantRelayDecorator(options.IBCKeeper),
+		evmevm.NewGasWantedDecorator(options.EvmKeeper, options.FeeMarketKeeper, feemarketParams),
+	)
+	return decorators
+}
+
 func newCosmosAnteHandler(options HandlerOptions) sdk.AnteHandler {
 	return func(ctx sdk.Context, tx sdk.Tx, simulate bool) (sdk.Context, error) {
 		feemarketParams := options.FeeMarketKeeper.GetParams(ctx)
 		txFeeChecker := evmevm.NewDynamicFeeChecker(&feemarketParams)
 
-		var simGasLimit *storetypes.Gas
-		if options.WasmNodeConfig != nil {
-			simGasLimit = options.WasmNodeConfig.SimulationGasLimit
-		}
-
-		decorators := []sdk.AnteDecorator{
-			NewMessageSecurityDecorator(options.Cdc, options.MaxTxGasWanted),
-			NewValidatorCommissionDecorator(options.Cdc),
-			// SetUpContext must precede the wasm decorators so their KV writes
-			// (CountTX counter) are metered by the tx gas meter, not the
-			// infinite meter BaseApp presets before ante.
-			ante.NewSetUpContextDecorator(),
-		}
-		if options.TXCounterStoreService != nil {
-			decorators = append(decorators, wasmkeeper.NewCountTXDecorator(options.TXCounterStoreService))
-		}
-		if options.WasmKeeper != nil {
-			decorators = append(decorators, wasmkeeper.NewGasRegisterDecorator(options.WasmKeeper.GetGasRegister()))
-		}
-
-		extChecker := antetypes.HasDynamicFeeExtensionOption
-
-		decorators = append(decorators,
-			wasmkeeper.NewTxContractsDecorator(),
-			cosmosante.NewRejectMessagesDecorator(),
-			cosmosante.NewAuthzLimiterDecorator(options.disabledAuthzMsgs()...),
-			wasmkeeper.NewLimitSimulationGasDecorator(simGasLimit),
-			ante.NewExtensionOptionsDecorator(extChecker),
-			ante.NewValidateBasicDecorator(),
-			ante.NewTxTimeoutHeightDecorator(),
-			ante.NewValidateMemoDecorator(options.AccountKeeper),
-			cosmosante.NewMinGasPriceDecorator(&feemarketParams),
-			ante.NewConsumeGasForTxSizeDecorator(options.AccountKeeper),
-			ante.NewDeductFeeDecorator(options.AccountKeeper, options.BankKeeper, options.FeegrantKeeper, txFeeChecker),
-			ante.NewSetPubKeyDecorator(options.AccountKeeper),
-			ante.NewValidateSigCountDecorator(options.AccountKeeper),
-			ante.NewSigGasConsumeDecorator(options.AccountKeeper, options.SigGasConsumer),
+		decorators := cosmosAnteDecorators(
+			options,
+			&feemarketParams,
+			antetypes.HasDynamicFeeExtensionOption,
 			ante.NewSigVerificationDecorator(options.AccountKeeper, options.SignModeHandler),
-			ante.NewIncrementSequenceDecorator(options.AccountKeeper),
-			ibcante.NewRedundantRelayDecorator(options.IBCKeeper),
-			evmevm.NewGasWantedDecorator(options.EvmKeeper, options.FeeMarketKeeper, &feemarketParams),
+			txFeeChecker,
 		)
 
 		return sdk.ChainAnteDecorators(decorators...)(ctx, tx, simulate)
@@ -175,49 +209,16 @@ func newCosmosAnteHandlerEip712(options HandlerOptions) sdk.AnteHandler {
 		feemarketParams := options.FeeMarketKeeper.GetParams(ctx)
 		txFeeChecker := evmevm.NewDynamicFeeChecker(&feemarketParams)
 
-		var simGasLimit *storetypes.Gas
-		if options.WasmNodeConfig != nil {
-			simGasLimit = options.WasmNodeConfig.SimulationGasLimit
-		}
-
-		decorators := []sdk.AnteDecorator{
-			NewMessageSecurityDecorator(options.Cdc, options.MaxTxGasWanted),
-			NewValidatorCommissionDecorator(options.Cdc),
-			// SetUpContext must precede the wasm decorators so their KV writes
-			// (CountTX counter) are metered by the tx gas meter, not the
-			// infinite meter BaseApp presets before ante.
-			ante.NewSetUpContextDecorator(),
-		}
-		if options.TXCounterStoreService != nil {
-			decorators = append(decorators, wasmkeeper.NewCountTXDecorator(options.TXCounterStoreService))
-		}
-		if options.WasmKeeper != nil {
-			decorators = append(decorators, wasmkeeper.NewGasRegisterDecorator(options.WasmKeeper.GetGasRegister()))
-		}
-
-		decorators = append(decorators,
-			wasmkeeper.NewTxContractsDecorator(),
-			cosmosante.NewRejectMessagesDecorator(),
-			cosmosante.NewAuthzLimiterDecorator(options.disabledAuthzMsgs()...),
-			wasmkeeper.NewLimitSimulationGasDecorator(simGasLimit),
-			// accept exactly the Web3 extension the EIP-712 signature
-			// verifier requires. The previous DynamicFee-only checker rejected
-			// valid Keplr txs with "unknown extension options" before they
-			// could reach Eip712SigVerificationDecorator below.
-			ante.NewExtensionOptionsDecorator(HasWeb3ExtensionOption),
-			ante.NewValidateBasicDecorator(),
-			ante.NewTxTimeoutHeightDecorator(),
-			ante.NewValidateMemoDecorator(options.AccountKeeper),
-			cosmosante.NewMinGasPriceDecorator(&feemarketParams),
-			ante.NewConsumeGasForTxSizeDecorator(options.AccountKeeper),
-			ante.NewDeductFeeDecorator(options.AccountKeeper, options.BankKeeper, options.FeegrantKeeper, txFeeChecker),
-			ante.NewSetPubKeyDecorator(options.AccountKeeper),
-			ante.NewValidateSigCountDecorator(options.AccountKeeper),
-			ante.NewSigGasConsumeDecorator(options.AccountKeeper, options.SigGasConsumer),
+		// accept exactly the Web3 extension the EIP-712 signature
+		// verifier requires. The previous DynamicFee-only checker rejected
+		// valid Keplr txs with "unknown extension options" before they
+		// could reach Eip712SigVerificationDecorator below.
+		decorators := cosmosAnteDecorators(
+			options,
+			&feemarketParams,
+			HasWeb3ExtensionOption,
 			NewEip712SigVerificationDecorator(options.AccountKeeper, options.Cdc),
-			ante.NewIncrementSequenceDecorator(options.AccountKeeper),
-			ibcante.NewRedundantRelayDecorator(options.IBCKeeper),
-			evmevm.NewGasWantedDecorator(options.EvmKeeper, options.FeeMarketKeeper, &feemarketParams),
+			txFeeChecker,
 		)
 
 		return sdk.ChainAnteDecorators(decorators...)(ctx, tx, simulate)

@@ -173,7 +173,13 @@ var (
 
 		cw721types.ModuleName: nil,
 
-		cosmosnft.ModuleName:           nil, // legacy cosmossdk.io/x/nft module account; x/collection uses the nft types as a library, not this account — kept for compatibility, remove only after confirming no escrow depends on it
+		// cosmosnft.ModuleName: retained because cosmossdk.io/x/nft/keeper.NewKeeper
+		// at app/keepers/keepers.go:332 (via x/collection/keeper.NewKeeper) requires
+		// this module account to exist; x/collection wraps the upstream types but
+		// still needs the "nft" account for IBC escrow. Deleting it triggers
+		// "panic: the nft module account has not been set" in TestInitCmd
+		// (regression discovered during 第19轮 dfe8cee 副作用审查).
+		cosmosnft.ModuleName:           nil,
 		nfttypes.ModuleName:            nil, // x/collection
 		wasmtypes.ModuleName:           {authtypes.Burner},
 		icatypes.ModuleName:            nil,

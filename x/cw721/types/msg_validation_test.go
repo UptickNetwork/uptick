@@ -97,6 +97,96 @@ func TestMsgConvertCW721_ValidateBasic_AllowsOmittedNftIDs(t *testing.T) {
 	require.NoError(t, msg.ValidateBasic())
 }
 
+// TestMsgConvertCW721_ValidateBasic_ClassIdGuard guards the N-2 fix
+// (round 18): the dfe8cee tightening added strings.TrimSpace(msg.ClassId)
+// == "" to MsgConvertCW721; an empty / whitespace-only class id must be
+// rejected, and a legitimate non-empty class id (incl. an ibc/<hash> voucher
+// form) must continue to validate.
+func TestMsgConvertCW721_ValidateBasic_ClassIdGuard(t *testing.T) {
+	t.Parallel()
+
+	makeMsg := func(classID string) MsgConvertCW721 {
+		return MsgConvertCW721{
+			Sender:          validationTestAddr,
+			Receiver:        validationTestAddr,
+			ContractAddress: validationTestAddr,
+			ClassId:         classID,
+			TokenIds:        []string{"1"},
+		}
+	}
+
+	t.Run("empty class id rejected", func(t *testing.T) {
+		t.Parallel()
+		err := makeMsg("").ValidateBasic()
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "class id cannot be empty")
+	})
+
+	t.Run("whitespace-only class id rejected", func(t *testing.T) {
+		t.Parallel()
+		err := makeMsg("   ").ValidateBasic()
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "class id cannot be empty")
+	})
+
+	t.Run("ibc voucher class id accepted (reverse sentinel)", func(t *testing.T) {
+		t.Parallel()
+		require.NoError(t, makeMsg("ibc/7F1D4F9D63B1E4D9E5A2D6B3E5C5A8B7C1D2E3F4A5B6C7D8E9F0A1B2C3D4E5F60").ValidateBasic())
+	})
+
+	t.Run("bare native class id accepted (reverse sentinel)", func(t *testing.T) {
+		t.Parallel()
+		require.NoError(t, makeMsg("class-1").ValidateBasic())
+	})
+}
+
+// TestMsgTransferCW721_ValidateBasic_ClassIdGuard guards the N-2 fix
+// (round 18): the dfe8cee tightening added strings.TrimSpace(msg.ClassId)
+// == "" to MsgTransferCW721; an empty / whitespace-only class id must be
+// rejected, and a legitimate non-empty class id (incl. an ibc/<hash> voucher
+// form) must continue to validate.
+func TestMsgTransferCW721_ValidateBasic_ClassIdGuard(t *testing.T) {
+	t.Parallel()
+
+	makeMsg := func(classID string) MsgTransferCW721 {
+		return MsgTransferCW721{
+			CwSender:          validationTestAddr,
+			CosmosReceiver:    validationTestAddr,
+			CwContractAddress: validationTestAddr,
+			ClassId:           classID,
+			CwTokenIds:        []string{"1"},
+			CosmosTokenIds:    []string{"nft-1"},
+			SourcePort:        "transfer",
+			SourceChannel:     "channel-0",
+			TimeoutHeight:     ibctypes.Height{RevisionNumber: 1, RevisionHeight: 100},
+		}
+	}
+
+	t.Run("empty class id rejected", func(t *testing.T) {
+		t.Parallel()
+		err := makeMsg("").ValidateBasic()
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "class id cannot be empty")
+	})
+
+	t.Run("whitespace-only class id rejected", func(t *testing.T) {
+		t.Parallel()
+		err := makeMsg("   ").ValidateBasic()
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "class id cannot be empty")
+	})
+
+	t.Run("ibc voucher class id accepted (reverse sentinel)", func(t *testing.T) {
+		t.Parallel()
+		require.NoError(t, makeMsg("ibc/7F1D4F9D63B1E4D9E5A2D6B3E5C5A8B7C1D2E3F4A5B6C7D8E9F0A1B2C3D4E5F60").ValidateBasic())
+	})
+
+	t.Run("bare native class id accepted (reverse sentinel)", func(t *testing.T) {
+		t.Parallel()
+		require.NoError(t, makeMsg("class-1").ValidateBasic())
+	})
+}
+
 func TestMsgTransferCW721_ValidateBasic_CosmosTokenIDRules(t *testing.T) {
 	t.Parallel()
 

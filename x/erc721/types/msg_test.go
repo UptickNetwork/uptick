@@ -131,14 +131,17 @@ func TestMsgConvertERC721_ValidateBasic_ERC721(t *testing.T) {
 		sender       string
 		receiver     string
 		contractAddr string
+		classID      string
 		tokenIDs     []string
 		wantErr      bool
+		wantErrMsg   string
 	}{
 		{
 			name:         "valid",
 			sender:       validSender,
 			receiver:     validSender,
 			contractAddr: "0x1234567890123456789012345678901234567890",
+			classID:      "class-1",
 			tokenIDs:     []string{"1"},
 			wantErr:      false,
 		},
@@ -147,6 +150,7 @@ func TestMsgConvertERC721_ValidateBasic_ERC721(t *testing.T) {
 			sender:       "bad",
 			receiver:     validSender,
 			contractAddr: "0x1234567890123456789012345678901234567890",
+			classID:      "class-1",
 			tokenIDs:     []string{"1"},
 			wantErr:      true,
 		},
@@ -155,6 +159,7 @@ func TestMsgConvertERC721_ValidateBasic_ERC721(t *testing.T) {
 			sender:       validSender,
 			receiver:     "bad",
 			contractAddr: "0x1234567890123456789012345678901234567890",
+			classID:      "class-1",
 			tokenIDs:     []string{"1"},
 			wantErr:      true,
 		},
@@ -163,8 +168,47 @@ func TestMsgConvertERC721_ValidateBasic_ERC721(t *testing.T) {
 			sender:       validSender,
 			receiver:     validSender,
 			contractAddr: "not-a-contract",
+			classID:      "class-1",
 			tokenIDs:     []string{"1"},
 			wantErr:      true,
+		},
+		{
+			// N-2 sentinel (round 18): the dfe8cee tightening added
+			// strings.TrimSpace(msg.ClassId) == "" to MsgConvertERC721; an
+			// empty class id must be rejected here. Without this case the
+			// defence could silently regress back to "valid with empty id".
+			name:         "empty class id rejected",
+			sender:       validSender,
+			receiver:     validSender,
+			contractAddr: "0x1234567890123456789012345678901234567890",
+			classID:      "",
+			tokenIDs:     []string{"1"},
+			wantErr:      true,
+			wantErrMsg:   "class id cannot be empty",
+		},
+		{
+			// N-2 sentinel: a whitespace-only class id is the same class of
+			// bug as empty (TrimSpace rejects both).
+			name:         "whitespace-only class id rejected",
+			sender:       validSender,
+			receiver:     validSender,
+			contractAddr: "0x1234567890123456789012345678901234567890",
+			classID:      "   ",
+			tokenIDs:     []string{"1"},
+			wantErr:      true,
+			wantErrMsg:   "class id cannot be empty",
+		},
+		{
+			// N-2 reverse sentinel: a non-empty class id must continue to
+			// validate. Locks in that the new guard does not regress
+			// legitimate ids (e.g. an "ibc/<hash>" voucher id).
+			name:         "ibc voucher class id accepted",
+			sender:       validSender,
+			receiver:     validSender,
+			contractAddr: "0x1234567890123456789012345678901234567890",
+			classID:      "ibc/7F1D4F9D63B1E4D9E5A2D6B3E5C5A8B7C1D2E3F4A5B6C7D8E9F0A1B2C3D4E5F60",
+			tokenIDs:     []string{"1"},
+			wantErr:      false,
 		},
 	}
 
@@ -174,12 +218,15 @@ func TestMsgConvertERC721_ValidateBasic_ERC721(t *testing.T) {
 				CosmosSender:       tc.sender,
 				CosmosReceiver:     tc.receiver,
 				EvmContractAddress: tc.contractAddr,
-				ClassId:            "class-1",
+				ClassId:            tc.classID,
 				EvmTokenIds:        tc.tokenIDs,
 			}
 			err := msg.ValidateBasic()
 			if tc.wantErr {
 				require.Error(t, err)
+				if tc.wantErrMsg != "" {
+					require.Contains(t, err.Error(), tc.wantErrMsg)
+				}
 			} else {
 				require.NoError(t, err)
 			}
@@ -210,17 +257,20 @@ func TestMsgTransferERC721_ValidateBasic_ERC721(t *testing.T) {
 		sender       string
 		receiver     string
 		contractAddr string
+		classID      string
 		tokenIDs     []string
 		port         string
 		channel      string
 		timeout      clienttypes.Height
 		wantErr      bool
+		wantErrMsg   string
 	}{
 		{
 			name:         "valid",
 			sender:       validSender,
 			receiver:     validSender,
 			contractAddr: "0x1234567890123456789012345678901234567890",
+			classID:      "class-1",
 			tokenIDs:     []string{"1"},
 			port:         "nft-transfer",
 			channel:      "channel-0",
@@ -232,6 +282,7 @@ func TestMsgTransferERC721_ValidateBasic_ERC721(t *testing.T) {
 			sender:       "bad",
 			receiver:     validSender,
 			contractAddr: "0x1234567890123456789012345678901234567890",
+			classID:      "class-1",
 			tokenIDs:     []string{"1"},
 			port:         "nft-transfer",
 			channel:      "channel-0",
@@ -243,6 +294,7 @@ func TestMsgTransferERC721_ValidateBasic_ERC721(t *testing.T) {
 			sender:       validSender,
 			receiver:     validSender,
 			contractAddr: "not-hex",
+			classID:      "class-1",
 			tokenIDs:     []string{"1"},
 			port:         "nft-transfer",
 			channel:      "channel-0",
@@ -254,6 +306,7 @@ func TestMsgTransferERC721_ValidateBasic_ERC721(t *testing.T) {
 			sender:       "",
 			receiver:     validSender,
 			contractAddr: "0x1234567890123456789012345678901234567890",
+			classID:      "class-1",
 			tokenIDs:     []string{"1"},
 			port:         "nft-transfer",
 			channel:      "channel-0",
@@ -265,6 +318,7 @@ func TestMsgTransferERC721_ValidateBasic_ERC721(t *testing.T) {
 			sender:       validSender,
 			receiver:     validSender,
 			contractAddr: "0x1234567890123456789012345678901234567890",
+			classID:      "class-1",
 			tokenIDs:     []string{"1"},
 			port:         "",
 			channel:      "channel-0",
@@ -276,6 +330,7 @@ func TestMsgTransferERC721_ValidateBasic_ERC721(t *testing.T) {
 			sender:       validSender,
 			receiver:     validSender,
 			contractAddr: "0x1234567890123456789012345678901234567890",
+			classID:      "class-1",
 			tokenIDs:     []string{"1"},
 			port:         "nft-transfer",
 			channel:      "",
@@ -287,6 +342,7 @@ func TestMsgTransferERC721_ValidateBasic_ERC721(t *testing.T) {
 			sender:       validSender,
 			receiver:     validSender,
 			contractAddr: "0x1234567890123456789012345678901234567890",
+			classID:      "class-1",
 			tokenIDs:     []string{"1"},
 			port:         "nft-transfer",
 			channel:      "channel-0",
@@ -297,11 +353,41 @@ func TestMsgTransferERC721_ValidateBasic_ERC721(t *testing.T) {
 			sender:       validSender,
 			receiver:     "bad",
 			contractAddr: "0x1234567890123456789012345678901234567890",
+			classID:      "class-1",
 			tokenIDs:     []string{"1"},
 			port:         "nft-transfer",
 			channel:      "channel-0",
 			timeout:      timeout,
 			wantErr:      true,
+		},
+		{
+			// N-2 sentinel (round 18): the dfe8cee tightening added
+			// strings.TrimSpace(msg.ClassId) == "" to MsgTransferERC721.
+			name:         "empty class id rejected",
+			sender:       validSender,
+			receiver:     validSender,
+			contractAddr: "0x1234567890123456789012345678901234567890",
+			classID:      "",
+			tokenIDs:     []string{"1"},
+			port:         "nft-transfer",
+			channel:      "channel-0",
+			timeout:      timeout,
+			wantErr:      true,
+			wantErrMsg:   "class id cannot be empty",
+		},
+		{
+			// N-2 reverse sentinel: a non-empty class id (including the IBC
+			// voucher form) must continue to validate.
+			name:         "ibc voucher class id accepted",
+			sender:       validSender,
+			receiver:     validSender,
+			contractAddr: "0x1234567890123456789012345678901234567890",
+			classID:      "ibc/ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890",
+			tokenIDs:     []string{"1"},
+			port:         "nft-transfer",
+			channel:      "channel-0",
+			timeout:      timeout,
+			wantErr:      false,
 		},
 	}
 
@@ -311,7 +397,7 @@ func TestMsgTransferERC721_ValidateBasic_ERC721(t *testing.T) {
 				CosmosSender:       tc.sender,
 				CosmosReceiver:     tc.receiver,
 				EvmContractAddress: tc.contractAddr,
-				ClassId:            "class-1",
+				ClassId:            tc.classID,
 				EvmTokenIds:        tc.tokenIDs,
 				SourcePort:         tc.port,
 				SourceChannel:      tc.channel,
@@ -320,6 +406,9 @@ func TestMsgTransferERC721_ValidateBasic_ERC721(t *testing.T) {
 			err := msg.ValidateBasic()
 			if tc.wantErr {
 				require.Error(t, err)
+				if tc.wantErrMsg != "" {
+					require.Contains(t, err.Error(), tc.wantErrMsg)
+				}
 			} else {
 				require.NoError(t, err)
 			}
