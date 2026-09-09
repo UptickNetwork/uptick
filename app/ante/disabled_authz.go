@@ -1,6 +1,7 @@
 package ante
 
 import (
+	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	vestingtypes "github.com/cosmos/cosmos-sdk/x/auth/vesting/types"
 	govv1 "github.com/cosmos/cosmos-sdk/x/gov/types/v1"
@@ -32,5 +33,10 @@ func DisabledAuthzMsgTypeURLs() []string {
 		sdk.MsgTypeURL(&upgradetypes.MsgCancelUpgrade{}),
 		sdk.MsgTypeURL(&ibcclienttypes.MsgUpdateClient{}),
 		sdk.MsgTypeURL(&ibcclienttypes.MsgUpgradeClient{}),
+		// wasm params are authority-gated (gov module account only); they must
+		// not be delegatable via authz. Note: wasm MsgStoreCode / MsgMigrateContract
+		// / MsgUpdateAdmin / MsgClearAdmin are admin/permission-gated rather than
+		// purely authority-gated, so they are intentionally left grantable.
+		sdk.MsgTypeURL(&wasmtypes.MsgUpdateParams{}),
 	}
 }

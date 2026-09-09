@@ -9,13 +9,11 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/tx/signing"
 	"github.com/cosmos/cosmos-sdk/x/auth/ante"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
-	sdkvesting "github.com/cosmos/cosmos-sdk/x/auth/vesting/types"
 	evmante "github.com/cosmos/evm/ante"
 	cosmosante "github.com/cosmos/evm/ante/cosmos"
 	evmevm "github.com/cosmos/evm/ante/evm"
 	anteinterfaces "github.com/cosmos/evm/ante/interfaces"
 	antetypes "github.com/cosmos/evm/ante/types"
-	evmtypes "github.com/cosmos/evm/x/vm/types"
 	ibcante "github.com/cosmos/ibc-go/v10/modules/core/ante"
 	ibckeeper "github.com/cosmos/ibc-go/v10/modules/core/keeper"
 
@@ -92,10 +90,11 @@ func (options HandlerOptions) disabledAuthzMsgs() []string {
 	if len(options.DisabledAuthzMsgs) > 0 {
 		return options.DisabledAuthzMsgs
 	}
-	return []string{
-		sdk.MsgTypeURL(&evmtypes.MsgEthereumTx{}),
-		sdk.MsgTypeURL(&sdkvesting.MsgCreateVestingAccount{}),
-	}
+	// Fall back to the full disable list (single source of truth in
+	// DisabledAuthzMsgTypeURLs) so a second construction point that forgets to
+	// set DisabledAuthzMsgs still denies gov/upgrade/IBC-client messages rather
+	// than silently dropping that protection.
+	return DisabledAuthzMsgTypeURLs()
 }
 
 // newEthAnteHandler creates the ante handler for Ethereum transactions
@@ -105,9 +104,11 @@ func newEthAnteHandler(options HandlerOptions) sdk.AnteHandler {
 }
 
 // newCosmosAnteHandler creates the default ante handler for Cosmos transactions.
-// Wasm CountTX / GasRegister / TxContracts run before SetUpContext.
-// LimitSimulationGas runs immediately after SetUpContext so the simulation gas
-// meter is not overwritten. AuthzLimiter uses DisabledAuthzMsgs from app.go.
+// SetUpContext runs before the wasm CountTX / GasRegister / TxContracts so their
+// KV writes (CountTX counter) are metered by the tx gas meter rather than the
+// infinite meter BaseApp presets. LimitSimulationGas must run after SetUpContext
+// so the simulation gas meter is not overwritten. AuthzLimiter uses
+// DisabledAuthzMsgs from app.go.
 //
 // cosmos/evm v0.6.1's NewAuthzLimiterDecorator recursively descends into
 // authz.MsgExec (see ante/cosmos/authz.go), so nested MsgExec is not a bypass.
@@ -124,6 +125,10 @@ func newCosmosAnteHandler(options HandlerOptions) sdk.AnteHandler {
 		decorators := []sdk.AnteDecorator{
 			NewMessageSecurityDecorator(options.Cdc, options.MaxTxGasWanted),
 			NewValidatorCommissionDecorator(options.Cdc),
+			// SetUpContext must precede the wasm decorators so their KV writes
+			// (CountTX counter) are metered by the tx gas meter, not the
+			// infinite meter BaseApp presets before ante.
+			ante.NewSetUpContextDecorator(),
 		}
 		if options.TXCounterStoreService != nil {
 			decorators = append(decorators, wasmkeeper.NewCountTXDecorator(options.TXCounterStoreService))
@@ -138,7 +143,6 @@ func newCosmosAnteHandler(options HandlerOptions) sdk.AnteHandler {
 			wasmkeeper.NewTxContractsDecorator(),
 			cosmosante.NewRejectMessagesDecorator(),
 			cosmosante.NewAuthzLimiterDecorator(options.disabledAuthzMsgs()...),
-			ante.NewSetUpContextDecorator(),
 			wasmkeeper.NewLimitSimulationGasDecorator(simGasLimit),
 			ante.NewExtensionOptionsDecorator(extChecker),
 			ante.NewValidateBasicDecorator(),
@@ -179,6 +183,10 @@ func newCosmosAnteHandlerEip712(options HandlerOptions) sdk.AnteHandler {
 		decorators := []sdk.AnteDecorator{
 			NewMessageSecurityDecorator(options.Cdc, options.MaxTxGasWanted),
 			NewValidatorCommissionDecorator(options.Cdc),
+			// SetUpContext must precede the wasm decorators so their KV writes
+			// (CountTX counter) are metered by the tx gas meter, not the
+			// infinite meter BaseApp presets before ante.
+			ante.NewSetUpContextDecorator(),
 		}
 		if options.TXCounterStoreService != nil {
 			decorators = append(decorators, wasmkeeper.NewCountTXDecorator(options.TXCounterStoreService))
@@ -191,7 +199,6 @@ func newCosmosAnteHandlerEip712(options HandlerOptions) sdk.AnteHandler {
 			wasmkeeper.NewTxContractsDecorator(),
 			cosmosante.NewRejectMessagesDecorator(),
 			cosmosante.NewAuthzLimiterDecorator(options.disabledAuthzMsgs()...),
-			ante.NewSetUpContextDecorator(),
 			wasmkeeper.NewLimitSimulationGasDecorator(simGasLimit),
 			// accept exactly the Web3 extension the EIP-712 signature
 			// verifier requires. The previous DynamicFee-only checker rejected

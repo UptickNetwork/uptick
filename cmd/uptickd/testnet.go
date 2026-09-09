@@ -9,10 +9,8 @@ import (
 	"net"
 	"os"
 	"path/filepath"
-	"strconv"
 
 	"cosmossdk.io/math"
-	"github.com/ethereum/go-ethereum/params"
 
 	"github.com/spf13/cobra"
 
@@ -60,8 +58,6 @@ var (
 	flagRPCAddress        = "rpc.address"
 	flagAPIAddress        = "api.address"
 	flagPrintMnemonic     = "print-mnemonic"
-	flagBaseFee           = "base-fee"
-	flagMinGasPrice       = "min-gas-price"
 )
 
 type initArgs struct {
@@ -100,8 +96,6 @@ func addTestnetFlagsToCmd(cmd *cobra.Command, numValidators int) {
 	cmd.Flags().String(flags.FlagChainID, "", "genesis file chain-id, if left blank will be randomly created")
 	cmd.Flags().String(sdkserver.FlagMinGasPrices, fmt.Sprintf("0.000006%s", cmdcfg.BaseDenom), "Minimum gas prices to accept for transactions; All fees in a tx must meet this minimum (e.g. 0.01uptick,0.001stake)")
 	cmd.Flags().String(flags.FlagKeyType, string(hd.EthSecp256k1Type), "Key signing algorithm to generate keys for")
-	cmd.Flags().String(flagBaseFee, strconv.Itoa(params.InitialBaseFee), "The params base_fee in the feemarket module in geneis")
-	cmd.Flags().String(flagMinGasPrice, "0", "The params min_gas_price in the feemarket module in geneis")
 }
 
 // NewTestnetCmd creates a root testnet command with subcommands to run an in-process testnet or initialize

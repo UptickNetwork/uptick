@@ -10,7 +10,12 @@ import (
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 )
 
-var minCommission = math.LegacyNewDecWithPrec(5, 2) // 5%
+// minCommission returns the chain-wide minimum validator commission rate (5%).
+// It is a function, not a package var, so it cannot be reassigned by init() or
+// tests — changing this value is a consensus-breaking change.
+func minCommission() math.LegacyDec {
+	return math.LegacyNewDecWithPrec(5, 2)
+}
 
 // maxAuthzValidationDepth bounds recursion into nested authz.MsgExec so a deeply
 // nested authorization cannot cause unbounded recursive validation.
@@ -87,16 +92,16 @@ func (vcd ValidatorCommissionDecorator) validateAuthzDepth(ctx sdk.Context, exec
 func (vcd ValidatorCommissionDecorator) validateMsg(_ sdk.Context, msg sdk.Msg) error {
 	switch msg := msg.(type) {
 	case *stakingtypes.MsgCreateValidator:
-		if msg.Commission.Rate.LT(minCommission) {
+		if msg.Commission.Rate.LT(minCommission()) {
 			return sdkerrors.Wrapf(
 				errortypes.ErrInvalidRequest,
-				"validator commission %s cannot be lower than minimum of %s", msg.Commission.Rate, minCommission)
+				"validator commission %s cannot be lower than minimum of %s", msg.Commission.Rate, minCommission())
 		}
 	case *stakingtypes.MsgEditValidator:
-		if msg.CommissionRate != nil && msg.CommissionRate.LT(minCommission) {
+		if msg.CommissionRate != nil && msg.CommissionRate.LT(minCommission()) {
 			return sdkerrors.Wrapf(
 				errortypes.ErrInvalidRequest,
-				"validator commission %s cannot be lower than minimum of %s", msg.CommissionRate, minCommission)
+				"validator commission %s cannot be lower than minimum of %s", msg.CommissionRate, minCommission())
 		}
 	}
 	return nil

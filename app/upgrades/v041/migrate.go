@@ -59,6 +59,10 @@ func migrateActiveStaticPrecompiles(ctx sdk.Context, box upgrades.Toolbox) error
 // list filled in when the stored list is empty. An already-populated list is
 // preserved so governance removals are not silently reverted.
 func withDefaultActiveStaticPrecompiles(params evmtypes.Params) (evmtypes.Params, bool) {
+	// An empty list means "reset to the default set". Note that proto round-trips
+	// collapse an explicitly-empty list to nil, so a governance decision to clear
+	// the list (disable all static precompiles) is not distinguishable from
+	// "never configured" here; both reset to the default.
 	if len(params.ActiveStaticPrecompiles) != 0 {
 		return params, false
 	}

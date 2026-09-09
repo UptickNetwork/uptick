@@ -100,8 +100,8 @@ func TestGetVoucherClassID_Deterministic(t *testing.T) {
 
 // TestGetRefundClassId covers the four observable shapes of `data.ClassId`:
 // bare native id → as-is; matching (port, channel) voucher → ibc/<hash>;
-// different-channel or different-port voucher → as-is + `cross_channel_refund`
-// event for multi-hop observability.
+// different-channel or different-port voucher → ibc/<hash> + `cross_channel_refund`
+// event (which keeps the full path) for multi-hop observability.
 func TestGetRefundClassId(t *testing.T) {
 	k := NewKeeper(ibcnfttransferkeeper.Keeper{})
 	packet := channeltypes.Packet{
@@ -131,16 +131,16 @@ func TestGetRefundClassId(t *testing.T) {
 		require.False(t, found, "matching prefix should not trigger cross_channel_refund event")
 	})
 
-	// a voucher whose channel
-	// prefix does NOT match this packet's (port, channel) must be returned
-	// UNCHANGED. This is the multi-hop ICS-721 case.
-	t.Run("voucher with different channel is returned unchanged with observability event", func(t *testing.T) {
+	// A voucher whose channel prefix does NOT match this packet's (port,
+	// channel) is a multi-hop ICS-721 case: the local voucher id is derived
+	// from the full path, while the event keeps the full path for observability.
+	t.Run("voucher with different channel derives local id with observability event", func(t *testing.T) {
 		ctx := newRefundCtx(t)
 		got, err := k.getRefundClassId(ctx, packet, nfttransfertypes.NonFungibleTokenPacketData{
 			ClassId: nfttransfertypes.PortID + "/channel-1/kitty",
 		})
 		require.NoError(t, err)
-		require.Equal(t, nfttransfertypes.PortID+"/channel-1/kitty", got)
+		require.Equal(t, nfttransfertypes.ParseClassTrace(nfttransfertypes.PortID+"/channel-1/kitty").IBCClassID(), got)
 		// Must emit an event so ops can spot multi-hop usage.
 		ev, found := findEvent(ctx, "cross_channel_refund")
 		require.True(t, found, "cross-channel voucher must emit cross_channel_refund event")
@@ -150,7 +150,7 @@ func TestGetRefundClassId(t *testing.T) {
 		requireAttribute(t, ev, "sequence", "42")
 	})
 
-	t.Run("voucher with different port is returned unchanged with observability event", func(t *testing.T) {
+	t.Run("voucher with different port derives local id with observability event", func(t *testing.T) {
 		ctx := newRefundCtx(t)
 		otherPacket := channeltypes.Packet{
 			SourcePort:    "transfer",
@@ -161,7 +161,7 @@ func TestGetRefundClassId(t *testing.T) {
 			ClassId: nfttransfertypes.PortID + "/channel-0/kitty",
 		})
 		require.NoError(t, err)
-		require.Equal(t, nfttransfertypes.PortID+"/channel-0/kitty", got)
+		require.Equal(t, nfttransfertypes.ParseClassTrace(nfttransfertypes.PortID+"/channel-0/kitty").IBCClassID(), got)
 		ev, found := findEvent(ctx, "cross_channel_refund")
 		require.True(t, found, "cross-port voucher must emit cross_channel_refund event")
 		requireAttribute(t, ev, "class_id", nfttransfertypes.PortID+"/channel-0/kitty")
@@ -180,7 +180,7 @@ func TestGetRefundClassId(t *testing.T) {
 			ClassId: nfttransfertypes.PortID + "/channel-0abc/foo",
 		})
 		require.NoError(t, err)
-		require.Equal(t, nfttransfertypes.PortID+"/channel-0abc/foo", got)
+		require.Equal(t, nfttransfertypes.ParseClassTrace(nfttransfertypes.PortID+"/channel-0abc/foo").IBCClassID(), got)
 		_, found := findEvent(ctx, "cross_channel_refund")
 		require.True(t, found, "near-miss prefix must emit cross_channel_refund event")
 	})

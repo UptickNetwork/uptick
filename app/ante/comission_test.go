@@ -45,7 +45,7 @@ func TestValidatorCommissionDecoratorValidateMsg(t *testing.T) {
 			sdk.NewCoin("stake", math.NewInt(1000)),
 			stakingtypes.Description{Moniker: "test"},
 			// Exactly 5%.
-			stakingtypes.NewCommissionRates(minCommission, math.LegacyZeroDec(), math.LegacyZeroDec()),
+			stakingtypes.NewCommissionRates(minCommission(), math.LegacyZeroDec(), math.LegacyZeroDec()),
 			math.NewInt(1),
 		)
 		require.NoError(t, err)

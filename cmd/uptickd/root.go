@@ -128,7 +128,6 @@ func NewRootCmd() *cobra.Command {
 		tmcli.NewCompletionCmd(rootCmd, true),
 		NewTestnetCmd(tempApplication.BasicManager(), banktypes.GenesisBalancesIterator{}),
 		AddIBCDenomCommand(debug.Cmd()),
-		debug.Cmd(),
 		confixcmd.ConfigCommand(),
 		pruning.Cmd(ac.newApp, app.DefaultNodeHome),
 		snapshot.Cmd(ac.newApp),

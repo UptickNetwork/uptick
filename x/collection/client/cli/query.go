@@ -228,7 +228,7 @@ func GetCmdQueryNFT() *cobra.Command {
 				return err
 			}
 
-			if err := types.ValidateTokenID(args[1]); err != nil {
+			if err := types.ValidateTokenIDForDenom(args[0], args[1]); err != nil {
 				return err
 			}
 

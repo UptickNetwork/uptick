@@ -132,8 +132,15 @@ func GetCmdIssueDenom() *cobra.Command {
 		},
 	}
 	cmd.Flags().AddFlagSet(FsIssueDenom)
-	_ = cmd.MarkFlagRequired(FlagMintRestricted)
-	_ = cmd.MarkFlagRequired(FlagUpdateRestricted)
+	// MarkFlagRequired only errors when the flag name is not registered (a
+	// programming error); fail fast so a future flag rename cannot silently drop
+	// the required-flag constraint.
+	if err := cmd.MarkFlagRequired(FlagMintRestricted); err != nil {
+		panic(err)
+	}
+	if err := cmd.MarkFlagRequired(FlagUpdateRestricted); err != nil {
+		panic(err)
+	}
 	flags.AddTxFlagsToCmd(cmd)
 
 	return cmd
@@ -173,6 +180,7 @@ func GetCmdMintNFT() *cobra.Command {
 				if _, err = sdk.AccAddressFromBech32(recipientStr); err != nil {
 					return err
 				}
+				recipient = recipientStr
 			} else {
 				recipient = sender
 			}
@@ -406,7 +414,6 @@ func GetCmdTransferDenom() *cobra.Command {
 			return tx.GenerateOrBroadcastTxCLI(clientCtx, cmd.Flags(), msg)
 		},
 	}
-	cmd.Flags().AddFlagSet(FsTransferDenom)
 	flags.AddTxFlagsToCmd(cmd)
 
 	return cmd

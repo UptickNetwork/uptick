@@ -98,6 +98,9 @@ func (msg MsgConvertCW721) ValidateBasic() error {
 	if _, err := sdk.AccAddressFromBech32(msg.ContractAddress); err != nil {
 		return sdkerrors.Wrapf(errortypes.ErrInvalidAddress, "invalid contract address %s", msg.ContractAddress)
 	}
+	if strings.TrimSpace(msg.ClassId) == "" {
+		return sdkerrors.Wrap(errortypes.ErrInvalidRequest, "class id cannot be empty")
+	}
 	if len(msg.TokenIds) == 0 {
 		return sdkerrors.Wrap(errortypes.ErrInvalidRequest, "token ids cannot be empty")
 	}
@@ -152,6 +155,9 @@ func (msg MsgTransferCW721) ValidateBasic() error {
 	}
 	if _, err := sdk.AccAddressFromBech32(msg.CwContractAddress); err != nil {
 		return sdkerrors.Wrapf(errortypes.ErrInvalidAddress, "invalid cw721 contract address %s", msg.CwContractAddress)
+	}
+	if strings.TrimSpace(msg.ClassId) == "" {
+		return sdkerrors.Wrap(errortypes.ErrInvalidRequest, "class id cannot be empty")
 	}
 	if len(msg.CwTokenIds) == 0 {
 		return sdkerrors.Wrap(errortypes.ErrInvalidRequest, "cw721 token ids cannot be empty")

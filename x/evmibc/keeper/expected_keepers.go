@@ -30,6 +30,10 @@ type CW721Converter interface {
 type ICS721Keeper interface {
 	OnAcknowledgementPacket(ctx sdk.Context, packet channeltypes.Packet, data nfttransfertypes.NonFungibleTokenPacketData, ack channeltypes.Acknowledgement) error
 	OnTimeoutPacket(ctx sdk.Context, packet channeltypes.Packet, data nfttransfertypes.NonFungibleTokenPacketData) error
+	// GetVoucherClassID resolves a class id — which may be a multi-hop trace
+	// path on a back-to-origin receive — to the canonical local voucher/native
+	// id, matching nft-transfer's keeper logic (HasClass check + ibc/<hash>).
+	GetVoucherClassID(ctx sdk.Context, classID string) (string, error)
 }
 
 var (

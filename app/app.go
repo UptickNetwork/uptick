@@ -173,7 +173,7 @@ var (
 
 		cw721types.ModuleName: nil,
 
-		cosmosnft.ModuleName:           nil, // cosmossdk.io/x/nft module account required by collection keeper
+		cosmosnft.ModuleName:           nil, // legacy cosmossdk.io/x/nft module account; x/collection uses the nft types as a library, not this account — kept for compatibility, remove only after confirming no escrow depends on it
 		nfttypes.ModuleName:            nil, // x/collection
 		wasmtypes.ModuleName:           {authtypes.Burner},
 		icatypes.ModuleName:            nil,

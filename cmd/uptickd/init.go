@@ -182,7 +182,7 @@ func InitCmd(mbm module.BasicManager, defaultNodeHome string) *cobra.Command {
 	cmd.Flags().String(cli.HomeFlag, defaultNodeHome, "node's home directory")
 	cmd.Flags().BoolP(genutilcli.FlagOverwrite, "o", false, "overwrite the genesis.json file")
 	cmd.Flags().Bool(genutilcli.FlagRecover, false, "provide seed phrase to recover existing key instead of creating")
-	cmd.Flags().String(flags.FlagChainID, "", "genesis file chain-id, if left blank will be randomly created")
+	cmd.Flags().String(flags.FlagChainID, "", "genesis file chain-id, defaults to the mainnet chain id if left blank")
 	cmd.Flags().String(genutilcli.FlagDefaultBondDenom, cmdcfg.BaseDenom, "defines the default denom to use in genesis file")
 
 	return cmd

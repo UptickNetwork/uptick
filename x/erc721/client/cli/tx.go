@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -64,9 +65,6 @@ func NewConvertNFTCmd() *cobra.Command {
 			}
 
 			evmContractAddress := args[2]
-			// if evmContractAddress == "" {
-			//	return fmt.Errorf("evm contract address can not be empty")
-			//}
 
 			// When evm token ids are omitted (first conversion / auto-deploy), leave
 			// the slice empty so the module derives them from the cosmos token ids.
@@ -139,17 +137,7 @@ func NewConvertERC721Cmd() *cobra.Command {
 			cosmosSender := cliCtx.GetFromAddress()
 
 			classId := args[2]
-			// if classId == "" {
-			//	return fmt.Errorf("classId can not be empty")
-			//}
-
-			// if args[3] == "" {
-			//	return fmt.Errorf("cosmos tokenids can not be empty")
-			//}
 			cosmosTokenIds := strings.Split(args[3], ",")
-			// if len(cosmosTokenIds) == 0 {
-			//	return fmt.Errorf("cosmos Token ids can not be empty")
-			//}
 
 			cosmosReceiver := cliCtx.GetFromAddress()
 			if len(args) == 5 {
@@ -186,13 +174,29 @@ const (
 	flagAbsoluteTimeouts       = "absolute-timeouts"
 )
 
+// defaultPacketTimeout is the fallback applied by the CLI when both timeout
+// flags are left at their zero defaults: a 10 minute relative timestamp,
+// mirroring the pre-migration behaviour of ibc-go's transfer CLI.
+const defaultPacketTimeout = 10 * time.Minute
+
+// resolvePacketTimeouts fills in a relative timeout timestamp when both the
+// timeout height and the timeout timestamp are zero. Without this fallback the
+// default CLI invocation fails MsgTransferERC721.ValidateBasic ("timeout height
+// and timeout timestamp cannot both be zero"). The msg-level guard is kept so
+// that packets submitted directly on-chain cannot live forever.
+func resolvePacketTimeouts(timeoutHeight clienttypes.Height, timeoutTimestamp uint64) (clienttypes.Height, uint64) {
+	if timeoutHeight.IsZero() && timeoutTimestamp == 0 {
+		return timeoutHeight, uint64(time.Now().Add(defaultPacketTimeout).UnixNano())
+	}
+	return timeoutHeight, timeoutTimestamp
+}
+
 // NewTransferERC721Cmd returns a CLI command handler for converting an erc721
 func NewTransferERC721Cmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use: "ibc-transfer-erc721 [evm_contract_address] [evm_token_ids] [src_port] [src_channel] [cosmos_receiver] [class_id] [cosmos_token_ids]",
-		Short: "Convert an erc721 token to Cosmos coin and transfer a non-fungible token through IBC " +
-			"When the receiver [optional] is omitted, the Cosmos coins are transferred to the sender.",
-		Args: cobra.RangeArgs(7, 8),
+		Use:   "ibc-transfer-erc721 [evm_contract_address] [evm_token_ids] [src_port] [src_channel] [cosmos_receiver] [class_id] [cosmos_token_ids]",
+		Short: "Convert an erc721 token to Cosmos coin and transfer a non-fungible token through IBC",
+		Args:  cobra.ExactArgs(7),
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			cliCtx, err := client.GetClientTxContext(cmd)
@@ -208,7 +212,7 @@ func NewTransferERC721Cmd() *cobra.Command {
 			}
 
 			if args[1] == "" {
-				return fmt.Errorf("cosmos tokenids can not be empty")
+				return fmt.Errorf("evm token ids can not be empty")
 			}
 			evmTokenIds := strings.Split(args[1], ",")
 			if len(evmTokenIds) == 0 {
@@ -221,7 +225,7 @@ func NewTransferERC721Cmd() *cobra.Command {
 
 			sourceChannel := args[3]
 			if sourceChannel == "" {
-				return fmt.Errorf("sourcePort can not be empty")
+				return fmt.Errorf("source channel can not be empty")
 			}
 
 			cosmosReceiver := args[4]
@@ -230,17 +234,7 @@ func NewTransferERC721Cmd() *cobra.Command {
 			}
 
 			classId := args[5]
-			// if classId == "" {
-			//	return fmt.Errorf("classId can not be empty")
-			//}
-
-			// if args[6] == "" {
-			//	return fmt.Errorf("cosmos tokenids can not be empty")
-			//}
 			cosmosTokenIds := strings.Split(args[6], ",")
-			// if len(cosmosTokenIds) == 0 {
-			//	return fmt.Errorf("cosmos token ids cannot be empty")
-			//}
 
 			timeoutHeightStr, err := cmd.Flags().GetString(flagPacketTimeoutHeight)
 			if err != nil {
@@ -272,6 +266,8 @@ func NewTransferERC721Cmd() *cobra.Command {
 				return fmt.Errorf("relative timeouts not supported after ibc-go v10 migration")
 			}
 
+			timeoutHeight, timeoutTimestamp = resolvePacketTimeouts(timeoutHeight, timeoutTimestamp)
+
 			msg := &types.MsgTransferERC721{
 				EvmContractAddress: strings.ToLower(evmContractAddress),
 				EvmTokenIds:        evmTokenIds,
@@ -286,13 +282,17 @@ func NewTransferERC721Cmd() *cobra.Command {
 				Memo:               memo,
 			}
 
+			if err := msg.ValidateBasic(); err != nil {
+				return err
+			}
+
 			return tx.GenerateOrBroadcastTxCLI(cliCtx, cmd.Flags(), msg)
 		},
 	}
-	cmd.Flags().String(flagPacketTimeoutHeight, "0-0", "Absolute packet timeout block height (revision-height). Relative timeouts are not supported after ibc-go v10. The timeout is disabled when set to 0-0.")
-	cmd.Flags().Uint64(flagPacketTimeoutTimestamp, 0, "Absolute packet timeout timestamp in nanoseconds since unix epoch. Relative timeouts are not supported after ibc-go v10. The timeout is disabled when set to 0.")
+	cmd.Flags().String(flagPacketTimeoutHeight, "0-0", "Absolute packet timeout block height (revision-height). When both height and timestamp are zero, a 10 minute relative timeout timestamp is applied.")
+	cmd.Flags().Uint64(flagPacketTimeoutTimestamp, 0, "Absolute packet timeout timestamp in nanoseconds since unix epoch. When both height and timestamp are zero, a 10 minute relative timeout timestamp is applied.")
 	cmd.Flags().String(flagPacketMemo, "", "Packet memo. Default is empty")
-	cmd.Flags().Bool(flagAbsoluteTimeouts, false, "Timeout flags are used as absolute timeouts.")
+	cmd.Flags().Bool(flagAbsoluteTimeouts, true, "Timeout flags are used as absolute timeouts (relative timeouts are not supported).")
 	flags.AddTxFlagsToCmd(cmd)
 	return cmd
 }

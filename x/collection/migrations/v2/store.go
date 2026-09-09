@@ -33,10 +33,8 @@ func Migrate(ctx sdk.Context,
 	}
 
 	var (
-		denomNum        int64
-		tokenNum        int64
-		skippedDenomNum int64
-		skippedTokenNum int64
+		denomNum int64
+		tokenNum int64
 	)
 	for ; iterator.Valid(); iterator.Next() {
 		var denom types.Denom
@@ -69,20 +67,17 @@ func Migrate(ctx sdk.Context,
 		store.Delete(KeyDenomName(denom.Name))
 		store.Delete(KeyCollection(denom.Id))
 
-		tokenInDenom, skippedInDenom, err := migrateToken(ctx, k, logger, denom.Id)
+		tokenInDenom, err := migrateToken(ctx, k, logger, denom.Id)
 		if err != nil {
 			return err
 		}
 		denomNum++
 		tokenNum += tokenInDenom
-		skippedTokenNum += skippedInDenom
 
 	}
 	logger.Info("migrate store data success",
 		"denomTotalNum", denomNum,
 		"tokenTotalNum", tokenNum,
-		"skippedDenomNum", skippedDenomNum,
-		"skippedTokenNum", skippedTokenNum,
 		"consume", time.Since(startTime).String(),
 	)
 	return nil
@@ -92,7 +87,7 @@ func migrateToken(
 	k keeper,
 	logger log.Logger,
 	denomID string,
-) (migrated int64, skipped int64, err error) {
+) (migrated int64, err error) {
 	var iterator storetypes.Iterator
 	defer func() {
 		if iterator != nil {
@@ -105,12 +100,12 @@ func migrateToken(
 	for ; iterator.Valid(); iterator.Next() {
 		var baseNFT types.BaseNFT
 		if err := k.cdc.Unmarshal(iterator.Value(), &baseNFT); err != nil {
-			return 0, skipped, err
+			return 0, err
 		}
 
 		owner, err := sdk.AccAddressFromBech32(baseNFT.Owner)
 		if err != nil {
-			return 0, skipped, err
+			return 0, err
 		}
 
 		if err := k.saveNFT(ctx, denomID,
@@ -121,7 +116,7 @@ func migrateToken(
 			baseNFT.Data,
 			owner,
 		); err != nil {
-			return 0, skipped, err
+			return 0, err
 		}
 
 		// delete old keys only after new data is successfully saved
@@ -129,6 +124,6 @@ func migrateToken(
 		store.Delete(KeyOwner(owner, denomID, baseNFT.Id))
 		migrated++
 	}
-	logger.Info("migrate nft success", "denomID", denomID, "nftNum", migrated, "skippedNftNum", skipped)
-	return migrated, skipped, nil
+	logger.Info("migrate nft success", "denomID", denomID, "nftNum", migrated)
+	return migrated, nil
 }

@@ -241,6 +241,7 @@ func TestMsgConvertCW721_ValidateBasic(t *testing.T) {
 				Sender:          tc.sender,
 				Receiver:        tc.receiver,
 				ContractAddress: tc.contract,
+				ClassId:         "class-1",
 				TokenIds:        tc.tokenIDs,
 			}
 			err := msg.ValidateBasic()
@@ -406,6 +407,7 @@ func TestMsgTransferCW721_ValidateBasic(t *testing.T) {
 				CwSender:          tc.cwSender,
 				CosmosReceiver:    tc.cosmosReceiver,
 				CwContractAddress: tc.contractAddr,
+				ClassId:           "class-1",
 				CwTokenIds:        tc.cwTokenIds,
 				SourcePort:        tc.sourcePort,
 				SourceChannel:     tc.sourceChan,

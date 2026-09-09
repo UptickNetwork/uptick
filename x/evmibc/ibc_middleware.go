@@ -251,22 +251,24 @@ func (im IBCMiddleware) OnTimeoutPacket(
 			return err
 		}
 		commit()
+		// Emit the timeout event only on the convert path: the nft-transfer
+		// module already emits EventTypeTimeout in the non-convert branch below,
+		// so emitting here too would produce a duplicate event.
+		ctx.EventManager().EmitEvent(
+			sdk.NewEvent(
+				types.EventTypeTimeout,
+				sdk.NewAttribute(sdk.AttributeKeyModule, types.ModuleName),
+				sdk.NewAttribute(types.AttributeKeySender, data.Sender),
+				sdk.NewAttribute(types.AttributeKeyReceiver, data.Receiver),
+				sdk.NewAttribute(types.AttributeKeyClassID, data.ClassId),
+				sdk.NewAttribute(types.AttributeKeyTokenIDs, strings.Join(data.TokenIds, ",")),
+			),
+		)
 	} else {
 		if err := im.Module.OnTimeoutPacket(ctx, channelVersion, packet, relayer); err != nil {
 			return err
 		}
 	}
-
-	ctx.EventManager().EmitEvent(
-		sdk.NewEvent(
-			types.EventTypeTimeout,
-			sdk.NewAttribute(sdk.AttributeKeyModule, types.ModuleName),
-			sdk.NewAttribute(types.AttributeKeySender, data.Sender),
-			sdk.NewAttribute(types.AttributeKeyReceiver, data.Receiver),
-			sdk.NewAttribute(types.AttributeKeyClassID, data.ClassId),
-			sdk.NewAttribute(types.AttributeKeyTokenIDs, strings.Join(data.TokenIds, ",")),
-		),
-	)
 
 	return nil
 }

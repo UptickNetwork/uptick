@@ -107,6 +107,9 @@ func (msg MsgConvertERC721) ValidateBasic() error {
 	if !common.IsHexAddress(msg.EvmContractAddress) {
 		return sdkerrors.Wrapf(errortypes.ErrInvalidAddress, "invalid contract hex address '%s'", msg.EvmContractAddress)
 	}
+	if strings.TrimSpace(msg.ClassId) == "" {
+		return sdkerrors.Wrap(errortypes.ErrInvalidRequest, "class id cannot be empty")
+	}
 	if _, err := sdk.AccAddressFromBech32(msg.CosmosReceiver); err != nil {
 		return sdkerrors.Wrap(err, "invalid reciver address")
 	}
@@ -164,6 +167,9 @@ func (msg MsgTransferERC721) Type() string { return TypeMsgTransferERC721 }
 func (msg MsgTransferERC721) ValidateBasic() error {
 	if !common.IsHexAddress(msg.EvmContractAddress) {
 		return sdkerrors.Wrapf(errortypes.ErrInvalidAddress, "invalid contract hex address '%s'", msg.EvmContractAddress)
+	}
+	if strings.TrimSpace(msg.ClassId) == "" {
+		return sdkerrors.Wrap(errortypes.ErrInvalidRequest, "class id cannot be empty")
 	}
 
 	if _, err := sdk.AccAddressFromBech32(msg.CosmosSender); err != nil {

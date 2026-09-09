@@ -106,6 +106,13 @@ func upgradeHandlerConstructor(
 			},
 		)
 
+		// Precheck the legacy collection store read-only before any write step,
+		// so a dirty record produces a complete report before the upgrade touches
+		// any state instead of an opaque halt after several migrations have run.
+		if problems := v2.PrecheckLegacyStore(sdkCtx, box.GetKVStoreKey(collectiontypes.StoreKey), box.AppCodec); len(problems) > 0 {
+			return nil, fmt.Errorf("legacy collection store precheck failed:\n%s", v2.FormatProblems(problems))
+		}
+
 		// Step 1: Migrate EVM ChainConfig from Block-based to Time-based.
 		// All fork times (Shanghai/Cancun/Prague) set to 0 = activated
 		// immediately; enables EIP-7702 SetCodeTx via PragueTime.
@@ -176,23 +183,19 @@ func upgradeHandlerConstructor(
 			cw721types.ModuleName,
 		)
 
-		// Precheck the legacy collection store read-only before migrating it,
-		// so a dirty record produces a complete report before any state change
-		// instead of an opaque halt mid-upgrade.
-		if problems := v2.PrecheckLegacyStore(sdkCtx, box.GetKVStoreKey(collectiontypes.StoreKey), box.AppCodec); len(problems) > 0 {
-			return nil, fmt.Errorf("legacy collection store precheck failed:\n%s", v2.FormatProblems(problems))
-		}
-
 		// Step 4: Run module migrations (SDK 0.53, ibc-go v10, cosmos/evm).
 		logger.Info("running module migrations")
 		return box.ModuleManager.RunMigrations(sdkCtx, c, vm)
 	}
 }
 
-// migrateEVMChainConfig migrates the EVM chain configuration from the legacy
-// Block-based fork activation to cosmos/evm's Time-based format. All fork
-// times (Shanghai/Cancun/Prague) are set to 0, activating them immediately —
-// safe because they were already active at block 0 in v032.
+// migrateEVMChainConfig verifies the EVM chain configuration is initialized for
+// this chain id. The actual Block-based → Time-based switch is applied by the
+// new binary's DefaultChainConfig at keeper construction — chainConfig is a
+// package-level global, not persisted state — so this step is a no-op on a
+// correctly booted node. The SetChainConfig branch only fires when the chain id
+// does not match (misconfiguration) and errors out as a fail-safe. All fork
+// times (Shanghai/Cancun/Prague) were already active at block 0 in v032.
 func migrateEVMChainConfig(ctx sdk.Context, logger log.Logger) error {
 	logger.Info("migrating EVM ChainConfig from Block-based to Time-based")
 
@@ -303,7 +306,7 @@ func getLegacyBoolParam(
 	subspace, ok := box.ParamsKeeper.GetSubspace(moduleName)
 	if ok {
 		if raw := subspace.GetRaw(ctx, []byte(key)); len(raw) > 0 {
-			return decodeLegacyBoolRaw(ctx, box, logger, moduleName, key, fallback, raw)
+			return decodeLegacyBoolRaw(logger, moduleName, key, raw)
 		}
 	}
 
@@ -330,27 +333,27 @@ func readLegacyBoolParamRaw(
 		return fallback
 	}
 
-	return decodeLegacyBoolRaw(ctx, upgrades.Toolbox{}, logger, moduleName, key, fallback, raw)
+	return decodeLegacyBoolRaw(logger, moduleName, key, raw)
 }
 
 func decodeLegacyBoolRaw(
-	_ sdk.Context,
-	_ upgrades.Toolbox,
 	logger log.Logger,
 	moduleName string,
 	key string,
-	fallback bool,
 	raw []byte,
 ) bool {
 	var value bool
 	if err := json.Unmarshal(raw, &value); err != nil {
+		// Fail-closed: a corrupt legacy bool param must not silently re-enable a
+		// feature governance had disabled (the old code returned the fallback,
+		// which was true for EnableErc20/EnableEVMHook). Default to disabled.
 		logger.Error(
-			"failed to decode legacy bool param",
+			"failed to decode legacy bool param, defaulting to false (disabled)",
 			"module", moduleName,
 			"key", key,
 			"error", err,
 		)
-		return fallback
+		return false
 	}
 	return value
 }
@@ -698,6 +701,9 @@ func deleteLegacyIBCTransferProvenance(ctx sdk.Context, box upgrades.Toolbox, lo
 	for ; iterator.Valid(); iterator.Next() {
 		key := iterator.Key()
 		// 0x04 + 20-byte address is the cosmos/evm STRv2 layout; leave it alone.
+		// Legacy provenance keys are 0x04 + a variable-length "<denom>/<...>" string
+		// (always longer than 21 bytes), so the length heuristic cannot collide with
+		// STRv2 addresses today; revisit if the erc20 store layout ever changes.
 		if len(key) == 1+common.AddressLength {
 			skipped++
 			continue

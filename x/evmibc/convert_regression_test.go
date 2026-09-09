@@ -140,6 +140,10 @@ func (f *fakeICS721) OnTimeoutPacket(_ sdk.Context, _ channeltypes.Packet, data 
 	return f.timeoutErr
 }
 
+func (f *fakeICS721) GetVoucherClassID(_ sdk.Context, classID string) (string, error) {
+	return classID, nil
+}
+
 func newConvertHarness(t *testing.T, recvOK bool) (sdk.Context, storetypes.StoreKey, *recordingIBCModule, *fakeERC721, *fakeCW721, *fakeICS721, IBCMiddleware) {
 	t.Helper()
 	key := storetypes.NewKVStoreKey("convert-e2e")

@@ -31,6 +31,10 @@ func (m *mockICS721) OnTimeoutPacket(sdk.Context, channeltypes.Packet, nfttransf
 	return nil
 }
 
+func (m *mockICS721) GetVoucherClassID(_ sdk.Context, classID string) (string, error) {
+	return classID, nil
+}
+
 // mockERC721 records the order in which the ERC721 refund (reverse conversion) runs.
 // refundErr, when set, makes RefundPacketToken return it (order still recorded),
 // so tests can exercise the refund-failure path.

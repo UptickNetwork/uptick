@@ -174,6 +174,7 @@ func TestMsgConvertERC721_ValidateBasic_ERC721(t *testing.T) {
 				CosmosSender:       tc.sender,
 				CosmosReceiver:     tc.receiver,
 				EvmContractAddress: tc.contractAddr,
+				ClassId:            "class-1",
 				EvmTokenIds:        tc.tokenIDs,
 			}
 			err := msg.ValidateBasic()
@@ -310,6 +311,7 @@ func TestMsgTransferERC721_ValidateBasic_ERC721(t *testing.T) {
 				CosmosSender:       tc.sender,
 				CosmosReceiver:     tc.receiver,
 				EvmContractAddress: tc.contractAddr,
+				ClassId:            "class-1",
 				EvmTokenIds:        tc.tokenIDs,
 				SourcePort:         tc.port,
 				SourceChannel:      tc.channel,

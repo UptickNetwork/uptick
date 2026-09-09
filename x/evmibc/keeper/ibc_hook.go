@@ -27,7 +27,6 @@ func (k Keeper) OnRecvPacket(
 
 	k.Logger(ctx).Info("OnRecvPacket ", "convertType", convertType)
 	msg := ""
-	cctx, write := ctx.CacheContext()
 
 	var data types.NonFungibleTokenPacketData
 	if err := types.ModuleCdc.UnmarshalJSON(packet.GetData(), &data); err != nil {
@@ -67,12 +66,32 @@ func (k Keeper) OnRecvPacket(
 				sdkerrors.Wrapf(errortypes.ErrInvalidRequest, "invalid class id prefix: %s", err.Error()),
 			)
 		}
-		voucherClassID = classID
+		// Align with nft-transfer's processReceivedPacket: a multi-hop return
+		// leaves a trace path in the unprefixed class id, which must be resolved
+		// to the canonical local ibc/<hash> (or native) id via the IBC keeper.
+		voucherClassID, err = k.ibcKeeper.GetVoucherClassID(ctx, classID)
+		if err != nil {
+			msg = err.Error()
+			ctx.EventManager().EmitEvent(
+				sdk.NewEvent("ibc_nft_convert",
+					sdk.NewAttribute("status", "1"),
+					sdk.NewAttribute("message", msg),
+					sdk.NewAttribute("sequence", fmt.Sprintf("%d", packet.Sequence)),
+					sdk.NewAttribute("source_channel", packet.SourceChannel),
+					sdk.NewAttribute("destination_channel", packet.DestinationChannel),
+				),
+			)
+			return channeltypes.NewErrorAcknowledgement(
+				sdkerrors.Wrapf(errortypes.ErrInvalidRequest, "failed to resolve voucher class id: %s", err.Error()),
+			)
+		}
 	}
 
 	k.Logger(ctx).Info("OnRecvPacket ", "voucherClassID", voucherClassID)
-	// use cctx to ConvertCoin
-	context := sdk.WrapSDKContext(cctx)
+	// Convert on the caller's context directly: the middleware's recvAndConvert
+	// already wraps the mint + convert in a single cache context, so an inner
+	// cache here would only add a redundant commit layer.
+	context := sdk.WrapSDKContext(ctx)
 	var err error
 	switch convertType {
 	case 0:
@@ -101,7 +120,6 @@ func (k Keeper) OnRecvPacket(
 		)
 	}
 
-	write()
 	msg = "ok"
 	ctx.EventManager().EmitEvent(
 		sdk.NewEvent("ibc_nft_convert",
@@ -164,13 +182,15 @@ func (k Keeper) OnAcknowledgementPacket(ctx sdk.Context, packet channeltypes.Pac
 	case *channeltypes.Acknowledgement_Error:
 		switch evmibctypes.OutboundConvertKind(data) {
 		case evmibctypes.ConvertKindERC721:
-			classID, err := k.getRefundClassId(ctx, packet, data)
+			localClassID, err := k.getRefundClassId(ctx, packet, data)
 			if err != nil {
 				return err
 			}
-			data.ClassId = classID
 			// Redirect the NFT refund to the module address so the sender
 			// does not receive both the ERC721 and the NFT (double refund).
+			// nftData keeps the original (full-path) ClassId so the IBC
+			// nft-transfer refund preserves its IsAwayFromOrigin mint/unescrow
+			// decision; the erc721 refund uses the local voucher id.
 			nftData := data
 			nftData.Sender = erc721types.AccModuleAddress.String()
 			// Release the IBC-escrowed NFT to the module account FIRST:
@@ -181,18 +201,19 @@ func (k Keeper) OnAcknowledgementPacket(ctx sdk.Context, packet channeltypes.Pac
 			if err := k.ibcKeeper.OnAcknowledgementPacket(ctx, packet, nftData, ack); err != nil {
 				return err
 			}
+			data.ClassId = localClassID
 			return k.erc721keeper.RefundPacketToken(ctx, data)
 		case evmibctypes.ConvertKindCW721:
-			classID, err := k.getRefundClassId(ctx, packet, data)
+			localClassID, err := k.getRefundClassId(ctx, packet, data)
 			if err != nil {
 				return err
 			}
-			data.ClassId = classID
 			nftData := data
 			nftData.Sender = cw721Types.AccModuleAddress.String()
 			if err := k.ibcKeeper.OnAcknowledgementPacket(ctx, packet, nftData, ack); err != nil {
 				return err
 			}
+			data.ClassId = localClassID
 			return k.cw721Keeper.RefundPacketToken(ctx, data)
 		}
 	default:
@@ -208,47 +229,50 @@ func (k Keeper) OnTimeoutPacket(ctx sdk.Context, packet channeltypes.Packet, dat
 
 	switch evmibctypes.OutboundConvertKind(data) {
 	case evmibctypes.ConvertKindERC721:
-		classID, err := k.getRefundClassId(ctx, packet, data)
+		localClassID, err := k.getRefundClassId(ctx, packet, data)
 		if err != nil {
 			return err
 		}
-		data.ClassId = classID
 		// Redirect the NFT refund to the module address so the sender
 		// does not receive both the ERC721 and the NFT (double refund).
+		// nftData keeps the original (full-path) ClassId so the IBC
+		// nft-transfer refund preserves its mint/unescrow decision.
 		nftData := data
 		nftData.Sender = erc721types.AccModuleAddress.String()
 		// Release the IBC-escrowed NFT first (see OnAcknowledgementPacket).
 		if err := k.ibcKeeper.OnTimeoutPacket(ctx, packet, nftData); err != nil {
 			return err
 		}
+		data.ClassId = localClassID
 		return k.erc721keeper.RefundPacketToken(ctx, data)
 	case evmibctypes.ConvertKindCW721:
-		classID, err := k.getRefundClassId(ctx, packet, data)
+		localClassID, err := k.getRefundClassId(ctx, packet, data)
 		if err != nil {
 			return err
 		}
-		data.ClassId = classID
 		nftData := data
 		nftData.Sender = cw721Types.AccModuleAddress.String()
 		if err := k.ibcKeeper.OnTimeoutPacket(ctx, packet, nftData); err != nil {
 			return err
 		}
+		data.ClassId = localClassID
 		return k.cw721Keeper.RefundPacketToken(ctx, data)
 	}
 	return nil
 }
 
-// getRefundClassId resolves the class id to feed into the downstream IBC
-// nft-transfer refund path on acknowledgement-error / timeout. It never
-// derives a class id not already present in `data.ClassId`:
+// getRefundClassId resolves the local (voucher) class id to feed into the
+// erc721/cw721 module-side refund on acknowledgement-error / timeout. The
+// caller keeps the original `data.ClassId` for the IBC nft-transfer refund,
+// which must see the full path to preserve its IsAwayFromOrigin mint/unescrow
+// decision (feeding it the local id flips the decision and strands the asset):
 //
 //  1. Bare class id (no "/"): original NFT is native to this chain — return as-is.
 //  2. Voucher matching this packet's (port, channel) prefix: strip and return
 //     the canonical ibc/<hash> form (single-hop).
 //     3/4. Voucher with a different channel or unrelated port prefix: multi-hop
-//     ICS-721 (or unrelated string) — emit `cross_channel_refund` and pass
-//     through; the downstream nft-transfer refund is fail-closed and no-ops
-//     when this chain holds no matching escrow.
+//     ICS-721 (or unrelated string) — emit `cross_channel_refund` and derive
+//     the canonical ibc/<hash> form.
 func (k Keeper) getRefundClassId(ctx sdk.Context, packet channeltypes.Packet, data types.NonFungibleTokenPacketData) (string, error) {
 	// Shape 1: bare class id (no "/" anywhere). Nothing to rewrite.
 	if !strings.Contains(data.ClassId, "/") {
@@ -269,9 +293,9 @@ func (k Keeper) getRefundClassId(ctx sdk.Context, packet channeltypes.Packet, da
 
 	// Shape 3 / 4: voucher prefix does not match this packet's (port,
 	// channel) — multi-hop ICS-721 or unrelated string. Emit for
-	// observability and pass through unchanged.
+	// observability and derive the canonical local voucher id.
 	k.Logger(ctx).Info(
-		"getRefundClassId: cross-channel or non-matching voucher prefix, passing through",
+		"getRefundClassId: cross-channel or non-matching voucher prefix, deriving local voucher id",
 		"class_id", data.ClassId,
 		"packet_source_port", packet.GetSourcePort(),
 		"packet_source_channel", packet.GetSourceChannel(),
@@ -286,5 +310,5 @@ func (k Keeper) getRefundClassId(ctx sdk.Context, packet channeltypes.Packet, da
 			sdk.NewAttribute("sequence", fmt.Sprintf("%d", packet.Sequence)),
 		),
 	)
-	return data.ClassId, nil
+	return types.ParseClassTrace(data.ClassId).IBCClassID(), nil
 }

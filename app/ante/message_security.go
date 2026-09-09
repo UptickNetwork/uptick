@@ -77,6 +77,16 @@ func (msd MessageSecurityDecorator) validateMessage(msg sdk.Msg) error {
 		// Validate MsgInstantiateContract2
 		return msd.validateWasmInstantiateContract2(msg)
 
+	case *wasmTypes.MsgStoreCode:
+		// Validate CosmWasm MsgStoreCode. The wasm binary size is already
+		// bounded by MsgStoreCode.ValidateBasic via wasmtypes.MaxWasmSize;
+		// re-run it here so oversized deployments are rejected before signature
+		// verification.
+		if err := msg.ValidateBasic(); err != nil {
+			return sdkerrors.Wrap(err, "invalid wasm store code message")
+		}
+		return nil
+
 	default:
 		// Check the message type URL to see if it is an EVM message
 		// If it is an EVM message, ensure it goes through the proper AnteHandler

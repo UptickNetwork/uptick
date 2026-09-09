@@ -84,7 +84,7 @@ Ref: https://keepachangelog.com/en/1.0.0/
 
 ### Bug Fixes
 
-* (erc721) Register a legacy alias so `MsgConvertERC721CustomGetSigner`-style signing keeps working; normalise token ids as base-10 uint256; document CLI semantics for `convert-nft` (81bfd1d).
+* (erc721/cw721) `ibc-transfer-erc721` / `ibc-transfer-cw721` accept exactly 7 positional arguments and fall back to a 10 minute relative timeout timestamp when both `--packet-timeout-height` and `--packet-timeout-timestamp` are left at their zero defaults, so the default invocation no longer fails msg validation with "timeout height and timeout timestamp cannot both be zero"; explicit `--absolute-timeouts=false` (relative timeouts against the counterparty state) is rejected as unsupported after the ibc-go v10 migration (G-15).
 * (collection) Tolerate nil-`Data` NFTs during genesis export; reject NUL/comma and over-length schema/data inputs with bounded limits.
 * (ante) Reject an empty/blank NFT name only when a non-empty value was supplied (M-1).
 * (cw721) Skip the CW721 IBC refund when the module account no longer owns the token instead of returning an error: an error aborts the `OnTimeout`/`OnAcknowledgement` callback, after which the relayer's `MsgTimeout`/`MsgAcknowledgement` can never succeed and the packet is stranded (CW721 half of C-2).

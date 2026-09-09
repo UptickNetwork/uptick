@@ -182,12 +182,12 @@ func TestMigrateLegacyEVMAccountsAggregatesFailures(t *testing.T) {
 
 func TestDecodeLegacyBoolRaw(t *testing.T) {
 	logger := log.NewNopLogger()
-	ctx := sdk.Context{}
-	box := upgrades.Toolbox{}
 
-	require.True(t, decodeLegacyBoolRaw(ctx, box, logger, "erc20", "EnableErc20", false, []byte("true")))
-	require.False(t, decodeLegacyBoolRaw(ctx, box, logger, "erc20", "EnableErc20", false, []byte("false")))
-	require.False(t, decodeLegacyBoolRaw(ctx, box, logger, "erc20", "EnableErc20", false, []byte("not-a-bool")))
+	require.True(t, decodeLegacyBoolRaw(logger, "erc20", "EnableErc20", []byte("true")))
+	require.False(t, decodeLegacyBoolRaw(logger, "erc20", "EnableErc20", []byte("false")))
+	// Corrupt raw value must fail-closed to false (disabled), never re-enable a
+	// feature governance had turned off.
+	require.False(t, decodeLegacyBoolRaw(logger, "erc20", "EnableErc20", []byte("not-a-bool")))
 }
 
 func TestReadLegacyBoolParamRaw(t *testing.T) {

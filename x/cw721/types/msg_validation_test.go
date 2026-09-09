@@ -91,6 +91,7 @@ func TestMsgConvertCW721_ValidateBasic_AllowsOmittedNftIDs(t *testing.T) {
 		Sender:          validationTestAddr,
 		Receiver:        validationTestAddr,
 		ContractAddress: validationTestAddr,
+		ClassId:         "class-1",
 		TokenIds:        []string{"1"},
 	}
 	require.NoError(t, msg.ValidateBasic())
@@ -111,6 +112,7 @@ func TestMsgTransferCW721_ValidateBasic_CosmosTokenIDRules(t *testing.T) {
 				CwSender:          validationTestAddr,
 				CosmosReceiver:    validationTestAddr,
 				CwContractAddress: validationTestAddr,
+				ClassId:           "class-1",
 				CwTokenIds:        []string{"1"},
 				CosmosTokenIds:    []string{tc.nftID},
 				SourcePort:        "transfer",
