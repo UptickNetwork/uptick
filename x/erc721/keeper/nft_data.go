@@ -42,11 +42,11 @@ func (k Keeper) GetClassIDAndNFTID(ctx sdk.Context, msg *types.MsgConvertERC721)
 			nftOrg = msg.CosmosTokenIds[i]
 		}
 		nftId, err = getNftData(nftOrg, tokenId, savedNftId, 0)
-
-		CosmosTokenIds = append(CosmosTokenIds, nftId)
 		if err != nil {
 			return "", nil, err
 		}
+
+		CosmosTokenIds = append(CosmosTokenIds, nftId)
 
 		classId, err = getNftData(msg.ClassId, msg.EvmContractAddress, savedClassId, 1)
 		if err != nil {

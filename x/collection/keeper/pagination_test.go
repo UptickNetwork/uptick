@@ -19,7 +19,8 @@ func TestNewDefaultPageRequest(t *testing.T) {
 
 func TestShapePageRequest(t *testing.T) {
 	t.Run("nil request returns default", func(t *testing.T) {
-		got := shapePageRequest(nil)
+		got, err := shapePageRequest(nil)
+		require.NoError(t, err)
 		require.Equal(t, newDefaultPageRequest(), got)
 	})
 
@@ -28,9 +29,10 @@ func TestShapePageRequest(t *testing.T) {
 			Key:     []byte("next-key"),
 			Limit:   50,
 			Reverse: true,
-			Offset:  999, // should be ignored
+			// Offset and CountTotal must not be set; they are validated below.
 		}
-		got := shapePageRequest(req)
+		got, err := shapePageRequest(req)
+		require.NoError(t, err)
 		require.Equal(t, []byte("next-key"), got.Key)
 		require.Equal(t, uint64(50), got.Limit)
 		require.True(t, got.Reverse)
@@ -40,7 +42,20 @@ func TestShapePageRequest(t *testing.T) {
 
 	t.Run("too large limit falls back to default", func(t *testing.T) {
 		req := &query.PageRequest{Limit: paginationMaxLimit + 1}
-		got := shapePageRequest(req)
+		got, err := shapePageRequest(req)
+		require.NoError(t, err)
 		require.Equal(t, paginationDefaultLimit, got.Limit)
+	})
+
+	t.Run("offset is rejected", func(t *testing.T) {
+		req := &query.PageRequest{Offset: 999}
+		_, err := shapePageRequest(req)
+		require.Error(t, err)
+	})
+
+	t.Run("count_total is rejected", func(t *testing.T) {
+		req := &query.PageRequest{CountTotal: true}
+		_, err := shapePageRequest(req)
+		require.Error(t, err)
 	})
 }

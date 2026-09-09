@@ -1,9 +1,5 @@
 package types
 
-import (
-	fmt "fmt"
-)
-
 // Parameter store key
 var (
 	KeyPrefixParams = []byte("erc721/params/")
@@ -28,13 +24,10 @@ func DefaultParams() Params {
 	}
 }
 
-// Validate validates the params
+// Validate validates the params.
+// EnableErc721 and EnableEVMHook are typed bool fields in the proto message;
+// the former type-assertion checks (interface{}(bool).(bool)) were always true
+// no-ops and have been removed.
 func (p Params) Validate() error {
-	if _, ok := interface{}(p.EnableErc721).(bool); !ok {
-		return fmt.Errorf("invalid parameter type for EnableErc721: %T", p.EnableErc721)
-	}
-	if _, ok := interface{}(p.EnableEVMHook).(bool); !ok {
-		return fmt.Errorf("invalid parameter type for EnableEVMHook: %T", p.EnableEVMHook)
-	}
 	return nil
 }

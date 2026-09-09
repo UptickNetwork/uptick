@@ -253,23 +253,23 @@ func (k Keeper) DeleteNFTUIDPairByNFTUID(ctx sdk.Context, nftUID string) {
 }
 
 // SetCwAddressByContractTokenId
-func (k Keeper) SetCwAddressByContractTokenId(ctx sdk.Context, evmContractAddress string, evmTokenId string, evmAddress string) {
+func (k Keeper) SetCwAddressByContractTokenId(ctx sdk.Context, cwContractAddress string, cwTokenId string, cwReceiver string) {
 
-	contractAndTokenId := evmContractAddress + evmTokenId
+	contractAndTokenId := cwContractAddress + cwTokenId
 	store := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixCwAddressByContractTokenId)
-	store.Set([]byte(contractAndTokenId), []byte(evmAddress))
+	store.Set([]byte(contractAndTokenId), []byte(cwReceiver))
 }
 
-func (k Keeper) GetCwAddressByContractTokenId(ctx sdk.Context, evmContractAddress string, evmTokenId string) []byte {
+func (k Keeper) GetCwAddressByContractTokenId(ctx sdk.Context, cwContractAddress string, cwTokenId string) []byte {
 
-	contractAndTokenId := evmContractAddress + evmTokenId
+	contractAndTokenId := cwContractAddress + cwTokenId
 	store := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixCwAddressByContractTokenId)
 	return store.Get([]byte(contractAndTokenId))
 }
 
-func (k Keeper) DeleteCwAddressByContractTokenId(ctx sdk.Context, evmContractAddress string, evmTokenId string) {
+func (k Keeper) DeleteCwAddressByContractTokenId(ctx sdk.Context, cwContractAddress string, cwTokenId string) {
 
-	contractAndTokenId := evmContractAddress + evmTokenId
+	contractAndTokenId := cwContractAddress + cwTokenId
 	store := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixCwAddressByContractTokenId)
 	store.Delete([]byte(contractAndTokenId))
 }

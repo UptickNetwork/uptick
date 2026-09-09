@@ -114,13 +114,22 @@ func (k Keeper) CreateNFTClass(ctx sdk.Context, msg *types.MsgConvertCW721) erro
 	// keep empty enhance fields rather than treating success as a wipe.
 	classEnhance := types.ClassEnhance{}
 
+	// A class that is already registered as a CW721 pair is a plain
+	// user-facing conflict: the caller asked for something that exists.
+	// ErrTokenPairAlreadyExists (code 7) is the correct signal here;
+	// ErrInternalTokenPair is reserved for broken module state.
 	if k.IsClassRegistered(ctx, msg.ClassId) {
-		return sdkerrors.Wrapf(types.ErrInternalTokenPair, "nft class already registered: %s", msg.ClassId)
+		return sdkerrors.Wrapf(types.ErrTokenPairAlreadyExists, "nft class already registered: %s", msg.ClassId)
 	}
 
+	// A native collection denom that exists WITHOUT a CW721 pair registration
+	// means the two namespaces have drifted apart (e.g. the denom was issued
+	// natively, or a pair was deleted without cleaning up the denom). That is
+	// an inconsistent-state condition, not a normal "already exists" conflict,
+	// so it surfaces as ErrInternalTokenPair (code 5).
 	_, err = k.nftKeeper.GetDenomInfo(ctx, msg.ClassId)
 	if err == nil {
-		return sdkerrors.Wrapf(types.ErrTokenPairAlreadyExists, "native NFT class already exists: %s", msg.ClassId)
+		return sdkerrors.Wrapf(types.ErrInternalTokenPair, "native NFT class %s already exists but is not registered as a cw721 pair", msg.ClassId)
 	}
 
 	err = k.nftKeeper.SaveDenom(ctx, msg.ClassId, cw721Data.Name, classEnhance.Schema,
@@ -131,26 +140,4 @@ func (k Keeper) CreateNFTClass(ctx sdk.Context, msg *types.MsgConvertCW721) erro
 	}
 
 	return nil
-}
-
-// ToggleConversion toggles conversion for a given token pair
-func (k Keeper) ToggleConversion(ctx sdk.Context, token string) (types.TokenPair, error) {
-	id := k.GetTokenPairID(ctx, token)
-	if len(id) == 0 {
-		return types.TokenPair{}, sdkerrors.Wrapf(
-			types.ErrTokenPairNotFound, "token '%s' not registered by id", token,
-		)
-	}
-
-	pair, found := k.GetTokenPair(ctx, id)
-	if !found {
-		return types.TokenPair{}, sdkerrors.Wrapf(
-			types.ErrTokenPairNotFound, "token '%s' not registered", token,
-		)
-	}
-
-	if err := k.SetTokenPair(ctx, pair); err != nil {
-		return types.TokenPair{}, err
-	}
-	return pair, nil
 }

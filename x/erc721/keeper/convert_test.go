@@ -526,6 +526,24 @@ type fakeEVMKeeper struct {
 	lastStateDB *statedb.StateDB
 	applyCalls  int
 	gasUsed     uint64
+
+	// retBytes is the default Ret returned by ApplyMessage when seq is empty
+	// and retErr is nil. nil Ret reproduces the pre-P0 behavior (empty return)
+	// which left ABI-unpack paths untestable; setting it lets tests inject
+	// controlled ABI-encoded contract returns.
+	retBytes []byte
+	// retErr, when non-nil, makes ApplyMessage return this error by default.
+	retErr error
+	// seq scripts per-call responses (indexed by applyCalls) to simulate
+	// multi-call sequences such as QueryNFTEnhance's getNFTEnhanceInfo ->
+	// tokenURI fallback. When set, it overrides retBytes/retErr.
+	seq []seqResp
+}
+
+// seqResp is a single scripted response for fakeEVMKeeper.ApplyMessage.
+type seqResp struct {
+	ret []byte
+	err error
 }
 
 func (f *fakeEVMKeeper) GetParams(_ sdk.Context) evmtypes.Params { return evmtypes.Params{} }
@@ -552,8 +570,22 @@ func (f *fakeEVMKeeper) ApplyMessage(
 ) (*evmtypes.MsgEthereumTxResponse, error) {
 	f.lastCommit = commit
 	f.lastStateDB = stateDB
+	n := f.applyCalls
 	f.applyCalls++
-	return &evmtypes.MsgEthereumTxResponse{GasUsed: f.gasUsed}, nil
+
+	// Per-call scripted responses take precedence (for multi-call sequences
+	// such as QueryNFTEnhance's getNFTEnhanceInfo -> tokenURI fallback).
+	if n < len(f.seq) {
+		r := f.seq[n]
+		if r.err != nil {
+			return nil, r.err
+		}
+		return &evmtypes.MsgEthereumTxResponse{GasUsed: f.gasUsed, Ret: r.ret}, nil
+	}
+	if f.retErr != nil {
+		return nil, f.retErr
+	}
+	return &evmtypes.MsgEthereumTxResponse{GasUsed: f.gasUsed, Ret: f.retBytes}, nil
 }
 
 // redeployEVMKeeper wraps fakeEVMKeeper and simulates contract deployment: an

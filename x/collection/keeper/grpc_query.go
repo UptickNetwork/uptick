@@ -26,6 +26,12 @@ func (k Keeper) Supply(c context.Context, request *types.QuerySupplyRequest) (*t
 	case len(request.Owner) == 0 && len(request.DenomId) == 0:
 		return nil, status.Errorf(codes.InvalidArgument, "must specify at least one of owner or denom_id")
 	default:
+		// Owner was provided. If DenomId is empty, GetTotalSupplyOfOwner
+		// would return 0 (no class to scope the lookup), silently lying
+		// "owner owns nothing". Require an explicit denom_id instead.
+		if len(request.DenomId) == 0 {
+			return nil, status.Error(codes.InvalidArgument, "denom_id is required")
+		}
 		owner, err := sdk.AccAddressFromBech32(request.Owner)
 		if err != nil {
 			return nil, status.Errorf(codes.InvalidArgument, "invalid owner address %s", request.Owner)
@@ -45,10 +51,14 @@ func (k Keeper) NFTsOfOwner(c context.Context, request *types.QueryNFTsOfOwnerRe
 	}
 
 	r := &nft.QueryNFTsRequest{
-		ClassId:    request.DenomId,
-		Owner:      request.Owner,
-		Pagination: shapePageRequest(request.Pagination),
+		ClassId: request.DenomId,
+		Owner:   request.Owner,
 	}
+	page, err := shapePageRequest(request.Pagination)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+	r.Pagination = page
 
 	result, err := k.nk.NFTs(c, r)
 	if err != nil {
@@ -93,9 +103,13 @@ func (k Keeper) Collection(c context.Context, request *types.QueryCollectionRequ
 	}
 
 	r := &nft.QueryNFTsRequest{
-		ClassId:    request.DenomId,
-		Pagination: shapePageRequest(request.Pagination),
+		ClassId: request.DenomId,
 	}
+	page, err := shapePageRequest(request.Pagination)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+	r.Pagination = page
 
 	result, err := k.nk.NFTs(c, r)
 	if err != nil {
@@ -153,8 +167,12 @@ func (k Keeper) Denom(c context.Context, request *types.QueryDenomRequest) (*typ
 func (k Keeper) Denoms(c context.Context, req *types.QueryDenomsRequest) (*types.QueryDenomsResponse, error) {
 	ctx := sdk.UnwrapSDKContext(c)
 
+	page, err := shapePageRequest(req.Pagination)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
 	result, err := k.nk.Classes(c, &nft.QueryClassesRequest{
-		Pagination: shapePageRequest(req.Pagination),
+		Pagination: page,
 	})
 	if err != nil {
 		return nil, err
@@ -183,7 +201,7 @@ func (k Keeper) NFT(c context.Context, request *types.QueryNFTRequest) (*types.Q
 
 	nft, err := k.GetNFT(ctx, request.DenomId, request.TokenId)
 	if err != nil {
-		return nil, sdkerrors.Wrapf(types.ErrUnknownNFT, "invalid NFT %s from collection %s", request.TokenId, request.DenomId)
+		return nil, sdkerrors.Wrapf(types.ErrUnknownNFT, "invalid NFT %s from collection %s: %v", request.TokenId, request.DenomId, err)
 	}
 
 	baseNFT, ok := nft.(types.BaseNFT)

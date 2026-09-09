@@ -39,6 +39,16 @@ func (k Keeper) NFTkeeper() nftkeeper.Keeper {
 	return k.nk
 }
 
+// GetOwner returns the owner of the given NFT, delegating to the underlying
+// x/nft keeper.
+//
+// Exposed so dependent modules (x/erc721) can query ownership through the
+// collection keeper instead of reaching into NFTkeeper() and coupling to the
+// underlying x/nft keeper type.
+func (k Keeper) GetOwner(ctx sdk.Context, classID, nftID string) sdk.AccAddress {
+	return k.nk.GetOwner(ctx, classID, nftID)
+}
+
 // Logger returns a module-specific logger.
 func (k Keeper) Logger(ctx sdk.Context) log.Logger {
 	return ctx.Logger().With("module", fmt.Sprintf("uptick/%s", types.ModuleName))

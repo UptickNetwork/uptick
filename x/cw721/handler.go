@@ -24,6 +24,9 @@ func NewHandler(server types.MsgServer) func(ctx sdk.Context, msg sdk.Msg) (*sdk
 		case *types.MsgTransferCW721:
 			res, err := server.TransferCW721(sdk.WrapSDKContext(ctx), msg)
 			return sdk.WrapServiceResult(ctx, res, err)
+		case *types.MsgUpdateParams:
+			res, err := server.UpdateParams(sdk.WrapSDKContext(ctx), msg)
+			return sdk.WrapServiceResult(ctx, res, err)
 		default:
 			err := sdkerrors.Wrapf(errortypes.ErrUnknownRequest, "unrecognized %s message type: %T", types.ModuleName, msg)
 			return nil, err

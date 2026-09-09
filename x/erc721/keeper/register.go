@@ -119,38 +119,3 @@ func (k Keeper) CreateNFTClass(ctx sdk.Context, msg *types.MsgConvertERC721) err
 
 	return nil
 }
-
-// ToggleConversion toggles conversion for a given token pair.
-//
-// The `token` argument is governance-supplied and untyped: the class-id
-// namespace is tried first, with fallback to the contract map only when the
-// input is unambiguously a 40-nibble EVM address (see GetTokenPairID).
-func (k Keeper) ToggleConversion(ctx sdk.Context, token string) (types.TokenPair, error) {
-	pair, err := semanticLookupForToggle(k, ctx, token)
-	if err != nil {
-		return types.TokenPair{}, err
-	}
-
-	if err := k.SetTokenPair(ctx, pair); err != nil {
-		return types.TokenPair{}, err
-	}
-	return pair, nil
-}
-
-// semanticLookupForToggle resolves a token identifier for governance
-// toggling. Class namespace wins precedence, then EVM is consulted only
-// when the input is an unambiguous hex address. This mirrors the public
-// TokenPair query path so the two operator-facing surfaces stay symmetric.
-func semanticLookupForToggle(k Keeper, ctx sdk.Context, token string) (types.TokenPair, error) {
-	if pair, err := k.GetPairByClass(ctx, token); err == nil {
-		return pair, nil
-	}
-	if common.IsHexAddress(token) {
-		if pair, err := k.GetPairByEVM(ctx, token); err == nil {
-			return pair, nil
-		}
-	}
-	return types.TokenPair{}, sdkerrors.Wrapf(
-		types.ErrTokenPairNotFound, "token '%s' not registered", token,
-	)
-}

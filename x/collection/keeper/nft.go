@@ -68,6 +68,15 @@ func (k Keeper) UpdateNFT(ctx sdk.Context, denomID,
 		return sdkerrors.Wrapf(errortypes.ErrUnauthorized, "nobody can update the NFT under this denom %s", denomID)
 	}
 
+	// Existence must be checked before Authorize: otherwise a missing NFT
+	// would surface as ErrUnauthorized (because GetOwner returns empty for a
+	// non-existent token) instead of ErrUnknownNFT. Matches the order used
+	// by TransferOwnership.
+	token, exist := k.nk.GetNFT(ctx, denomID, tokenID)
+	if !exist {
+		return sdkerrors.Wrapf(types.ErrUnknownNFT, "nft not exist: %s-%s", denomID, tokenID)
+	}
+
 	// just the owner of NFT can edit
 	if err := k.Authorize(ctx, denomID, tokenID, owner); err != nil {
 		return err
@@ -80,10 +89,7 @@ func (k Keeper) UpdateNFT(ctx sdk.Context, denomID,
 		return nil
 	}
 
-	token, exist := k.nk.GetNFT(ctx, denomID, tokenID)
-	if !exist {
-		return sdkerrors.Wrapf(types.ErrUnknownNFT, "nft ID %s not exists", tokenID)
-	}
+	// token was fetched above; reuse it instead of reading again.
 
 	token.Uri = types.Modify(token.Uri, tokenURI)
 	token.UriHash = types.Modify(token.UriHash, tokenURIHash)
@@ -214,7 +220,9 @@ func (k Keeper) GetNFT(ctx sdk.Context, denomID, tokenID string) (nft exported.N
 	// erroring on the same record.
 	if token.Data != nil {
 		if err := k.cdc.Unmarshal(token.Data.GetValue(), &nftMetadata); err != nil {
-			return nil, err
+			k.Logger(ctx).Debug("failed to unmarshal nft data",
+				"denom", denomID, "token", tokenID, "err", err)
+			nftMetadata = types.NFTMetadata{}
 		}
 	}
 

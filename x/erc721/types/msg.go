@@ -69,6 +69,14 @@ func (msg MsgConvertNFT) ValidateBasic() error {
 			return err
 		}
 	}
+	// When both slices are non-empty, their lengths must match so the keeper
+	// can pair them positionally. Validate here so the failure is reported as
+	// invalid request instead of surfacing after the transaction is accepted.
+	if len(msg.EvmTokenIds) > 0 && len(msg.EvmTokenIds) != len(msg.CosmosTokenIds) {
+		return sdkerrors.Wrapf(errortypes.ErrInvalidRequest,
+			"evm token ids length %d does not match cosmos token ids length %d",
+			len(msg.EvmTokenIds), len(msg.CosmosTokenIds))
+	}
 	return nil
 }
 
@@ -121,6 +129,11 @@ func (msg MsgConvertERC721) ValidateBasic() error {
 		if err := collectiontypes.ValidateTokenID(id); err != nil {
 			return sdkerrors.Wrapf(err, "invalid cosmos token id '%s'", id)
 		}
+	}
+	if len(msg.CosmosTokenIds) > 0 && len(msg.EvmTokenIds) != len(msg.CosmosTokenIds) {
+		return sdkerrors.Wrapf(errortypes.ErrInvalidRequest,
+			"evm token ids length %d does not match cosmos token ids length %d",
+			len(msg.EvmTokenIds), len(msg.CosmosTokenIds))
 	}
 	return nil
 }

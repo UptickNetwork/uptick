@@ -56,7 +56,7 @@ func (vcd ValidatorCommissionDecorator) validateAuthz(ctx sdk.Context, execMsg *
 }
 
 func (vcd ValidatorCommissionDecorator) validateAuthzDepth(ctx sdk.Context, execMsg *authz.MsgExec, depth int) error {
-	if depth > maxAuthzValidationDepth {
+	if depth >= maxAuthzValidationDepth {
 		return sdkerrors.Wrapf(
 			errortypes.ErrInvalidRequest,
 			"authz nesting depth exceeds maximum %d",

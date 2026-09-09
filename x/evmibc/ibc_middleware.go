@@ -141,7 +141,11 @@ func PackageToModuleAccount(packet channeltypes.Packet, moduleAddr sdk.AccAddres
 	}
 	dstReceiver := data.Receiver
 	data.Receiver = moduleAddr.String()
-	packet.Data = types.ModuleCdc.MustMarshalJSON(&data)
+	dataBz, err := types.ModuleCdc.MarshalJSON(&data)
+	if err != nil {
+		return channeltypes.Packet{}, ""
+	}
+	packet.Data = dataBz
 
 	return packet, dstReceiver
 }

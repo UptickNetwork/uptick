@@ -1,6 +1,8 @@
 package v2
 
 import (
+	"fmt"
+	"math"
 	"unsafe"
 
 	"cosmossdk.io/core/store"
@@ -48,8 +50,7 @@ func (k keeper) saveNFT(ctx sdk.Context, denomID,
 	}
 	k.setNFT(ctx, token)
 	k.setOwner(ctx, token.ClassId, token.Id, receiver)
-	k.incrTotalSupply(ctx, token.ClassId)
-	return nil
+	return k.incrTotalSupply(ctx, token.ClassId)
 }
 
 func (k keeper) setNFT(ctx sdk.Context, token nft.NFT) {
@@ -67,9 +68,15 @@ func (k keeper) setOwner(ctx sdk.Context, classID, nftID string, owner sdk.AccAd
 	ownerStore.Set([]byte(nftID), nftkeeper.Placeholder)
 }
 
-func (k keeper) incrTotalSupply(ctx sdk.Context, classID string) {
-	supply := k.GetTotalSupply(ctx, classID) + 1
-	k.updateTotalSupply(ctx, classID, supply)
+func (k keeper) incrTotalSupply(ctx sdk.Context, classID string) error {
+	current := k.GetTotalSupply(ctx, classID)
+	if current == math.MaxUint64 {
+		// A migrated chain that already saturated the counter would otherwise
+		// wrap to 0 on the next increment, hiding every subsequent mint.
+		return fmt.Errorf("total supply overflow for class %s", classID)
+	}
+	k.updateTotalSupply(ctx, classID, current+1)
+	return nil
 }
 
 // GetTotalSupply returns the number of all nfts under the specified classID

@@ -157,6 +157,13 @@ func (k Keeper) GetContractAddressAndTokenIds(ctx sdk.Context, msg *types.MsgCon
 // nftType: 0:nftId 1:classId 2:tokenId 3:contract address
 func getNftData(nftOrg string, nftPairOrg string, nftSaved string, nftType int) (string, error) {
 	var nftRet string
+	// NOTE: case ordering is significant. Case 1 already handled
+	// (nftOrg == "" && nftSaved == ""), so by the time case 3 is reached
+	// nftOrg != "". The two conditions in case 3 are therefore disjoint and
+	// both are needed:
+	//   - nftSaved == ""            -> nothing saved, trust the request value
+	//   - nftSaved == nftOrg        -> saved value agrees with the request
+	// Anything else (a saved value that disagrees) is a conflict -> error.
 	switch {
 	case nftOrg == "" && nftSaved == "":
 		nftRet = createNftDataByType(nftPairOrg, nftType)
@@ -176,7 +183,11 @@ func getNftDatas(nftOrgs []string, nftPairOrgs []string, nftSaveds []string, nft
 	var nftOrg = ""
 	nftLen := len(nftPairOrgs)
 	for n := 0; n < nftLen; n++ {
-		if nftSaveds != nil {
+		// Guard against out-of-range access: nftSaveds may be shorter than
+		// nftPairOrgs when the caller has no saved values for some entries.
+		// A nil or short slice leaves nftSaved as the zero value (""), which
+		// getNftData treats as "no saved value" — the safe fallback.
+		if nftSaveds != nil && n < len(nftSaveds) {
 			nftSaved = nftSaveds[n]
 		}
 		if nftOrgs != nil && nftLen == len(nftOrgs) {

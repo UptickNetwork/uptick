@@ -46,7 +46,7 @@ func (k Keeper) TransferCW721(
 
 	resMsg, err := k.ConvertCW721(ctx, &convertMsg)
 	if err != nil {
-		return nil, sdkerrors.Wrapf(err, "failed to ConvertCW721 %v", err)
+		return nil, sdkerrors.Wrapf(err, "failed to ConvertCW721")
 	}
 
 	ibcMsg := ibcnfttransfertypes.MsgTransfer{
@@ -139,7 +139,7 @@ func (k Keeper) ConvertCW721(
 
 	msgconvertcw721, err := k.convertWasm2Cosmos(ctx, msg) //
 	if err != nil {
-		return nil, sdkerrors.Wrapf(err, "failed to ConvertCW721 %v", err)
+		return nil, sdkerrors.Wrapf(err, "failed to ConvertCW721")
 	}
 	return &types.MsgConvertCW721Response{
 		ContractAddress: msgconvertcw721.ContractAddress,
@@ -226,6 +226,22 @@ func (k Keeper) convertWasm2Cosmos(
 		}
 	}
 
+	// Emit the convert event, mirroring convertCosmos2Wasm so clients can
+	// observe CW721→NFT conversions symmetrically.
+	ctx.EventManager().EmitEvents(
+		sdk.Events{
+			sdk.NewEvent(
+				types.EventTypeConvertCW721,
+				sdk.NewAttribute(sdk.AttributeKeySender, msg.Sender),
+				sdk.NewAttribute(types.AttributeKeyReceiver, msg.Receiver),
+				sdk.NewAttribute(types.AttributeKeyNFTClass, msg.ClassId),
+				sdk.NewAttribute(types.AttributeKeyNFTID, strings.Join(msg.NftIds, ",")),
+				sdk.NewAttribute(types.AttributeKeyCW721Token, msg.ContractAddress),
+				sdk.NewAttribute(types.AttributeKeyCW721TokenID, strings.Join(msg.TokenIds, ",")),
+			),
+		},
+	)
+
 	return msg, nil
 }
 
@@ -241,6 +257,14 @@ func (k Keeper) ConvertNFT(
 	ctx := sdk.UnwrapSDKContext(goCtx)
 	if !k.GetEnableCw721(ctx) {
 		return nil, types.ErrCW721Disabled
+	}
+
+	// Pre-validate the batch size before deploying any contract or touching
+	// state. A caller who passes an oversized batch would otherwise reach the
+	// check inside convertCosmos2Wasm only after GetContractAddressAndTokenIds
+	// has already instantiated a CW721 contract, leaving an orphan contract.
+	if len(msg.NftIds) > maxCW721BatchSize {
+		return nil, sdkerrors.Wrapf(errortypes.ErrInvalidRequest, "nft batch size %d exceeds maximum %d", len(msg.NftIds), maxCW721BatchSize)
 	}
 
 	// classId, nftIDs
@@ -424,7 +448,21 @@ func (k Keeper) RefundPacketToken(
 
 		owner, err := k.QueryCW721TokenOwner(ctx, cwContractAddress, cwTokenId)
 		if err != nil {
-			return err
+			// Skip this token instead of returning: an error here would abort
+			// the IBC callback and strand the packet forever. Emit a skip event
+			// and continue; the pair mapping and NFT are left untouched so a
+			// future retry (manual or governance) can still process this token.
+			ctx.EventManager().EmitEvent(
+				sdk.NewEvent(
+					types.EventTypeRefundPacketTokenSkip,
+					sdk.NewAttribute(types.AttributeKeyNFTClass, data.ClassId),
+					sdk.NewAttribute(types.AttributeKeyNFTID, tokenId),
+					sdk.NewAttribute(types.AttributeKeyCW721Token, cwContractAddress),
+					sdk.NewAttribute(types.AttributeKeyCW721TokenID, cwTokenId),
+					sdk.NewAttribute("reason", "cw721_owner_query_failed"),
+				),
+			)
+			continue
 		}
 		shouldRefund := moduleOwnsCW721(owner)
 
@@ -447,7 +485,21 @@ func (k Keeper) RefundPacketToken(
 
 			_, err := k.TransferCw721(ctx, cwContractAddress, cwTokenId, string(cwReceiver), types.AccModuleAddress.String())
 			if err != nil {
-				return err
+				// Skip instead of returning: a transfer failure (e.g. contract
+				// paused, bad owner proof) should not stall the IBC packet.
+				// Leave the pair mapping and NFT intact so a future retry can
+				// process this token; emit a skip event for observability.
+				ctx.EventManager().EmitEvent(
+					sdk.NewEvent(
+						types.EventTypeRefundPacketTokenSkip,
+						sdk.NewAttribute(types.AttributeKeyNFTClass, data.ClassId),
+						sdk.NewAttribute(types.AttributeKeyNFTID, tokenId),
+						sdk.NewAttribute(types.AttributeKeyCW721Token, cwContractAddress),
+						sdk.NewAttribute(types.AttributeKeyCW721TokenID, cwTokenId),
+						sdk.NewAttribute("reason", "cw721_transfer_failed"),
+					),
+				)
+				continue
 			}
 
 			groups = appendToRefundGroups(groups, cwContractAddress, string(cwReceiver), cwTokenId, tokenId)

@@ -346,7 +346,7 @@ func SimulateMsgBurnNFT(k keeper.Keeper, ak types.AccountKeeper, bk types.BankKe
 		}
 
 		if _, _, err = app.SimDeliver(txGen.TxEncoder(), tx); err != nil {
-			return simtypes.NoOpMsg(types.ModuleName, types.EventTypeEditNFT, err.Error()), nil, err
+			return simtypes.NoOpMsg(types.ModuleName, types.EventTypeBurnNFT, err.Error()), nil, err
 		}
 
 		return simtypes.NewOperationMsg(msg, true, ""), nil, nil
@@ -431,7 +431,12 @@ func SimulateMsgIssueDenom(k keeper.Keeper, ak types.AccountKeeper, bk types.Ban
 		msg := types.NewMsgIssueDenom(
 			denomID,
 			strings.ToLower(simtypes.RandStringOfLength(r, 10)),
-			"Schema",
+			// Schema must be valid JSON: MsgIssueDenom.ValidateBasic (msgs.go:81)
+			// rejects non-empty, non-JSON schemas via gjson.Valid. The previous
+			// literal "Schema" failed this check, so this sim op never reached
+			// SimDeliver and IssueDenom was effectively untested in sim. Use the
+			// minimal valid JSON object a real issuer would send.
+			"{}",
 			sender.Address.String(),
 			simtypes.RandStringOfLength(r, 5),
 			genRandomBool(r),

@@ -1,8 +1,6 @@
 package app
 
 import (
-	"fmt"
-
 	sdkerrors "cosmossdk.io/errors"
 	storetypes "cosmossdk.io/store/types"
 	"github.com/cosmos/cosmos-sdk/crypto/keys/ed25519"
@@ -49,7 +47,7 @@ func SigVerificationGasConsumer(
 		// Multisig keys
 		multisignature, ok := sig.Data.(*signing.MultiSignatureData)
 		if !ok {
-			return fmt.Errorf("expected %T, got, %T", &signing.MultiSignatureData{}, sig.Data)
+			return sdkerrors.Wrapf(errortypes.ErrInvalidPubKey, "expected %T, got %T", &signing.MultiSignatureData{}, sig.Data)
 		}
 		return authante.ConsumeMultisignatureVerificationGas(meter, multisignature, pubkey, params, sig.Sequence)
 

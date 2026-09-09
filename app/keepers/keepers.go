@@ -365,9 +365,7 @@ func New(
 	govRouter.AddRoute(govtypes.RouterKey, govv1beta1.ProposalHandler).
 		AddRoute(paramproposal.RouterKey, params.NewParamChangeProposalHandler(appKeepers.ParamsKeeper))
 
-	appKeepers.GovKeeper = govKeeper.SetHooks(govtypes.NewMultiGovHooks(
-		govtypes.NewMultiGovHooks(),
-	))
+	appKeepers.GovKeeper = govKeeper.SetHooks(govtypes.NewMultiGovHooks())
 
 	// Set legacy router for backwards compatibility with gov v1beta1
 	govKeeper.SetLegacyRouter(govRouter)
@@ -526,9 +524,6 @@ func New(
 	appKeepers.IBCNftTransferModule = nfttransfer.NewAppModule(appKeepers.IBCNFTTransferKeeper)
 	nftTransferIBCModule := nfttransfer.NewIBCModule(appKeepers.IBCNFTTransferKeeper)
 	ercTransferStack := evmibc.NewIBCMiddleware(appKeepers.EVMIBCKeeper, nftTransferIBCModule, appKeepers.IBCKeeper.ChannelKeeper)
-	if err := appKeepers.Erc721Keeper.SetICS4Wrapper(appKeepers.IBCKeeper.ChannelKeeper); err != nil {
-		panic(err)
-	}
 
 	// create static IBC router, add transfer route, then set and seal it
 	icaControllerStack := icacontroller.NewIBCMiddleware(appKeepers.ICAControllerKeeper)

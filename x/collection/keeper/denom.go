@@ -3,6 +3,7 @@ package keeper
 import (
 	sdkerrors "cosmossdk.io/errors"
 	"cosmossdk.io/x/nft"
+
 	"github.com/UptickNetwork/uptick/x/collection/types"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -22,6 +23,28 @@ func (k Keeper) SaveDenom(ctx sdk.Context, id,
 	uriHash,
 	data string,
 ) error {
+	// Baseline denom-id validation. SaveDenom is the shared entry point for
+	// genesis import (ValidateGenesis already runs ValidateDenomID, so this is
+	// a redundant backstop there), user issuance (MsgIssueDenom, which runs the
+	// stricter ValidateIssueDenomID upstream) and module-derived classes
+	// (erc721/cw721 Convert, whose derived id is "uptick-<hex>" — exactly the
+	// reserved shape ValidateIssueDenomID rejects but ValidateDenomID allows).
+	// ValidateDenomID enforces charset, length [3,128], NUL, comma, and the
+	// uptick-/ibc- prefix rules; it does NOT apply the issuance-only
+	// bech32/hex-address collision policy, which stays at ValidateIssueDenomID.
+	if err := types.ValidateDenomID(id); err != nil {
+		return err
+	}
+	// Oversized schema/data are bounded separately: the schema is embedded in
+	// the first ERC721 deployment calldata, so an unbounded schema can
+	// permanently DoS conversion; data is arbitrary metadata.
+	if len(schema) > types.MaxDenomSchemaLen {
+		return sdkerrors.Wrapf(types.ErrInvalidDenom, "schema too long: %d > %d", len(schema), types.MaxDenomSchemaLen)
+	}
+	if len(data) > types.MaxDenomDataLen {
+		return sdkerrors.Wrapf(types.ErrInvalidDenom, "data too long: %d > %d", len(data), types.MaxDenomDataLen)
+	}
+
 	denomMetadata := &types.DenomMetadata{
 		Creator:          creator.String(),
 		Schema:           schema,
@@ -56,8 +79,16 @@ func (k Keeper) TransferDenomOwner(
 		return err
 	}
 
-	// authorize
-	if srcOwner.String() != denom.Creator {
+	// authorize. Compare on bytes, not on the bech32 string representation:
+	// two addresses that decode to the same bytes but use different bech32
+	// display variants (e.g. uppercase/lowercase, or future HRP changes) would
+	// pass a string comparison inconsistently. Authorize/NFT ownership checks
+	// elsewhere in this module use byte equality.
+	creatorAcc, err := sdk.AccAddressFromBech32(denom.Creator)
+	if err != nil {
+		return sdkerrors.Wrap(err, "invalid creator address")
+	}
+	if !srcOwner.Equals(creatorAcc) {
 		return sdkerrors.Wrapf(errortypes.ErrUnauthorized, "%s is not allowed to transfer denom %s", srcOwner.String(), denomID)
 	}
 

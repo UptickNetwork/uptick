@@ -82,6 +82,10 @@ func (k Keeper) EvmContract(c context.Context, req *types.QueryEvmAddressRequest
 		return nil, status.Error(codes.InvalidArgument, "empty request")
 	}
 
+	if req.Port == "" || req.Channel == "" || req.ClassId == "" {
+		return nil, status.Error(codes.InvalidArgument, "port, channel, and class_id are required")
+	}
+
 	ctx := sdk.UnwrapSDKContext(c)
 	token := k.GetVoucherClassID(req.Port, req.Channel, req.ClassId)
 

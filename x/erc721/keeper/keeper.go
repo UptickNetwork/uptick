@@ -3,18 +3,15 @@ package keeper
 import (
 	"fmt"
 
-	"cosmossdk.io/errors"
 	"cosmossdk.io/log"
 	storetypes "cosmossdk.io/store/types"
 	nftkeeper "github.com/UptickNetwork/uptick/x/collection/keeper"
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	porttypes "github.com/cosmos/ibc-go/v10/modules/core/05-port/types"
 
 	"github.com/UptickNetwork/uptick/x/erc721/types"
 	ibcnfttransferkeeper "github.com/bianjieai/nft-transfer/keeper"
 	ibcnfttransfertypes "github.com/bianjieai/nft-transfer/types"
-	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
 )
 
 // Keeper of this module maintains collections of erc721.
@@ -25,7 +22,6 @@ type Keeper struct {
 	accountKeeper types.AccountKeeper
 	nftKeeper     nftkeeper.Keeper
 	evmKeeper     types.EVMKeeper
-	ics4Wrapper   porttypes.ICS4Wrapper
 	ibcKeeper     ibcnfttransferkeeper.Keeper
 }
 
@@ -50,17 +46,6 @@ func NewKeeper(storeKey storetypes.StoreKey,
 // Logger returns a module-specific logger.
 func (k Keeper) Logger(ctx sdk.Context) log.Logger {
 	return ctx.Logger().With("module", fmt.Sprintf("x/%s", types.ModuleName))
-}
-
-// SetICS4Wrapper sets the ICS4 wrapper to the keeper.
-// It returns an error if the wrapper has already been set.
-func (k *Keeper) SetICS4Wrapper(ics4Wrapper porttypes.ICS4Wrapper) error {
-	if k.ics4Wrapper != nil {
-		return errors.Wrap(errortypes.ErrInvalidRequest, "ICS4 wrapper already set")
-	}
-
-	k.ics4Wrapper = ics4Wrapper
-	return nil
 }
 
 // GetVoucherClassID returns the canonical IBC voucher class ID for a given

@@ -2,6 +2,7 @@ package app
 
 import (
 	"encoding/json"
+	"fmt"
 
 	storetypes "cosmossdk.io/store/types"
 	tmproto "github.com/cometbft/cometbft/proto/tendermint/types"
@@ -79,19 +80,22 @@ func (app *Uptick) prepForZeroHeightGenesis(ctx sdk.Context, jailAllowedAddrs []
 	err := app.StakingKeeper.IterateValidators(ctx, func(_ int64, val stakingtypes.ValidatorI) (stop bool) {
 		valBz, err := app.StakingKeeper.ValidatorAddressCodec().StringToBytes(val.GetOperator())
 		if err != nil {
+			ctx.Logger().Error("failed to decode validator operator address", "operator", val.GetOperator(), "err", err)
 			panic(err)
 		}
-		_, _ = app.DistrKeeper.WithdrawValidatorCommission(ctx, valBz)
+		if _, err := app.DistrKeeper.WithdrawValidatorCommission(ctx, valBz); err != nil {
+			ctx.Logger().Error("withdraw validator commission failed", "operator", val.GetOperator(), "err", err)
+		}
 		return false
 	})
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	// withdraw all delegator rewards
 	dels, err := app.StakingKeeper.GetAllDelegations(ctx)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	for _, delegation := range dels {
 		valAddr, err := sdk.ValAddressFromBech32(delegation.ValidatorAddress)
@@ -103,7 +107,9 @@ func (app *Uptick) prepForZeroHeightGenesis(ctx sdk.Context, jailAllowedAddrs []
 		if err != nil {
 			return err
 		}
-		_, _ = app.DistrKeeper.WithdrawDelegationRewards(ctx, delAddr, valAddr)
+		if _, err := app.DistrKeeper.WithdrawDelegationRewards(ctx, delAddr, valAddr); err != nil {
+			ctx.Logger().Error("withdraw delegation rewards failed", "delegator", delegation.DelegatorAddress, "validator", delegation.ValidatorAddress, "err", err)
+		}
 	}
 
 	// clear validator slash events
@@ -121,21 +127,26 @@ func (app *Uptick) prepForZeroHeightGenesis(ctx sdk.Context, jailAllowedAddrs []
 		// donate any unwithdrawn outstanding reward fraction tokens to the community pool
 		valBz, err := app.StakingKeeper.ValidatorAddressCodec().StringToBytes(val.GetOperator())
 		if err != nil {
+			ctx.Logger().Error("failed to decode validator operator address", "operator", val.GetOperator(), "err", err)
 			panic(err)
 		}
 		scraps, err := app.DistrKeeper.GetValidatorOutstandingRewardsCoins(ctx, valBz)
 		if err != nil {
+			ctx.Logger().Error("get validator outstanding rewards failed", "operator", val.GetOperator(), "err", err)
 			panic(err)
 		}
 		feePool, err := app.DistrKeeper.FeePool.Get(ctx)
 		if err != nil {
+			ctx.Logger().Error("get fee pool failed", "err", err)
 			panic(err)
 		}
 		feePool.CommunityPool = feePool.CommunityPool.Add(scraps...)
 		if err := app.DistrKeeper.FeePool.Set(ctx, feePool); err != nil {
+			ctx.Logger().Error("set fee pool failed", "err", err)
 			panic(err)
 		}
 		if err := app.DistrKeeper.Hooks().AfterValidatorCreated(ctx, valBz); err != nil {
+			ctx.Logger().Error("AfterValidatorCreated hook failed", "operator", val.GetOperator(), "err", err)
 			panic(err)
 		}
 		return false
@@ -151,8 +162,12 @@ func (app *Uptick) prepForZeroHeightGenesis(ctx sdk.Context, jailAllowedAddrs []
 		if err != nil {
 			return err
 		}
-		_ = app.DistrKeeper.Hooks().BeforeDelegationCreated(ctx, delAddr, valAddr)
-		_ = app.DistrKeeper.Hooks().AfterDelegationModified(ctx, delAddr, valAddr)
+		if err := app.DistrKeeper.Hooks().BeforeDelegationCreated(ctx, delAddr, valAddr); err != nil {
+			ctx.Logger().Error("BeforeDelegationCreated hook failed", "delegator", del.DelegatorAddress, "validator", del.ValidatorAddress, "err", err)
+		}
+		if err := app.DistrKeeper.Hooks().AfterDelegationModified(ctx, delAddr, valAddr); err != nil {
+			ctx.Logger().Error("AfterDelegationModified hook failed", "delegator", del.DelegatorAddress, "validator", del.ValidatorAddress, "err", err)
+		}
 	}
 
 	// reset context height
@@ -165,7 +180,9 @@ func (app *Uptick) prepForZeroHeightGenesis(ctx sdk.Context, jailAllowedAddrs []
 		for i := range red.Entries {
 			red.Entries[i].CreationHeight = 0
 		}
-		_ = app.StakingKeeper.SetRedelegation(ctx, red)
+		if err := app.StakingKeeper.SetRedelegation(ctx, red); err != nil {
+			ctx.Logger().Error("SetRedelegation failed", "delegator", red.DelegatorAddress, "validator", red.ValidatorSrcAddress, "err", err)
+		}
 		return false
 	})
 
@@ -174,7 +191,9 @@ func (app *Uptick) prepForZeroHeightGenesis(ctx sdk.Context, jailAllowedAddrs []
 		for i := range ubd.Entries {
 			ubd.Entries[i].CreationHeight = 0
 		}
-		_ = app.StakingKeeper.SetUnbondingDelegation(ctx, ubd)
+		if err := app.StakingKeeper.SetUnbondingDelegation(ctx, ubd); err != nil {
+			ctx.Logger().Error("SetUnbondingDelegation failed", "delegator", ubd.DelegatorAddress, "validator", ubd.ValidatorAddress, "err", err)
+		}
 		return false
 	})
 
@@ -188,15 +207,14 @@ func (app *Uptick) prepForZeroHeightGenesis(ctx sdk.Context, jailAllowedAddrs []
 		addr := sdk.ValAddress(stakingtypes.AddressFromValidatorsKey(iter.Key()))
 		validator, err := app.StakingKeeper.GetValidator(ctx, addr)
 		if err != nil {
-			panic("expected validator, not found")
+			return fmt.Errorf("expected validator %s, not found: %w", addr, err)
 		}
 		validator.UnbondingHeight = 0
 		if applyAllowedAddrs && !allowedAddrsMap[addr.String()] {
 			validator.Jailed = true
 		}
-		err = app.StakingKeeper.SetValidator(ctx, validator)
-		if err != nil {
-			panic(err)
+		if err := app.StakingKeeper.SetValidator(ctx, validator); err != nil {
+			return fmt.Errorf("SetValidator failed for %s: %w", addr, err)
 		}
 		counter++
 	}
@@ -216,7 +234,9 @@ func (app *Uptick) prepForZeroHeightGenesis(ctx sdk.Context, jailAllowedAddrs []
 		ctx,
 		func(addr sdk.ConsAddress, info slashingtypes.ValidatorSigningInfo) (stop bool) {
 			info.StartHeight = 0
-			_ = app.SlashingKeeper.SetValidatorSigningInfo(ctx, addr, info)
+			if err := app.SlashingKeeper.SetValidatorSigningInfo(ctx, addr, info); err != nil {
+				ctx.Logger().Error("SetValidatorSigningInfo failed", "consensus_addr", addr.String(), "err", err)
+			}
 			return false
 		},
 	)

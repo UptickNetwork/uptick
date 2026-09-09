@@ -172,9 +172,30 @@ func (k Keeper) QueryClassEnhance(
 		)
 	}
 
+	// Comma-ok type assertions: the values come from an external
+	// (user-registered) ERC721 contract's ABI-unpacked return. A type mismatch
+	// is anomalous (e.g. a contract implementing getClassEnhanceInfo with a
+	// different signature, or an ABI-library edge case), and panicking the node
+	// on it is unacceptable. Degrade the offending field to its zero value and
+	// log; the class is still created with sparse enhance metadata.
+	data, ok0 := ret[0].(string)
+	description, ok1 := ret[1].(string)
+	mintRestricted, ok2 := ret[2].(bool)
+	schema, ok3 := ret[3].(string)
+	updateRestricted, ok4 := ret[4].(bool)
+	uri, ok5 := ret[5].(string)
+	uriHash, ok6 := ret[6].(string)
+	if !ok0 || !ok1 || !ok2 || !ok3 || !ok4 || !ok5 || !ok6 {
+		k.Logger(ctx).Debug(
+			"QueryClassEnhance: unexpected type in getClassEnhanceInfo return",
+			"contract", contract.String(),
+			"ok", []bool{ok0, ok1, ok2, ok3, ok4, ok5, ok6},
+		)
+	}
+
 	return types.NewClassEnhance(
-		ret[0].(string), ret[1].(string), ret[2].(bool), ret[3].(string),
-		ret[4].(bool), ret[5].(string), ret[6].(string),
+		data, description, mintRestricted, schema,
+		updateRestricted, uri, uriHash,
 	), nil
 }
 
@@ -191,9 +212,32 @@ func (k Keeper) QueryNFTEnhance(
 		if err != nil {
 			return types.NFTEnhance{}, err
 		}
-		return types.NewNFTEnhance("", retTokenUri[0].(string), "", ""), nil
+		if len(retTokenUri) < 1 {
+			return types.NewNFTEnhance("", "", "", ""), nil
+		}
+		uri, ok := retTokenUri[0].(string)
+		if !ok {
+			return types.NewNFTEnhance("", "", "", ""), nil
+		}
+		return types.NewNFTEnhance("", uri, "", ""), nil
 	}
-	return types.NewNFTEnhance(retEnhance[0].(string), retEnhance[1].(string), retEnhance[2].(string), retEnhance[3].(string)), nil
+	if len(retEnhance) < 4 {
+		return types.NFTEnhance{}, sdkerrors.Wrapf(
+			types.ErrABIUnpack,
+			"unexpected getNFTEnhanceInfo length %d, expected >= 4",
+			len(retEnhance),
+		)
+	}
+	enhance := make([]string, 4)
+	for i := 0; i < 4; i++ {
+		s, ok := retEnhance[i].(string)
+		if !ok {
+			enhance[i] = ""
+			continue
+		}
+		enhance[i] = s
+	}
+	return types.NewNFTEnhance(enhance[0], enhance[1], enhance[2], enhance[3]), nil
 }
 
 func (k Keeper) QueryERC721DataByTokenID(
@@ -374,6 +418,10 @@ func (k Keeper) CallEVMWithData(
 	// budget instead of exposing an unbounded 25M×N CPU surface.
 	if res != nil && res.GasUsed > 0 {
 		ctx.GasMeter().ConsumeGas(res.GasUsed, "erc721 evm call")
+	}
+
+	if res == nil {
+		return nil, sdkerrors.Wrap(evmtypes.ErrVMExecution, "nil response from ApplyMessage")
 	}
 
 	if res.Failed() {

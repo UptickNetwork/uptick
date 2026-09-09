@@ -184,12 +184,12 @@ func (s *KeeperTestSuite) TestAuthorize() {
 // make genesis export panic (it is exported with empty metadata instead).
 func (s *KeeperTestSuite) TestExportGenesisNilData() {
 	creator := sdk.AccAddress([]byte("creator-nil"))
-	s.Require().NoError(s.keeper.SaveDenom(s.ctx, "denom-nil", "Nil", "", "NIL", creator, false, false, "", "", "", ""))
+	s.Require().NoError(s.keeper.SaveDenom(s.ctx, "denomnil", "Nil", "", "NIL", creator, false, false, "", "", "", ""))
 
 	// Mint directly via the underlying nft keeper to produce a nil-Data NFT
 	// (SaveNFT always attaches NFTMetadata).
 	s.Require().NoError(s.nftKpr.Mint(s.ctx, nft.NFT{
-		ClassId: "denom-nil",
+		ClassId: "denomnil",
 		Id:      "nft-nil",
 		Uri:     "ipfs://nil",
 	}, creator))
@@ -287,18 +287,18 @@ func (s *KeeperTestSuite) TestSaveNFTRejectsEmptyInputs() {
 // chain state see the same shape they would have seen before the bug.
 func (s *KeeperTestSuite) TestGetNFTsSkipsUndecodableNFT() {
 	creator := sdk.AccAddress([]byte("creator-undec"))
-	s.Require().NoError(s.keeper.SaveDenom(s.ctx, "denom-un", "U", "", "U", creator, false, false, "", "", "", ""))
+	s.Require().NoError(s.keeper.SaveDenom(s.ctx, "denomun", "U", "", "U", creator, false, false, "", "", "", ""))
 	// Mint a clean NFT first.
-	s.Require().NoError(s.keeper.SaveNFT(s.ctx, "denom-un", "good", "Good", "", "", "", creator))
+	s.Require().NoError(s.keeper.SaveNFT(s.ctx, "denomun", "good", "Good", "", "", "", creator))
 
 	// Mint a second NFT, then poison its Data so Unmarshal fails.
-	s.Require().NoError(s.keeper.SaveNFT(s.ctx, "denom-un", "bad", "Bad", "", "", "", creator))
-	bad, ok := s.nftKpr.GetNFT(s.ctx, "denom-un", "bad")
+	s.Require().NoError(s.keeper.SaveNFT(s.ctx, "denomun", "bad", "Bad", "", "", "", creator))
+	bad, ok := s.nftKpr.GetNFT(s.ctx, "denomun", "bad")
 	s.Require().True(ok)
 	bad.Data = &codectypes.Any{TypeUrl: "/cosmos.bad.Type", Value: []byte{0xff, 0xfe}}
 	s.Require().NoError(s.nftKpr.Update(s.ctx, bad))
 
-	nfts, err := s.keeper.GetNFTs(s.ctx, "denom-un")
+	nfts, err := s.keeper.GetNFTs(s.ctx, "denomun")
 	s.Require().NoError(err, "undecodable NFT must not abort the whole query")
 	s.Require().Len(nfts, 2)
 

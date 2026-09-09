@@ -372,6 +372,10 @@ func (k Keeper) convertCosmos2Evm(
 				ctx, erc721, types.ModuleAddress, contract, true,
 				"mintEnhance", receiver, bigTokenIds[i], reqInfo.GetName(), reqInfo.GetURI(), reqInfo.GetData(), reqInfo.GetURIHash())
 			if err != nil {
+				// mintEnhance failed — fall back to plain mint. Log the
+				// original error so the root cause is not lost.
+				k.Logger(ctx).Debug("mintEnhance failed, falling back to mint",
+					"token", bigTokenIds[i].String(), "err", err)
 				// mint normal
 				_, err = k.CallEVM(
 					ctx, erc721, types.ModuleAddress, contract, true,
@@ -450,6 +454,20 @@ func (k Keeper) validateNoMappingConflict(ctx sdk.Context, msg *types.MsgConvert
 				tokenId, string(bound), expectedNFTUID,
 			)
 		}
+		// Reverse check: the Cosmos NFT must not already be bound to a
+		// different EVM token (defense-in-depth — SetNFTPairs also
+		// rejects, but we want to fail before EVM transfer/NFT mint).
+		reverseBound := k.GetTokenUIDPairByNFTUID(ctx, expectedNFTUID)
+		if len(reverseBound) > 0 {
+			boundEvmTokenId, _ := types.GetNFTFromUID(string(reverseBound))
+			if boundEvmTokenId != tokenId {
+				return sdkerrors.Wrapf(
+					types.ErrNFTMappingConflict,
+					"nft %s is already bound to erc721 token %s, not %s",
+					expectedNFTUID, boundEvmTokenId, tokenId,
+				)
+			}
+		}
 	}
 	return nil
 }
@@ -509,7 +527,7 @@ func (k Keeper) convertEvm2Cosmos(
 			"safeTransferFrom", sender, types.ModuleAddress, bigTokenId,
 		)
 		if err != nil {
-			return nil, sdkerrors.Wrapf(errortypes.ErrUnauthorized, "%s error safeTransferFrom ", err)
+			return nil, sdkerrors.Wrapf(types.ErrEVMCall, "failed to safeTransferFrom erc721 token %s: %v", tokenId, err)
 		}
 
 		nftId := string(k.GetNFTPairByContractTokenID(ctx, msg.EvmContractAddress, tokenId))
@@ -529,10 +547,25 @@ func (k Keeper) convertEvm2Cosmos(
 
 			// mint nft
 			if _, err = k.nftKeeper.MintNFT(ctx, &mintNFT); err != nil {
-				return nil, sdkerrors.Wrapf(errortypes.ErrUnauthorized, "%s error MsgMintNFT ", err)
+				return nil, sdkerrors.Wrapf(err, "failed to mint nft")
 			}
 
 		} else {
+			// The native NFT must be escrowed by the module account: it was
+			// locked there when it was converted cosmos -> evm. Verify
+			// ownership explicitly so a stale mapping (e.g. the NFT has
+			// already been returned to a user) fails with a clear error here
+			// instead of an opaque unauthorized error inside TransferNFT.
+			// validateNoMappingConflict already guarantees that any existing
+			// mapping matches (msg.ClassId, msg.CosmosTokenIds[i]).
+			if ownerAddr := k.nftKeeper.GetOwner(ctx, msg.ClassId, msg.CosmosTokenIds[i]); !ownerAddr.Equals(types.AccModuleAddress) {
+				return nil, sdkerrors.Wrapf(
+					errortypes.ErrUnauthorized,
+					"nft %s of class %s is not escrowed by the module account (current owner %s)",
+					msg.CosmosTokenIds[i], msg.ClassId, ownerAddr,
+				)
+			}
+
 			transferNft := nftTypes.MsgTransferNFT{
 				DenomId:   msg.ClassId,
 				Id:        msg.CosmosTokenIds[i],
@@ -544,7 +577,7 @@ func (k Keeper) convertEvm2Cosmos(
 				Recipient: msg.CosmosReceiver,
 			}
 			if _, err = k.nftKeeper.TransferNFT(ctx, &transferNft); err != nil {
-				return nil, sdkerrors.Wrapf(errortypes.ErrUnauthorized, "%s error MsgTransferNFT ", err)
+				return nil, sdkerrors.Wrapf(err, "failed to transfer nft")
 			}
 		}
 	}
@@ -623,12 +656,12 @@ func (k Keeper) RefundPacketToken(
 		if len(pairUID) == 0 {
 			return sdkerrors.Wrapf(types.ErrTokenPairNotFound, "missing ERC721 pair for class %s token %s", data.ClassId, tokenId)
 		}
-		emvTokenId, evmContractAddress := types.GetNFTFromUID(string(pairUID))
-		if emvTokenId == "" || evmContractAddress == "" {
+		evmTokenId, evmContractAddress := types.GetNFTFromUID(string(pairUID))
+		if evmTokenId == "" || evmContractAddress == "" {
 			return sdkerrors.Wrapf(types.ErrInternalTokenPair, "invalid ERC721 uid for class %s token %s", data.ClassId, tokenId)
 		}
 
-		bigTokenId, err := parseERC721TokenID(emvTokenId)
+		bigTokenId, err := parseERC721TokenID(evmTokenId)
 		if err != nil {
 			return err
 		}
@@ -646,7 +679,7 @@ func (k Keeper) RefundPacketToken(
 					sdk.NewAttribute(types.AttributeKeyNFTClass, data.ClassId),
 					sdk.NewAttribute(types.AttributeKeyNFTID, tokenId),
 					sdk.NewAttribute(types.AttributeKeyERC721Token, evmContractAddress),
-					sdk.NewAttribute(types.AttributeKeyERC721TokenID, emvTokenId),
+					sdk.NewAttribute(types.AttributeKeyERC721TokenID, evmTokenId),
 					sdk.NewAttribute("reason", "nft_already_gone"),
 				),
 			)
@@ -667,12 +700,12 @@ func (k Keeper) RefundPacketToken(
 					sdk.NewAttribute(types.AttributeKeyNFTClass, data.ClassId),
 					sdk.NewAttribute(types.AttributeKeyNFTID, tokenId),
 					sdk.NewAttribute(types.AttributeKeyERC721Token, evmContractAddress),
-					sdk.NewAttribute(types.AttributeKeyERC721TokenID, emvTokenId),
+					sdk.NewAttribute(types.AttributeKeyERC721TokenID, evmTokenId),
 					sdk.NewAttribute("reason", "owner_is_not_module_account"),
 				),
 			)
 		} else {
-			evmReceiver := k.GetEvmRefundReceiver(ctx, evmContractAddress, tokenId, emvTokenId)
+			evmReceiver := k.GetEvmRefundReceiver(ctx, evmContractAddress, tokenId, evmTokenId)
 			if len(evmReceiver) == 0 {
 				return sdkerrors.Wrapf(errortypes.ErrInvalidAddress, "missing ERC721 refund receiver for contract %s token %s", evmContractAddress, tokenId)
 			}
@@ -688,23 +721,23 @@ func (k Keeper) RefundPacketToken(
 
 		refundContract := strings.ToLower(evmContractAddress)
 		k.DeleteEvmAddressByContractTokenId(ctx, refundContract, tokenId)
-		if emvTokenId != tokenId {
-			k.DeleteEvmAddressByContractTokenId(ctx, refundContract, emvTokenId)
+		if evmTokenId != tokenId {
+			k.DeleteEvmAddressByContractTokenId(ctx, refundContract, evmTokenId)
 		}
 		k.DeleteNFTPairByNFTID(ctx, data.ClassId, tokenId)
-		k.DeleteNFTPairByTokenID(ctx, evmContractAddress, emvTokenId)
+		k.DeleteNFTPairByTokenID(ctx, evmContractAddress, evmTokenId)
 
 		// Defense-in-depth: if the native NFT is owned by a non-module address
 		// (e.g. already refunded on a parallel path), skip the burn; the ERC721
 		// refund proceeds independently below.
-		if ownerAddr := k.nftKeeper.NFTkeeper().GetOwner(ctx, data.ClassId, tokenId); ownerAddr.String() != types.AccModuleAddress.String() {
+		if ownerAddr := k.nftKeeper.GetOwner(ctx, data.ClassId, tokenId); !ownerAddr.Equals(types.AccModuleAddress) {
 			ctx.EventManager().EmitEvent(
 				sdk.NewEvent(
 					types.EventTypeRefundPacketTokenSkip,
 					sdk.NewAttribute(types.AttributeKeyNFTClass, data.ClassId),
 					sdk.NewAttribute(types.AttributeKeyNFTID, tokenId),
 					sdk.NewAttribute(types.AttributeKeyERC721Token, evmContractAddress),
-					sdk.NewAttribute(types.AttributeKeyERC721TokenID, emvTokenId),
+					sdk.NewAttribute(types.AttributeKeyERC721TokenID, evmTokenId),
 					sdk.NewAttribute(types.AttributeKeyNFTOwner, ownerAddr.String()),
 					sdk.NewAttribute("reason", "nft_owner_not_module"),
 				),
@@ -714,7 +747,7 @@ func (k Keeper) RefundPacketToken(
 					groups,
 					common.HexToAddress(evmContractAddress).Hex(),
 					receiver.Hex(),
-					emvTokenId,
+					evmTokenId,
 					tokenId,
 				)
 			}
@@ -735,7 +768,7 @@ func (k Keeper) RefundPacketToken(
 				groups,
 				common.HexToAddress(evmContractAddress).Hex(),
 				receiver.Hex(),
-				emvTokenId,
+				evmTokenId,
 				tokenId,
 			)
 		}

@@ -2,6 +2,7 @@ package types
 
 import (
 	"encoding/hex"
+	"fmt"
 	"strings"
 
 	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
@@ -12,6 +13,7 @@ import (
 	cryptotypes "github.com/cosmos/cosmos-sdk/crypto/types"
 	"github.com/cosmos/cosmos-sdk/crypto/types/multisig"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/ethereum/go-ethereum/common"
 )
 
 const prefix = "uptick"
@@ -23,6 +25,10 @@ const prefix = "uptick"
 // Deprecated: not wired into signature verification; app/sigverify.go's
 // SigVerificationGasConsumer is the source of truth (and rejects ed25519).
 // Kept only for the existing unit test; do not call from production code.
+//
+// ed25519 is only used for consensus-validator key verification, not for
+// transaction signing; this function is retained solely for compatibility
+// with existing tests and must not be called from new code.
 func IsSupportedKey(pubkey cryptotypes.PubKey) bool {
 	switch pubkey := pubkey.(type) {
 	case *ethsecp256k1.PubKey, *ed25519.PubKey:
@@ -77,15 +83,24 @@ func ConvertAddressCosmos2Evm(cosmosAddress string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	if len(rawBytes) != common.AddressLength {
+		return "", fmt.Errorf("invalid address length: %d", len(rawBytes))
+	}
 	evmAddress := "0x" + hex.EncodeToString(rawBytes)
 	return evmAddress, nil
 }
 
 func ConvertAddressEvm2Cosmos(evmAddress string) (string, error) {
+	if !strings.HasPrefix(evmAddress, "0x") {
+		return "", fmt.Errorf("invalid evm address: %s", evmAddress)
+	}
 
 	rawBytes, err := hex.DecodeString(evmAddress[2:])
 	if err != nil {
 		return "", err
+	}
+	if len(rawBytes) != common.AddressLength {
+		return "", fmt.Errorf("invalid address length: %d", len(rawBytes))
 	}
 
 	cosmosAddress, err := sdk.Bech32ifyAddressBytes(prefix, rawBytes)

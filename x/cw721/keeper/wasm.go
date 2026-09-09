@@ -21,9 +21,11 @@ type ContractInfoData struct {
 	Name   string `json:"name"`
 	Symbol string `json:"symbol"`
 }
-type Result struct {
-	Data *string `json:"data,omitempty"`
-}
+
+// contractInfo is the request payload for a CW721 "contract_info" smart query.
+// The value type is the empty struct because the query takes no arguments and
+// must serialize to `{"contract_info":{}}`.
+type contractInfo map[string]struct{}
 
 // QueryCW721 returns the data of a deployed CW721 contract
 func (k Keeper) QueryCW721(
@@ -31,9 +33,8 @@ func (k Keeper) QueryCW721(
 	contractAddress string,
 ) (types.CW721Data, error) {
 
-	contractInfo := make(map[string]Result)
-	contractInfo["contract_info"] = Result{}
-	jsonStr, err := json.Marshal(contractInfo)
+	req := contractInfo{"contract_info": {}}
+	jsonStr, err := json.Marshal(req)
 
 	if err != nil {
 		return types.CW721Data{}, err
@@ -304,7 +305,7 @@ func (k Keeper) ExecWasmMsg(
 	execMsg *wasmtypes.MsgExecuteContract) (*wasmtypes.MsgExecuteContractResponse, error) {
 
 	if err := execMsg.ValidateBasic(); err != nil {
-		return nil, sdkerrors.Wrapf(types.ErrABIPack, "nft class is invalid %s: %s", execMsg.Msg, err.Error())
+		return nil, sdkerrors.Wrapf(types.ErrABIPack, "invalid wasm execute message: %s: %s", execMsg.Msg, err.Error())
 	}
 
 	return k.wasmKeeper.ExecuteContract(ctx, execMsg)

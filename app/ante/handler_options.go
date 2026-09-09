@@ -216,6 +216,3 @@ func newCosmosAnteHandlerEip712(options HandlerOptions) sdk.AnteHandler {
 		return sdk.ChainAnteDecorators(decorators...)(ctx, tx, simulate)
 	}
 }
-
-// evmtypesAccountKeeper is a shim to satisfy evmtypes.AccountKeeper if needed
-var _ evmtypes.AccountKeeper = (evmtypes.AccountKeeper)(nil)

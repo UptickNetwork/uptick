@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"regexp"
 	"strings"
+	"unicode/utf8"
 
 	sdkerrors "cosmossdk.io/errors"
 	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
@@ -49,8 +50,9 @@ func removeInvalidPrefixes(str string) string {
 func SanitizeERC721Name(name string) string {
 	name = removeLeadingNumbers(name)
 	name = removeSpecialChars(name)
-	if len(name) > 128 {
-		name = name[:128]
+	if utf8.RuneCountInString(name) > 128 {
+		runes := []rune(name)
+		name = string(runes[:128])
 	}
 	name = removeInvalidPrefixes(name)
 	return name

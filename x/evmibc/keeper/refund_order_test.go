@@ -32,8 +32,11 @@ func (m *mockICS721) OnTimeoutPacket(sdk.Context, channeltypes.Packet, nfttransf
 }
 
 // mockERC721 records the order in which the ERC721 refund (reverse conversion) runs.
+// refundErr, when set, makes RefundPacketToken return it (order still recorded),
+// so tests can exercise the refund-failure path.
 type mockERC721 struct {
-	order *[]string
+	order     *[]string
+	refundErr error
 }
 
 func (m *mockERC721) ConvertNFT(context.Context, *erc721types.MsgConvertNFT) (*erc721types.MsgConvertNFTResponse, error) {
@@ -42,11 +45,12 @@ func (m *mockERC721) ConvertNFT(context.Context, *erc721types.MsgConvertNFT) (*e
 
 func (m *mockERC721) RefundPacketToken(sdk.Context, nfttransfertypes.NonFungibleTokenPacketData) error {
 	*m.order = append(*m.order, "erc:refund")
-	return nil
+	return m.refundErr
 }
 
 type mockCW721 struct {
-	order *[]string
+	order     *[]string
+	refundErr error
 }
 
 func (m *mockCW721) ConvertNFT(context.Context, *cw721types.MsgConvertNFT) (*cw721types.MsgConvertNFTResponse, error) {
@@ -55,7 +59,7 @@ func (m *mockCW721) ConvertNFT(context.Context, *cw721types.MsgConvertNFT) (*cw7
 
 func (m *mockCW721) RefundPacketToken(sdk.Context, nfttransfertypes.NonFungibleTokenPacketData) error {
 	*m.order = append(*m.order, "cw:refund")
-	return nil
+	return m.refundErr
 }
 
 // TestOnAcknowledgementPacket_ERC721ReleasesIBCBeforeRefund reproduces the
