@@ -90,6 +90,42 @@ import (
 	"github.com/spf13/cast"
 )
 
+// LegacyNFTTransferPortID is the ICS-721 port this chain used before v0.4.0.
+//
+// Upstream nft-transfer v1.3.0 changed types.PortID from this literal to
+// types.ModuleName ("nonfungibletokentransfer"), because ibc-go v10 dropped the
+// capability-based port to module binding: the receiving module is now looked up
+// from the packet's port alone (core/keeper/msg_server.go:438 for RecvPacket,
+// :503/:552/:605 for acknowledgements and timeouts), and the port router refuses
+// any route key that is not alphanumeric
+// (core/05-port/types/router.go:44, sdk.IsAlphaNumeric).
+//
+// The channels opened under the old name are still in the IBC core channel
+// store, so without a route for them every packet on an existing nft-transfer/*
+// channel fails with ErrInvalidRoute - including the acknowledgement and timeout
+// callbacks that unescrow the sender's NFT, which strands that NFT for good.
+const LegacyNFTTransferPortID = "nft-transfer"
+
+// legacyNFTTransferRouteKey makes the legacy port resolve again.
+//
+// The router cannot be handed the port itself: "nft-transfer" contains a hyphen
+// and AddRoute panics on it. The key therefore has to be an alphanumeric string
+// that the core port keeper still maps to this port. portkeeper.Route
+// (core/05-port/keeper/keeper.go:33-47) tries an exact match and then walks the
+// sorted route keys returning the first one contained in the queried port, so
+// "nft" catches "nft-transfer" - and it wins over the ICS-20 "transfer" key only
+// because "nft" sorts first. "nft" is also a prefix of "nft-transfer", so the
+// mapping survives a future tightening of that fallback from Contains to
+// HasPrefix. TestICS721LegacyPortStillResolves pins the behaviour against the
+// real router, because a silent change here re-strands escrowed NFTs.
+//
+// The ICS-721 module tolerates arriving under the old port: OnRecvPacket,
+// OnAcknowledgementPacket and OnTimeoutPacket carry no port assertion and derive
+// the escrow address, class prefix and origin test from the packet's own port
+// and channel. Only new handshakes are restricted to the new port, because
+// ValidateTransferChannelParams asserts portID == keeper.GetPort(ctx).
+const legacyNFTTransferRouteKey = "nft"
+
 // AppKeepers defines a structure used to consolidate all
 // the keepers needed to run an iris appKeepers.
 type AppKeepers struct {
@@ -133,6 +169,13 @@ type AppKeepers struct {
 	EVMIBCKeeper evmIBCKeepr.Keeper
 	NFTKeeper    nftkeeper.Keeper
 	// wasm keepers
+	//
+	// Held by value, like every other keeper in this struct. The ante handler
+	// wants a *wasmkeeper.Keeper / *wasmtypes.NodeConfig, so app.go passes
+	// &app.WasmKeeper / &app.WasmConfig - which only compiles because Uptick
+	// embeds AppKeepers by value, making the promoted field addressable.
+	// Changing these to pointers would fix that call site but touch every other
+	// one, all of which read them as values.
 	WasmKeeper           wasmkeeper.Keeper
 	WasmConfig           wasmtypes.NodeConfig
 	TransferModule       transfer.AppModule
@@ -482,10 +525,16 @@ func New(
 		appKeepers.BankKeeper,
 		appKeepers.StakingKeeper,
 		distrkeeper.NewQuerier(appKeepers.DistrKeeper),
-		appKeepers.IBCKeeper.ChannelKeeper, // ICS4Wrapper
-		appKeepers.IBCKeeper.ChannelKeeper,
-		appKeepers.IBCKeeper.ChannelKeeperV2,
-		appKeepers.IBCTransferKeeper, // ICS20TransferPortSource
+		// ics4Wrapper and channelKeeper are both the core v1 channel keeper:
+		// wasm is not wrapped in an IBC middleware stack, so nothing interposes
+		// on its packets (contrast the ICA controller stack installed later in
+		// this function). The three are NOT the same object - channelKeeperV2
+		// is the separate channelkeeperv2 instance ibc-go v10 adds for the v2
+		// channel path, with its own store, and wasmd v0.61 requires both.
+		appKeepers.IBCKeeper.ChannelKeeper,   // ICS4Wrapper
+		appKeepers.IBCKeeper.ChannelKeeper,   // ChannelKeeper (v1)
+		appKeepers.IBCKeeper.ChannelKeeperV2, // ChannelKeeperV2
+		appKeepers.IBCTransferKeeper,         // ICS20TransferPortSource
 		bApp.MsgServiceRouter(),
 		bApp.GRPCQueryRouter(),
 		wasmDir,
@@ -514,6 +563,16 @@ func New(
 		appKeepers.IBCNFTTransferKeeper,
 	)
 
+	// Close the burn hole between the collection module and the two conversion
+	// modules: x/collection must refuse to burn a native NFT whose contract
+	// half is escrowed, but it cannot see the erc721/cw721 pair stores and may
+	// not import them (they are built from it). The check is therefore injected
+	// here. TestConvertedNFTCheckerIsWired fails if this wiring is ever removed.
+	appKeepers.NFTKeeper.SetConvertedNFTChecker(convertedNFTChecker{
+		erc721: appKeepers.Erc721Keeper,
+		cw721:  appKeepers.Cw721Keeper,
+	})
+
 	appKeepers.EVMIBCKeeper = evmIBCKeepr.NewKeeper(appKeepers.IBCNFTTransferKeeper)
 
 	appKeepers.EVMIBCKeeper.SetCw721Keeper(appKeepers.Cw721Keeper)
@@ -531,6 +590,7 @@ func New(
 		AddRoute(icacontrollertypes.SubModuleName, icaControllerStack).
 		AddRoute(ibctransfertypes.ModuleName, transferStack).
 		AddRoute(ibcnfttransfertypes.PortID, ercTransferStack).
+		AddRoute(legacyNFTTransferRouteKey, ercTransferStack).
 		AddRoute(wasmtypes.ModuleName, wasm.NewIBCHandler(appKeepers.WasmKeeper, appKeepers.IBCKeeper.ChannelKeeper, appKeepers.IBCTransferKeeper, appVersionGetterWrapper{appKeepers.IBCKeeper}))
 
 	// Set IBC Router
@@ -629,4 +689,23 @@ type appVersionGetterWrapper struct {
 
 func (w appVersionGetterWrapper) GetAppVersion(ctx sdk.Context, portID, channelID string) (string, bool) {
 	return w.ik.ChannelKeeper.GetAppVersion(ctx, portID, channelID)
+}
+
+// convertedNFTChecker answers x/collection's "does this native NFT have a
+// contract-side counterpart?" question from the two conversion modules' pair
+// stores.
+//
+// It lives in the wiring layer because x/collection must not import x/erc721 or
+// x/cw721 (both are constructed from the collection keeper) and x/erc721 is not
+// allowed to import x/cw721 either.
+type convertedNFTChecker struct {
+	erc721 erc721keeper.Keeper
+	cw721  cw721keeper.Keeper
+}
+
+var _ nftkeeper.ConvertedNFTChecker = convertedNFTChecker{}
+
+func (c convertedNFTChecker) IsConvertedNFT(ctx sdk.Context, classID, nftID string) bool {
+	return len(c.erc721.GetNFTPairByClassNFTID(ctx, classID, nftID)) > 0 ||
+		len(c.cw721.GetNFTPairByClassNFTID(ctx, classID, nftID)) > 0
 }
