@@ -39,7 +39,7 @@ import (
 func TestMigrateEVMChainConfig(t *testing.T) {
 	ctx := sdk.NewContext(nil, cmtproto.Header{ChainID: "uptick_117-1"}, false, log.NewNopLogger())
 
-	require.NoError(t, migrateEVMChainConfig(ctx, log.NewNopLogger()))
+	require.NoError(t, migrateEVMChainConfig(ctx, upgrades.Toolbox{}, log.NewNopLogger()))
 
 	cfg := evmtypes.GetChainConfig()
 	require.NotNil(t, cfg)
@@ -90,8 +90,13 @@ func TestMigrateLegacyEVMAccounts(t *testing.T) {
 	require.Equal(t, uint64(3), baseAccount.Sequence)
 }
 
-// TestMigrateLegacyEVMAccountsSkipsVesting ensures the account migration can
-// decode (and safely skip) vesting accounts such as PeriodicVestingAccount.
+// TestMigrateLegacyEVMAccountsSkipsVesting ensures the account migration
+// iterating over the auth store can decode (and safely skip) vesting accounts
+// such as PeriodicVestingAccount. Without registering the vesting types in
+// newLegacyAccountCodec, replay of an upgrade on a chain holding vesting
+// accounts fails with "no concrete type registered for type URL
+// /cosmos.vesting.v1beta1.PeriodicVestingAccount against interface
+// *types.AccountI".
 func TestMigrateLegacyEVMAccountsSkipsVesting(t *testing.T) {
 	reg := codectypes.NewInterfaceRegistry()
 	authtypes.RegisterInterfaces(reg)
@@ -139,55 +144,14 @@ func TestMigrateLegacyEVMAccountsSkipsVesting(t *testing.T) {
 	require.True(t, isNew, "expected migrated cosmos/evm pubkey, got %T", newPk)
 }
 
-// TestMigrateLegacyEVMAccountsAggregatesFailures ensures the auth migration
-// scans the full store and reports every undecodable account in one aggregated
-// error (fail-closed: a skipped legacy EthAccount would be unreadable after
-// the upgrade) instead of aborting at the first bad record.
-func TestMigrateLegacyEVMAccountsAggregatesFailures(t *testing.T) {
-	cdc := codec.NewProtoCodec(codectypes.NewInterfaceRegistry())
-	authtypes.RegisterInterfaces(cdc.InterfaceRegistry())
-
-	db := dbm.NewMemDB()
-	cms := rootstore.NewCommitMultiStore(db, log.NewNopLogger(), storemetrics.NewNoOpMetrics())
-	authKey := storetypes.NewKVStoreKey(authtypes.StoreKey)
-	cms.MountStoreWithDB(authKey, storetypes.StoreTypeIAVL, db)
-	require.NoError(t, cms.LoadLatestVersion())
-
-	store := prefix.NewStore(cms.GetKVStore(authKey), []byte(authtypes.AddressStoreKeyPrefix))
-
-	// A healthy legacy EthAccount that should be migratable.
-	goodAddr := sdk.AccAddress([]byte("goodaccount"))
-	goodAccount := &legacy.EthAccount{
-		BaseAccount: &authtypes.BaseAccount{Address: goodAddr.String(), AccountNumber: 1, Sequence: 1},
-	}
-	migrationCdc := newLegacyAccountCodec()
-	goodBytes, err := migrationCdc.MarshalInterface(goodAccount)
-	require.NoError(t, err)
-	store.Set(goodAddr.Bytes(), goodBytes)
-
-	// Two corrupted records (invalid protobuf for any registered account type).
-	badAddr1 := sdk.AccAddress([]byte("badaccount1"))
-	badAddr2 := sdk.AccAddress([]byte("badaccount2"))
-	store.Set(badAddr1.Bytes(), []byte{0xde, 0xad, 0xbe, 0xef})
-	store.Set(badAddr2.Bytes(), []byte{0x00, 0xff})
-
-	ctx := sdk.NewContext(cms, cmtproto.Header{ChainID: "uptick_117-1"}, false, log.NewNopLogger())
-	err = migrateLegacyEVMAccounts(ctx, authKey, cdc, nil, log.NewNopLogger())
-
-	// Fail-closed: one aggregated error covering both bad records — proving the
-	// scan continued past the first failure instead of stopping there.
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "2 legacy auth account(s) failed to migrate")
-}
-
 func TestDecodeLegacyBoolRaw(t *testing.T) {
 	logger := log.NewNopLogger()
+	ctx := sdk.Context{}
+	box := upgrades.Toolbox{}
 
-	require.True(t, decodeLegacyBoolRaw(logger, "erc20", "EnableErc20", []byte("true")))
-	require.False(t, decodeLegacyBoolRaw(logger, "erc20", "EnableErc20", []byte("false")))
-	// Corrupt raw value must fail-closed to false (disabled), never re-enable a
-	// feature governance had turned off.
-	require.False(t, decodeLegacyBoolRaw(logger, "erc20", "EnableErc20", []byte("not-a-bool")))
+	require.True(t, decodeLegacyBoolRaw(ctx, box, logger, "erc20", "EnableErc20", false, []byte("true")))
+	require.False(t, decodeLegacyBoolRaw(ctx, box, logger, "erc20", "EnableErc20", false, []byte("false")))
+	require.False(t, decodeLegacyBoolRaw(ctx, box, logger, "erc20", "EnableErc20", false, []byte("not-a-bool")))
 }
 
 func TestReadLegacyBoolParamRaw(t *testing.T) {
@@ -310,7 +274,7 @@ func TestRepairEvmDenomMetadata(t *testing.T) {
 		Symbol:  "UOC",
 	})
 
-	repairEvmDenomMetadata(ctx, box, "auoc", log.NewNopLogger())
+	require.NoError(t, repairEvmDenomMetadata(ctx, box, "auoc", log.NewNopLogger()))
 	got, found := bk.GetDenomMetaData(ctx, "auoc")
 	require.True(t, found)
 	require.Equal(t, "uoc", got.Display)

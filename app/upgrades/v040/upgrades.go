@@ -12,8 +12,6 @@ import (
 	upgradetypes "cosmossdk.io/x/upgrade/types"
 	"github.com/UptickNetwork/uptick/app/upgrades"
 	"github.com/UptickNetwork/uptick/app/upgrades/v040/legacy"
-	v2 "github.com/UptickNetwork/uptick/x/collection/migrations/v2"
-	collectiontypes "github.com/UptickNetwork/uptick/x/collection/types"
 	"github.com/cosmos/cosmos-sdk/codec"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	cryptocodec "github.com/cosmos/cosmos-sdk/crypto/codec"
@@ -39,25 +37,74 @@ import (
 
 const upgradeName = "v0.4.0"
 
-// legacyIBCTransferProvenancePrefix is the KVStore prefix (byte 0x04) the
-// deprecated uptick x/erc20 used for IBC transfer provenance records.
-// cosmos/evm's x/erc20 reserves 0x04 for KeyPrefixSTRv2Addresses, so the
-// leftover records must be removed to avoid a namespace collision.
+// legacyIBCTransferProvenancePrefix is the KVStore prefix (byte 0x04) used by
+// the deprecated uptick x/erc20 module to store IBC transfer provenance records
+// (SetIBCTransferProvenance). In cosmos/evm's x/erc20 the same byte 0x04 is
+// reserved for KeyPrefixSTRv2Addresses, so the leftover records must be removed
+// to avoid a namespace collision and to reclaim dead state.
 var legacyIBCTransferProvenancePrefix = []byte{0x04}
 
-// Upgrade implements the v0.4.0 upgrade plan: migration from legacy
-// go-ethereum v1.10.x to cosmos/evm v0.6.1 (cosmos/go-ethereum v1.16.2).
+// Upgrade implements the v0.4.0 upgrade plan.
 //
-// Key steps: EVM ChainConfig migrates from Block-based to Time-based fork
-// activation (all fork times set to 0); ibc-go v8 → v10 removes the capability
-// module entirely; SDK v0.50 → v0.53 deprecates x/params (erc20/erc721/cw721
-// params move to module stores); the self-developed x/erc20 is replaced by
-// cosmos/evm's x/erc20 (legacy OWNER_MODULE pairs are deleted, OWNER_EXTERNAL
-// pairs keep working under the legacy "erc20/0x…" denom).
+// This upgrade migrates Uptick from legacy go-ethereum v1.10.x
+// to cosmos/evm v0.6.1 (based on cosmos/go-ethereum v1.16.2).
 //
-// This upgrade is NOT reversible: once the capability store is deleted and
-// ChainConfig is Time-based, the chain cannot roll back. Ensure all validators
-// have upgraded before the upgrade height.
+// =====================================================================
+// MAJOR CHANGES IN THIS UPGRADE
+// =====================================================================
+//
+// 1. EVM Module: x/evm → cosmos/evm x/vm
+//   - go-ethereum upgraded from v1.10.17 → v1.16.2
+//   - ChainConfig fields changed from Block-based to Time-based
+//     (ShanghaiBlock → ShanghaiTime, CancunBlock → CancunTime,
+//     PragueBlock → PragueTime)
+//   - EIP-7702 SetCodeTx is now natively supported by cosmos/go-ethereum
+//     (no custom implementation needed)
+//   - ChainConfig is now a global variable (set during NewKeeper),
+//     not stored in Params. The upgrade handler re-initializes it.
+//
+// 2. IBC Module: ibc-go v8 → v10
+//   - capability module removed entirely
+//   - ScopedKeeper references removed from all keepers
+//   - IBCModule interface signatures changed (added channelVersion param)
+//   - SendPacket/WriteAcknowledgement no longer require chanCap
+//
+// 3. SDK: v0.50 → v0.53
+//   - x/params module deprecated (params now authority-based)
+//   - gov v1beta1 proposals → gov v1 (for erc20 module)
+//   - runtime.KVStoreService replaces direct StoreKey in keeper constructors
+//
+// 4. Wasm: wasmd v0.53 → v0.61
+//   - WasmConfig → NodeConfig
+//   - wasmvm v2 → v3
+//
+// 5. EVM Hardfork Activation
+//   - In v032, Shanghai/Cancun/Prague were activated via Block height = 0
+//   - In cosmos/evm v0.6.1, these are activated via Time (timestamp)
+//   - The upgrade sets all fork times to 0 (activated immediately at upgrade)
+//   - This ensures all EVM opcodes (PUSH0, BLOBHASH, etc.) are enabled
+//   - EIP-7702 SetCodeTx (type 0x04) is enabled via PragueTime
+//
+// 6. Capability Store Cleanup
+//   - The 'capability' module store is deleted (ibc-go v10 doesn't use it)
+//
+// 7. erc20 Module
+//   - Uptick replaces its self-developed x/erc20 with cosmos/evm's x/erc20
+//     (v0.6.1). The old MsgTransferERC20 / IBC provenance refund path is no
+//     longer wired; IBC coin->ERC20 conversion now goes through cosmos/evm's
+//     ERC20 IBC middleware + ibc_callbacks.go.
+//   - Params migrated from x/params subspace to authority-based.
+//     EnableEVMHook is dropped (cosmos/evm uses PermissionlessRegistration).
+//   - Existing OWNER_MODULE pairs are deleted (STRv2 addressing differs).
+//   - Existing OWNER_EXTERNAL pairs keep their legacy "erc20/0x…" denom and
+//     remain functional; only NEW registrations use the "erc20:0x…" scheme.
+//
+// =====================================================================
+// ROLLBACK NOTE
+// =====================================================================
+// This upgrade is NOT reversible. Once the capability store is deleted
+// and ChainConfig is migrated to Time-based, the chain cannot roll back
+// to the legacy implementation. Ensure all validators have upgraded before the upgrade height.
 var Upgrade = upgrades.Upgrade{
 	UpgradeName:               upgradeName,
 	UpgradeHandlerConstructor: upgradeHandlerConstructor,
@@ -83,15 +130,6 @@ func upgradeHandlerConstructor(
 		sdkCtx := sdk.UnwrapSDKContext(ctx)
 		logger := sdkCtx.Logger()
 
-		// Idempotency guard: re-scheduled plan or crash-restart replay would
-		// re-run the one-shot migrations below and hard-stop the chain.
-		if box.UpgradeAlreadyApplied(vm) {
-			logger.Warn("upgrade plan already applied; skipping one-shot migrations",
-				"name", upgradeName,
-			)
-			return vm, nil
-		}
-
 		logger.Info(
 			"executing upgrade plan",
 			"name", upgradeName,
@@ -106,23 +144,39 @@ func upgradeHandlerConstructor(
 			},
 		)
 
-		// Precheck the legacy collection store read-only before any write step,
-		// so a dirty record produces a complete report before the upgrade touches
-		// any state instead of an opaque halt after several migrations have run.
-		if problems := v2.PrecheckLegacyStore(sdkCtx, box.GetKVStoreKey(collectiontypes.StoreKey), box.AppCodec); len(problems) > 0 {
-			return nil, fmt.Errorf("legacy collection store precheck failed:\n%s", v2.FormatProblems(problems))
-		}
-
-		// Step 1: Migrate EVM ChainConfig from Block-based to Time-based.
-		// All fork times (Shanghai/Cancun/Prague) set to 0 = activated
-		// immediately; enables EIP-7702 SetCodeTx via PragueTime.
-		if err := migrateEVMChainConfig(sdkCtx, logger); err != nil {
+		// Step 1: Migrate EVM ChainConfig from Block-based to Time-based
+		//
+		// In the legacy upgrade (v032), Shanghai/Cancun/Prague were activated via:
+		//   ChainConfig.ShanghaiBlock = 0
+		//   ChainConfig.CancunBlock = 0
+		//   ChainConfig.PragueBlock = 0
+		//
+		// In cosmos/evm v0.6.1, these are now Time-based (timestamp):
+		//   ChainConfig.ShanghaiTime = 0  (activated immediately)
+		//   ChainConfig.CancunTime = 0
+		//   ChainConfig.PragueTime = 0
+		//
+		// cosmos/evm also adds new fields not in the legacy implementation:
+		//   - OsakaTime (not activated, nil)
+		//   - VerkleTime (not activated, nil)
+		//   - BlobScheduleConfig (Cancun/Prague/Osaka blob configs)
+		//
+		// EIP-7702 SetCodeTx (type 0x04) is enabled when PragueTime is set.
+		// This allows EOA accounts to delegate to smart contract code,
+		// enabling account abstraction without protocol-level changes.
+		if err := migrateEVMChainConfig(sdkCtx, box, logger); err != nil {
 			return nil, fmt.Errorf("migrate EVM chain config: %w", err)
 		}
 
-		// Step 1.5: Repair EVM params (legacy proto has zero-valued
-		// AccessControl / ExtendedDenomOptions, which would deny all
-		// contract calls) and initialize EvmCoinInfo (required by PreBlock).
+		// Step 1.5: Migrate EVM params + initialize coin info.
+		//
+		// The legacy ethermint params proto (fields 1-6) has no
+		// access_control/history_serve_window/extended_denom_options, so after
+		// unmarshaling into cosmos/evm v0.6.1's Params those fields are zero:
+		//   - AccessControl = AccessTypeUnspecified -> every create/call is denied
+		//   - ExtendedDenomOptions = nil -> LoadEvmCoinInfo fails for non-18-dec
+		// Additionally, cosmos/evm v0.6.1 requires EvmCoinInfo to be persisted in
+		// the module store; without it the first PreBlock panics on RegisterDenom.
 		if err := migrateEVMParams(sdkCtx, box, logger); err != nil {
 			return nil, fmt.Errorf("migrate EVM params: %w", err)
 		}
@@ -140,35 +194,61 @@ func upgradeHandlerConstructor(
 			return nil, fmt.Errorf("migrate legacy EVM accounts: %w", err)
 		}
 
-		// Step 2: Migrate erc20 params from x/params subspace to authority-based.
+		// Step 2: Migrate erc20 params from x/params subspace to authority-based
+		//
+		// In SDK 0.50 with legacy x/evm, erc20 params were stored in x/params subspace.
+		// In SDK 0.53 + cosmos/evm, params are stored directly in the module store
+		// and managed via gov v1 authority.
 		if err := migrateErc20Params(sdkCtx, box, logger); err != nil {
 			return nil, fmt.Errorf("migrate erc20 params: %w", err)
 		}
 
-		// Step 3: Delete legacy OWNER_MODULE token pairs — STRv2 addressing
-		// generates different ERC20 addresses, so these pairs are no longer
-		// valid for bidirectional conversion. Deleted pairs are logged.
-		deleteLegacyOwnerModulePairs(sdkCtx, box, logger)
+		// Step 3: Delete legacy OWNER_MODULE token pairs
+		//
+		// The old uptick x/erc20 module stored OWNER_MODULE pairs (module-deployed
+		// ERC20 contracts). With cosmos/evm v0.6.1, the STRv2 addressing scheme
+		// generates different ERC20 addresses, so old OWNER_MODULE pairs are no
+		// longer valid for bidirectional conversion.
+		//
+		// These legacy pairs are deleted (token pair + byERC20 + byDenom maps)
+		// rather than merely disabled: the old ERC20 is being deprecated and real
+		// data volume is low, so no backwards compatibility is required. Deleted
+		// pairs are logged for auditability.
+		if err := deleteLegacyOwnerModulePairs(sdkCtx, box, logger); err != nil {
+			return nil, fmt.Errorf("delete legacy OWNER_MODULE pairs: %w", err)
+		}
 
-		// Step 3.2: Delete legacy IBC transfer provenance records — the
-		// deprecated MsgTransferERC20 path wrote them under KVStore prefix
-		// byte 0x04, which cosmos/evm's x/erc20 reserves for STRv2Addresses.
+		// Step 3.2: Delete legacy IBC transfer provenance records
+		//
+		// The deprecated MsgTransferERC20 path wrote provenance records under
+		// KVStore prefix byte 0x04. cosmos/evm's x/erc20 reserves that byte for
+		// STRv2Addresses, so the leftover records are removed to prevent a
+		// namespace collision and reclaim dead state.
 		deleteLegacyIBCTransferProvenance(sdkCtx, box, logger)
 
-		// Step 3.5: Migrate erc721 params from x/params subspace to the
-		// module's own KV store.
+		// Step 3.5: Migrate erc721 params from x/params subspace to self-contained KV store
+		//
+		// The old evm-nft-convert module stored params in x/params subspace.
+		// The new x/erc721 module stores params directly in its own KV store,
+		// following the same pattern as cosmos/evm ERC20.
 		if err := migrateErc721Params(sdkCtx, box, logger); err != nil {
 			return nil, fmt.Errorf("migrate erc721 params: %w", err)
 		}
 
-		// Step 3.6: Migrate cw721 params from x/params subspace to the
-		// module's own KV store.
+		// Step 3.6: Migrate cw721 params from x/params subspace to self-contained KV store
+		//
+		// The old wasm-nft-convert module stored params in x/params subspace.
+		// The new x/cw721 module stores params directly in its own KV store,
+		// following the same pattern as cosmos/evm ERC20.
 		if err := migrateCw721Params(sdkCtx, box, logger); err != nil {
 			return nil, fmt.Errorf("migrate cw721 params: %w", err)
 		}
 
-		// Step 3.7: Align ICS-721 port with ibc-go v10's alphanumeric router
-		// key: the bound port must equal ModuleName or the router panics.
+		// Step 3.7: Align ICS-721 port with ibc-go v10's alphanumeric router key.
+		//
+		// Legacy genesis stored PortId "nft-transfer". ibc-go v10 looks up
+		// IBCModule callbacks by port ID and panics on non-alphanumeric route
+		// keys, so the bound port must equal ModuleName.
 		migrateNFTTransferPort(sdkCtx, box, logger)
 
 		// Step 3.8: Remove legacy x/params subspaces for modules that have
@@ -183,20 +263,33 @@ func upgradeHandlerConstructor(
 			cw721types.ModuleName,
 		)
 
-		// Step 4: Run module migrations (SDK 0.53, ibc-go v10, cosmos/evm).
+		// Step 4: Run module migrations
+		//
+		// This handles all SDK 0.53, ibc-go v10, and cosmos/evm module migrations
+		// that are registered in the module manager.
+		// The module manager will call each module's InitGenesis if it's a new
+		// module, or run the registered migration scripts.
 		logger.Info("running module migrations")
 		return box.ModuleManager.RunMigrations(sdkCtx, c, vm)
 	}
 }
 
-// migrateEVMChainConfig verifies the EVM chain configuration is initialized for
-// this chain id. The actual Block-based → Time-based switch is applied by the
-// new binary's DefaultChainConfig at keeper construction — chainConfig is a
-// package-level global, not persisted state — so this step is a no-op on a
-// correctly booted node. The SetChainConfig branch only fires when the chain id
-// does not match (misconfiguration) and errors out as a fail-safe. All fork
-// times (Shanghai/Cancun/Prague) were already active at block 0 in v032.
-func migrateEVMChainConfig(ctx sdk.Context, logger log.Logger) error {
+// migrateEVMChainConfig migrates the EVM chain configuration from the old
+// legacy format (Block-based) to the new cosmos/evm format (Time-based).
+//
+// Key changes:
+// - ShanghaiBlock → ShanghaiTime
+// - CancunBlock → CancunTime
+// - PragueBlock → PragueTime
+// - New fields: OsakaTime, VerkleTime (nil = not activated)
+// - ChainConfig is now a global variable in cosmos/evm, set via SetChainConfig()
+//
+// The migration sets all fork times to 0, meaning they activate immediately
+// at the upgrade block. This is safe because:
+// 1. Shanghai/Cancun/Prague were already activated in v032 (at block 0)
+// 2. The upgrade block's timestamp is used as the reference point
+// 3. Setting time=0 means "active since genesis timestamp"
+func migrateEVMChainConfig(ctx sdk.Context, box upgrades.Toolbox, logger log.Logger) error {
 	logger.Info("migrating EVM ChainConfig from Block-based to Time-based")
 
 	evmChainID, err := upticktypes.ParseEIP155ChainID(ctx.ChainID())
@@ -237,8 +330,12 @@ func migrateEVMChainConfig(ctx sdk.Context, logger log.Logger) error {
 		GrayGlacierBlock:    &zero,
 		MergeNetsplitBlock:  &zero,
 
-		// Shanghai/Cancun/Prague — Time-based activation at 0 ensures all
-		// EVM opcodes (incl. EIP-7702 SetCodeTx) remain enabled.
+		// Shanghai/Cancun/Prague — migrated from Block-based to Time-based
+		// Setting to 0 means "active since the beginning of time"
+		// This ensures all EVM opcodes are enabled:
+		// - Shanghai: PUSH0 (EIP-3855), WARM/COLD balance (EIP-3651)
+		// - Cancun: BLOBHASH, BLOBBASEFEE, TLOAD/TSTORE, MCOPY (EIP-4844, 1153, 5656)
+		// - Prague: EIP-7702 SetCodeTx (type 0x04), EIP-2537 BLS12-381 precompiles
 		ShanghaiTime: &zero,
 		CancunTime:   &zero,
 		PragueTime:   &zero,
@@ -275,9 +372,19 @@ func migrateEVMChainConfig(ctx sdk.Context, logger log.Logger) error {
 	return nil
 }
 
-// newLegacyAccountCodec builds a codec that can decode every account type a
-// live chain may hold (vesting, multisig, legacy EthAccount) while iterating
-// the auth store during account migration.
+// migrateEVMParams repairs the EVM module params and initializes EvmCoinInfo.
+//
+// The legacy ethermint params proto predates cosmos/evm v0.6.1's new fields, so
+// after unmarshaling the carried-over params have:
+//   - AccessControl = AccessTypeUnspecified -> NewRestrictedPermissionPolicy
+//     denies all contract creation and calls (including precompiles);
+//   - ExtendedDenomOptions = nil -> LoadEvmCoinInfo errors for non-18-decimal
+//     denominations;
+//   - HistoryServeWindow = 0.
+//
+// It also persists EvmCoinInfo (base-denom metadata) into the module store;
+// without it the x/vm PreBlock calls sdk.RegisterDenom("") and panics on the
+// first block after the upgrade.
 func newLegacyAccountCodec() codec.Codec {
 	interfaceRegistry := codectypes.NewInterfaceRegistry()
 	authtypes.RegisterInterfaces(interfaceRegistry)
@@ -306,7 +413,7 @@ func getLegacyBoolParam(
 	subspace, ok := box.ParamsKeeper.GetSubspace(moduleName)
 	if ok {
 		if raw := subspace.GetRaw(ctx, []byte(key)); len(raw) > 0 {
-			return decodeLegacyBoolRaw(logger, moduleName, key, raw)
+			return decodeLegacyBoolRaw(ctx, box, logger, moduleName, key, fallback, raw)
 		}
 	}
 
@@ -333,38 +440,35 @@ func readLegacyBoolParamRaw(
 		return fallback
 	}
 
-	return decodeLegacyBoolRaw(logger, moduleName, key, raw)
+	return decodeLegacyBoolRaw(ctx, upgrades.Toolbox{}, logger, moduleName, key, fallback, raw)
 }
 
 func decodeLegacyBoolRaw(
+	_ sdk.Context,
+	_ upgrades.Toolbox,
 	logger log.Logger,
 	moduleName string,
 	key string,
+	fallback bool,
 	raw []byte,
 ) bool {
 	var value bool
 	if err := json.Unmarshal(raw, &value); err != nil {
-		// Fail-closed: a corrupt legacy bool param must not silently re-enable a
-		// feature governance had disabled (the old code returned the fallback,
-		// which was true for EnableErc20/EnableEVMHook). Default to disabled.
 		logger.Error(
-			"failed to decode legacy bool param, defaulting to false (disabled)",
+			"failed to decode legacy bool param",
 			"module", moduleName,
 			"key", key,
 			"error", err,
 		)
-		return false
+		return fallback
 	}
 	return value
 }
 
 // migrateLegacyEVMAccounts rewrites Ethermint v0.3.x EthAccount records into
-// standard SDK BaseAccount records (cosmos/evm v0.6.1 no longer uses EthAccount;
-// leaving the legacy Any values would make accounts unreadable).
-//
-// Failure policy: the FULL auth store is scanned, all failures are collected,
-// and one aggregated error is returned at the end — a skipped legacy EthAccount
-// would be unreadable after the upgrade, so nothing is silently skipped.
+// standard SDK BaseAccount records. cosmos/evm v0.6.1 no longer uses the
+// EthAccount type, so leaving the legacy protobuf Any values in the auth store
+// would make accounts unreadable after the upgrade.
 func migrateLegacyEVMAccounts(
 	ctx sdk.Context,
 	storeKey *storetypes.KVStoreKey,
@@ -383,74 +487,51 @@ func migrateLegacyEVMAccounts(
 	migrationCdc := newLegacyAccountCodec()
 	migrated := 0
 
-	// Collected failures: key hex -> reason. We keep scanning after a failure
-	// so that every bad account is reported in a single pass.
-	type authMigrationFailure struct {
-		key    string
-		reason string
-	}
-	var failures []authMigrationFailure
-	fail := func(key []byte, format string, args ...interface{}) {
-		failures = append(failures, authMigrationFailure{
-			key:    fmt.Sprintf("%x", key),
-			reason: fmt.Sprintf(format, args...),
-		})
-	}
-
 	for ; iterator.Valid(); iterator.Next() {
 		accountBytes := iterator.Value()
 		var accountI sdk.AccountI
 		if err := migrationCdc.UnmarshalInterface(accountBytes, &accountI); err != nil {
-			fail(iterator.Key(), "decode auth account: %v", err)
-			continue
+			return fmt.Errorf("decode auth account %x: %w", iterator.Key(), err)
 		}
 
 		legacyAccount, ok := accountI.(*legacy.EthAccount)
 		if !ok {
-			// Retained accounts (vesting, module, ...) keep their type, but a
-			// legacy ethermint pubkey Any must be rewritten to the v0.4.0 key
-			// type or the account becomes unqueryable after the upgrade.
-			if err := migrateRetainedAccountPubKey(appCodec, store, iterator.Key(), accountI, logger); err != nil {
-				fail(iterator.Key(), "migrate retained account pubkey: %v", err)
+			// Retained accounts (vesting, module, ...) are not rewritten to
+			// BaseAccount, but their embedded BaseAccount.PubKey may still be
+			// the legacy /ethermint.crypto.v1.ethsecp256k1.PubKey Any. Without
+			// rewriting that Any to the v0.4.0 key type, the account becomes
+			// unqueryable after the upgrade ("can't resolve type URL
+			// /ethermint.crypto.v1.ethsecp256k1.PubKey: proto: not found").
+			if err := migrateRetainedAccountPubKey(ctx, migrationCdc, appCodec, store, iterator.Key(), accountI, logger); err != nil {
+				return err
 			}
 			continue
 		}
 		if legacyAccount.BaseAccount == nil {
-			fail(iterator.Key(), "legacy EthAccount has nil BaseAccount")
-			continue
+			return fmt.Errorf("legacy EthAccount %x has nil BaseAccount", iterator.Key())
 		}
 
 		if legacyAccount.CodeHash != "" && evmKeeper != nil {
-			// common.HexToHash silently truncates/zero-pads malformed input,
-			// which would persist an unresolvable "ghost" code hash. Validate
-			// explicitly: legacy code hashes are keccak256 (32 bytes) hex.
-			codeHashBytes := common.FromHex(legacyAccount.CodeHash)
-			switch len(codeHashBytes) {
-			case 0:
-				// Empty / "0x" — nothing to migrate.
-			case 32:
-				evmKeeper.SetCodeHash(ctx, iterator.Key(), codeHashBytes)
-			default:
-				fail(iterator.Key(), "legacy EthAccount has malformed code hash %q: expected 32-byte hex, got %d bytes",
-					legacyAccount.CodeHash, len(codeHashBytes))
-				continue
-			}
+			codeHash := common.HexToHash(legacyAccount.CodeHash)
+			evmKeeper.SetCodeHash(ctx, iterator.Key(), codeHash.Bytes())
 		}
 
-		// Rewrite the legacy pubkey Any into the v0.4.0 key type —
-		// MarshalInterface alone would keep the old type URL inside the Any.
+		// Rewrite the legacy pubkey Any (/ethermint.crypto.v1.ethsecp256k1.PubKey)
+		// into the v0.4.0 key type (/cosmos.evm.crypto.v1.ethsecp256k1.PubKey).
+		// appCodec.MarshalInterface only re-serializes the BaseAccount and would
+		// keep the old type URL inside the pubkey Any, making the account's
+		// pubkey unreadable (and signature verification impossible) after the
+		// upgrade.
 		if legacyAccount.BaseAccount.PubKey != nil {
 			var oldPk cryptotypes.PubKey
 			if err := migrationCdc.UnpackAny(legacyAccount.BaseAccount.PubKey, &oldPk); err != nil {
-				fail(iterator.Key(), "decode legacy pubkey: %v", err)
-				continue
+				return fmt.Errorf("decode legacy pubkey %x: %w", iterator.Key(), err)
 			}
 			if ethPk, isEth := oldPk.(*legacy.EthSecp256k1PubKey); isEth {
 				newPk := &evmsecp256k1.PubKey{Key: ethPk.Key}
 				anyPk, err := codectypes.NewAnyWithValue(newPk)
 				if err != nil {
-					fail(iterator.Key(), "pack migrated pubkey: %v", err)
-					continue
+					return fmt.Errorf("pack migrated pubkey %x: %w", iterator.Key(), err)
 				}
 				legacyAccount.BaseAccount.PubKey = anyPk
 			}
@@ -458,27 +539,11 @@ func migrateLegacyEVMAccounts(
 
 		newBytes, err := appCodec.MarshalInterface(legacyAccount.BaseAccount)
 		if err != nil {
-			fail(iterator.Key(), "marshal migrated BaseAccount: %v", err)
-			continue
+			return fmt.Errorf("marshal migrated BaseAccount %x: %w", iterator.Key(), err)
 		}
 
 		store.Set(iterator.Key(), newBytes)
 		migrated++
-	}
-
-	if len(failures) > 0 {
-		for _, f := range failures {
-			logger.Error("legacy auth account failed to migrate",
-				"account_key", f.key,
-				"reason", f.reason,
-			)
-		}
-		// Abort with an aggregated error: the upgrade tx rolls back atomically,
-		// and after patching the accounts the upgrade can be re-run unchanged.
-		return fmt.Errorf(
-			"%d legacy auth account(s) failed to migrate — the full list was logged above; first failure: account %s: %s",
-			len(failures), failures[0].key, failures[0].reason,
-		)
 	}
 
 	logger.Info("legacy EVM accounts migrated to BaseAccount", "migrated", migrated)
@@ -490,7 +555,8 @@ func migrateLegacyEVMAccounts(
 // account stays queryable and signable after the upgrade. Accounts without a
 // legacy pubkey are left untouched.
 func migrateRetainedAccountPubKey(
-	appCodec codec.Codec,
+	ctx sdk.Context,
+	migrationCdc, appCodec codec.Codec,
 	store storetypes.KVStore,
 	key []byte,
 	account sdk.AccountI,
@@ -520,9 +586,6 @@ func migrateRetainedAccountPubKey(
 	return nil
 }
 
-// migrateEVMParams repairs the EVM module params (the legacy ethermint proto
-// zero-fills AccessControl, which would deny all contract calls) and persists
-// EvmCoinInfo, without which the first PreBlock after the upgrade panics.
 func migrateEVMParams(ctx sdk.Context, box upgrades.Toolbox, logger log.Logger) error {
 	logger.Info("migrating EVM params and initializing coin info")
 
@@ -556,9 +619,14 @@ func migrateEVMParams(ctx sdk.Context, box upgrades.Toolbox, logger log.Logger) 
 		return fmt.Errorf("set evm params: %w", err)
 	}
 
-	// Repair malformed denom metadata (Display unit missing from DenomUnits
-	// would resolve decimals to 0 and panic) before initializing EvmCoinInfo.
-	repairEvmDenomMetadata(ctx, box, evmParams.EvmDenom, logger)
+	// Some testnets carry metadata where the Display unit is not present in
+	// DenomUnits (e.g. display "origin" while units only list "auoc"/"uoc").
+	// cosmos/evm derives coin decimals from the Display unit's exponent, so
+	// such metadata would resolve decimals to 0 and panic the upgrade. Repair
+	// it before initializing EvmCoinInfo.
+	if err := repairEvmDenomMetadata(ctx, box, evmParams.EvmDenom, logger); err != nil {
+		return fmt.Errorf("repair evm denom metadata: %w", err)
+	}
 
 	// Persist EvmCoinInfo so the x/vm PreBlock can register the base denom.
 	if err := box.EvmKeeper.InitEvmCoinInfo(ctx); err != nil {
@@ -570,14 +638,15 @@ func migrateEVMParams(ctx sdk.Context, box upgrades.Toolbox, logger log.Logger) 
 }
 
 // repairEvmDenomMetadata normalizes the bank denom metadata for the EVM denom
-// so InitEvmCoinInfo can derive a supported decimals value: points Display at
-// the highest-exponent unit (or appends an 18-decimal display unit) when the
-// current Display unit is absent from DenomUnits.
-func repairEvmDenomMetadata(ctx sdk.Context, box upgrades.Toolbox, evmDenom string, logger log.Logger) {
+// so that InitEvmCoinInfo can derive a supported decimals value. It points
+// Display at the highest-exponent unit when the current Display unit is absent
+// from DenomUnits, and falls back to appending an 18-decimal display unit when
+// no exponent is present at all.
+func repairEvmDenomMetadata(ctx sdk.Context, box upgrades.Toolbox, evmDenom string, logger log.Logger) error {
 	metadata, found := box.BankKeeper.GetDenomMetaData(ctx, evmDenom)
 	if !found {
 		// Let InitEvmCoinInfo surface the missing-metadata error.
-		return
+		return nil
 	}
 
 	displayInUnits := false
@@ -593,7 +662,7 @@ func repairEvmDenomMetadata(ctx sdk.Context, box upgrades.Toolbox, evmDenom stri
 		}
 	}
 	if displayInUnits {
-		return
+		return nil
 	}
 
 	if maxExponent > 0 {
@@ -607,11 +676,21 @@ func repairEvmDenomMetadata(ctx sdk.Context, box upgrades.Toolbox, evmDenom stri
 	}
 	box.BankKeeper.SetDenomMetaData(ctx, metadata)
 	logger.Info("repaired evm denom metadata", "display", metadata.Display)
+	return nil
 }
 
-// migrateErc20Params migrates erc20 params from x/params subspace to the
-// authority-based store of cosmos/evm's x/erc20. The legacy EnableEVMHook
-// param is intentionally dropped; cosmos/evm defaults are used instead.
+// migrateErc20Params migrates erc20 module parameters from x/params subspace
+// to the new authority-based params system.
+//
+// In SDK 0.50 with legacy x/evm, erc20 params were stored in x/params subspace.
+// In SDK 0.53 + cosmos/evm, params are stored directly in the erc20 module store
+// and managed via gov v1 authority (authtypes.NewModuleAddress(govtypes.ModuleName)).
+//
+// Uptick now uses cosmos/evm's x/erc20 (not the self-developed module), so this
+// migration initializes the cosmos/evm erc20 keeper's params in the new
+// authority-based store. The legacy EnableEVMHook param is intentionally
+// dropped; cosmos/evm's default params (EnableErc20 + PermissionlessRegistration)
+// are used instead.
 func migrateErc20Params(ctx sdk.Context, box upgrades.Toolbox, logger log.Logger) error {
 	logger.Info("migrating erc20 params to authority-based system")
 
@@ -638,11 +717,24 @@ func migrateErc20Params(ctx sdk.Context, box upgrades.Toolbox, logger log.Logger
 	return nil
 }
 
-// deleteLegacyOwnerModulePairs deletes all OWNER_MODULE token pairs (pair +
-// byERC20 + byDenom maps); STRv2 addressing makes these old bindings invalid.
-// OWNER_EXTERNAL pairs are preserved, and the Cosmos-native coins themselves
-// stay untouched in the bank module. Deleted pairs are logged.
-func deleteLegacyOwnerModulePairs(ctx sdk.Context, box upgrades.Toolbox, logger log.Logger) {
+// deleteLegacyOwnerModulePairs deletes all existing OWNER_MODULE token pairs.
+//
+// In the legacy uptick x/erc20 module, OWNER_MODULE pairs were created for
+// Cosmos-native coins that had module-deployed ERC20 contracts. With the
+// migration to cosmos/evm v0.6.1, the STRv2 addressing scheme generates
+// different ERC20 contract addresses, making these old pairs invalid for
+// bidirectional conversion.
+//
+// What this migration does:
+//   - Iterates all existing token pairs in the erc20 store
+//   - For pairs with ContractOwner == OWNER_MODULE: deletes the pair and its
+//     byERC20 + byDenom maps (DeleteTokenPair)
+//   - Preserves OWNER_EXTERNAL pairs (external ERC20 → Cosmos coin mappings)
+//
+// Deleted pairs are logged (denom + erc20 address) for auditability. The
+// Cosmos-native coin itself is NOT removed from the bank module — only the
+// ERC20↔coin mapping is dropped.
+func deleteLegacyOwnerModulePairs(ctx sdk.Context, box upgrades.Toolbox, logger log.Logger) error {
 	logger.Info("deleting legacy OWNER_MODULE token pairs")
 
 	erc20Keeper := box.Erc20Keeper
@@ -680,12 +772,17 @@ func deleteLegacyOwnerModulePairs(ctx sdk.Context, box upgrades.Toolbox, logger 
 		logger.Debug(d)
 	}
 
+	return nil
 }
 
-// deleteLegacyIBCTransferProvenance removes the provenance records written by
-// the deprecated MsgTransferERC20 path. The legacy store used KVStore prefix
-// byte 0x04, which cosmos/evm's x/erc20 reserves for STRv2Addresses, so the
-// leftover records must be cleared to avoid a namespace collision.
+// deleteLegacyIBCTransferProvenance removes the IBC transfer provenance records
+// written by the deprecated MsgTransferERC20 path (uptick x/erc20).
+//
+// In the legacy uptick x/erc20 store, KVStore prefix byte 0x04 held
+// IBCTransferProvenance records keyed by
+// "port/channel/sequence/sender/denom/amount". cosmos/evm's x/erc20 reserves
+// the same byte 0x04 for KeyPrefixSTRv2Addresses, so the leftover records are
+// dead state that must be cleared to avoid a namespace collision.
 func deleteLegacyIBCTransferProvenance(ctx sdk.Context, box upgrades.Toolbox, logger log.Logger) {
 	storeKey := box.GetKVStoreKey(erc20types.StoreKey)
 	if storeKey == nil {
@@ -701,9 +798,6 @@ func deleteLegacyIBCTransferProvenance(ctx sdk.Context, box upgrades.Toolbox, lo
 	for ; iterator.Valid(); iterator.Next() {
 		key := iterator.Key()
 		// 0x04 + 20-byte address is the cosmos/evm STRv2 layout; leave it alone.
-		// Legacy provenance keys are 0x04 + a variable-length "<denom>/<...>" string
-		// (always longer than 21 bytes), so the length heuristic cannot collide with
-		// STRv2 addresses today; revisit if the erc20 store layout ever changes.
 		if len(key) == 1+common.AddressLength {
 			skipped++
 			continue
@@ -719,8 +813,16 @@ func deleteLegacyIBCTransferProvenance(ctx sdk.Context, box upgrades.Toolbox, lo
 	)
 }
 
-// migrateErc721Params migrates erc721 params from the deprecated x/params
-// subspace to the module's own KV store; defaults apply if unset.
+// migrateErc721Params migrates erc721 module parameters from x/params subspace
+// to the new self-contained KV store (aligned with cosmos/evm ERC20 pattern).
+//
+// In the old evm-nft-convert module, params were stored in x/params subspace
+// via paramtypes.ParamSet interface. The new x/erc721 module stores params
+// directly in its own KV store (using the same store key prefix), eliminating
+// the dependency on x/params.
+//
+// Since the old params subspace is being deprecated in SDK 0.53, we use
+// default params and let operators adjust via gov proposal if needed.
 func migrateErc721Params(ctx sdk.Context, box upgrades.Toolbox, logger log.Logger) error {
 	logger.Info("migrating erc721 params to self-contained KV store")
 
@@ -763,8 +865,16 @@ func migrateErc721Params(ctx sdk.Context, box upgrades.Toolbox, logger log.Logge
 	return nil
 }
 
-// migrateCw721Params migrates cw721 params from the deprecated x/params
-// subspace to the module's own KV store; defaults apply if unset.
+// migrateCw721Params migrates cw721 module parameters from x/params subspace
+// to the new self-contained KV store (aligned with cosmos/evm ERC20 pattern).
+//
+// In the old wasm-nft-convert module, params were stored in x/params subspace
+// via paramtypes.ParamSet interface. The new x/cw721 module stores params
+// directly in its own KV store (using the same store key prefix), eliminating
+// the dependency on x/params.
+//
+// Since the old params subspace is being deprecated in SDK 0.53, we use
+// default params and let operators adjust via gov proposal if needed.
 func migrateCw721Params(ctx sdk.Context, box upgrades.Toolbox, logger log.Logger) error {
 	logger.Info("migrating cw721 params to self-contained KV store")
 

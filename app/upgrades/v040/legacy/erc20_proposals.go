@@ -331,9 +331,6 @@ func (m *RegisterERC20Proposal) Size() int {
 	return legacyProposalStringSize(1, m.Title) + legacyProposalStringSize(2, m.Description) + legacyProposalStringSize(3, m.Erc20Address)
 }
 
-// gogo-protobuf generated code and must stay byte-symmetric per type.
-//
-//nolint:dupl // legacy hand-rolled proto decoding; the duplication mirrors
 func (m *RegisterERC20Proposal) Unmarshal(dAtA []byte) error {
 	i := 0
 	for i < len(dAtA) {
@@ -413,9 +410,6 @@ func (m *ToggleTokenRelayProposal) Size() int {
 	return legacyProposalStringSize(1, m.Title) + legacyProposalStringSize(2, m.Description) + legacyProposalStringSize(3, m.Token)
 }
 
-// gogo-protobuf generated code and must stay byte-symmetric per type.
-//
-//nolint:dupl // legacy hand-rolled proto decoding; the duplication mirrors
 func (m *ToggleTokenRelayProposal) Unmarshal(dAtA []byte) error {
 	i := 0
 	for i < len(dAtA) {

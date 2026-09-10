@@ -13,9 +13,9 @@ import (
 
 // compile-time assertions
 var (
-	_ proto.Message      = (*EthSecp256k1PubKey)(nil)
-	_ proto.Marshaler    = (*EthSecp256k1PubKey)(nil)
-	_ proto.Unmarshaler  = (*EthSecp256k1PubKey)(nil)
+	_ proto.Message     = (*EthSecp256k1PubKey)(nil)
+	_ proto.Marshaler   = (*EthSecp256k1PubKey)(nil)
+	_ proto.Unmarshaler = (*EthSecp256k1PubKey)(nil)
 	_ cryptotypes.PubKey = (*EthSecp256k1PubKey)(nil)
 )
 
@@ -246,7 +246,7 @@ func encodeVarintLegacyKeys(dAtA []byte, offset int, v uint64) int {
 }
 
 func sovLegacyKeys(x uint64) (n int) {
-	return (bitsLen64(x) + 6) / 7
+	return (int(bitsLen64(x)) + 6) / 7
 }
 
 func bitsLen64(x uint64) (n int) {
