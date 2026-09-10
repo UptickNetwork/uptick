@@ -1,6 +1,7 @@
 package keeper
 
 import (
+	"fmt"
 	"strconv"
 
 	sdkerrors "cosmossdk.io/errors"
@@ -13,8 +14,23 @@ import (
 )
 
 // GetTokenPairs - get all registered token tokenPairs
+//
+// Corrupt records are skipped here and reported through
+// GetTokenPairsWithReport: this accessor is reachable from the gRPC query path,
+// where a panic would take the node's query handler down, and it is no longer
+// the genesis-export entry point (ExportGenesis fails closed on the report).
 func (k Keeper) GetTokenPairs(ctx sdk.Context) []types.TokenPair {
+	tokenPairs, _ := k.GetTokenPairsWithReport(ctx)
+	return tokenPairs
+}
+
+// GetTokenPairsWithReport returns every decodable token pair plus the list of
+// records that could not be decoded. Damaged records are never dropped
+// silently: the caller decides whether to abort (genesis export does) or to
+// continue with the healthy subset.
+func (k Keeper) GetTokenPairsWithReport(ctx sdk.Context) ([]types.TokenPair, []GenesisExportIssue) {
 	tokenPairs := []types.TokenPair{}
+	var issues []GenesisExportIssue
 
 	store := ctx.KVStore(k.storeKey)
 	iterator := storetypes.KVStorePrefixIterator(store, types.KeyPrefixTokenPair)
@@ -23,15 +39,18 @@ func (k Keeper) GetTokenPairs(ctx sdk.Context) []types.TokenPair {
 	for ; iterator.Valid(); iterator.Next() {
 		var tokenPair types.TokenPair
 		if err := k.cdc.Unmarshal(iterator.Value(), &tokenPair); err != nil {
-			// Fail loud: skipping a corrupt pair would drop it from ExportGenesis
-			// and orphan UID/refund records, which then panics on the next export.
-			panic(sdkerrors.Wrap(err, "failed to unmarshal cw721 token pair"))
+			issues = append(issues, GenesisExportIssue{
+				Kind:   GenesisExportIssueTokenPairCorrupt,
+				Key:    fmt.Sprintf("%q", iterator.Key()),
+				Detail: err.Error(),
+			})
+			continue
 		}
 
 		tokenPairs = append(tokenPairs, tokenPair)
 	}
 
-	return tokenPairs
+	return tokenPairs, issues
 }
 
 // GetTokenPair - get registered token pair from the identifier

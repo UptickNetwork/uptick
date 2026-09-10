@@ -6,8 +6,6 @@ import (
 	evmtypes "github.com/cosmos/evm/x/vm/types"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-
-	"github.com/UptickNetwork/uptick/app/upgrades"
 )
 
 // defaultActiveStaticPrecompiles is the list of static precompile addresses
@@ -37,19 +35,31 @@ func ConfigureDefaultStaticPrecompiles() {
 	evmtypes.DefaultStaticPrecompiles = defaultActiveStaticPrecompiles
 }
 
+// evmParamsStore is the slice of the EVM keeper this migration needs.
+//
+// It is an interface rather than the concrete keeper on purpose: the real keeper
+// can only fail SetParams on invalid params, and this migration always writes a
+// known-good list, so with the concrete type the error branch below would be
+// unreachable from any test. Narrowing the dependency makes the failure path
+// injectable instead of untested.
+type evmParamsStore interface {
+	GetParams(ctx sdk.Context) evmtypes.Params
+	SetParams(ctx sdk.Context, params evmtypes.Params) error
+}
+
 // migrateActiveStaticPrecompiles repairs the EVM params so the static
 // precompiles are actually activated. The v0.4.0 upgrade introduced the
 // ActiveStaticPrecompiles params field (the legacy ethermint params proto had no
 // such field) but never populated it, leaving every custom precompile inactive:
 // IsAvailableStaticPrecompile returns false, so GetStaticPrecompileInstance
 // never loads the contract and precompile calls fail.
-func migrateActiveStaticPrecompiles(ctx sdk.Context, box upgrades.Toolbox) error {
-	params := box.EvmKeeper.GetParams(ctx)
+func migrateActiveStaticPrecompiles(ctx sdk.Context, store evmParamsStore) error {
+	params := store.GetParams(ctx)
 	updated, changed := withDefaultActiveStaticPrecompiles(params)
 	if !changed {
 		return nil
 	}
-	if err := box.EvmKeeper.SetParams(ctx, updated); err != nil {
+	if err := store.SetParams(ctx, updated); err != nil {
 		return fmt.Errorf("set evm params: %w", err)
 	}
 	return nil

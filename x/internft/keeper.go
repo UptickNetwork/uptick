@@ -152,27 +152,16 @@ func (ik InterNftKeeper) GetNFT(ctx sdk.Context, classID, tokenID string) (nfttr
 // Fault-tolerant on missing NFTs (matches x/erc721 and x/cw721
 // RefundPacketToken): if the NFT is already gone, skipping keeps the IBC
 // refund path alive instead of rolling back the whole cache context.
+//
+// The absence check is a plain HasNFT read on purpose. An earlier version
+// wrapped it in a blanket recover(), which swallowed every panic — including
+// the SDK gas meter's OutOfGas and store/runtime panics — and then reported
+// the burn as successful with reason "nft_already_gone". That silently turned
+// a failed transaction into a successful ICS-721 burn, so the recover() was
+// removed: only a genuine HasNFT == false may skip, everything else must
+// propagate.
 func (ik InterNftKeeper) Burn(ctx sdk.Context, classID string, tokenID string) error {
-	// The cosmos-sdk nft Keeper is a value type, so it cannot be nil-checked;
-	// a recover() harness short-circuits both "NFT absent" and an
-	// un-initialized keeper (test only).
-	hasNFT := false
-	func() {
-		defer func() {
-			if r := recover(); r != nil {
-				ik.Logger(ctx).Debug(
-					"interNft.Burn: HasNFT panicked; treating as NFT absent",
-					"class_id", classID,
-					"token_id", tokenID,
-					"recover", r,
-				)
-				hasNFT = false
-			}
-		}()
-		hasNFT = ik.nk.HasNFT(ctx, classID, tokenID)
-	}()
-
-	if !hasNFT {
+	if !ik.nk.HasNFT(ctx, classID, tokenID) {
 		ctx.EventManager().EmitEvent(
 			sdk.NewEvent(
 				"inter_nft_burn_skip",

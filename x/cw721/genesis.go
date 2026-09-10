@@ -63,23 +63,30 @@ func importPerTokenState(ctx sdk.Context, k keeper.Keeper, data types.GenesisSta
 }
 
 // ExportGenesis export module status
+//
+// Fail-closed, and diagnosable: every damaged record in the live store is
+// collected first, and the export is aborted with the complete repair list
+// instead of either panicking on the first bad key (the old bare panic gave an
+// operator nothing to act on) or dropping records from a "successful" genesis.
+// A genesis that silently loses conversions or refunds is worse than a failed
+// export.
 func ExportGenesis(ctx sdk.Context, k keeper.Keeper) *types.GenesisState {
-	// Export the per-token runtime state alongside the collection-level
-	// pairs. A failure here means the live store violates the invariants the
-	// genesis file must preserve; aborting the export beats writing a
-	// genesis that silently loses conversions or refunds.
-	nftUIDPairs, err := k.ExportNFTUIDPairs(ctx)
-	if err != nil {
-		panic(err)
-	}
-	refundReceivers, err := k.ExportRefundReceivers(ctx)
-	if err != nil {
-		panic(err)
+	tokenPairs, pairIssues := k.GetTokenPairsWithReport(ctx)
+	nftUIDPairs, uidIssues := k.ExportNFTUIDPairsWithReport(ctx)
+	refundReceivers, refundIssues := k.ExportRefundReceiversWithReport(ctx)
+
+	issues := make([]keeper.GenesisExportIssue, 0, len(pairIssues)+len(uidIssues)+len(refundIssues))
+	issues = append(issues, pairIssues...)
+	issues = append(issues, uidIssues...)
+	issues = append(issues, refundIssues...)
+
+	if len(issues) > 0 {
+		panic(&keeper.GenesisExportError{Module: types.ModuleName, Issues: issues})
 	}
 
 	return &types.GenesisState{
 		Params:          k.GetParams(ctx),
-		TokenPairs:      k.GetTokenPairs(ctx),
+		TokenPairs:      tokenPairs,
 		NftUidPairs:     nftUIDPairs,
 		RefundReceivers: refundReceivers,
 	}

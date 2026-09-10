@@ -24,7 +24,11 @@ jobs:
       contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4 # v4.2.2
+        # Audit O-05: pinned to an immutable commit. `@v4` resolved to v4.4.0 at
+        # the time of pinning (the previous comment claimed v4.2.2, which the
+        # mutable tag had already moved past) - a mutable tag on the job that
+        # holds `contents: write` is the highest-value target in the repo.
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
 

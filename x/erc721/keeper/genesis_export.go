@@ -1,6 +1,8 @@
 package keeper
 
 import (
+	"fmt"
+	"sort"
 	"strings"
 
 	"cosmossdk.io/errors"
@@ -22,6 +24,17 @@ import (
 // reverse[y]=x). A mismatch means the live store is corrupt; failing the
 // export loudly is preferable to baking the corruption into a genesis file.
 func (k Keeper) ExportNFTUIDPairs(ctx sdk.Context) ([]types.NFTUIDPair, error) {
+	pairs, issues := k.ExportNFTUIDPairsWithReport(ctx)
+	if len(issues) > 0 {
+		return nil, issuesToError(types.ModuleName, issues)
+	}
+	return pairs, nil
+}
+
+// ExportNFTUIDPairsWithReport collects every damaged index entry instead of
+// aborting on the first one, so the fail-closed export can report the complete
+// repair list in one pass.
+func (k Keeper) ExportNFTUIDPairsWithReport(ctx sdk.Context) ([]types.NFTUIDPair, []GenesisExportIssue) {
 	forward := make(map[string]string)
 
 	store := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixNFTUIDPairByTokenUID)
@@ -32,6 +45,7 @@ func (k Keeper) ExportNFTUIDPairs(ctx sdk.Context) ([]types.NFTUIDPair, error) {
 	iter.Close()
 
 	pairs := make([]types.NFTUIDPair, 0, len(forward))
+	var issues []GenesisExportIssue
 
 	reverseStore := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixNFTUIDPairByNFTUID)
 	reverse := reverseStore.Iterator(nil, nil)
@@ -42,11 +56,15 @@ func (k Keeper) ExportNFTUIDPairs(ctx sdk.Context) ([]types.NFTUIDPair, error) {
 
 		partner, ok := forward[tokenUID]
 		if !ok || partner != nftUID {
-			return nil, errors.Wrapf(
-				types.ErrInternalTokenPair,
-				"inconsistent bidirectional NFT UID index: token %q <-> nft %q has no matching forward entry (found %q)",
-				tokenUID, nftUID, partner,
-			)
+			issues = append(issues, GenesisExportIssue{
+				Kind: GenesisExportIssueUIDIndexBackward,
+				Key:  nftUID,
+				Detail: fmt.Sprintf(
+					"reverse entry points at token UID %q whose forward entry is %q",
+					tokenUID, partner,
+				),
+			})
+			continue
 		}
 		delete(forward, tokenUID)
 
@@ -57,14 +75,26 @@ func (k Keeper) ExportNFTUIDPairs(ctx sdk.Context) ([]types.NFTUIDPair, error) {
 	}
 
 	for tokenUID, nftUID := range forward {
-		return nil, errors.Wrapf(
-			types.ErrInternalTokenPair,
-			"inconsistent bidirectional NFT UID index: token %q -> nft %q has no reverse entry",
-			tokenUID, nftUID,
-		)
+		issues = append(issues, GenesisExportIssue{
+			Kind: GenesisExportIssueUIDIndexForward,
+			Key:  tokenUID,
+			Detail: fmt.Sprintf(
+				"forward entry points at nft UID %q which has no reverse entry",
+				nftUID,
+			),
+		})
 	}
 
-	return pairs, nil
+	// The forward leftovers are collected from a map, so sort for a stable,
+	// reproducible repair list (and reproducible test assertions).
+	sort.Slice(issues, func(i, j int) bool {
+		if issues[i].Key != issues[j].Key {
+			return issues[i].Key < issues[j].Key
+		}
+		return issues[i].Kind < issues[j].Kind
+	})
+
+	return pairs, issues
 }
 
 // ExportRefundReceivers returns every recorded IBC refund receiver. Refund
@@ -73,6 +103,17 @@ func (k Keeper) ExportNFTUIDPairs(ctx sdk.Context) ([]types.NFTUIDPair, error) {
 // is lossless for any address format and fails loudly on orphaned records
 // instead of silently dropping refund state.
 func (k Keeper) ExportRefundReceivers(ctx sdk.Context) ([]types.RefundReceiver, error) {
+	receivers, issues := k.ExportRefundReceiversWithReport(ctx)
+	if len(issues) > 0 {
+		return nil, issuesToError(types.ModuleName, issues)
+	}
+	return receivers, nil
+}
+
+// ExportRefundReceiversWithReport exports every refund receiver and reports
+// (rather than aborts on) the orphaned keys, so the fail-closed caller can
+// print the full repair list at once.
+func (k Keeper) ExportRefundReceiversWithReport(ctx sdk.Context) ([]types.RefundReceiver, []GenesisExportIssue) {
 	contracts := make([]string, 0)
 	for _, pair := range k.GetTokenPairs(ctx) {
 		contracts = append(contracts, pair.Erc721Address)
@@ -83,11 +124,17 @@ func (k Keeper) ExportRefundReceivers(ctx sdk.Context) ([]types.RefundReceiver, 
 	defer iter.Close()
 
 	receivers := make([]types.RefundReceiver, 0)
+	var issues []GenesisExportIssue
 	for ; iter.Valid(); iter.Next() {
 		key := string(iter.Key())
 		contract, tokenID, err := splitContractTokenKey(contracts, key)
 		if err != nil {
-			return nil, err
+			issues = append(issues, GenesisExportIssue{
+				Kind:   GenesisExportIssueRefundKeyOrphan,
+				Key:    fmt.Sprintf("%q", key),
+				Detail: err.Error(),
+			})
+			continue
 		}
 		receivers = append(receivers, types.RefundReceiver{
 			EvmContractAddress: contract,
@@ -96,7 +143,7 @@ func (k Keeper) ExportRefundReceivers(ctx sdk.Context) ([]types.RefundReceiver, 
 		})
 	}
 
-	return receivers, nil
+	return receivers, issues
 }
 
 // splitContractTokenKey recovers the (contract, tokenID) parts of a refund

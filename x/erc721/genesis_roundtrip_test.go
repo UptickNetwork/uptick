@@ -208,7 +208,10 @@ func TestDeletePairPerTokenStateClearsOrphans(t *testing.T) {
 	require.Empty(t, exported.RefundReceivers)
 }
 
-func TestGetTokenPairsPanicsOnCorruptValue(t *testing.T) {
+// The store accessor must not panic on a corrupt record: it is reachable from
+// the gRPC query path. The corruption is reported instead of hidden, and the
+// fail-closed genesis export turns that report into a diagnosable abort.
+func TestGetTokenPairsSkipsAndReportsCorruptValue(t *testing.T) {
 	key := storetypes.NewKVStoreKey(types.StoreKey)
 	tkey := storetypes.NewTransientStoreKey(types.StoreKey + "-t")
 	cdc := codec.NewProtoCodec(codectypes.NewInterfaceRegistry())
@@ -218,7 +221,28 @@ func TestGetTokenPairsPanicsOnCorruptValue(t *testing.T) {
 	store := ctx.KVStore(key)
 	store.Set(append(append([]byte{}, types.KeyPrefixTokenPair...), []byte("x")...), []byte("not-a-proto"))
 
-	require.Panics(t, func() { _ = k.GetTokenPairs(ctx) })
+	// The plain accessor degrades gracefully (query paths stay up)...
+	var pairs []types.TokenPair
+	require.NotPanics(t, func() { pairs = k.GetTokenPairs(ctx) })
+	require.Empty(t, pairs)
+
+	// ...while the reporting accessor exposes the damaged key.
+	reported, issues := k.GetTokenPairsWithReport(ctx)
+	require.Empty(t, reported)
+	require.Len(t, issues, 1)
+	require.Equal(t, keeper.GenesisExportIssueTokenPairCorrupt, issues[0].Kind)
+	require.NotEmpty(t, issues[0].Key)
+
+	// ExportGenesis must fail closed with the structured repair list.
+	defer func() {
+		r := recover()
+		require.NotNil(t, r, "ExportGenesis must abort on corrupt state")
+		exportErr, ok := r.(*keeper.GenesisExportError)
+		require.True(t, ok, "panic value must be the structured export error, got %T", r)
+		require.Len(t, exportErr.Issues, 1)
+		require.Contains(t, exportErr.Error(), string(keeper.GenesisExportIssueTokenPairCorrupt))
+	}()
+	_ = ExportGenesis(ctx, k)
 }
 
 // TestGenesisRoundTripPreservesDualKeyRefundReceivers covers the runtime

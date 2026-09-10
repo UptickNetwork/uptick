@@ -506,7 +506,24 @@ func (k Keeper) RefundPacketToken(
 		} else {
 			cwReceiver := k.GetCwAddressByContractTokenId(ctx, cwContractAddress, cwTokenId)
 			if len(cwReceiver) == 0 {
-				return sdkerrors.Wrapf(errortypes.ErrInvalidAddress, "missing CW721 refund receiver for contract %s token %s", cwContractAddress, cwTokenId)
+				// One token without a recorded receiver must not abort the whole
+				// packet: returning an error here tears down the IBC callback's
+				// cache context, so every OTHER token in the packet stays
+				// unrefunded and the packet keeps retrying. Skip with a
+				// distinguishable reason (symmetric with the owner/transfer
+				// skips above) and leave the mapping + NFT intact for a later
+				// repair/retry.
+				ctx.EventManager().EmitEvent(
+					sdk.NewEvent(
+						types.EventTypeRefundPacketTokenSkip,
+						sdk.NewAttribute(types.AttributeKeyNFTClass, data.ClassId),
+						sdk.NewAttribute(types.AttributeKeyNFTID, tokenId),
+						sdk.NewAttribute(types.AttributeKeyCW721Token, cwContractAddress),
+						sdk.NewAttribute(types.AttributeKeyCW721TokenID, cwTokenId),
+						sdk.NewAttribute("reason", "cw721_refund_receiver_missing"),
+					),
+				)
+				continue
 			}
 
 			_, err := k.TransferCw721(ctx, cwContractAddress, cwTokenId, string(cwReceiver), types.AccModuleAddress.String())

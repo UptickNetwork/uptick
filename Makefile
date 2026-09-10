@@ -194,20 +194,24 @@ TOOLS_DESTDIR  ?= $(GOPATH)/bin
 STATIK         = $(TOOLS_DESTDIR)/statik
 RUNSIM         = $(TOOLS_DESTDIR)/runsim
 
-# Install the runsim binary with a temporary workaround of entering an outside
-# directory as the "go get" command ignores the -mod option and will polute the
-# go.{mod, sum} files.
+# Install the runsim binary.
 #
-# ref: https://github.com/golang/go/issues/30515
+# The previous recipe ran `go get github.com/cosmos/tools/cmd/runsim@master`
+# from /tmp to keep go.{mod,sum} untouched. That no longer works: `go get`
+# installs nothing outside a module ("go.mod file not found in current
+# directory or any parent directory"), so the target and every simulation
+# target that depends on it failed before running a single test. A versioned
+# `go install` is the supported replacement and never touches the module of the
+# directory it is run from.
 runsim: $(RUNSIM)
 $(RUNSIM):
 	@echo "Installing runsim..."
-	@(cd /tmp && ${GO_MOD} go get github.com/cosmos/tools/cmd/runsim@master)
+	@GOBIN=$(TOOLS_DESTDIR) go install github.com/cosmos/tools/cmd/runsim@v1.0.0
 
 statik: $(STATIK)
 $(STATIK):
 	@echo "Installing statik..."
-	@(cd /tmp && go install github.com/rakyll/statik@v0.1.6)
+	@GOBIN=$(TOOLS_DESTDIR) go install github.com/rakyll/statik@v0.1.6
 
 contract-tools:
 ifeq (, $(shell which stringer))
@@ -387,30 +391,92 @@ test-sim-custom-genesis-fast:
 
 test-sim-import-export: runsim
 	@echo "Running application import/export simulation. This may take several minutes..."
-	@$(BINDIR)/runsim -Jobs=4 -SimAppPkg=$(SIMAPP) -ExitOnFail 50 5 TestAppImportExport
+	@$(RUNSIM) -Jobs=4 -SimAppPkg=$(SIMAPP) -ExitOnFail 50 5 TestAppImportExport
 
 test-sim-after-import: runsim
 	@echo "Running application simulation-after-import. This may take several minutes..."
-	@$(BINDIR)/runsim -Jobs=4 -SimAppPkg=$(SIMAPP) -ExitOnFail 50 5 TestAppSimulationAfterImport
+	@$(RUNSIM) -Jobs=4 -SimAppPkg=$(SIMAPP) -ExitOnFail 50 5 TestAppSimulationAfterImport
 
 test-sim-custom-genesis-multi-seed: runsim
 	@echo "Running multi-seed custom genesis simulation..."
 	@echo "By default, ${HOME}/.$(UPTICK_DIR)/config/genesis.json will be used."
-	@$(BINDIR)/runsim -Genesis=${HOME}/.$(UPTICK_DIR)/config/genesis.json -SimAppPkg=$(SIMAPP) -ExitOnFail 400 5 TestFullAppSimulation
+	@$(RUNSIM) -Genesis=${HOME}/.$(UPTICK_DIR)/config/genesis.json -SimAppPkg=$(SIMAPP) -ExitOnFail 400 5 TestFullAppSimulation
 
 test-sim-multi-seed-long: runsim
 	@echo "Running long multi-seed application simulation. This may take awhile!"
-	@$(BINDIR)/runsim -Jobs=4 -SimAppPkg=$(SIMAPP) -ExitOnFail 500 50 TestFullAppSimulation
+	@$(RUNSIM) -Jobs=4 -SimAppPkg=$(SIMAPP) -ExitOnFail 500 50 TestFullAppSimulation
 
 test-sim-multi-seed-short: runsim
 	@echo "Running short multi-seed application simulation. This may take awhile!"
-	@$(BINDIR)/runsim -Jobs=4 -SimAppPkg=$(SIMAPP) -ExitOnFail 50 10 TestFullAppSimulation
+	@$(RUNSIM) -Jobs=4 -SimAppPkg=$(SIMAPP) -ExitOnFail 50 10 TestFullAppSimulation
 
-test-sim-benchmark-invariants:
-	@echo "Running simulation invariant benchmarks..."
-	@go test -mod=readonly $(SIMAPP) -benchmem -bench=BenchmarkInvariants -run=^$ \
-	-Enabled=true -NumBlocks=1000 -BlockSize=200 \
-	-Period=1 -Commit=true -Seed=57 -v -timeout 24h
+# The invariant benchmark that used to live here is gone: SDK v0.53 made
+# module.Manager.RegisterInvariants a no-op and x/simulation stopped asserting
+# invariants, so no benchmark could assert anything. This one measures the same
+# harness the simulation targets drive.
+test-sim-benchmark:
+	@echo "Benchmarking the application simulation..."
+	@go test -mod=readonly $(SIMAPP) -benchmem -bench=BenchmarkSimulation -run=^$ \
+		-Enabled=true -NumBlocks=10 -BlockSize=200 -Commit=true -Seed=57 -v -timeout 24h
+
+# CI-sized simulation gate (audit G-05/G-06). The targets above are soak runs
+# driven by runsim; this one drives the same harness with block counts small
+# enough for every pull request, so determinism, export/import and
+# resume-from-export stop being "only run by hand" checks.
+#
+# Every test here is skipped unless -Enabled=true, which is why the flag is not
+# optional: without it the target would report success while doing nothing.
+test-sim-ci:
+	@echo "Running the CI-sized simulation gate..."
+	@go test -mod=readonly $(SIMAPP) -run TestAppStateDeterminism -Enabled=true \
+		-NumBlocks=5 -BlockSize=4 -Commit=true -Seed=1 -Period=0 -v -timeout 20m
+	@go test -mod=readonly $(SIMAPP) -run TestAppImportExport -Enabled=true \
+		-NumBlocks=5 -BlockSize=4 -Commit=true -Seed=1 -Period=0 -v -timeout 20m
+	@go test -mod=readonly $(SIMAPP) -run TestAppSimulationAfterImport -Enabled=true \
+		-NumBlocks=4 -BlockSize=3 -Commit=true -Seed=1 -Period=0 -v -timeout 20m
+	@go test -mod=readonly $(SIMAPP) -run TestFullAppSimulation -Enabled=true \
+		-NumBlocks=5 -BlockSize=4 -Commit=true -Seed=1 -Period=0 -v -timeout 20m
+.PHONY: test-sim-ci
+
+###############################################################################
+###                             End-to-end tests                             ###
+###############################################################################
+
+# The e2e suite needs a real node: it signs Keplr-style transactions and probes
+# the EVM JSON-RPC endpoint. scripts/e2e-localnet.sh owns the node lifecycle so
+# the same command works locally and in CI.
+#
+# UPTICK_E2E_STRICT=1 makes an unreachable node a failure instead of a skip -
+# otherwise this target could pass without ever talking to a chain.
+e2e-localnet-start:
+	@./scripts/e2e-localnet.sh start
+
+e2e-localnet-stop:
+	@./scripts/e2e-localnet.sh stop
+
+# Start a node, run the e2e suite against it with strict mode on, always stop
+# the node.
+#
+# Node, test and teardown are joined into ONE shell on purpose. Make runs each
+# recipe line in its own shell, and a job runner reaps a step's process tree
+# when that shell exits - so `start` in its own recipe line reliably leaves the
+# test talking to a node that is already dead. Keeping it a single shell is
+# also what makes `exit $$status` meaningful: the failure of the test, not of
+# the teardown, decides the target's exit code.
+test-e2e-localnet:
+	@status=0; \
+	./scripts/e2e-localnet.sh start || status=$$?; \
+	if [ $$status -eq 0 ]; then \
+		UPTICK_E2E_STRICT=1 go test -mod=readonly ./tests/e2e/... -count=1 -v -timeout 15m || status=$$?; \
+	fi; \
+	./scripts/e2e-localnet.sh stop || true; \
+	exit $$status
+.PHONY: test-e2e-localnet e2e-localnet-start e2e-localnet-stop
+
+# Run the e2e suite against an already running node (see e2e-localnet-start).
+test-e2e:
+	@go test -mod=readonly ./tests/e2e/... -count=1 -v -timeout 15m
+.PHONY: test-e2e
 
 .PHONY: \
 test-sim-nondeterminism \
@@ -420,7 +486,7 @@ test-sim-after-import \
 test-sim-custom-genesis-multi-seed \
 test-sim-multi-seed-short \
 test-sim-multi-seed-long \
-test-sim-benchmark-invariants
+test-sim-benchmark
 
 benchmark:
 	@go test -mod=readonly -bench=. $(PACKAGES_NOSIMULATION)

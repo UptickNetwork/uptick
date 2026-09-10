@@ -769,13 +769,25 @@ func (k Keeper) RefundPacketToken(
 		} else {
 			evmReceiver := k.GetEvmRefundReceiver(ctx, evmContractAddress, tokenId, evmTokenId)
 			if len(evmReceiver) == 0 {
-				// Deliberately kept as an error, symmetric with x/cw721
-				// (msg_server.go, "missing CW721 refund receiver") which has a
-				// pinned test for it: without a recorded receiver there is no
-				// address to refund to at all. Every skip-able failure mode
-				// above continues; this one aborts the callback so the whole
-				// packet retries once the receiver record is repaired.
-				return sdkerrors.Wrapf(errortypes.ErrInvalidAddress, "missing ERC721 refund receiver for contract %s token %s", evmContractAddress, tokenId)
+				// One token without a recorded receiver must not abort the
+				// whole packet. Returning here used to tear down the IBC
+				// callback's cache context, leaving every OTHER token in the
+				// packet unrefunded and the packet itself retrying forever.
+				// Skip with a distinguishable reason — symmetric with every
+				// other per-token failure in this function and with x/cw721.
+				// The pair mapping and the native NFT are left untouched so a
+				// later repair/retry can still refund this token.
+				ctx.EventManager().EmitEvent(
+					sdk.NewEvent(
+						types.EventTypeRefundPacketTokenSkip,
+						sdk.NewAttribute(types.AttributeKeyNFTClass, data.ClassId),
+						sdk.NewAttribute(types.AttributeKeyNFTID, tokenId),
+						sdk.NewAttribute(types.AttributeKeyERC721Token, evmContractAddress),
+						sdk.NewAttribute(types.AttributeKeyERC721TokenID, evmTokenId),
+						sdk.NewAttribute("reason", "erc721_refund_receiver_missing"),
+					),
+				)
+				continue
 			}
 			receiver = common.HexToAddress(string(evmReceiver))
 

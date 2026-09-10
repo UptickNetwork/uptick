@@ -218,10 +218,12 @@ func TestGenesisPairsCaseInsensitiveRefundContract(t *testing.T) {
 	require.NoError(t, gs.Validate())
 }
 
-// TestGetTokenPairsPanicsOnCorruptValue pins the fail-loud contract of the
-// plural pair iterator (mirrors the erc721 test): a corrupt stored pair must
-// panic on the genesis-export path rather than being silently dropped.
-func TestGetTokenPairsPanicsOnCorruptValue(t *testing.T) {
+// TestGetTokenPairsSkipsAndReportsCorruptValue replaces the old fail-loud
+// panic contract of the plural pair iterator (mirrors the erc721 test): the
+// accessor is reachable from the gRPC query path, so it degrades gracefully
+// and reports the damaged key, and the fail-closed genesis export turns that
+// report into a diagnosable abort.
+func TestGetTokenPairsSkipsAndReportsCorruptValue(t *testing.T) {
 	key := storetypes.NewKVStoreKey(types.StoreKey)
 	tkey := storetypes.NewTransientStoreKey(types.StoreKey + "-t")
 	cdc := codec.NewProtoCodec(codectypes.NewInterfaceRegistry())
@@ -231,7 +233,28 @@ func TestGetTokenPairsPanicsOnCorruptValue(t *testing.T) {
 	store := ctx.KVStore(key)
 	store.Set(append(append([]byte{}, types.KeyPrefixTokenPair...), []byte("x")...), []byte("not-a-proto"))
 
-	require.Panics(t, func() { _ = k.GetTokenPairs(ctx) })
+	// The plain accessor degrades gracefully (query paths stay up)...
+	var pairs []types.TokenPair
+	require.NotPanics(t, func() { pairs = k.GetTokenPairs(ctx) })
+	require.Empty(t, pairs)
+
+	// ...while the reporting accessor exposes the damaged key.
+	reported, issues := k.GetTokenPairsWithReport(ctx)
+	require.Empty(t, reported)
+	require.Len(t, issues, 1)
+	require.Equal(t, keeper.GenesisExportIssueTokenPairCorrupt, issues[0].Kind)
+	require.NotEmpty(t, issues[0].Key)
+
+	// ExportGenesis must fail closed with the structured repair list.
+	defer func() {
+		r := recover()
+		require.NotNil(t, r, "ExportGenesis must abort on corrupt state")
+		exportErr, ok := r.(*keeper.GenesisExportError)
+		require.True(t, ok, "panic value must be the structured export error, got %T", r)
+		require.Len(t, exportErr.Issues, 1)
+		require.Contains(t, exportErr.Error(), string(keeper.GenesisExportIssueTokenPairCorrupt))
+	}()
+	_ = ExportGenesis(ctx, k)
 }
 
 // TestDeletePairPerTokenStateClearsOrphans is the cw721 twin of the erc721

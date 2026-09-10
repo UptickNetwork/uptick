@@ -40,10 +40,21 @@ func (k Keeper) InitGenesis(ctx sdk.Context, data types.GenesisState) {
 }
 
 // ExportGenesis returns a GenesisState for a given context and keeper.
+//
+// Degradations reported by GetCollectionsWithReport are logged at Error level
+// and summarized: the export still succeeds (no class or NFT is dropped), but
+// an operator must be able to see that some metadata fields were lost.
 func (k Keeper) ExportGenesis(ctx sdk.Context) *types.GenesisState {
-	collections, err := k.GetCollections(ctx)
-	if err != nil {
-		panic(err)
+	collections, issues := k.GetCollectionsWithReport(ctx)
+	for _, issue := range issues {
+		k.Logger(ctx).Error("ExportGenesis: export degraded", "issue", issue.String())
+	}
+	if len(issues) > 0 {
+		k.Logger(ctx).Error(
+			"ExportGenesis: exported genesis is partially degraded; listed classes lost metadata fields",
+			"degraded_classes", len(issues),
+			"exported_classes", len(collections),
+		)
 	}
 	return types.NewGenesisState(collections)
 }

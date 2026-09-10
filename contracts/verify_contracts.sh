@@ -17,9 +17,15 @@
 # so the build stays reproducible across environments; this was verified by a
 # full byte-for-byte rebuild comparison.
 #
-# Audit P3-15: ERC20Burnable is an abstract contract — solc emits no bytecode
-# for it. That case is now asserted explicitly (empty committed bin, empty
-# refs hash) instead of silently "passing" an empty-bytecode comparison.
+# Audit P3-15: an abstract contract produces no bytecode. That case is asserted
+# explicitly (empty committed bin, empty refs hash) instead of silently
+# "passing" an empty-vs-empty comparison.
+#
+# Audit O-05: compiled_contracts/*.json with no matching root .sol is a
+# violation — such an artifact can be neither rebuilt nor reviewed, so it must
+# not exist. The check at the bottom makes that an explicit gate instead of an
+# implicit gap in the `for *.sol` loop (which is why the old orphan
+# compiled_contracts/ERC20Burnable.json could sit unreferenced for so long).
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -85,9 +91,9 @@ for sol in *.sol; do
     artifact="$TMP_DO/${name}.${kind}"
     ref_file="${refs_dir}/${name}.${kind}.sha256"
 
-    # Audit P3-15: ERC20Burnable is an abstract contract — solc emits an EMPTY
-    # bytecode file (or none at all). Assert that case explicitly instead of
-    # letting an empty-vs-empty comparison silently "pass".
+    # Audit P3-15: an abstract contract yields an EMPTY bytecode file (or none
+    # at all). Assert that case explicitly instead of letting an empty-vs-empty
+    # comparison silently "pass".
     if [ ! -s "$artifact" ]; then
       committed_bin="$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('bin',''))" "$json_file" 2>/dev/null || echo UNKNOWN)"
       if [ "$committed_bin" = "" ]; then
@@ -132,5 +138,29 @@ for sol in *.sol; do
     fi
   done
 done
+
+# Audit O-05: every committed artifact must be traceable to a root .sol source.
+# The loop above only walks `*.sol`, so a stale artifact left behind by a
+# removed or renamed contract would never be looked at (and, because it is
+# outside the loop, never compared against anything either).
+for json_file in compiled_contracts/*.json; do
+  [ -e "$json_file" ] || continue
+  base="$(basename "$json_file" .json)"
+  if [ ! -f "${base}.sol" ]; then
+    echo "error: $json_file has no matching ${base}.sol source; delete the orphan" >&2
+    status=1
+  fi
+done
+
+# In write mode also regenerate checksums.txt so the artifact integrity list can
+# never drift from the artifacts it describes.
+if [ "$write_mode" = "write" ]; then
+  : > checksums.txt
+  for json_file in compiled_contracts/*.json; do
+    [ -e "$json_file" ] || continue
+    echo "$(hash_file "$json_file")  $json_file" >> checksums.txt
+    echo "wrote checksums.txt entry for $json_file"
+  done
+fi
 
 exit "$status"

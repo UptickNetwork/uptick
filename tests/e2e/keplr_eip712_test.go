@@ -72,25 +72,29 @@ func init() {
 	cmdcfg.RegisterDenoms()
 }
 
-func TestKeplrEip712TransferEndToEnd(t *testing.T) {
-	home := os.Getenv("UPTICK_E2E_HOME")
-	if home == "" {
-		home = "/tmp/uptick-keplr"
-	}
-	rest := os.Getenv("UPTICK_E2E_REST")
-	if rest == "" {
-		rest = "http://127.0.0.1:1317"
-	}
+// e2eNode resolves the node the suite talks to.
+//
+// Under UPTICK_E2E_STRICT=1 an unreachable node is a hard failure. The
+// dedicated e2e CI job starts a real node and sets that variable precisely so
+// that a green run always means the node was really exercised - a suite that
+// silently skips itself proves nothing about Keplr broadcast paths.
+func e2eNode(t *testing.T) (home, rest string) {
+	t.Helper()
+
+	home = envOr("UPTICK_E2E_HOME", "/tmp/uptick-keplr")
+	rest = envOr("UPTICK_E2E_REST", "http://127.0.0.1:1317")
+
 	if !restReachable(rest) {
-		// In the dedicated e2e job (UPTICK_E2E_STRICT=1) a missing
-		// node is a failure, not a skip — `go test ./...` passing
-		// locally with this suite skipped proves nothing about real
-		// Keplr broadcast paths.
 		if os.Getenv("UPTICK_E2E_STRICT") == "1" {
-			t.Fatalf("no uptick node reachable at %s; the CI e2e job must never skip", rest)
+			t.Fatalf("no uptick node reachable at %s; UPTICK_E2E_STRICT=1 forbids skipping this suite", rest)
 		}
-		t.Skipf("no uptick node reachable at %s; set UPTICK_E2E_REST to run the e2e test", rest)
+		t.Skipf("no uptick node reachable at %s; set UPTICK_E2E_REST to run the e2e suite", rest)
 	}
+	return home, rest
+}
+
+func TestKeplrEip712TransferEndToEnd(t *testing.T) {
+	home, rest := e2eNode(t)
 
 	enc := params.MakeEncodingConfig()
 	banktypes.RegisterInterfaces(enc.InterfaceRegistry)
@@ -138,18 +142,11 @@ func TestKeplrEip712TransferEndToEnd(t *testing.T) {
 // dApp path (window.keplr.getOfflineSigner + @cosmjs/stargate): SIGN_MODE_DIRECT
 // with the legacy /ethermint.crypto.v1.ethsecp256k1.PubKey public key and no
 // Web3 extension option.
+//
+// This path was previously skipped unconditionally, so nothing ever exercised
+// it. It now honours the same node/strict contract as the EIP-712 test.
 func TestKeplrDirectTransferEndToEnd(t *testing.T) {
-	home := os.Getenv("UPTICK_E2E_HOME")
-	if home == "" {
-		home = "/tmp/uptick-keplr"
-	}
-	rest := os.Getenv("UPTICK_E2E_REST")
-	if rest == "" {
-		rest = "http://127.0.0.1:1317"
-	}
-	if !restReachable(rest) {
-		t.Skipf("no uptick node reachable at %s", rest)
-	}
+	home, rest := e2eNode(t)
 
 	enc := params.MakeEncodingConfig()
 	banktypes.RegisterInterfaces(enc.InterfaceRegistry)
@@ -160,70 +157,17 @@ func TestKeplrDirectTransferEndToEnd(t *testing.T) {
 	pubKey := privKey.PubKey().(*ethsecp256k1.PubKey)
 	from := sdk.AccAddress(pubKey.Address().Bytes())
 
-	accNum, seq := queryAccount(t, rest, from.String())
-	msgs := []sdk.Msg{
-		&banktypes.MsgSend{
-			FromAddress: from.String(),
-			ToAddress:   from.String(),
-			Amount:      sdk.NewCoins(sdk.NewInt64Coin(e2eDenom, 1)),
-		},
-	}
-	fee := legacytx.StdFee{
-		Amount: sdk.NewCoins(sdk.NewCoin(e2eDenom, e2eFeeAmount)),
-		Gas:    200000,
-	}
-
-	msgAny, err := codectypes.NewAnyWithValue(msgs[0])
-	require.NoError(t, err)
-	pubAny := newLegacyAny(t, "/ethermint.crypto.v1.ethsecp256k1.PubKey", &ethsecp256k1.PubKey{Key: pubKey.Bytes()})
-
-	body := &txtypes.TxBody{Messages: []*codectypes.Any{msgAny}}
-	bodyBz, err := enc.Codec.Marshal(body)
-	require.NoError(t, err)
-
-	authInfo := &txtypes.AuthInfo{
-		SignerInfos: []*txtypes.SignerInfo{
-			{
-				PublicKey: pubAny,
-				ModeInfo: &txtypes.ModeInfo{
-					Sum: &txtypes.ModeInfo_Single_{
-						Single: &txtypes.ModeInfo_Single{Mode: signing.SignMode_SIGN_MODE_DIRECT},
-					},
-				},
-				Sequence: seq,
-			},
-		},
-		Fee: &txtypes.Fee{Amount: fee.Amount, GasLimit: fee.Gas},
-	}
-	authInfoBz, err := enc.Codec.Marshal(authInfo)
-	require.NoError(t, err)
-
-	signDoc := &txtypes.SignDoc{
-		BodyBytes:     bodyBz,
-		AuthInfoBytes: authInfoBz,
-		ChainId:       e2eChainID,
-		AccountNumber: accNum,
-	}
-	signDocBz, err := enc.Codec.Marshal(signDoc)
-	require.NoError(t, err)
-	sig, err := privKey.Sign(signDocBz)
-	require.NoError(t, err)
-
-	txRaw := &txtypes.TxRaw{
-		BodyBytes:     bodyBz,
-		AuthInfoBytes: authInfoBz,
-		Signatures:    [][]byte{sig},
-	}
-	txRawBz, err := enc.Codec.Marshal(txRaw)
-	require.NoError(t, err)
-
-	txHash := broadcastTx(t, rest, base64.StdEncoding.EncodeToString(txRawBz))
-	require.Eventually(t, func() bool {
-		code, height := queryTxResult(t, rest, txHash)
-		return height != "" && code >= 0
-	}, 20*time.Second, 500*time.Millisecond)
-	code, _ := queryTxResult(t, rest, txHash)
-	require.Zero(t, code, "keplr direct transfer failed with code %d", code)
+	// The SIGN_MODE_DIRECT construction lives in signDirectAndBroadcast so
+	// there is exactly one implementation of it. Keeping a second copy here
+	// meant a fix to the signing path could land in one place and be missed in
+	// the other - the failure mode the audit found twice in the erc721/cw721
+	// pair, and the reason this test now shares the collection lifecycle
+	// suite's code instead of duplicating it.
+	signDirectAndBroadcast(t, enc, rest, privKey, pubKey, from, &banktypes.MsgSend{
+		FromAddress: from.String(),
+		ToAddress:   from.String(),
+		Amount:      sdk.NewCoins(sdk.NewInt64Coin(e2eDenom, 1)),
+	}, 200_000)
 }
 
 func buildSignedKeplrEip712Tx(
@@ -295,10 +239,16 @@ func buildSignedKeplrEip712Tx(
 
 func loadKeplrPrivKey(t *testing.T, home string, cdc codec.Codec) cryptotypes.PrivKey {
 	t.Helper()
-	kr, err := keyring.New("uptick", keyring.BackendTest, home, nil, cdc)
+
+	// The service name decides the on-disk keyring directory
+	// (<home>/<service>-test), so it must match the one the CLI uses. The CLI
+	// goes through sdk.KeyringServiceName(); hardcoding a different name here
+	// made the key invisible and would strand this test on first contact with a
+	// real node.
+	kr, err := keyring.New(sdk.KeyringServiceName(), keyring.BackendTest, home, nil, cdc)
 	require.NoError(t, err)
 	rec, err := kr.Key("keplr")
-	require.NoError(t, err)
+	require.NoError(t, err, "no %q key in the test keyring under %s", "keplr", home)
 	local := rec.GetLocal()
 	require.NotNil(t, local, "keplr key is not a local key")
 	priv, ok := local.PrivKey.GetCachedValue().(cryptotypes.PrivKey)

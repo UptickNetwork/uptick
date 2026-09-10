@@ -5,10 +5,10 @@ import (
 	"math/rand"
 	"strings"
 
-	simappparams "cosmossdk.io/simapp/params"
 	"github.com/cosmos/cosmos-sdk/baseapp"
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	moduletestutil "github.com/cosmos/cosmos-sdk/types/module/testutil"
 	simtypes "github.com/cosmos/cosmos-sdk/types/simulation"
 	"github.com/cosmos/cosmos-sdk/x/simulation"
 
@@ -161,7 +161,12 @@ func SimulateMsgTransferNFT(k keeper.Keeper, ak types.AccountKeeper, bk types.Ba
 			return simtypes.NoOpMsg(types.ModuleName, types.EventTypeTransfer, err.Error()), nil, err
 		}
 
-		txGen := simappparams.MakeTestEncodingConfig().TxConfig
+		// The deprecated cosmossdk.io/simapp/params.MakeTestEncodingConfig built
+		// its interface registry with types.NewInterfaceRegistry(), which carries
+		// a failing address codec. TxBuilder.SetMsgs derives signer addresses
+		// through that codec, so every signed mock tx failed with "requires a
+		// proper address codec implementation to do address conversion".
+		txGen := moduletestutil.MakeTestTxConfig()
 		tx, err := simtestutil.GenSignedMockTx(
 			r,
 			txGen,
@@ -220,7 +225,12 @@ func SimulateMsgEditNFT(k keeper.Keeper, ak types.AccountKeeper, bk types.BankKe
 			return simtypes.NoOpMsg(types.ModuleName, types.EventTypeEditNFT, err.Error()), nil, err
 		}
 
-		txGen := simappparams.MakeTestEncodingConfig().TxConfig
+		// The deprecated cosmossdk.io/simapp/params.MakeTestEncodingConfig built
+		// its interface registry with types.NewInterfaceRegistry(), which carries
+		// a failing address codec. TxBuilder.SetMsgs derives signer addresses
+		// through that codec, so every signed mock tx failed with "requires a
+		// proper address codec implementation to do address conversion".
+		txGen := moduletestutil.MakeTestTxConfig()
 		tx, err := simtestutil.GenSignedMockTx(
 			r,
 			txGen,
@@ -254,9 +264,14 @@ func SimulateMsgMintNFT(k keeper.Keeper, ak types.AccountKeeper, bk types.BankKe
 		randomSender, _ := simtypes.RandomAcc(r, accs)
 		randomRecipient, _ := simtypes.RandomAcc(r, accs)
 
+		denomID := randDenom(ctx, k, r, true, false)
+		if denomID == "" {
+			return simtypes.NoOpMsg(types.ModuleName, types.EventTypeMintNFT, "no mintable denom"), nil, nil
+		}
+
 		msg := types.NewMsgMintNFT(
-			genNFTID(r, 3, 128),               // nft ID
-			randDenom(ctx, k, r, true, false), // denom
+			genNFTID(r, 3, 128), // nft ID
+			denomID,             // denom
 			"",
 			simtypes.RandStringOfLength(r, 45), // tokenURI
 			simtypes.RandStringOfLength(r, 32), // uriHash
@@ -278,7 +293,12 @@ func SimulateMsgMintNFT(k keeper.Keeper, ak types.AccountKeeper, bk types.BankKe
 			return simtypes.NoOpMsg(types.ModuleName, types.EventTypeMintNFT, err.Error()), nil, err
 		}
 
-		txGen := simappparams.MakeTestEncodingConfig().TxConfig
+		// The deprecated cosmossdk.io/simapp/params.MakeTestEncodingConfig built
+		// its interface registry with types.NewInterfaceRegistry(), which carries
+		// a failing address codec. TxBuilder.SetMsgs derives signer addresses
+		// through that codec, so every signed mock tx failed with "requires a
+		// proper address codec implementation to do address conversion".
+		txGen := moduletestutil.MakeTestTxConfig()
 		tx, err := simtestutil.GenSignedMockTx(
 			r,
 			txGen,
@@ -329,7 +349,12 @@ func SimulateMsgBurnNFT(k keeper.Keeper, ak types.AccountKeeper, bk types.BankKe
 			return simtypes.NoOpMsg(types.ModuleName, types.EventTypeBurnNFT, err.Error()), nil, err
 		}
 
-		txGen := simappparams.MakeTestEncodingConfig().TxConfig
+		// The deprecated cosmossdk.io/simapp/params.MakeTestEncodingConfig built
+		// its interface registry with types.NewInterfaceRegistry(), which carries
+		// a failing address codec. TxBuilder.SetMsgs derives signer addresses
+		// through that codec, so every signed mock tx failed with "requires a
+		// proper address codec implementation to do address conversion".
+		txGen := moduletestutil.MakeTestTxConfig()
 		tx, err := simtestutil.GenSignedMockTx(
 			r,
 			txGen,
@@ -362,14 +387,18 @@ func SimulateMsgTransferDenom(k keeper.Keeper, ak types.AccountKeeper, bk types.
 	) {
 
 		denomID := randDenom(ctx, k, r, false, false)
+		if denomID == "" {
+			return simtypes.NoOpMsg(types.ModuleName, types.TypeMsgTransferDenom, "no denom available"), nil, nil
+		}
+
 		denom, err := k.GetDenomInfo(ctx, denomID)
 		if err != nil {
-			return simtypes.NoOpMsg(types.ModuleName, types.TypeMsgTransferDenom, err.Error()), nil, err
+			return simtypes.NoOpMsg(types.ModuleName, types.TypeMsgTransferDenom, err.Error()), nil, nil
 		}
 
 		creator, err := sdk.AccAddressFromBech32(denom.Creator)
 		if err != nil {
-			return simtypes.NoOpMsg(types.ModuleName, types.TypeMsgTransferDenom, err.Error()), nil, err
+			return simtypes.NoOpMsg(types.ModuleName, types.TypeMsgTransferDenom, err.Error()), nil, nil
 		}
 		account := ak.GetAccount(ctx, creator)
 		owner, found := simtypes.FindAccount(accs, account.GetAddress())
@@ -390,7 +419,12 @@ func SimulateMsgTransferDenom(k keeper.Keeper, ak types.AccountKeeper, bk types.
 			return simtypes.NoOpMsg(types.ModuleName, types.TypeMsgTransferDenom, err.Error()), nil, err
 		}
 
-		txGen := simappparams.MakeTestEncodingConfig().TxConfig
+		// The deprecated cosmossdk.io/simapp/params.MakeTestEncodingConfig built
+		// its interface registry with types.NewInterfaceRegistry(), which carries
+		// a failing address codec. TxBuilder.SetMsgs derives signer addresses
+		// through that codec, so every signed mock tx failed with "requires a
+		// proper address codec implementation to do address conversion".
+		txGen := moduletestutil.MakeTestTxConfig()
 		tx, err := simtestutil.GenSignedMockTx(
 			r,
 			txGen,
@@ -453,7 +487,12 @@ func SimulateMsgIssueDenom(k keeper.Keeper, ak types.AccountKeeper, bk types.Ban
 			return simtypes.NoOpMsg(types.ModuleName, types.TypeMsgTransferDenom, err.Error()), nil, err
 		}
 
-		txGen := simappparams.MakeTestEncodingConfig().TxConfig
+		// The deprecated cosmossdk.io/simapp/params.MakeTestEncodingConfig built
+		// its interface registry with types.NewInterfaceRegistry(), which carries
+		// a failing address codec. TxBuilder.SetMsgs derives signer addresses
+		// through that codec, so every signed mock tx failed with "requires a
+		// proper address codec implementation to do address conversion".
+		txGen := moduletestutil.MakeTestTxConfig()
 		tx, err := simtestutil.GenSignedMockTx(
 			r,
 			txGen,
@@ -494,33 +533,51 @@ func genDenomID(r *rand.Rand) string {
 	return denomID
 }
 
-func randNFT(ctx sdk.Context, k keeper.Keeper, r *rand.Rand, mintable, editable bool) (sdk.AccAddress, string, string) {
-	var denoms = []string{kitties, doggos}
+// existingDenoms lists the denoms in the store that satisfy the requested
+// capability filters, in store order.
+//
+// The previous helpers seeded their candidate list with the hardcoded names
+// "kitties" and "doggos", so a randomly picked denom frequently did not exist
+// and the generated message failed on chain ("denom ID kitties not exists").
+// Generators must only ever return denoms that are actually present.
+func existingDenoms(ctx sdk.Context, k keeper.Keeper, mintable, editable bool) []string {
 	res, err := k.Denoms(sdk.UnwrapSDKContext(ctx), &types.QueryDenomsRequest{})
+	if err != nil {
+		return nil
+	}
 
-	if err == nil {
-		for _, d := range res.Denoms {
-			if mintable && !d.MintRestricted {
-				denoms = append(denoms, d.Id)
-			}
-
-			if editable && !d.UpdateRestricted {
-				denoms = append(denoms, d.Id)
-			}
+	denoms := make([]string, 0, len(res.Denoms))
+	for _, d := range res.Denoms {
+		if mintable && d.MintRestricted {
+			continue
 		}
+		if editable && d.UpdateRestricted {
+			continue
+		}
+		denoms = append(denoms, d.Id)
+	}
+	return denoms
+}
+
+func randNFT(ctx sdk.Context, k keeper.Keeper, r *rand.Rand, mintable, editable bool) (sdk.AccAddress, string, string) {
+	denoms := existingDenoms(ctx, k, mintable, editable)
+
+	// Drop denoms that hold no NFT and retry; the loop is bounded by the number
+	// of denoms and consumes randomness deterministically for a given state.
+	for len(denoms) > 0 {
+		idx := r.Intn(len(denoms))
+		denomID := denoms[idx]
+
+		nfts, err := k.GetNFTs(ctx, denomID)
+		if err == nil && len(nfts) > 0 {
+			token := nfts[r.Intn(len(nfts))]
+			return token.GetOwner(), denomID, token.GetID()
+		}
+
+		denoms = append(denoms[:idx], denoms[idx+1:]...)
 	}
 
-	idx := r.Intn(len(denoms))
-
-	rndDenomID := denoms[idx]
-	nfts, err := k.GetNFTs(ctx, rndDenomID)
-	if err != nil || len(nfts) == 0 {
-		return nil, "", ""
-	}
-
-	// get random collection from owner's balance
-	token := nfts[r.Intn(len(nfts))]
-	return token.GetOwner(), rndDenomID, token.GetID()
+	return nil, "", ""
 }
 
 func randData(r *rand.Rand) string {
@@ -534,25 +591,14 @@ func genNFTID(r *rand.Rand, minID, maxID int) string {
 	return strings.ToLower(id)
 }
 
+// randDenom returns an existing denom usable for the requested capability, or
+// "" when the store has none. Callers must treat "" as "nothing to do".
 func randDenom(ctx sdk.Context, k keeper.Keeper, r *rand.Rand, mintable, editable bool) string {
-	res, err := k.Denoms(sdk.UnwrapSDKContext(ctx), &types.QueryDenomsRequest{})
-	var denoms = []string{kitties, doggos}
-	if err != nil {
-		i := r.Intn(len(denoms))
-		return denoms[i]
+	denoms := existingDenoms(ctx, k, mintable, editable)
+	if len(denoms) == 0 {
+		return ""
 	}
-
-	for _, d := range res.Denoms {
-		if mintable && !d.MintRestricted {
-			denoms = append(denoms, d.Id)
-		}
-
-		if editable && !d.UpdateRestricted {
-			denoms = append(denoms, d.Id)
-		}
-	}
-	idx := r.Intn(len(denoms))
-	return denoms[idx]
+	return denoms[r.Intn(len(denoms))]
 }
 
 func genRandomBool(r *rand.Rand) bool {

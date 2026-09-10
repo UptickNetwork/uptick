@@ -2,6 +2,7 @@ package app
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	storetypes "cosmossdk.io/store/types"
@@ -76,15 +77,28 @@ func (app *Uptick) prepForZeroHeightGenesis(ctx sdk.Context, jailAllowedAddrs []
 
 	/* Handle fee distribution state. */
 
+	// Every withdrawal below must succeed before any irreversible cleanup
+	// runs: the slash-event and historical-reward purges further down cannot be
+	// undone by re-running the export, so a failure that used to be
+	// log-and-continue could ship a genesis whose distribution accounting is
+	// silently incomplete. Errors are collected (not just the first one) so a
+	// single run reports everything that needs attention, and returned before
+	// the destructive steps.
+	var distributionErrs []error
+
 	// withdraw all validator commission
 	err := app.StakingKeeper.IterateValidators(ctx, func(_ int64, val stakingtypes.ValidatorI) (stop bool) {
 		valBz, err := app.StakingKeeper.ValidatorAddressCodec().StringToBytes(val.GetOperator())
 		if err != nil {
 			ctx.Logger().Error("failed to decode validator operator address", "operator", val.GetOperator(), "err", err)
-			panic(err)
+			distributionErrs = append(distributionErrs,
+				fmt.Errorf("decode validator operator %s: %w", val.GetOperator(), err))
+			return false
 		}
 		if _, err := app.DistrKeeper.WithdrawValidatorCommission(ctx, valBz); err != nil {
 			ctx.Logger().Error("withdraw validator commission failed", "operator", val.GetOperator(), "err", err)
+			distributionErrs = append(distributionErrs,
+				fmt.Errorf("withdraw validator commission for %s: %w", val.GetOperator(), err))
 		}
 		return false
 	})
@@ -100,16 +114,29 @@ func (app *Uptick) prepForZeroHeightGenesis(ctx sdk.Context, jailAllowedAddrs []
 	for _, delegation := range dels {
 		valAddr, err := sdk.ValAddressFromBech32(delegation.ValidatorAddress)
 		if err != nil {
-			return err
+			distributionErrs = append(distributionErrs,
+				fmt.Errorf("decode validator address %s: %w", delegation.ValidatorAddress, err))
+			continue
 		}
 
 		delAddr, err := sdk.AccAddressFromBech32(delegation.DelegatorAddress)
 		if err != nil {
-			return err
+			distributionErrs = append(distributionErrs,
+				fmt.Errorf("decode delegator address %s: %w", delegation.DelegatorAddress, err))
+			continue
 		}
 		if _, err := app.DistrKeeper.WithdrawDelegationRewards(ctx, delAddr, valAddr); err != nil {
 			ctx.Logger().Error("withdraw delegation rewards failed", "delegator", delegation.DelegatorAddress, "validator", delegation.ValidatorAddress, "err", err)
+			distributionErrs = append(distributionErrs,
+				fmt.Errorf("withdraw delegation rewards for %s/%s: %w",
+					delegation.DelegatorAddress, delegation.ValidatorAddress, err))
 		}
+	}
+
+	if len(distributionErrs) > 0 {
+		return fmt.Errorf(
+			"zero-height export aborted before the irreversible distribution cleanup: %w",
+			errors.Join(distributionErrs...))
 	}
 
 	// clear validator slash events
@@ -155,6 +182,11 @@ func (app *Uptick) prepForZeroHeightGenesis(ctx sdk.Context, jailAllowedAddrs []
 	}
 
 	// reinitialize all delegations
+	//
+	// By the time this runs the slash events and historical rewards have
+	// already been purged, so a hook failure can no longer be downgraded to a
+	// log line: the export must fail rather than emit a genesis whose
+	// delegation indexes were never rebuilt.
 	for _, del := range dels {
 		valAddr, err := sdk.ValAddressFromBech32(del.ValidatorAddress)
 		if err != nil {
@@ -166,9 +198,13 @@ func (app *Uptick) prepForZeroHeightGenesis(ctx sdk.Context, jailAllowedAddrs []
 		}
 		if err := app.DistrKeeper.Hooks().BeforeDelegationCreated(ctx, delAddr, valAddr); err != nil {
 			ctx.Logger().Error("BeforeDelegationCreated hook failed", "delegator", del.DelegatorAddress, "validator", del.ValidatorAddress, "err", err)
+			return fmt.Errorf("rebuild delegation index (BeforeDelegationCreated) for %s/%s: %w",
+				del.DelegatorAddress, del.ValidatorAddress, err)
 		}
 		if err := app.DistrKeeper.Hooks().AfterDelegationModified(ctx, delAddr, valAddr); err != nil {
 			ctx.Logger().Error("AfterDelegationModified hook failed", "delegator", del.DelegatorAddress, "validator", del.ValidatorAddress, "err", err)
+			return fmt.Errorf("rebuild delegation index (AfterDelegationModified) for %s/%s: %w",
+				del.DelegatorAddress, del.ValidatorAddress, err)
 		}
 	}
 
@@ -178,16 +214,22 @@ func (app *Uptick) prepForZeroHeightGenesis(ctx sdk.Context, jailAllowedAddrs []
 	/* Handle staking state. */
 
 	// iterate through redelegations, reset creation height
+	var resetErrs []error
 	if err := app.StakingKeeper.IterateRedelegations(ctx, func(_ int64, red stakingtypes.Redelegation) (stop bool) {
 		for i := range red.Entries {
 			red.Entries[i].CreationHeight = 0
 		}
 		if err := app.StakingKeeper.SetRedelegation(ctx, red); err != nil {
 			ctx.Logger().Error("SetRedelegation failed", "delegator", red.DelegatorAddress, "validator", red.ValidatorSrcAddress, "err", err)
+			resetErrs = append(resetErrs,
+				fmt.Errorf("reset redelegation %s/%s: %w", red.DelegatorAddress, red.ValidatorSrcAddress, err))
 		}
 		return false
 	}); err != nil {
 		return fmt.Errorf("failed to iterate redelegations: %w", err)
+	}
+	if len(resetErrs) > 0 {
+		return fmt.Errorf("failed to reset redelegation creation heights: %w", errors.Join(resetErrs...))
 	}
 
 	// iterate through unbonding delegations, reset creation height
@@ -197,10 +239,15 @@ func (app *Uptick) prepForZeroHeightGenesis(ctx sdk.Context, jailAllowedAddrs []
 		}
 		if err := app.StakingKeeper.SetUnbondingDelegation(ctx, ubd); err != nil {
 			ctx.Logger().Error("SetUnbondingDelegation failed", "delegator", ubd.DelegatorAddress, "validator", ubd.ValidatorAddress, "err", err)
+			resetErrs = append(resetErrs,
+				fmt.Errorf("reset unbonding delegation %s/%s: %w", ubd.DelegatorAddress, ubd.ValidatorAddress, err))
 		}
 		return false
 	}); err != nil {
 		return fmt.Errorf("failed to iterate unbonding delegations: %w", err)
+	}
+	if len(resetErrs) > 0 {
+		return fmt.Errorf("failed to reset unbonding delegation creation heights: %w", errors.Join(resetErrs...))
 	}
 
 	// Iterate through validators by power descending, reset bond heights, and
@@ -236,17 +283,23 @@ func (app *Uptick) prepForZeroHeightGenesis(ctx sdk.Context, jailAllowedAddrs []
 	/* Handle slashing state. */
 
 	// reset start height on signing infos
+	var signingInfoErrs []error
 	if err := app.SlashingKeeper.IterateValidatorSigningInfos(
 		ctx,
 		func(addr sdk.ConsAddress, info slashingtypes.ValidatorSigningInfo) (stop bool) {
 			info.StartHeight = 0
 			if err := app.SlashingKeeper.SetValidatorSigningInfo(ctx, addr, info); err != nil {
 				ctx.Logger().Error("SetValidatorSigningInfo failed", "consensus_addr", addr.String(), "err", err)
+				signingInfoErrs = append(signingInfoErrs,
+					fmt.Errorf("reset signing info for %s: %w", addr.String(), err))
 			}
 			return false
 		},
 	); err != nil {
 		return fmt.Errorf("failed to iterate validator signing infos: %w", err)
+	}
+	if len(signingInfoErrs) > 0 {
+		return fmt.Errorf("failed to reset validator signing infos: %w", errors.Join(signingInfoErrs...))
 	}
 	return nil
 }

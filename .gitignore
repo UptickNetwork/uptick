@@ -20,6 +20,11 @@
 vendor
 build
 bin
+# `make build` writes to build/, but a stray root-level uptickd (from `go build
+# ./cmd/uptickd`, a manual build or a copied CI artifact) shows up as untracked
+# and is 200 MB - one `git add -A` would put a binary blob into the repository
+# and every future clone. Anchored to the root so build/uptickd is unaffected.
+/uptickd
 tools/bin/*
 docs/_build
 docs/tutorial

@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
 
 	nftTypes "github.com/UptickNetwork/uptick/x/collection/types"
 	"github.com/UptickNetwork/uptick/x/erc721/contracts"
@@ -18,10 +17,12 @@ import (
 
 // These tests pin the round-10 N-1 fix: x/erc721's RefundPacketToken used to
 // return an error for six per-token failure modes, aborting the whole IBC
-// callback and stranding every other token in the packet. All skip-able modes
-// now emit a refund_packet_token_skip event and continue, mirroring x/cw721.
-// Two failure modes deliberately stay errors (missing refund receiver, native
-// burn failure) — see the symmetry test at the bottom.
+// callback and stranding every other token in the packet. Every skip-able mode
+// — including a missing refund receiver — now emits a
+// refund_packet_token_skip event and continues, mirroring x/cw721. Only a
+// native burn failure stays an error: by that point the pair mappings have
+// already been deleted, so the whole cache context must roll back to keep the
+// store consistent.
 
 // packOwnerOf encodes an ownerOf return carrying the given owner address.
 func packOwnerOf(t *testing.T, owner common.Address) []byte {
@@ -195,10 +196,12 @@ func TestRefundPacketToken_TransferFailureSkipsAndKeepsToken(t *testing.T) {
 }
 
 // Symmetry sentinel with x/cw721 (TestRefundPacketToken_MissingReceiver):
-// a missing refund receiver stays an ERROR on both sides. There is no address
-// to refund to, so unlike the skip-able modes above the packet is retried as
-// a whole once the receiver record is repaired.
-func TestRefundPacketToken_MissingReceiverStaysAnError(t *testing.T) {
+// a missing refund receiver must SKIP on both sides. Returning an error tore
+// down the IBC callback's cache context, which left every other token in the
+// packet unrefunded and made the packet retry forever. The token keeps its
+// mapping and its native NFT so it can be refunded once the receiver record is
+// repaired.
+func TestRefundPacketToken_MissingReceiverSkips(t *testing.T) {
 	k, ctx, owner := setupConvertKeeper(t)
 	require.NoError(t, k.SetNFTPairs(ctx, registerTestContract, "1", "kitty", "nft1"))
 	moveNFTToModuleErc721(t, k, ctx, owner, "kitty", "nft1")
@@ -211,5 +214,43 @@ func TestRefundPacketToken_MissingReceiverStaysAnError(t *testing.T) {
 		ClassId:  "kitty",
 		TokenIds: []string{"nft1"},
 	})
-	require.ErrorIs(t, err, errortypes.ErrInvalidAddress)
+	require.NoError(t, err, "a missing refund receiver must skip, not abort the packet")
+
+	require.Equal(t, "erc721_refund_receiver_missing", refundSkipReasons(ctx)["nft1"])
+	require.True(t, k.nftKeeper.HasNFT(ctx, "kitty", "nft1"), "the native NFT must stay for a later retry")
+	require.NotEmpty(t, k.GetTokenUIDPairByNFTUID(ctx, types.CreateNFTUID("kitty", "nft1")), "the pair mapping must be kept for retry")
+	require.False(t, hasRefundEvent(ctx), "no refund event may be emitted for a token that was not refunded")
+}
+
+// Mixed batch: the FIRST token is missing its refund receiver, the SECOND is
+// fully refundable. Before the fix the first token aborted the callback and
+// nft1 was never refunded.
+func TestRefundPacketToken_MissingReceiverDoesNotStrandOtherTokens(t *testing.T) {
+	k, ctx, owner := setupConvertKeeper(t)
+	setupRefundableToken(t, k, ctx, owner, "kitty", "nft1", "1")
+
+	// nft2 has a pair and a module-owned NFT but no recorded receiver, so it is
+	// the token that hits the missing-receiver branch. It is listed first.
+	require.NoError(t, k.nftKeeper.SaveNFT(ctx, "kitty", "nft2", "Spot2", "ipfs://nft2", "", "", owner))
+	require.NoError(t, k.SetNFTPairs(ctx, registerTestContract, "2", "kitty", "nft2"))
+	moveNFTToModuleErc721(t, k, ctx, owner, "kitty", "nft2")
+
+	evm := k.evmKeeper.(*fakeEVMKeeper)
+	evm.seq = []seqResp{
+		{ret: packOwnerOf(t, types.ModuleAddress)}, // nft2 ownerOf: module owns it
+		{ret: packOwnerOf(t, types.ModuleAddress)}, // nft1 ownerOf
+		{ret: nil}, // nft1 safeTransferFrom
+	}
+
+	err := k.RefundPacketToken(ctx, ibcnfttransfertypes.NonFungibleTokenPacketData{
+		ClassId:  "kitty",
+		TokenIds: []string{"nft2", "nft1"},
+	})
+	require.NoError(t, err, "a missing receiver must not abort the packet")
+
+	require.Equal(t, "erc721_refund_receiver_missing", refundSkipReasons(ctx)["nft2"])
+	require.True(t, k.nftKeeper.HasNFT(ctx, "kitty", "nft2"), "nft2 keeps its native NFT for a later retry")
+
+	require.False(t, k.nftKeeper.HasNFT(ctx, "kitty", "nft1"), "nft1 must still be refunded")
+	require.True(t, hasRefundEvent(ctx), "nft1 must produce a refund event")
 }

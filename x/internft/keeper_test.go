@@ -9,21 +9,49 @@ import (
 	storetypes "cosmossdk.io/store/types"
 	tmproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	dbm "github.com/cosmos/cosmos-db"
+	"github.com/cosmos/cosmos-sdk/codec"
+	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	"github.com/stretchr/testify/require"
+
+	collectionkeeper "github.com/UptickNetwork/uptick/x/collection/keeper"
+	collectiontypes "github.com/UptickNetwork/uptick/x/collection/types"
 )
 
-// newBurnCtx builds a minimal sdk.Context with an event manager wired
-// up. The internft.Burn guard only reads/writes through ctx.EventManager
-// and ctx.Logger, so an in-memory store is enough.
-func newBurnCtx(t *testing.T) sdk.Context {
+// newBurnKeeper builds a REAL collection-backed InterNftKeeper over an
+// in-memory commit multi-store, with the gas-metered KV store wired into the
+// store service. The previous version of these tests used a zero-value
+// InterNftKeeper, which only worked because Burn() recovered every panic —
+// i.e. the test pinned the very anti-pattern under audit. A real keeper lets
+// us assert both halves of the contract: a missing NFT skips cleanly, while a
+// store-level panic (OutOfGas) must propagate.
+//
+// gasLimit is consumed by every KV read: pass a small positive value for
+// normal paths, or 0 to force OutOfGas on the first read.
+func newBurnKeeper(t *testing.T, gasLimit uint64) (InterNftKeeper, sdk.Context) {
 	t.Helper()
-	memDB := store.NewCommitMultiStore(dbm.NewMemDB(), log.NewNopLogger(), metrics.NewNoOpMetrics())
-	memDB.MountStoreWithDB(storetypes.NewKVStoreKey("dummy"), storetypes.StoreTypeIAVL, nil)
-	require.NoError(t, memDB.LoadLatestVersion())
-	return sdk.NewContext(memDB, tmproto.Header{}, false, log.NewNopLogger()).
+
+	cdc := codec.NewProtoCodec(codectypes.NewInterfaceRegistry())
+	collectiontypes.RegisterInterfaces(cdc.InterfaceRegistry())
+
+	db := dbm.NewMemDB()
+	cms := store.NewCommitMultiStore(db, log.NewNopLogger(), metrics.NewNoOpMetrics())
+	key := storetypes.NewKVStoreKey(collectiontypes.StoreKey)
+	cms.MountStoreWithDB(key, storetypes.StoreTypeIAVL, db)
+	require.NoError(t, cms.LoadLatestVersion())
+
+	ctx := sdk.NewContext(cms, tmproto.Header{}, false, log.NewNopLogger()).
+		WithGasMeter(storetypes.NewGasMeter(gasLimit)).
 		WithKVGasConfig(storetypes.KVGasConfig())
+
+	// ctx.KVStore wraps the raw store in gaskv bound to ctx's gas meter, so
+	// reads actually consume gas and an exhausted meter panics with OutOfGas.
+	storeSvc := &internftKVStoreService{
+		store: internftKVStoreAdapter{inner: ctx.KVStore(key)},
+	}
+	collectionKeeper := collectionkeeper.NewKeeper(cdc, storeSvc, &nftAccountKeeper{}, &nftBankKeeper{})
+	return NewInterNftKeeper(cdc, collectionKeeper, &internftAccountKeeper{}), ctx
 }
 
 // findEvent returns the first event of the given type.
@@ -36,16 +64,12 @@ func findBurnEvent(ctx sdk.Context, eventType string) (sdk.Event, bool) {
 	return sdk.Event{}, false
 }
 
-// TestInterNftKeeper_BurnSkipOnMissingNFT verifies the no-panic + skip-event
-// contract of Burn when the NFT is absent (production path is exercised by
-// the nft-transfer module's own suite).
+// TestInterNftKeeper_BurnSkipOnMissingNFT verifies the skip half of the
+// contract: when the NFT genuinely does not exist, Burn emits the skip event
+// and returns nil so the surrounding IBC refund callback can keep going.
 func TestInterNftKeeper_BurnSkipOnMissingNFT(t *testing.T) {
-	ik := InterNftKeeper{} // zero-value: nk is nil; the guard must not touch it
-	ctx := newBurnCtx(t)
+	ik, ctx := newBurnKeeper(t, 1_000_000)
 
-	// Must complete without panicking and without returning an error,
-	// even though the underlying nft keeper is nil (which would
-	// definitely panic if reached).
 	require.NotPanics(t, func() {
 		err := ik.Burn(ctx, "class-1", "token-1")
 		require.NoError(t, err)
@@ -55,6 +79,22 @@ func TestInterNftKeeper_BurnSkipOnMissingNFT(t *testing.T) {
 	require.True(t, ok, "Burn must emit inter_nft_burn_skip when NFT is missing")
 	require.Equal(t, "class-1", string(ev.Attributes[0].Value),
 		"first attribute should be class_id")
+}
+
+// TestInterNftKeeper_BurnPropagatesOutOfGas is the counter-contract to the
+// test above: an exhausted gas meter must abort the call instead of being
+// downgraded to a "token already gone" skip. Before the blanket recover() was
+// removed this call returned nil and emitted inter_nft_burn_skip, which made a
+// failed transaction look like a successful ICS-721 burn.
+func TestInterNftKeeper_BurnPropagatesOutOfGas(t *testing.T) {
+	ik, ctx := newBurnKeeper(t, 0)
+
+	require.Panics(t, func() {
+		_ = ik.Burn(ctx, "class-1", "token-1")
+	}, "OutOfGas must propagate out of Burn instead of being recovered")
+
+	_, ok := findBurnEvent(ctx, "inter_nft_burn_skip")
+	require.False(t, ok, "a panicking Burn must not emit a success-shaped skip event")
 }
 
 func TestInterClass_Getters(t *testing.T) {

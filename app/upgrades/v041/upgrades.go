@@ -50,7 +50,7 @@ func upgradeHandlerConstructor(
 
 		// Repair the EVM params: v0.4.0 introduced ActiveStaticPrecompiles but
 		// left it empty, so every custom static precompile was inactive.
-		if err := migrateActiveStaticPrecompiles(sdkCtx, box); err != nil {
+		if err := migrateActiveStaticPrecompiles(sdkCtx, box.EvmKeeper); err != nil {
 			return nil, fmt.Errorf("migrate active static precompiles: %w", err)
 		}
 

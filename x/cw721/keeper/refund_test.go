@@ -5,7 +5,6 @@ import (
 
 	ibcnfttransfertypes "github.com/bianjieai/nft-transfer/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/stretchr/testify/require"
 
 	collectiontypes "github.com/UptickNetwork/uptick/x/collection/types"
@@ -109,19 +108,74 @@ func TestRefundPacketToken_MissingPairDoesNotStrandOtherTokens(t *testing.T) {
 	require.True(t, seen, "expected a cw721_pair_not_found skip event for nft2")
 }
 
-func TestRefundPacketToken_MissingReceiver(t *testing.T) {
+// A missing refund receiver must SKIP (mirrors x/erc721): returning an error
+// tore down the IBC callback's cache context, which left every other token in
+// the packet unrefunded and made the packet retry forever.
+func TestRefundPacketToken_MissingReceiverSkips(t *testing.T) {
 	k, ctx, _, contract, wasm := setupConvertKeeper(t)
 
 	require.NoError(t, k.SetNFTPairs(ctx, contract, "1", "kitty", "nft1"))
 	// The module still escrows the CW721, so the refund path is taken and it
-	// requires a receiver recorded at send time.
+	// requires a receiver recorded at send time — none is recorded on purpose.
 	wasm.setOwner(contract, "1", cw721types.AccModuleAddress.String())
 
 	err := k.RefundPacketToken(ctx, ibcnfttransfertypes.NonFungibleTokenPacketData{
 		ClassId:  "kitty",
 		TokenIds: []string{"nft1"},
 	})
-	require.ErrorIs(t, err, errortypes.ErrInvalidAddress)
+	require.NoError(t, err, "a missing refund receiver must skip, not abort the packet")
+
+	skip := findEvent(ctx.EventManager().Events(), cw721types.EventTypeRefundPacketTokenSkip)
+	require.NotNil(t, skip, "expected a %s event", cw721types.EventTypeRefundPacketTokenSkip)
+	require.Equal(t, "cw721_refund_receiver_missing", refundAttr(*skip)["reason"])
+
+	// The token was not moved and no refund was claimed, so a later repair can
+	// still process it.
+	require.Equal(t, cw721types.AccModuleAddress.String(), wasm.ownerOf(contract, "1"))
+	require.Nil(t, findEvent(ctx.EventManager().Events(), cw721types.EventTypeRefundPacketToken),
+		"no refund event may be emitted for a token that was not refunded")
+}
+
+// Mixed batch: the FIRST token is missing its refund receiver, the SECOND is
+// fully refundable. Before the fix the first token aborted the callback and
+// nft1 was never refunded.
+func TestRefundPacketToken_MissingReceiverDoesNotStrandOtherTokens(t *testing.T) {
+	k, ctx, owner, contract, wasm := setupConvertKeeper(t)
+
+	// nft1 is fully refundable (pair + escrow + recorded receiver)...
+	require.NoError(t, k.SetNFTPairs(ctx, contract, "1", "kitty", "nft1"))
+	moveNFTToModule(t, k, ctx, owner, "kitty", "nft1")
+	wasm.setOwner(contract, "1", cw721types.AccModuleAddress.String())
+	k.SetCwAddressByContractTokenId(ctx, contract, "1", owner.String())
+
+	// ...while nft2 is escrowed by the module but has NO recorded receiver.
+	require.NoError(t, k.nftKeeper.SaveNFT(ctx, "kitty", "nft2", "Spot2", "ipfs://nft2", "", "", owner))
+	require.NoError(t, k.SetNFTPairs(ctx, contract, "2", "kitty", "nft2"))
+	moveNFTToModule(t, k, ctx, owner, "kitty", "nft2")
+	wasm.setOwner(contract, "2", cw721types.AccModuleAddress.String())
+
+	err := k.RefundPacketToken(ctx, ibcnfttransfertypes.NonFungibleTokenPacketData{
+		ClassId:  "kitty",
+		TokenIds: []string{"nft2", "nft1"},
+	})
+	require.NoError(t, err, "a missing receiver must not abort the packet")
+
+	var nft2Reason string
+	for _, ev := range ctx.EventManager().Events() {
+		if ev.Type != cw721types.EventTypeRefundPacketTokenSkip {
+			continue
+		}
+		if attrs := refundAttr(ev); attrs[cw721types.AttributeKeyNFTID] == "nft2" {
+			nft2Reason = attrs["reason"]
+		}
+	}
+	require.Equal(t, "cw721_refund_receiver_missing", nft2Reason)
+
+	require.NotNil(t, findEvent(ctx.EventManager().Events(), cw721types.EventTypeRefundPacketToken),
+		"nft1 must be refunded even though nft2 lacks a receiver")
+	require.Equal(t, owner.String(), wasm.ownerOf(contract, "1"))
+	require.False(t, k.nftKeeper.HasNFT(ctx, "kitty", "nft1"), "nft1 must be burned after the refund")
+	require.True(t, k.nftKeeper.HasNFT(ctx, "kitty", "nft2"), "nft2 keeps its NFT for a later retry")
 }
 
 // When the module account no longer owns the CW721 the refund must be skipped

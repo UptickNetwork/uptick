@@ -35,4 +35,9 @@ verify-contracts-reproducible:
 	@command -v solc >/dev/null 2>&1 || { echo "solc not installed"; exit 1; }
 	@npm ci >/dev/null 2>&1 || { echo "npm ci failed"; exit 1; }
 	@./verify_contracts.sh
+	@# verify_contracts.sh compares the built bytecode hex against the committed
+	@# JSON field by field; this additionally checks the WHOLE committed JSON
+	@# (abi string, field order, no trailing newline) against a fresh rebuild, so
+	@# a hand-edited artifact cannot survive on a matching bin alone.
+	@python3 gen_artifacts.py --check
 	@rm -rf node_modules

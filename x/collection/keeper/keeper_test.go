@@ -293,6 +293,52 @@ func (s *KeeperTestSuite) TestGetCollectionsIncludesNilDataClass() {
 	s.Require().Empty(ids["nildataclass"].Schema)
 }
 
+// Regression for the export data-loss path: a class whose metadata blob is
+// present but undecodable must still be exported (base fields + its NFTs), and
+// the degradation must be reported explicitly instead of the class silently
+// disappearing from a "successful" genesis export.
+func (s *KeeperTestSuite) TestGetCollectionsKeepsClassWithUndecodableMetadata() {
+	creator := sdk.AccAddress([]byte("creator-corrupt"))
+	s.Require().NoError(s.keeper.SaveDenom(s.ctx, "healthy", "Healthy", "", "H", creator, false, false, "", "", "", ""))
+
+	// A class carrying a Data blob that is not valid protobuf for
+	// DenomMetadata: GetDenomInfo fails on it.
+	s.Require().NoError(s.nftKpr.SaveClass(s.ctx, nft.Class{
+		Id:     "corruptclass",
+		Name:   "Corrupt",
+		Symbol: "CC",
+		Data:   &codectypes.Any{Value: []byte{0xff, 0xff, 0xff, 0xff}},
+	}))
+	s.Require().NoError(s.nftKpr.Mint(s.ctx, nft.NFT{
+		ClassId: "corruptclass",
+		Id:      "token-1",
+		Uri:     "ipfs://token-1",
+	}, creator))
+
+	cs, issues := s.keeper.GetCollectionsWithReport(s.ctx)
+
+	// Both classes survive: the corrupt one is downgraded, not dropped.
+	s.Require().Len(cs, 2)
+	byID := make(map[string]types.Collection, 2)
+	for _, c := range cs {
+		byID[c.Denom.Id] = c
+	}
+	s.Require().Contains(byID, "healthy")
+	s.Require().Contains(byID, "corruptclass")
+
+	// The corrupt class keeps its base fields AND its NFT.
+	corrupt := byID["corruptclass"]
+	s.Require().Equal("Corrupt", corrupt.Denom.Name)
+	s.Require().Equal("CC", corrupt.Denom.Symbol)
+	s.Require().Len(corrupt.NFTs, 1)
+	s.Require().Equal("token-1", corrupt.NFTs[0].GetID())
+
+	// The degradation is reported, not swallowed.
+	s.Require().Len(issues, 1)
+	s.Require().Equal("corruptclass", issues[0].ClassID)
+	s.Require().Equal(ExportIssueClassMetadata, issues[0].Kind)
+}
+
 // Defense-in-depth: SaveNFT must reject empty inputs rather than
 // silently writing a corrupt state entry (empty key / zero address).
 func (s *KeeperTestSuite) TestSaveNFTRejectsEmptyInputs() {

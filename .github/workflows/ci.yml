@@ -8,39 +8,113 @@ on:
       - release/v0.4.0
       - release/**
 
+# Audit O-05: every third-party action below is pinned to an immutable commit
+# SHA with the human-readable release in a trailing comment, instead of a
+# mutable tag ("@v4"). A tag can be re-pointed at any time by whoever controls
+# the upstream repo, which turns a normal `make test` run into arbitrary code
+# execution inside the job - with access to the repo token. To update one:
+# resolve the new tag (`git ls-remote --tags <repo> refs/tags/<tag>`), review
+# the diff between the old and new commit, then replace the SHA and the comment
+# together.
+permissions:
+  contents: read
+
 jobs:
   build-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version: "1.25.13"
 
       - name: Build
         run: make build
 
+      # `make test` is `go test -race ./...`, so this covers the unit suites
+      # AND the real-EVM ERC721 suite in app/erc721_contract_evm_test.go
+      # (audit G-07/G-08/O-04): it deploys the embedded bytecode on a live EVM
+      # keeper, which is the only way to prove _safeMint honours receiver
+      # hooks, that a revert/gas-burn rolls the mint back, and that _burn
+      # clears the enhance metadata.
       - name: Test
         run: make test
+
+  # Audit G-06 (part 1): determinism, export/import and resume-from-export were
+  # only ever run by hand. Each of these is a release blocker - an
+  # export/import asymmetry corrupts state on an upgrade, and a nondeterministic
+  # app forks the chain - yet none of them ran in CI. They run here with
+  # CI-sized block counts so the cost stays inside a normal PR.
+  #
+  # `-Enabled=true` is mandatory: simulation tests skip themselves without it,
+  # which is precisely how a "green" job can prove nothing.
+  simulation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Set up Go
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version: "1.25.13"
+
+      - name: Short-seed simulation gate
+        run: make test-sim-ci
+
+  # Audit G-06 (part 2): the unit suite cannot reach the REST gateway or the
+  # EVM JSON-RPC endpoint. This job boots a real single-node chain
+  # (scripts/e2e-localnet.sh), then runs tests/e2e with UPTICK_E2E_STRICT=1 so
+  # an unreachable node FAILS the job instead of skipping it - a suite that
+  # quietly skips itself never proved a Keplr broadcast ever worked.
+  e2e-localnet:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Set up Go
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version: "1.25.13"
+
+      - name: Build uptickd
+        run: make build
+
+      # Node lifecycle, test run and teardown happen inside a single `make`
+      # invocation (one shell): a background node started in an earlier step is
+      # not guaranteed to outlive it.
+      - name: Run the e2e suite against a real node
+        env:
+          UPTICKD: ${{ github.workspace }}/build/uptickd
+          UPTICK_E2E_HOME: ${{ runner.temp }}/uptick-e2e
+        run: make test-e2e-localnet
+
+      - name: Show node log on failure
+        if: failure()
+        run: tail -n 200 "${{ runner.temp }}/uptick-e2e/e2e-localnet.log" || true
 
   lint:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version: "1.25.13"
 
       - name: Lint
         # v6 does not support golangci-lint v2 ("invalid version string
         # 'v2.13.2'"); v7 is required for the v2 binary + v2 config schema.
-        uses: golangci/golangci-lint-action@v7
+        uses: golangci/golangci-lint-action@9fae48acfc02a90574d7c304a1758ef9895495fa # v7.0.1
         with:
           version: v2.13.2
 
@@ -48,10 +122,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "22"
           cache: npm
@@ -71,6 +145,15 @@ jobs:
       - name: Verify reproducible contract bytecode
         working-directory: contracts
         run: make verify-contracts-reproducible
+
+      # The ERC721 receiver fixtures the EVM integration suite deploys are
+      # compiled into app/erc721_evm_receivers_gen_test.go. Without this check a
+      # change to contracts/test/EVMReceiverFixtures.sol would silently keep the
+      # tests running the OLD bytecode, i.e. the suite would keep passing while
+      # testing something other than the committed Solidity.
+      - name: Verify generated receiver fixtures are current
+        working-directory: contracts/test
+        run: ./gen_receivers.py --check
 
       # R-NEW-3: integrity of the committed artifacts (checksums.txt) plus the
       # embedded x/erc721 copy must never drift from the canonical root JSON.

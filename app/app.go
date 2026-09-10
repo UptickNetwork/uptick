@@ -572,8 +572,13 @@ func NewUptick(
 	}
 
 	// create the simulation manager and define the order of the modules for deterministic simulations
+	//
+	// NOTE: auth must be handed the real RandomizedGenesisAccounts function.
+	// Passing nil (as this used to) makes SimulationManager.GenerateGenesisStates
+	// panic with a nil function call, which is why the simulation harness could
+	// never run and the Makefile simulation targets pointed at nothing (G-05).
 	app.sm = module.NewSimulationManager(
-		auth.NewAppModule(appCodec, app.AccountKeeper, nil, app.GetSubspace(authtypes.ModuleName)),
+		auth.NewAppModule(appCodec, app.AccountKeeper, authsims.RandomGenesisAccounts, app.GetSubspace(authtypes.ModuleName)),
 		bank.NewAppModule(appCodec, app.BankKeeper, app.AccountKeeper, app.GetSubspace(banktypes.ModuleName)),
 		gov.NewAppModule(appCodec, app.GovKeeper, app.AccountKeeper, app.BankKeeper, app.GetSubspace(govtypes.ModuleName)),
 		mint.NewAppModule(appCodec, app.MintKeeper, app.AccountKeeper, nil, app.GetSubspace(minttypes.ModuleName)),
