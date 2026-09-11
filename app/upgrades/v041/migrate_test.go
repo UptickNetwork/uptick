@@ -1,6 +1,7 @@
 package v041
 
 import (
+	"encoding/hex"
 	"errors"
 	"slices"
 	"testing"
@@ -8,7 +9,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"cosmossdk.io/log"
+	"cosmossdk.io/math"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	feemarkettypes "github.com/cosmos/evm/x/feemarket/types"
 	evmtypes "github.com/cosmos/evm/x/vm/types"
 	icacontrollertypes "github.com/cosmos/ibc-go/v10/modules/apps/27-interchain-accounts/controller/types"
 )
@@ -181,3 +184,176 @@ func TestMigrateICAControllerParams_IsIdempotent(t *testing.T) {
 	require.Len(t, store.writes, 1, "the second run must observe the flip and skip")
 	require.True(t, store.params.ControllerEnabled)
 }
+
+// ---------------------------------------------------------------------------
+// feemarket base fee rescue
+// ---------------------------------------------------------------------------
+
+// legacyFeeMarketParamsHex is the exact protobuf the pre-upgrade chain has
+// stored at feemarkettypes.ParamsKey. It was produced by ethermint
+// v0.24.1-uptick's types.Params, which encodes base_fee as cosmossdk.io/math.Int:
+//
+//	10 08                                   field 2  varint  base_fee_change_denominator = 8
+//	18 02                                   field 3  varint  elasticity_multiplier     = 2
+//	28 00                                   field 5  varint  enable_height              = 0
+//	32 0a 31 30 ... 30                      field 6  bytes   base_fee    = "1000000000"
+//	3a 01 30                                field 7  bytes   min_gas_price = "0"
+//	42 12 35 30 ... 30                      field 8  bytes   min_gas_multiplier = "5e17"
+//
+// The field-6 payload is the ASCII of the math.Int, which is also how
+// math.LegacyDec marshals its raw big.Int - the two encodings are the same
+// bytes and only the field's declared Go type says how to read them.
+const legacyFeeMarketParamsHex = "100818022800320a313030303030303030303a01304212353030303030303030303030303030303030"
+
+func legacyFeeMarketParams(t *testing.T) []byte {
+	t.Helper()
+	bz, err := hex.DecodeString(legacyFeeMarketParamsHex)
+	require.NoError(t, err)
+	return bz
+}
+
+// TestLegacyFeeMarketBaseFeeDecodesSmallerByOneE18 is the pin on WHY
+// migrateFeeMarketBaseFee exists. It is deliberately written against the real
+// cosmos/evm Params type rather than a restatement of the constants, so that if
+// cosmos/evm ever restores math.Int (or changes LegacyDec's wire form) this test
+// fails and tells the next reader the migration has become obsolete rather than
+// merely unnecessary.
+func TestLegacyFeeMarketBaseFeeDecodesSmallerByOneE18(t *testing.T) {
+	var params feemarkettypes.Params
+	require.NoError(t, params.Unmarshal(legacyFeeMarketParams(t)))
+
+	// 1 gwei, the value the ethermint chain actually had, reads back as 10^-9.
+	require.Equal(t, "0.000000001000000000", params.BaseFee.String())
+
+	require.Equal(t, feemarkettypes.DefaultBaseFee.String(), "1000000000.000000000000000000",
+		"the intended value must stay the module default; if this changes the "+
+			"smaller-by-10^18 premise of the migration needs re-deriving")
+
+	// The other two floats are math.LegacyDec in BOTH versions, so they are
+	// unaffected - which is also why they cannot be used to detect the mismatch.
+	require.Equal(t, "0.000000000000000000", params.MinGasPrice.String())
+	require.Equal(t, "0.500000000000000000", params.MinGasMultiplier.String())
+
+	// Nothing about the value makes GetParams fail; the mis-read is silent.
+	require.True(t, params.BaseFee.IsPositive(), "the corrupt value is not an error state")
+	require.True(t, params.BaseFee.LT(math.LegacyOneDec()), "it is below one whole wei")
+}
+
+func TestWithRepairedBaseFee_RescalesLegacyEncoding(t *testing.T) {
+	// Exactly what the legacy bytes decode to.
+	legacy := feemarkettypes.DefaultParams()
+	legacy.BaseFee = math.LegacyNewDecWithPrec(1, 9) // 0.000000001
+
+	repaired, changed := withRepairedBaseFee(legacy)
+
+	require.True(t, changed)
+	require.Equal(t, feemarkettypes.DefaultBaseFee.String(), repaired.BaseFee.String(),
+		"1 gwei stored as math.Int must come back as 1 gwei in math.LegacyDec")
+}
+
+// TestWithRepairedBaseFee_IsIdempotent is the property the missing
+// UpgradeAlreadyApplied guard depends on. The rescale is not idempotent on its
+// own (a second application would multiply by another 10^18), so the guard is
+// what makes a replayed plan safe.
+func TestWithRepairedBaseFee_IsIdempotent(t *testing.T) {
+	legacy := feemarkettypes.DefaultParams()
+	legacy.BaseFee = math.LegacyNewDecWithPrec(1, 9)
+
+	once, changed := withRepairedBaseFee(legacy)
+	require.True(t, changed)
+
+	twice, changedAgain := withRepairedBaseFee(once)
+	require.False(t, changedAgain, "an already repaired value must not be rescaled again")
+	require.Equal(t, once.BaseFee.String(), twice.BaseFee.String())
+}
+
+// TestWithRepairedBaseFee_LeavesPlausibleValuesAlone is the sentinel half of the
+// guard: it must not rewrite state that is already correct, in particular the
+// values a governance MsgUpdateParams or a fresh genesis can produce.
+func TestWithRepairedBaseFee_LeavesPlausibleValuesAlone(t *testing.T) {
+	for name, fee := range map[string]math.LegacyDec{
+		"module default": feemarkettypes.DefaultBaseFee,
+		"one whole wei":  math.LegacyOneDec(),
+		"1 gwei again":   math.LegacyNewDec(1_000_000_000),
+		"100 gwei":       math.LegacyNewDec(100_000_000_000),
+		"zero":           math.LegacyZeroDec(),
+		"nil":            {},
+	} {
+		t.Run(name, func(t *testing.T) {
+			params := feemarkettypes.DefaultParams()
+			params.BaseFee = fee
+
+			repaired, changed := withRepairedBaseFee(params)
+
+			require.False(t, changed, "%s must not be treated as legacy-encoded", name)
+			require.Equal(t, fee.String(), repaired.BaseFee.String())
+		})
+	}
+}
+
+// recordingFeeMarketParamsStore records calls instead of only the final state,
+// for the same reason as recordingICAParamsStore: writing the repaired value
+// over the legacy value is indistinguishable from not writing at all when only
+// the store contents are inspected.
+type recordingFeeMarketParamsStore struct {
+	params  feemarkettypes.Params
+	writes  []feemarkettypes.Params
+	failSet error
+}
+
+func (s *recordingFeeMarketParamsStore) GetParams(sdk.Context) feemarkettypes.Params {
+	return s.params
+}
+
+// SetParams mirrors the real keeper's read-your-writes behavior so a second call
+// observes the first one's write.
+func (s *recordingFeeMarketParamsStore) SetParams(_ sdk.Context, params feemarkettypes.Params) error {
+	if s.failSet != nil {
+		return s.failSet
+	}
+	s.writes = append(s.writes, params)
+	s.params = params
+	return nil
+}
+
+func legacyFeeMarketStore(t *testing.T) *recordingFeeMarketParamsStore {
+	t.Helper()
+	var params feemarkettypes.Params
+	require.NoError(t, params.Unmarshal(legacyFeeMarketParams(t)))
+	return &recordingFeeMarketParamsStore{params: params}
+}
+
+func TestMigrateFeeMarketBaseFee_RepairsLegacyValue(t *testing.T) {
+	store := legacyFeeMarketStore(t)
+	require.Equal(t, "0.000000001000000000", store.params.BaseFee.String())
+
+	require.NoError(t, migrateFeeMarketBaseFee(icaTestCtx(), store))
+
+	require.Len(t, store.writes, 1)
+	require.Equal(t, feemarkettypes.DefaultBaseFee.String(), store.params.BaseFee.String())
+}
+
+func TestMigrateFeeMarketBaseFee_NoWriteWhenAlreadyRepaired(t *testing.T) {
+	// A fresh chain's genesis, or a second execution of the same plan.
+	store := &recordingFeeMarketParamsStore{params: feemarkettypes.DefaultParams()}
+
+	require.NoError(t, migrateFeeMarketBaseFee(icaTestCtx(), store))
+
+	require.Empty(t, store.writes, "a plausible base fee is left untouched")
+}
+
+// TestMigrateFeeMarketBaseFee_SetParamsErrorPropagates pins that a rejected
+// write fails the upgrade instead of being reported as a successful migration.
+func TestMigrateFeeMarketBaseFee_SetParamsErrorPropagates(t *testing.T) {
+	store := legacyFeeMarketStore(t)
+	store.failSet = errSetFeeMarketParams
+
+	err := migrateFeeMarketBaseFee(icaTestCtx(), store)
+
+	require.Error(t, err)
+	require.ErrorIs(t, err, errSetFeeMarketParams)
+	require.Contains(t, err.Error(), "set feemarket params",
+		"the wrap must name the step so an operator can tell which repair failed")
+}
+
+var errSetFeeMarketParams = errors.New("feemarket keeper rejected the params")

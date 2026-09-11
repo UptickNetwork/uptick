@@ -15,10 +15,12 @@ import (
 const upgradeName = "v0.4.1"
 
 // Upgrade is the v0.4.1 upgrade. It repairs state left behind by earlier
-// versions: activates the static precompiles and enables the ICA controller
-// submodule. The Keplr compatibility fix (legacy ethermint pubkey and EIP-712
-// extension option decoding) lives entirely in the binary runtime (encoding
-// config + ante handler), so no migration is needed for it.
+// versions: activates the static precompiles, enables the ICA controller
+// submodule, re-scales the feemarket base fee, and collapses the duplicate
+// entries in the ERC721 conversion index. The Keplr compatibility fix
+// (legacy ethermint pubkey and EIP-712 extension option decoding) lives entirely
+// in the binary runtime (encoding config + ante handler), so no migration is
+// needed for it.
 var Upgrade = upgrades.Upgrade{
 	UpgradeName:               upgradeName,
 	UpgradeHandlerConstructor: upgradeHandlerConstructor,
@@ -37,10 +39,13 @@ func upgradeHandlerConstructor(
 		// module ConsensusVersion, so a chain upgrading from v0.4.0 already
 		// has a version map equal to the current consensus versions and the
 		// guard would wrongly skip the one-shot repairs below on their first
-		// (and only legitimate) run. Both repairs are inherently idempotent —
-		// migrateActiveStaticPrecompiles only writes when the param is empty
-		// and migrateICAControllerParams only flips a disabled flag — so a
-		// replayed plan is harmless without the guard.
+		// (and only legitimate) run. All four repairs are inherently
+		// idempotent — migrateActiveStaticPrecompiles only writes when the
+		// param is empty, migrateICAControllerParams only flips a disabled
+		// flag, migrateFeeMarketBaseFee only rescales a value that is still in
+		// the legacy-encoded range, and pruneErc721UIDIndex deletes only keys
+		// it can prove duplicate a binding that survives — so a replayed plan
+		// is harmless without the guard.
 
 		sdkCtx.Logger().Info(
 			"executing upgrade plan",
@@ -59,6 +64,22 @@ func upgradeHandlerConstructor(
 		// ibc-go v10 param migration keeps the stored value as-is, so every
 		// ICA register fails with "controller submodule is disabled".
 		migrateICAControllerParams(sdkCtx, box.ICAControllerKeeper)
+
+		// Re-scale the feemarket base fee: ethermint stored it as math.Int and
+		// cosmos/evm reads it as math.LegacyDec, so the v0.4.0 upgrade left
+		// 1 gwei reading back as 10^-9 and BeginBlock made it permanent.
+		if err := migrateFeeMarketBaseFee(sdkCtx, box.FeeMarketKeeper); err != nil {
+			return nil, fmt.Errorf("migrate feemarket params: %w", err)
+		}
+
+		// Collapse the duplicate forward keys the pre-v0.4.1 write path left in
+		// the ERC721 conversion index. Position relative to RunMigrations is not
+		// load-bearing here: x/erc721 has no pending module migration (its
+		// consensus version did not move), so the handler is the only thing that
+		// can reach this state. It is kept with the other repairs because it is
+		// one, and because it must not run its own writes after the module
+		// manager has had a say in the same store.
+		pruneErc721UIDIndex(sdkCtx, box.Erc721Keeper)
 
 		return box.ModuleManager.RunMigrations(sdkCtx, c, vm)
 	}

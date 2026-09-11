@@ -1,6 +1,7 @@
 package cw721
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 
@@ -318,4 +319,55 @@ func TestDeletePairPerTokenStateClearsOrphans(t *testing.T) {
 	require.Equal(t, []byte(nftB), k.GetNFTUIDPairByTokenUID(ctx, tokenB))
 	require.Equal(t, []byte(tokenB), k.GetTokenUIDPairByNFTUID(ctx, nftB))
 	require.Equal(t, []byte(rtOwner), k.GetCwAddressByContractTokenId(ctx, otherContract, "7"))
+}
+
+// TestExportDropsBindingsThatCannotBeImported is the cw721 twin of the erc721
+// export/import agreement test: a bidirectional binding whose pair is no
+// longer registered must not be written into the genesis, because the
+// import-side validation rejects it and InitGenesis panics on the same
+// condition. It is dropped and reported instead, so a degraded export stays
+// importable.
+//
+// Unlike the other tests here it builds its own pair, because a genesis that
+// must pass its own Validate() needs a real CW721 contract address: CW721
+// contracts are CosmWasm contracts addressed in bech32, and TokenPair.Validate
+// enforces that (the hex-shaped rtContract used by the round-trip fixtures
+// could never appear in a valid genesis).
+func TestExportDropsBindingsThatCannotBeImported(t *testing.T) {
+	sdk.GetConfig().SetBech32PrefixForAccount("uptick", "uptickpub")
+	contract := sdk.AccAddress(bytes.Repeat([]byte{0x22}, 20)).String()
+
+	k, ctx := newRoundTripKeeper(t)
+	pair := types.NewTokenPair(contract, "kitty")
+	k.SetTokenPair(ctx, pair)
+	k.SetClassMap(ctx, pair.ClassId, pair.GetID())
+	k.SetCW721Map(ctx, contract, pair.GetID())
+
+	registeredToken := types.CreateTokenUID(contract, "42")
+	registeredNFT := types.CreateNFTUID("kitty", "custom-nft")
+	k.SetNFTUIDPairByTokenUID(ctx, registeredToken, registeredNFT)
+	k.SetNFTUIDPairByNFTUID(ctx, registeredNFT, registeredToken)
+	k.SetCwAddressByContractTokenId(ctx, contract, "42", rtOwner)
+
+	// A fully consistent bidirectional binding whose class ("ghost") was never
+	// registered.
+	ghostToken := types.CreateTokenUID(contract, "77")
+	ghostNFT := types.CreateNFTUID("ghost", "nft1")
+	k.SetNFTUIDPairByTokenUID(ctx, ghostToken, ghostNFT)
+	k.SetNFTUIDPairByNFTUID(ctx, ghostNFT, ghostToken)
+
+	var exported *types.GenesisState
+	require.NotPanics(t, func() { exported = ExportGenesis(ctx, k) })
+	require.NotNil(t, exported)
+
+	require.Len(t, exported.NftUidPairs, 1, "only the registered binding may be exported")
+	require.Equal(t, registeredNFT, exported.NftUidPairs[0].NftUid)
+
+	require.NoError(t, exported.Validate(),
+		"the exported genesis must pass the import-side validation")
+
+	issues := k.ExportIssues(ctx)
+	require.Len(t, issues, 1)
+	require.Equal(t, keeper.GenesisExportIssueUIDIndexUnregisteredPair, issues[0].Kind)
+	require.Equal(t, ghostToken, issues[0].Key)
 }

@@ -8,6 +8,7 @@ import (
 	"cosmossdk.io/store/prefix"
 	storetypes "cosmossdk.io/store/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/UptickNetwork/uptick/x/erc721/types"
@@ -183,35 +184,136 @@ func (k Keeper) IsClassRegistered(ctx sdk.Context, classID string) bool {
 // forward[x]=y ⟺ reverse[y]=x. A conflicting binding would let an attacker
 // release a module-escrowed victim token (registry poisoning) and is rejected
 // with ErrNFTMappingConflict so the conversion rolls back.
+//
+// Key spelling: BOTH components of the forward key are normalised. The token
+// id is written as the canonical base-10 value (types.CanonicalEVMTokenID) and
+// the contract address as its lowercase form (types.CanonicalContractAddress),
+// and any pre-existing key for the same binding under another spelling of
+// either component is removed in the same write. That is what lets a pair
+// created before v0.4.0 stay readable (see ResolveNFTUIDPair) while the store
+// converges on one key per binding instead of accumulating duplicates.
+//
+// Creation is still strictly gated — but only on the token id, because only
+// there do the two spellings mean different things. A legacy "0x"+hex token id
+// is accepted only when it is upgrading a binding that already exists; letting
+// a fresh binding use the old spelling would key it by a value that differs
+// from what the caller's string names. The two address spellings are the same
+// 20 bytes, so an address is simply normalised and needs no gate.
 func (k Keeper) SetNFTPairs(ctx sdk.Context, contractAddress string, tokenID string, classID string, nftID string) error {
-	tokenUID := types.CreateTokenUID(contractAddress, tokenID)
+	// GetContractAddressAndTokenIds replays the identifiers it read out of an
+	// existing pair, so an upgrade legitimately arrives in the legacy/checksum
+	// spellings. Normalise both components here once; everything below works
+	// on `canonicalTokenID` and `canonicalContract`.
+	canonicalTokenID, isLegacyTokenID, err := types.CanonicalEVMTokenID(tokenID)
+	if err != nil {
+		return err
+	}
+	canonicalContract := types.CanonicalContractAddress(contractAddress)
+
+	tokenUID := types.CreateTokenUID(canonicalContract, canonicalTokenID)
 	nftUID := types.CreateNFTUID(classID, nftID)
 
-	forward := k.GetNFTUIDPairByTokenUID(ctx, tokenUID)
-	reverse := k.GetTokenUIDPairByNFTUID(ctx, nftUID)
+	// Probe every spelling this binding may already be stored under: the cross
+	// product of both components' spellings. Without this an upgrade would be
+	// mistaken for a new binding, which would both reject the upgrade and
+	// leave the old key behind as a duplicate.
+	var (
+		boundNFT   []byte
+		staleKeys  []string
+		foundForms int
+	)
+	for _, tokenVariant := range types.EVMTokenIDKeyVariants(canonicalTokenID) {
+		for _, contractVariant := range types.ContractAddressKeyVariants(contractAddress) {
+			variantUID := types.CreateTokenUID(contractVariant, tokenVariant)
+			stored := k.GetNFTUIDPairByTokenUID(ctx, variantUID)
+			if len(stored) == 0 {
+				continue
+			}
+			foundForms++
 
-	if len(forward) != 0 && string(forward) != nftUID {
+			if boundNFT == nil {
+				boundNFT = stored
+			} else if string(stored) != string(boundNFT) {
+				// Two spellings of one value bound to two different NFTs is
+				// the duplicate-key residue this normalisation exists to
+				// prevent. Refuse to guess which is authoritative.
+				return sdkerrors.Wrapf(
+					types.ErrNFTMappingConflict,
+					"erc721 token %s on %s is stored under %d spellings bound to conflicting nfts (%s vs %s)",
+					canonicalTokenID, contractAddress, foundForms, string(boundNFT), string(stored),
+				)
+			}
+			if variantUID != tokenUID {
+				staleKeys = append(staleKeys, variantUID)
+			}
+		}
+	}
+
+	if len(boundNFT) != 0 && string(boundNFT) != nftUID {
 		return sdkerrors.Wrapf(
 			types.ErrNFTMappingConflict,
 			"erc721 token %s on %s is already bound to nft %s (attempted %s)",
-			tokenID, contractAddress, string(forward), nftUID,
-		)
-	}
-	if len(reverse) != 0 && string(reverse) != tokenUID {
-		return sdkerrors.Wrapf(
-			types.ErrNFTMappingConflict,
-			"nft %s of class %s is already bound to token %s (attempted %s)",
-			nftID, classID, string(reverse), tokenUID,
+			canonicalTokenID, canonicalContract, string(boundNFT), nftUID,
 		)
 	}
 
-	if len(forward) == 0 {
-		k.SetNFTPairByContractTokenID(ctx, contractAddress, tokenID, classID, nftID)
+	// Creation-time gate, token id only (see the doc comment). Msg*.ValidateBasic
+	// rejects it too; this closes the internal callers.
+	if foundForms == 0 && isLegacyTokenID {
+		return sdkerrors.Wrapf(
+			errortypes.ErrInvalidRequest,
+			"legacy hex ERC721 token id %q cannot create a new binding; use the base-10 token id",
+			tokenID,
+		)
 	}
-	if len(reverse) == 0 {
-		k.SetNFTPairByClassNFTID(ctx, classID, nftID, contractAddress, tokenID)
+
+	reverse := k.GetTokenUIDPairByNFTUID(ctx, nftUID)
+	if len(reverse) != 0 && string(reverse) != tokenUID {
+		// The reverse index may still hold the other spelling of either
+		// component (a pair created before v0.4.0 was written entirely in the
+		// legacy forms), so compare the values rather than the strings.
+		boundTokenID, boundContract := types.GetNFTFromUID(string(reverse))
+		if !types.EqualEVMTokenID(boundTokenID, canonicalTokenID) ||
+			!types.EqualContractAddress(boundContract, canonicalContract) {
+			return sdkerrors.Wrapf(
+				types.ErrNFTMappingConflict,
+				"nft %s of class %s is already bound to token %s (attempted %s)",
+				nftID, classID, string(reverse), tokenUID,
+			)
+		}
+	}
+
+	// Unconditional upsert: either the binding is new, or it exists and is
+	// being rewritten under the canonical spelling. Writing the canonical key
+	// also has to happen when the binding was just read under another
+	// spelling, otherwise the pair would keep only the non-canonical key.
+	k.SetNFTPairByContractTokenID(ctx, canonicalContract, canonicalTokenID, classID, nftID)
+	k.SetNFTPairByClassNFTID(ctx, classID, nftID, canonicalContract, canonicalTokenID)
+	for _, stale := range staleKeys {
+		k.DeleteNFTUIDPairByTokenUID(ctx, stale)
 	}
 	return nil
+}
+
+// ResolveNFTUIDPair resolves the forward (contract, tokenID) → NFT binding
+// for a key written under ANY spelling of either component, returning the
+// stored NFT UID and the exact token-id spelling it was found under. Both
+// spellings of each component denote the same value (a uint256, and a 20-byte
+// address), so callers that hold any of them reach the same binding.
+//
+// Read-only by construction: it never rewrites the key it found. The upgrade
+// to the canonical spelling happens in SetNFTPairs, i.e. only when a write
+// path is already touching the pair.
+func (k Keeper) ResolveNFTUIDPair(ctx sdk.Context, contractAddress string, tokenID string) (nftUID []byte, matchedTokenID string) {
+	for _, tokenVariant := range types.EVMTokenIDKeyVariants(tokenID) {
+		for _, contractVariant := range types.ContractAddressKeyVariants(contractAddress) {
+			tokenUID := types.CreateTokenUID(contractVariant, tokenVariant)
+			if stored := k.GetNFTUIDPairByTokenUID(ctx, tokenUID); len(stored) > 0 {
+				return stored, tokenVariant
+			}
+		}
+	}
+	return nil, ""
 }
 
 func (k Keeper) SetNFTPairByContractTokenID(ctx sdk.Context, contractAddress string, tokenID string, classID string, nftID string) {
@@ -228,8 +330,8 @@ func (k Keeper) SetNFTUIDPairByTokenUID(ctx sdk.Context, tokenUID string, nftUID
 }
 
 func (k Keeper) GetNFTPairByContractTokenID(ctx sdk.Context, contractAddress string, tokenID string) []byte {
-	tokenUID := types.CreateTokenUID(contractAddress, tokenID)
-	return k.GetNFTUIDPairByTokenUID(ctx, tokenUID)
+	nftUID, _ := k.ResolveNFTUIDPair(ctx, contractAddress, tokenID)
+	return nftUID
 }
 
 func (k Keeper) GetNFTUIDPairByTokenUID(ctx sdk.Context, tokenUID string) []byte {
@@ -237,9 +339,16 @@ func (k Keeper) GetNFTUIDPairByTokenUID(ctx sdk.Context, tokenUID string) []byte
 	return store.Get([]byte(tokenUID))
 }
 
+// DeleteNFTPairByTokenID removes the forward binding for a token id under
+// every spelling it may have been stored in — both components of the key can
+// be spelled more than one way — so a purge driven by a value read out of the
+// reverse index cannot leave a key orphaned behind.
 func (k Keeper) DeleteNFTPairByTokenID(ctx sdk.Context, contractAddress string, tokenID string) {
-	tokenUID := types.CreateTokenUID(contractAddress, tokenID)
-	k.DeleteNFTUIDPairByTokenUID(ctx, tokenUID)
+	for _, tokenVariant := range types.EVMTokenIDKeyVariants(tokenID) {
+		for _, contractVariant := range types.ContractAddressKeyVariants(contractAddress) {
+			k.DeleteNFTUIDPairByTokenUID(ctx, types.CreateTokenUID(contractVariant, tokenVariant))
+		}
+	}
 }
 
 func (k Keeper) DeleteNFTUIDPairByTokenUID(ctx sdk.Context, tokenUID string) {

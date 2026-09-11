@@ -548,6 +548,12 @@ func (k Keeper) RefundPacketToken(
 			groups = appendToRefundGroups(groups, cwContractAddress, string(cwReceiver), cwTokenId, tokenId)
 		}
 
+		// Forced order, same as x/erc721: the pair mappings must be gone before the
+		// native burn below, because x/collection.RemoveNFT refuses to burn an NFT
+		// that IsConvertedNFT reports as bound to a contract token (the checker in
+		// app/keepers answers from this module's pair index). Reversing it would
+		// make every refund's burn fail after the CW721 had already been returned
+		// to the user.
 		k.DeleteCwAddressByContractTokenId(ctx, cwContractAddress, cwTokenId)
 		k.DeleteNFTPairByTokenID(ctx, cwContractAddress, cwTokenId)
 		k.DeleteNFTPairByNFTID(ctx, data.ClassId, tokenId)

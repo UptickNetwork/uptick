@@ -22,6 +22,12 @@ const (
 	// GenesisExportIssueRefundKeyOrphan means a refund receiver record does not
 	// belong to any registered contract.
 	GenesisExportIssueRefundKeyOrphan GenesisExportIssueKind = "refund_key_orphaned"
+	// GenesisExportIssueUIDIndexUnregisteredPair means a bidirectional
+	// conversion binding is internally consistent but its contract/class no
+	// longer resolve to a registered token pair, so the import side would
+	// reject it (ValidateGenesisPairs) and InitGenesis would panic. The export
+	// drops and reports it instead.
+	GenesisExportIssueUIDIndexUnregisteredPair GenesisExportIssueKind = "nft_uid_index_unregistered_pair"
 )
 
 // GenesisExportIssue is one state record that cannot be exported faithfully.

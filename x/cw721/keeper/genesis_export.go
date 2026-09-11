@@ -34,6 +34,20 @@ func (k Keeper) ExportNFTUIDPairs(ctx sdk.Context) ([]types.NFTUIDPair, error) {
 // ExportNFTUIDPairsWithReport collects every damaged index entry instead of
 // aborting on the first one, so the fail-closed export can report the complete
 // repair list in one pass.
+//
+// A binding is exported only if the import side would accept it:
+// types.ValidateGenesisPairs requires the token UID and the NFT UID to resolve
+// to the same registered token pair, and InitGenesis panics on the same
+// condition. A consistent binding can still outlive its pair -- a pair record
+// that no longer decodes is dropped from the exported TokenPairs, and a
+// removed pair's index entries are swept best-effort -- so emitting them
+// verbatim produced a genesis that failed its own validation: an unusable
+// backup exactly when it is needed. Such bindings are dropped AND reported:
+// dropping is the only importable option (nothing this validation rejects can
+// survive an InitGenesis), and the dropped record stays visible in
+// <home>/export-issues.json so it can be repaired out of band. The live chain
+// is untouched either way -- this is purely about producing a genesis that can
+// be read back.
 func (k Keeper) ExportNFTUIDPairsWithReport(ctx sdk.Context) ([]types.NFTUIDPair, []GenesisExportIssue) {
 	forward := make(map[string]string)
 
@@ -43,6 +57,11 @@ func (k Keeper) ExportNFTUIDPairsWithReport(ctx sdk.Context) ([]types.NFTUIDPair
 		forward[string(iter.Key())] = string(iter.Value())
 	}
 	iter.Close()
+
+	// GetTokenPairs returns exactly the healthy subset ExportGenesis writes
+	// into TokenPairs (records that do not decode are left out), so the
+	// membership predicate is evaluated against what the genesis will contain.
+	registered := k.GetTokenPairs(ctx)
 
 	pairs := make([]types.NFTUIDPair, 0, len(forward))
 	var issues []GenesisExportIssue
@@ -66,7 +85,23 @@ func (k Keeper) ExportNFTUIDPairsWithReport(ctx sdk.Context) ([]types.NFTUIDPair
 			})
 			continue
 		}
+
+		// Consume the forward entry on every path below, so an unusable
+		// binding is reported once (as unregistered) instead of twice (un-
+		// registered here and forward-without-reverse at the end).
 		delete(forward, tokenUID)
+
+		if !types.UIDBelongsToRegisteredPair(tokenUID, nftUID, registered) {
+			issues = append(issues, GenesisExportIssue{
+				Kind: GenesisExportIssueUIDIndexUnregisteredPair,
+				Key:  tokenUID,
+				Detail: fmt.Sprintf(
+					"binding (%q -> %q) does not belong to any registered token pair",
+					tokenUID, nftUID,
+				),
+			})
+			continue
+		}
 
 		pairs = append(pairs, types.NFTUIDPair{
 			TokenUid: tokenUID,

@@ -71,10 +71,12 @@ func ValidateGenesisPairs(pairs []NFTUIDPair, receivers []RefundReceiver, tokenP
 		if _, dup := seenNFT[pair.NftUid]; dup {
 			return errors.Wrapf(ErrInternalTokenPair, "duplicate NFT UID %q in genesis NFT UID pairs", pair.NftUid)
 		}
-		if !uidBelongsToRegisteredPair(pair.TokenUid, pair.NftUid, tokenPairs) {
+		if !UIDBelongsToRegisteredPair(pair.TokenUid, pair.NftUid, tokenPairs) {
 			return errors.Wrapf(
 				ErrInternalTokenPair,
-				"NFT UID pair (token %q, nft %q) does not belong to any registered token pair",
+				"NFT UID pair (token %q, nft %q) does not belong to any registered token pair "+
+					"(a genesis export drops such records and lists them in <home>/export-issues.json; "+
+					"check that file on the node that produced this genesis)",
 				pair.TokenUid, pair.NftUid,
 			)
 		}
@@ -107,9 +109,16 @@ func ValidateGenesisPairs(pairs []NFTUIDPair, receivers []RefundReceiver, tokenP
 	return nil
 }
 
-// uidBelongsToRegisteredPair reports whether the token UID's contract and the
+// UIDBelongsToRegisteredPair reports whether the token UID's contract and the
 // NFT UID's class resolve to the same registered TokenPair.
-func uidBelongsToRegisteredPair(tokenUID, nftUID string, tokenPairs []TokenPair) bool {
+//
+// It is exported because it is not only the import-side check: it is also the
+// predicate ExportGenesis uses to decide which bindings it may write into a
+// genesis file. Sharing the exact function is what keeps the two sides in
+// agreement -- an export must never emit a record that this validation (and
+// therefore InitGenesis) rejects, because the backup would then be unreadable
+// exactly when it is needed.
+func UIDBelongsToRegisteredPair(tokenUID, nftUID string, tokenPairs []TokenPair) bool {
 	_, contract := GetNFTFromUID(tokenUID)
 	_, classID := GetNFTFromUID(nftUID)
 	if contract == "" || classID == "" {

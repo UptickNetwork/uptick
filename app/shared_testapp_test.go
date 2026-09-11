@@ -42,8 +42,16 @@ func sharedTestApp(t *testing.T) (*Uptick, sdk.Context) {
 		db, dir := simDB(t, "shared-testapp")
 		t.Cleanup(func() {
 			_ = db.Close()
-			_ = os.RemoveAll(dir)
 		})
+		// The directory is NOT removed here. The application is built once for
+		// the whole test binary, so its home directory has to survive just as
+		// long: wasmvm writes its compiled-module cache under
+		// <home>/data/wasm (wasmd's keeper_cgo.go) whenever a test stores a
+		// contract, and a per-test removal would make those tests fail with
+		// "Cache error: Error opening Wasm file for writing" purely because some
+		// earlier test happened to build the app first. TestMain removes it once
+		// the run is over.
+		sharedTestAppDir = dir
 
 		app := newSimApp(t, db, dir)
 
@@ -96,4 +104,19 @@ var (
 	sharedTestAppOnce sync.Once
 	sharedTestAppApp  *Uptick
 	sharedTestAppCtx  sdk.Context
+	// sharedTestAppDir is the home directory of the shared application. It is
+	// removed by TestMain rather than by the test that created it, because the
+	// application outlives that test (see sharedTestApp).
+	sharedTestAppDir string
 )
+
+// TestMain owns the teardown of the shared application's home directory. Doing
+// it here keeps the directory alive for exactly as long as the application is,
+// which is what the wasm VM's on-disk module cache needs.
+func TestMain(m *testing.M) {
+	code := m.Run()
+	if sharedTestAppDir != "" {
+		_ = os.RemoveAll(sharedTestAppDir)
+	}
+	os.Exit(code)
+}

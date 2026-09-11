@@ -23,12 +23,15 @@ var _ types.MsgServer = &Keeper{}
 
 const maxERC721BatchSize = 100
 
+// parseERC721TokenID parses a token id that is about to be handed to the
+// ERC721 contract. It accepts both the canonical base-10 spelling and the
+// legacy "0x"+hex spelling, because the value may be replayed out of a pair
+// created before v0.4.0; both spellings denote the same uint256 the contract
+// stores. Binding creation is gated separately — types.ValidateEVMTokenID
+// enforces the canonical spelling at message-validation time and SetNFTPairs
+// refuses to create a new pair from a legacy-spelled id.
 func parseERC721TokenID(tokenID string) (*big.Int, error) {
-	n, ok := new(big.Int).SetString(tokenID, 10)
-	if !ok || n.Sign() < 0 || n.BitLen() > 256 {
-		return nil, sdkerrors.Wrapf(errortypes.ErrInvalidRequest, "invalid ERC721 token id %q", tokenID)
-	}
-	return n, nil
+	return types.ParseEVMTokenID(tokenID)
 }
 
 // pairContractRedeployable reports whether a class whose pair contract lost
@@ -105,11 +108,13 @@ func (k Keeper) ConvertERC721(
 		return nil, types.ErrERC721Disabled
 	}
 
-	// Normalize the EVM contract address to lowercase so token-pair and
-	// NFT-pair records are always keyed consistently. GetNFTPairByContractTokenID
-	// builds a case-sensitive key (tokenID + "," + address); convertCosmos2Evm
-	// lowercases before lookup, so the reverse direction must store lowercase too.
-	msg.EvmContractAddress = strings.ToLower(msg.EvmContractAddress)
+	// Normalise the EVM contract address to its canonical lowercase spelling so
+	// token-pair and NFT-pair records are always keyed consistently.
+	// GetNFTPairByContractTokenID builds a key from (tokenID, "," , address);
+	// convertCosmos2Evm lowercases before lookup, so the reverse direction must
+	// store lowercase too. Reads tolerate the pre-v0.4.0 EIP-55 spelling
+	// (types.ContractAddressKeyVariants), writes never introduce it again.
+	msg.EvmContractAddress = types.CanonicalContractAddress(msg.EvmContractAddress)
 
 	// classId, nftId
 	classId, nftIds, err := k.GetClassIDAndNFTID(ctx, msg)
@@ -216,6 +221,13 @@ func (k Keeper) ConvertNFT(
 		return nil, types.ErrERC721Disabled
 	}
 
+	// Normalise the caller-supplied contract address before any key or
+	// comparison is derived from it. A registered class is pinned to the
+	// pair's canonical contract further down, but the caller's own spelling
+	// still flows through getNftData, where a differently-cased spelling of
+	// the SAME address must not be reported as a contradiction.
+	msg.EvmContractAddress = types.CanonicalContractAddress(msg.EvmContractAddress)
+
 	// Pre-validate the batch size before deploying any contract or touching
 	// state. A caller who passes an oversized batch would otherwise reach the
 	// check inside convertCosmos2Evm only after GetContractAddressAndTokenIds
@@ -237,7 +249,7 @@ func (k Keeper) ConvertNFT(
 	if err != nil {
 		return nil, err
 	}
-	msg.EvmContractAddress = strings.ToLower(contractAddress)
+	msg.EvmContractAddress = types.CanonicalContractAddress(contractAddress)
 	msg.EvmTokenIds = tokenIds
 
 	// Error checked during msg validation
@@ -306,7 +318,7 @@ func (k Keeper) ConvertNFT(
 		if err != nil {
 			return nil, sdkerrors.Wrapf(err, "failed to re-deploy erc721 contract for class %s after purging self-destructed pair", msg.ClassId)
 		}
-		msg.EvmContractAddress = strings.ToLower(contractAddress)
+		msg.EvmContractAddress = types.CanonicalContractAddress(contractAddress)
 		msg.EvmTokenIds = tokenIds
 
 		if _, err = k.RegisterNFT(ctx, msg); err != nil {
@@ -348,7 +360,7 @@ func (k Keeper) convertCosmos2Evm(
 
 	erc721 := contracts.ERC721UpticksContract.ABI
 	contract := pair.GetERC721Contract()
-	msg.EvmContractAddress = strings.ToLower(contract.String())
+	msg.EvmContractAddress = types.CanonicalContractAddress(contract.String())
 
 	for i, tokenId := range msg.EvmTokenIds {
 		bigTokenId, err := parseERC721TokenID(tokenId)
@@ -837,6 +849,16 @@ func (k Keeper) RefundPacketToken(
 			}
 		}
 
+		// The pair mappings and the refund receiver MUST be gone before the native
+		// burn below, and the order is not interchangeable. x/collection.RemoveNFT
+		// refuses to burn an NFT that IsConvertedNFT reports as bound to a contract
+		// token (ErrNFTBoundToContract); the production checker is wired in
+		// app/keepers and answers from this module's own pair index, which
+		// DeleteNFTPairByNFTID clears just below. Burning first would therefore
+		// fail on EVERY refund -- after the ERC721 had already been returned to the
+		// user -- leaving the module account holding the native NFT forever, with
+		// no way for the packet to converge. Deleting the binding is what makes the
+		// burn legal. Guarded by TestRefundBurnRequiresThePairMappingsGone.
 		refundContract := strings.ToLower(evmContractAddress)
 		k.DeleteEvmAddressByContractTokenId(ctx, refundContract, tokenId)
 		if evmTokenId != tokenId {

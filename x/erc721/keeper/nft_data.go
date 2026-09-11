@@ -1,8 +1,6 @@
 package keeper
 
 import (
-	"strings"
-
 	sdkerrors "cosmossdk.io/errors"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
@@ -27,13 +25,17 @@ func (k Keeper) GetClassIDAndNFTID(ctx sdk.Context, msg *types.MsgConvertERC721)
 
 	for i, tokenId := range msg.EvmTokenIds {
 
-		uTokenId := types.CreateTokenUID(msg.EvmContractAddress, tokenId)
-		savedPair := k.GetNFTUIDPairByTokenUID(ctx, uTokenId)
+		// Resolve through every known token-id spelling: a pair created before
+		// v0.4.0 stores the legacy "0x"+hex form, so a caller replaying the
+		// canonical base-10 form of that same value must still reach it.
+		// Missing this lookup would derive a fresh nft id instead of reusing
+		// the bound one.
+		savedPair, _ := k.ResolveNFTUIDPair(ctx, msg.EvmContractAddress, tokenId)
 		var savedNftId, savedClassId string
 		if len(savedPair) > 0 {
 			savedNftId, savedClassId = types.GetNFTFromUID(string(savedPair))
 			if savedNftId == "" || savedClassId == "" {
-				return "", nil, sdkerrors.Wrapf(errortypes.ErrInvalidRequest, "invalid ERC721 NFT UID pair for token %s", uTokenId)
+				return "", nil, sdkerrors.Wrapf(errortypes.ErrInvalidRequest, "invalid ERC721 NFT UID pair for token %s", types.CreateTokenUID(msg.EvmContractAddress, tokenId))
 			}
 		}
 
@@ -126,7 +128,14 @@ func (k Keeper) GetContractAddressAndTokenIds(ctx sdk.Context, msg *types.MsgCon
 	// A registered class has a canonical contract. Reject a caller-supplied
 	// address that differs from the pair (this would allow conversion against
 	// an external compatible contract and break the class↔contract identity).
-	if EvmContractAddress != "" && strings.ToLower(EvmContractAddress) != pair.Erc721Address {
+	//
+	// Compare by value, not by string: an address is 20 bytes, and the store
+	// may still hold the pre-v0.4.0 EIP-55 spelling while the caller (or the
+	// reverse index) spells the very same address in lowercase. String
+	// equality here is what produced the "expect 0x…59 got 0x…59" error, i.e.
+	// the same address rejected against itself. x/cw721 already compares its
+	// contract addresses case-insensitively for the same reason.
+	if EvmContractAddress != "" && !types.EqualContractAddress(EvmContractAddress, pair.Erc721Address) {
 		return "", nil, sdkerrors.Wrapf(
 			types.ErrContractAddressNotCorrect,
 			"contract address is not correct, expect %s got %s",
@@ -168,7 +177,14 @@ func getNftDatas(nftOrgs []string, nftPairOrgs []string, nftSaveds []string, nft
 	var nftOrg = ""
 	nftLen := len(nftPairOrgs)
 	for n := 0; n < nftLen; n++ {
-		if nftSaveds != nil {
+		// Guard against out-of-range access: nftSaveds may be shorter than
+		// nftPairOrgs when the caller has no saved values for some entries
+		// (EVM -> Cosmos conversion passes nil). A nil or short slice leaves
+		// nftSaved as the zero value (""), which getNftData treats as "no saved
+		// value" -- the safe fallback. Both current callers happen to build the
+		// slice with the same length as the input ids, but that is a property
+		// of the callers, not of this function; x/cw721 guards it identically.
+		if nftSaveds != nil && n < len(nftSaveds) {
 			nftSaved = nftSaveds[n]
 		}
 		if nftOrgs != nil && nftLen == len(nftOrgs) {
@@ -197,7 +213,7 @@ func getNftData(nftOrg string, nftPairOrg string, nftSaved string, nftType int) 
 		nftRet = createNftDataByType(nftPairOrg, nftType)
 	case nftOrg == "":
 		nftRet = nftSaved
-	case nftSaved == "", nftSaved == nftOrg:
+	case nftSaved == "", nftDataAgrees(nftSaved, nftOrg, nftType):
 		nftRet = nftOrg
 	default:
 		return "", getNftDataErrorByType(nftSaved, nftOrg, nftType)
@@ -205,6 +221,27 @@ func getNftData(nftOrg string, nftPairOrg string, nftSaved string, nftType int) 
 
 	return nftRet, nil
 
+}
+
+// nftDataAgrees reports whether a stored and a caller-supplied identifier of
+// the given nftType (0: nftId, 1: classId, 2: tokenId, 3: contract address)
+// denote the same thing.
+//
+// Two of these types are values the store can hold in more than one spelling:
+// token ids ("0x"+hex vs base-10) and contract addresses (EIP-55 vs
+// lowercase). A caller that spells the same value differently is NOT
+// contradicting the stored binding, and treating it as a contradiction
+// rejected perfectly valid conversions. Everything else still compares as a
+// plain string.
+func nftDataAgrees(nftSaved string, nftOrg string, nftType int) bool {
+	switch nftType {
+	case 2:
+		return types.EqualEVMTokenID(nftSaved, nftOrg)
+	case 3:
+		return types.EqualContractAddress(nftSaved, nftOrg)
+	default:
+		return nftSaved == nftOrg
+	}
 }
 
 // createNftDataByType derives an id of the given nftType

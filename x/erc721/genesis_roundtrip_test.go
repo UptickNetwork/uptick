@@ -308,3 +308,51 @@ func TestGenesisRoundTripPreservesDualKeyRefundReceivers(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, first, second, "dual-key refund state must round-trip losslessly")
 }
+
+// TestExportDropsBindingsThatCannotBeImported pins the export/import
+// agreement for the per-token conversion index.
+//
+// A bidirectional binding can outlive its token pair: a pair record that no
+// longer decodes is dropped from the exported TokenPairs, and a removed pair's
+// index entries are only cleaned up best-effort (DeletePairPerTokenState is a
+// match-by-contract/class sweep). ExportGenesis used to emit such a binding
+// verbatim, and the resulting genesis then FAILED its own import-side
+// validation -- ValidateGenesisPairs requires every UID to resolve to a
+// registered pair -- so InitGenesis would have panicked on the very backup
+// taken to recover the chain, and `validate-genesis` would have rejected it
+// with no hint of what to do.
+//
+// The export must therefore apply the SAME predicate the import applies: a
+// record the import would reject is dropped AND reported, never written into a
+// genesis that cannot be read back. (Same policy the export already applies to
+// forward entries without a reverse half and to orphaned refund keys.)
+func TestExportDropsBindingsThatCannotBeImported(t *testing.T) {
+	k, ctx := newRoundTripKeeper(t)
+	_, registeredNFT := seedPairAndRuntimeState(t, k, ctx)
+
+	// A fully consistent bidirectional binding whose class ("ghost") was never
+	// registered: both index halves agree, so the inconsistent-index check
+	// cannot catch it.
+	ghostToken := types.CreateTokenUID(rtContract, "77")
+	ghostNFT := types.CreateNFTUID("ghost", "nft1")
+	k.SetNFTUIDPairByTokenUID(ctx, ghostToken, ghostNFT)
+	k.SetNFTUIDPairByNFTUID(ctx, ghostNFT, ghostToken)
+
+	var exported *types.GenesisState
+	require.NotPanics(t, func() { exported = ExportGenesis(ctx, k) })
+	require.NotNil(t, exported)
+
+	require.Len(t, exported.NftUidPairs, 1, "only the registered binding may be exported")
+	require.Equal(t, registeredNFT, exported.NftUidPairs[0].NftUid)
+
+	// The invariant: a degraded export must still be importable. Without the
+	// membership filter this is the error ValidateGenesisPairs returns, and
+	// importPerTokenState turns it into an InitGenesis panic.
+	require.NoError(t, exported.Validate(),
+		"the exported genesis must pass the import-side validation")
+
+	issues := k.ExportIssues(ctx)
+	require.Len(t, issues, 1)
+	require.Equal(t, keeper.GenesisExportIssueUIDIndexUnregisteredPair, issues[0].Kind)
+	require.Equal(t, ghostToken, issues[0].Key)
+}
