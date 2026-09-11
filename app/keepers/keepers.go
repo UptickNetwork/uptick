@@ -498,8 +498,17 @@ func New(
 	// auto-converts incoming IBC coins to their ERC20 representation on recv
 	// (and refunds to ERC20 on error ack / timeout). The ERC20 keeper's
 	// ibc_callbacks.go implements the conversion; the middleware invokes them.
+	//
+	// The middleware is handed the gate rather than the bare keeper so the
+	// inbound RegisterERC20Extension branch honours
+	// Params.PermissionlessRegistration. Upstream never reads that parameter on
+	// this path, so without the gate the switch is bypassed by anyone who can
+	// get an unseen denom delivered. See erc20_ibc_gate.go.
 	transferIBCModule := transfer.NewIBCModule(appKeepers.IBCTransferKeeper)
-	transferStack := cosmoserc20.NewIBCMiddleware(appKeepers.Erc20Keeper, transferIBCModule)
+	transferStack := cosmoserc20.NewIBCMiddleware(
+		NewERC20IBCGate(&appKeepers.Erc20Keeper),
+		transferIBCModule,
+	)
 
 	// The ICS-721 adapter carries the burn-guard slot. Its value travels into
 	// IBCNFTTransferKeeper by copy, which is why the slot itself is a pointer:
