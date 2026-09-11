@@ -29,7 +29,12 @@ const (
 	// DisplayDenom defines the denomination displayed to users in client applications.
 	DisplayDenom = "uptick"
 	// BaseDenom defines to the default denomination used in Uptick (staking, EVM, governance, etc.)
-	BaseDenom = "auptick"
+	//
+	// It is an alias, not a second literal: the same string is the EVM coin
+	// denom (app/keepers/keepers.go passes it to WithDefaultEvmCoinInfo) and
+	// the gas denom, so a typo here would split balances across two denoms
+	// rather than fail loudly. types.AttoPhoton is the one place it is spelled.
+	BaseDenom = upticktypes.AttoPhoton
 )
 
 // SetBech32Prefixes sets the global prefixes to be used when serializing addresses and public keys to Bech32 strings.

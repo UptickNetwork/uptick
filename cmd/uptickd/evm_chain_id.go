@@ -57,6 +57,19 @@ func writeAppTomlEVMChainID(home string, id uint64) error {
 	if err != nil {
 		return err
 	}
+
+	// Match first, then rewrite. ReplaceAll alone reports success whether or
+	// not it matched anything: on an app.toml whose entry is commented out,
+	// quoted, or absent entirely it wrote the file back unchanged and returned
+	// nil, so init reported success while eth_chainId kept answering the old
+	// value. FindIndex distinguishes "already correct" from "never matched".
+	if evmChainIDLine.FindIndex(bz) == nil {
+		return fmt.Errorf(
+			"%s: no %q entry matched %q; add an unquoted `evm-chain-id = <n>` line to the [evm] section "+
+				"so the JSON-RPC server advertises EIP-155 id %d",
+			path, "evm-chain-id", evmChainIDLine.String(), id)
+	}
+
 	next := evmChainIDLine.ReplaceAll(bz, []byte(fmt.Sprintf("evm-chain-id = %d", id)))
 	//nolint:gosec // G703: path is derived from the operator's own --home flag on a local CLI, not untrusted input
 	return os.WriteFile(path, next, 0o600)

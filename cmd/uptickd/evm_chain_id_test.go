@@ -135,3 +135,50 @@ func TestApplyEVMChainIDSyncsRegisteredFlag(t *testing.T) {
 	require.Equal(t, uint64(9000), got, "a registered flag is synced with the resolved id")
 	require.Equal(t, uint64(9000), v.GetUint64(srvflags.EVMChainID))
 }
+
+// writeAppTomlEVMChainID rewrites the app.toml entry in place, because the JSON
+// RPC server reads app.toml's evm-chain-id rather than the keeper's
+// process-wide ChainConfig. The failure it used to have was silence:
+// regexp.ReplaceAll reports success whether or not it matched, so an app.toml
+// whose entry was commented out, quoted or missing was written back unchanged
+// and `init` reported success while eth_chainId kept answering the old id.
+func TestWriteAppTomlEVMChainIDRewritesTheLine(t *testing.T) {
+	home := t.TempDir()
+	require.NoError(t, os.MkdirAll(home+"/config", 0o755))
+	require.NoError(t, os.WriteFile(home+"/config/app.toml", []byte(
+		"[evm]\n# evm-chain-id = 262144\nevm-chain-id = 262144\n"), 0o600))
+
+	require.NoError(t, writeAppTomlEVMChainID(home, 117))
+
+	got, err := os.ReadFile(home + "/config/app.toml")
+	require.NoError(t, err)
+	require.Contains(t, string(got), "evm-chain-id = 117")
+	require.Contains(t, string(got), "# evm-chain-id = 262144",
+		"the commented example is documentation and must stay commented")
+}
+
+func TestWriteAppTomlEVMChainIDFailsWhenThereIsNothingToRewrite(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		body string
+	}{
+		{"absent", "[evm]\n"},
+		{"commented out", "[evm]\n# evm-chain-id = 262144\n"},
+		{"quoted value", "[evm]\nevm-chain-id = \"262144\"\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			home := t.TempDir()
+			require.NoError(t, os.MkdirAll(home+"/config", 0o755))
+			path := home + "/config/app.toml"
+			require.NoError(t, os.WriteFile(path, []byte(tc.body), 0o600))
+
+			err := writeAppTomlEVMChainID(home, 117)
+			require.Error(t, err, "doing nothing silently is the bug this guards")
+			require.Contains(t, err.Error(), "evm-chain-id")
+
+			after, rerr := os.ReadFile(path)
+			require.NoError(t, rerr)
+			require.Equal(t, tc.body, string(after), "a rejected write must leave the file untouched")
+		})
+	}
+}
