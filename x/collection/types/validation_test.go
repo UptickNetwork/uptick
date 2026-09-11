@@ -133,6 +133,41 @@ func TestMsgTransferDenom_RejectsIBCVoucher(t *testing.T) {
 	require.Error(t, msg.ValidateBasic())
 }
 
+// The "uptick-" branch of ValidateDenomID used to return after checking only
+// that the suffix was non-empty and slash-free, so an oversized or oddly
+// punctuated class id in a genesis file was accepted even though
+// keeper.SaveDenom documents this function as the one place enforcing the
+// charset and the [3,128] bound. The charset is deliberately the loosest
+// superset of the shapes the module derives, so nothing the chain can actually
+// produce is rejected.
+func TestValidateDenomID_UptickBranchEnforcesShape(t *testing.T) {
+	// Shapes x/erc721 (40 hex nibbles) and x/cw721 (bech32) derive.
+	require.NoError(t, ValidateDenomID("uptick-abcdef"))
+	require.NoError(t, ValidateDenomID("uptick-custom-denom"))
+	require.NoError(t, ValidateDenomID("uptick-b37eb5464b45a8097cbbb7c22727a6b259a3d85e"))
+	require.NoError(t, ValidateDenomID("uptick-uptick1qypqxpq9qcrsszg2pvxq6rs0zqg3yyc5z5tpwxqergd3c8g7rusqqwmr9x"))
+
+	// Exactly at the length bound passes; one byte over fails.
+	atBound := "uptick-" + strings.Repeat("a", MaxDenomLen-len("uptick-"))
+	require.Len(t, atBound, MaxDenomLen)
+	require.NoError(t, ValidateDenomID(atBound))
+	require.Error(t, ValidateDenomID(atBound+"a"))
+
+	// Punctuation, whitespace and control characters are not part of any
+	// module-derived shape.
+	for _, bad := range []string{
+		"uptick-has space",
+		"uptick-line\nbreak",
+		"uptick-tab\there",
+		"uptick-colon:",
+		"uptick-semi;colon",
+		"uptick-plus+sign",
+		"uptick-emoji\U0001F600",
+	} {
+		require.Error(t, ValidateDenomID(bad), "expected %q to be rejected", bad)
+	}
+}
+
 func TestValidateKeywordsAndIsIBCDenom(t *testing.T) {
 	require.Error(t, ValidateKeywords("ibc-token"))
 	require.NoError(t, ValidateKeywords("custom-token"))

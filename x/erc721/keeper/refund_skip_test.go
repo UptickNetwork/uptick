@@ -2,6 +2,8 @@ package keeper
 
 import (
 	"errors"
+	"os"
+	"strings"
 	"testing"
 
 	ibcnfttransfertypes "github.com/bianjieai/nft-transfer/types"
@@ -18,11 +20,12 @@ import (
 // These tests pin the round-10 N-1 fix: x/erc721's RefundPacketToken used to
 // return an error for six per-token failure modes, aborting the whole IBC
 // callback and stranding every other token in the packet. Every skip-able mode
-// — including a missing refund receiver — now emits a
-// refund_packet_token_skip event and continues, mirroring x/cw721. Only a
-// native burn failure stays an error: by that point the pair mappings have
-// already been deleted, so the whole cache context must roll back to keep the
-// store consistent.
+// now emits a refund_packet_token_skip event and continues, mirroring x/cw721.
+//
+// Round 22 found the seventh site (a native burn failure) still returning an
+// error in both modules; it skips too now. The invariant is enforced
+// mechanically by TestRefundPacketTokenReturnsNoError below, because "fix one
+// of the twins" has now happened three times.
 
 // packOwnerOf encodes an ownerOf return carrying the given owner address.
 func packOwnerOf(t *testing.T, owner common.Address) []byte {
@@ -253,4 +256,59 @@ func TestRefundPacketToken_MissingReceiverDoesNotStrandOtherTokens(t *testing.T)
 
 	require.False(t, k.nftKeeper.HasNFT(ctx, "kitty", "nft1"), "nft1 must still be refunded")
 	require.True(t, hasRefundEvent(ctx), "nft1 must produce a refund event")
+}
+
+// TestRefundPacketTokenReturnsNoError is a static guard on the function body:
+// no per-token failure inside RefundPacketToken may return an error.
+//
+// A returned error tears down the IBC callback, so the ack is never written,
+// the relayer retries the packet forever, the tokens after the failing one are
+// abandoned, and the retry observes a half-unwound state. The policy existed
+// since round 10, but it was enforced by eye -- and the eye missed a site in
+// each module (round 10 left six in erc721, round 22 found the burn-failure
+// site in both twins). Checking it mechanically is the only version that
+// survives the next twin-module edit.
+func TestRefundPacketTokenReturnsNoError(t *testing.T) {
+	body := functionSource(t, "msg_server.go", "func (k Keeper) RefundPacketToken")
+	require.NotEmpty(t, body)
+	// Prove the extraction really landed on RefundPacketToken; a silently empty
+	// or wrong slice would make the loop below pass for the wrong reason.
+	require.Contains(t, strings.Join(body, "\n"), "EventTypeRefundPacketTokenSkip")
+
+	for _, line := range body {
+		code := strings.TrimSpace(line)
+		if strings.HasPrefix(code, "//") {
+			continue
+		}
+		require.NotRegexp(t, `\breturn\s+\S*[Ee]rr`, code,
+			"RefundPacketToken must skip and emit an event instead of returning an error (offending line: %q)", code)
+	}
+}
+
+// functionSource returns the lines of the top-level function whose declaration
+// starts with sig, up to and including its closing brace. gofmt puts that brace
+// at column 0, which makes this a safe way to look at one function at a time.
+func functionSource(t *testing.T, file, sig string) []string {
+	t.Helper()
+
+	src, err := os.ReadFile(file)
+	require.NoError(t, err, "the guard must read the production source")
+
+	lines := strings.Split(string(src), "\n")
+	start := -1
+	for i, line := range lines {
+		if strings.HasPrefix(line, sig) {
+			start = i
+			break
+		}
+	}
+	require.GreaterOrEqual(t, start, 0, "function %q not found in %s", sig, file)
+
+	for i := start + 1; i < len(lines); i++ {
+		if lines[i] == "}" {
+			return lines[start : i+1]
+		}
+	}
+	t.Fatalf("unterminated function %q in %s", sig, file)
+	return nil
 }

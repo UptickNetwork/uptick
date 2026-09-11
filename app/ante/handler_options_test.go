@@ -3,6 +3,7 @@ package ante
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"testing"
 
 	corestore "cosmossdk.io/core/store"
@@ -146,9 +147,81 @@ func TestGasRegisterDecoratorRequiresWasmKeeper(t *testing.T) {
 		nil,
 	)
 
-	for _, d := range decorators {
-		if fmt.Sprintf("%T", d) == "*wasmkeeper.GasRegisterDecorator" {
-			t.Fatalf("GasRegisterDecorator must NOT appear when WasmKeeper == nil")
+	require.Equal(t, -1, decoratorIndex(decorators, (*wasmkeeper.GasRegisterDecorator)(nil)),
+		"GasRegisterDecorator must NOT appear when WasmKeeper == nil")
+}
+
+// decoratorIndex returns the index of the first decorator whose concrete type
+// equals prototype's, or -1.
+//
+// It compares reflect.Type values rather than type-name strings on purpose. The
+// wasmd keeper package is imported as `wasmkeeper` but declares `package
+// keeper`, so fmt.Sprintf("%T", d) prints "*keeper.GasRegisterDecorator" and
+// any literal built from the import alias can never match - the assertion this
+// helper replaces had exactly that shape and could not fail. Names also collide
+// across packages: cosmos-sdk's, ibc-go's and cosmos/evm's ante packages all
+// print as "ante" or "cosmos".
+//
+// A typed nil works for pointer decorators: reflect.TypeOf recovers the pointer
+// type without allocating.
+func decoratorIndex(chain []sdk.AnteDecorator, prototype any) int {
+	want := reflect.TypeOf(prototype)
+	for i, d := range chain {
+		if reflect.TypeOf(d) == want {
+			return i
 		}
 	}
+	return -1
+}
+
+// TestAnteDecoratorOrdering pins the two orderings in cosmosAnteDecorators
+// whose inversion breaks behaviour silently. Both are stated as comments in
+// handler_options.go and neither is observable from a type-level assert, so
+// without this test a plausible-looking reorder would only show up in
+// production as "the wasm simulation ignores its gas cap" or "signature
+// verification became free".
+//
+// The rest of the chain is deliberately not pinned. Most pairs only decide
+// which error surfaces first, including the one flagged in review as an
+// adjacency constraint (RejectMessagesDecorator next to the extension-option
+// checker): those two have never been adjacent - the authz limiter and the
+// simulation-gas decorator sit between them - and swapping any of the three
+// leaves the same tx either accepted or rejected, just reported differently.
+func TestAnteDecoratorOrdering(t *testing.T) {
+	sigVerify := ante.NewSigVerificationDecorator(nil, nil)
+	decorators := cosmosAnteDecorators(
+		HandlerOptions{TXCounterStoreService: stubKVStoreService{}},
+		&feemarkettypes.Params{},
+		func(*codectypes.Any) bool { return false },
+		sigVerify,
+		nil,
+	)
+
+	// SetUpContext installs the tx's own gas meter; LimitSimulationGas then
+	// replaces it with the wasm simulation cap. Reversed, SetUpContext would
+	// overwrite the cap and SimulationGasLimit would never bind - a simulation
+	// of an expensive contract would run unbounded.
+	setUpIdx := decoratorIndex(decorators, ante.SetUpContextDecorator{})
+	simGasIdx := decoratorIndex(decorators, (*wasmkeeper.LimitSimulationGasDecorator)(nil))
+	require.NotEqual(t, -1, setUpIdx, "SetUpContextDecorator must be present in the chain")
+	require.NotEqual(t, -1, simGasIdx, "LimitSimulationGasDecorator must be present in the chain")
+	require.Less(t, setUpIdx, simGasIdx,
+		"SetUpContextDecorator (index %d) must precede LimitSimulationGasDecorator (index %d), otherwise the simulation gas cap is overwritten",
+		setUpIdx, simGasIdx)
+
+	// SetPubKey -> SigGasConsume -> SigVerification is the canonical
+	// sub-order: verification resolves the pubkey SetPubKey just installed, and
+	// the gas it costs is charged before it runs. Reversing the last two hands
+	// out signature verification without charging for it.
+	setPubKeyIdx := decoratorIndex(decorators, ante.SetPubKeyDecorator{})
+	sigGasIdx := decoratorIndex(decorators, ante.SigGasConsumeDecorator{})
+	sigVerifyIdx := decoratorIndex(decorators, sigVerify)
+	require.NotEqual(t, -1, setPubKeyIdx, "SetPubKeyDecorator must be present in the chain")
+	require.NotEqual(t, -1, sigGasIdx, "SigGasConsumeDecorator must be present in the chain")
+	require.NotEqual(t, -1, sigVerifyIdx, "the caller's signature verifier must be present in the chain")
+	require.Less(t, setPubKeyIdx, sigGasIdx,
+		"SetPubKeyDecorator (index %d) must precede SigGasConsumeDecorator (index %d)", setPubKeyIdx, sigGasIdx)
+	require.Less(t, sigGasIdx, sigVerifyIdx,
+		"SigGasConsumeDecorator (index %d) must precede the signature verifier (index %d) so verification is paid for",
+		sigGasIdx, sigVerifyIdx)
 }

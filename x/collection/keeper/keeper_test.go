@@ -274,8 +274,7 @@ func (s *KeeperTestSuite) TestGetCollectionsIncludesNilDataClass() {
 		Symbol: "ND",
 	}))
 
-	cs, err := s.keeper.GetCollections(s.ctx)
-	s.Require().NoError(err)
+	cs := s.keeper.GetCollections(s.ctx)
 	// All three classes are returned. The nil-data one survives the loop
 	// with zero-value metadata instead of crashing genesis export.
 	s.Require().Len(cs, 3)

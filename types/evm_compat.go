@@ -44,11 +44,3 @@ func IsValidChainID(chainID string) bool {
 	_, err := ParseEIP155ChainID(chainID)
 	return err == nil
 }
-
-// EthAccount wraps BaseAccount with a CodeHash for EVM compatibility.
-// In cosmos/evm, EthAccount is no longer used — standard BaseAccount is used instead.
-// This type is provided as a temporary shim during migration.
-type EthAccount struct {
-	*authtypes.BaseAccount
-	CodeHash string
-}

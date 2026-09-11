@@ -1,6 +1,8 @@
 package keeper
 
 import (
+	"os"
+	"strings"
 	"testing"
 
 	ibcnfttransfertypes "github.com/bianjieai/nft-transfer/types"
@@ -272,9 +274,66 @@ func TestRefundPacketToken_SkipsWhenOwnerUnknown(t *testing.T) {
 func TestModuleOwnsCW721(t *testing.T) {
 	t.Parallel()
 
-	require.True(t, moduleOwnsCW721(cw721types.AccModuleAddress.String()))
+	canonical := cw721types.AccModuleAddress.String()
+	require.True(t, moduleOwnsCW721(canonical))
 	require.False(t, moduleOwnsCW721("uptick1someoneelse"))
 	require.False(t, moduleOwnsCW721(""))
+
+	// bech32 is case-insensitive and the value comes from a contract query
+	// response, so any case variant of the module address must match.
+	require.True(t, moduleOwnsCW721(strings.ToUpper(canonical)))
+	require.True(t, moduleOwnsCW721(strings.ToLower(canonical)))
+	require.True(t, moduleOwnsCW721(strings.ToUpper(canonical[:1])+canonical[1:]),
+		"mixed case must match too: a strict bech32 decoder may reject it, so a plain decode-only comparison is not enough")
+
+	// A different address that merely decodes is still not the module.
+	require.False(t, moduleOwnsCW721(sdk.AccAddress([]byte("someone-else-addr-01")).String()))
+}
+
+// The gate that decides whether the module still escrows the token reads its
+// input straight out of the CW721 contract's all_nft_info response, and bech32
+// is case-insensitive. Before the fix a contract echoing the module address in
+// a non-canonical case was read as "not the module" and the refund was skipped
+// even though the module really did hold the token — permanently stranding the
+// escrowed native NFT. This asserts the whole refund path, not just the
+// predicate in isolation.
+func TestRefundPacketToken_RefundsOnNonCanonicalModuleAddressCase(t *testing.T) {
+	for _, name := range []string{"upper", "mixed"} {
+		t.Run(name, func(t *testing.T) {
+			k, ctx, owner, contract, wasm := setupConvertKeeper(t)
+
+			// Resolve the canonical string only AFTER the keeper setup has
+			// installed the chain's bech32 prefix. sdk.AccAddress.String()
+			// caches its result process-wide, so the first call anywhere in
+			// this test binary fixes the display form for every later call —
+			// computing it before the prefix is set yields a cosmos1... form
+			// that the validators below then reject as "expected uptick".
+			canonical := cw721types.AccModuleAddress.String()
+			variant := strings.ToUpper(canonical)
+			if name == "mixed" {
+				variant = strings.ToUpper(canonical[:1]) + canonical[1:]
+			}
+
+			require.NoError(t, k.SetNFTPairs(ctx, contract, "1", "kitty", "nft1"))
+			moveNFTToModule(t, k, ctx, owner, "kitty", "nft1")
+			// The contract reports the module as owner, in a variant case.
+			wasm.setOwner(contract, "1", variant)
+			k.SetCwAddressByContractTokenId(ctx, contract, "1", owner.String())
+
+			err := k.RefundPacketToken(ctx, ibcnfttransfertypes.NonFungibleTokenPacketData{
+				ClassId:  "kitty",
+				TokenIds: []string{"nft1"},
+			})
+			require.NoError(t, err)
+
+			require.Nil(t, findEvent(ctx.EventManager().Events(), cw721types.EventTypeRefundPacketTokenSkip),
+				"the module does own the token, so nothing may be skipped")
+			require.NotNil(t, findEvent(ctx.EventManager().Events(), cw721types.EventTypeRefundPacketToken),
+				"a case variant of the module address must still be refunded")
+			require.Equal(t, owner.String(), wasm.ownerOf(contract, "1"),
+				"the CW721 token must be handed back to the depositor")
+		})
+	}
 }
 
 // Defense-in-depth: if the native NFT is already gone when the refund runs,
@@ -302,6 +361,20 @@ func TestRefundPacketToken_SkipsWhenNativeNFTAlreadyGone(t *testing.T) {
 	skip := findEvent(ctx.EventManager().Events(), cw721types.EventTypeRefundPacketTokenSkip)
 	require.NotNil(t, skip)
 	require.Equal(t, "nft_already_gone", refundAttr(*skip)["reason"])
+
+	// Round 25: this reason is shared with x/erc721, where it means the
+	// opposite (pair mappings retained, human triage required) and is flagged
+	// with pairs_retained=true. Here the mappings were already deleted above
+	// because the CW721 side is settled, so the attribute must be absent —
+	// absence is the "converged" half of the distinction an operator reads.
+	_, hasPairsRetained := refundAttr(*skip)["pairs_retained"]
+	require.False(t, hasPairsRetained,
+		"cw721's nft_already_gone is the converged case and must not claim retained pairs")
+
+	// The mappings really are gone, which is what makes the claim above true
+	// rather than a convention.
+	require.Empty(t, k.GetNFTPairByClassNFTID(ctx, "kitty", "nft1"),
+		"the pair mapping must be deleted on this path, unlike x/erc721")
 }
 
 // Defense-in-depth: the native NFT exists but is owned by a
@@ -380,4 +453,57 @@ func TestCW721RefundEvents_GroupsByContractAndReceiver(t *testing.T) {
 	require.Equal(t, "c1", refundAttr(events[0])[cw721types.AttributeKeyCW721Token])
 	require.Equal(t, "r1", refundAttr(events[0])[cw721types.AttributeKeyReceiver])
 	require.Equal(t, "t2", refundAttr(events[1])[cw721types.AttributeKeyCW721TokenID])
+}
+
+// TestRefundPacketTokenReturnsNoError is a static guard on the function body:
+// no per-token failure inside RefundPacketToken may return an error.
+//
+// A returned error tears down the IBC callback, so the ack is never written,
+// the relayer retries the packet forever, and the tokens after the failing one
+// are abandoned. Round 22 found the last site (a native burn failure) still
+// returning an error in both this module and its erc721 twin, so the invariant
+// is checked mechanically now.
+func TestRefundPacketTokenReturnsNoError(t *testing.T) {
+	body := functionSource(t, "msg_server.go", "func (k Keeper) RefundPacketToken")
+	require.NotEmpty(t, body)
+	// Prove the extraction really landed on RefundPacketToken; a silently empty
+	// or wrong slice would make the loop below pass for the wrong reason.
+	require.Contains(t, strings.Join(body, "\n"), "EventTypeRefundPacketTokenSkip")
+
+	for _, line := range body {
+		code := strings.TrimSpace(line)
+		if strings.HasPrefix(code, "//") {
+			continue
+		}
+		require.NotRegexp(t, `\breturn\s+\S*[Ee]rr`, code,
+			"RefundPacketToken must skip and emit an event instead of returning an error (offending line: %q)", code)
+	}
+}
+
+// functionSource returns the lines of the top-level function whose declaration
+// starts with sig, up to and including its closing brace. gofmt puts that brace
+// at column 0, which makes this a safe way to look at one function at a time.
+func functionSource(t *testing.T, file, sig string) []string {
+	t.Helper()
+
+	src, err := os.ReadFile(file)
+	require.NoError(t, err, "the guard must read the production source")
+
+	lines := strings.Split(string(src), "\n")
+	start := -1
+	for i, line := range lines {
+		if strings.HasPrefix(line, sig) {
+			start = i
+			break
+		}
+	}
+	require.GreaterOrEqual(t, start, 0, "function %q not found in %s", sig, file)
+
+	for i := start + 1; i < len(lines); i++ {
+		if lines[i] == "}" {
+			return lines[start : i+1]
+		}
+	}
+	t.Fatalf("unterminated function %q in %s", sig, file)
+	return nil
 }

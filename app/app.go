@@ -215,6 +215,11 @@ type Uptick struct {
 	evmMempool *evmmempool.ExperimentalEVMMempool
 	clientCtx  client.Context
 
+	// homeDir is the node home directory (`--home`), captured at construction.
+	// It is only used by the offline export path to persist the diagnostics of
+	// a degraded genesis export; no consensus path reads it.
+	homeDir string
+
 	// the module manager
 	mm *module.Manager
 	bm module.BasicManager
@@ -262,6 +267,7 @@ func NewUptick(
 		interfaceRegistry: interfaceRegistry,
 		txConfig:          txConfig,
 		legacyAmino:       legacyAmino,
+		homeDir:           cast.ToString(appOpts.Get(flags.FlagHome)),
 	}
 
 	// get skipUpgradeHeights from the app options
@@ -412,7 +418,12 @@ func NewUptick(
 	// During begin block slashing happens after distr.BeginBlocker so that
 	// there is nothing left over in the validator fee pool, so as to keep the
 	// CanWithdrawInvariant invariant.
-	// NOTE: upgrade module must go first to handle software upgrades.
+	//
+	// NOTE: the upgrade module is NOT ordered here. Since SDK v0.47 it runs in
+	// the pre-block phase, so the ordering that actually decides whether a
+	// software upgrade is handled is the SetOrderPreBlockers call above.
+	// upgradetypes.ModuleName is listed below among the no-op modules and its
+	// position in that group carries no meaning.
 	// NOTE: staking module is required if HistoricalEntries param > 0.
 	app.mm.SetOrderBeginBlockers(
 
@@ -1008,6 +1019,27 @@ func NoOpMempoolOption() func(*baseapp.BaseApp) {
 		app.SetPrepareProposal(handler.PrepareProposalHandler())
 		app.SetProcessProposal(handler.ProcessProposalHandler())
 	}
+}
+
+// PrepareDefaultGenesisDenom overrides sdk.DefaultBondDenom, which several
+// module defaults are derived from while DefaultGenesis runs -- mint's
+// Params.MintDenom and crisis' ConstantFee among them. The SDK zero value is
+// "stake", so any genesis built without this call ends up with staking on the
+// chain denom while mint keeps issuing a phantom "stake" nobody holds and
+// MsgVerifyInvariant cannot be funded.
+//
+// It MUST be called before the BasicManager's DefaultGenesis is materialised;
+// setting the denom afterwards has no effect on the defaults already built.
+// Both genesis entry points (init and testnet init-files) go through here so
+// they cannot drift apart.
+//
+// An empty denom is ignored, so callers may pass an optional flag value
+// straight through without clobbering the package-level default.
+func PrepareDefaultGenesisDenom(denom string) {
+	if denom == "" {
+		return
+	}
+	sdk.DefaultBondDenom = denom
 }
 
 // CustomizeDefaultGenesis overlays Uptick-specific defaults onto a

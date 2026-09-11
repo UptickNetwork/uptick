@@ -61,6 +61,8 @@ Ref: https://keepachangelog.com/en/1.0.0/
 ### Features
 
 * (evm) Activate the EVM static precompiles (bank, staking, distribution, ICS20, gov, slashing, bech32, p256) on upgrade and for fresh chains — v0.4.0 shipped the `ActiveStaticPrecompiles` param empty (M-6 #1).
+
+  The migration writes only when the stored list is **empty**, and it reads an empty list as "never configured". Read that together with the proto round-trip: an explicitly empty list collapses to nil on the way through the store, so a governance decision to clear the list (disable every static precompile) is indistinguishable from the untouched default, and the v0.4.1 upgrade re-activates the shipped set over it. Re-apply the governance change after the upgrade if clearing was intentional. The vesting precompile (0x803) is deliberately **absent** from the set — Uptick does not register it, and activating it panics the EVM with "precompiled contract not stored in memory".
 * (ibc) Enable the ICA controller submodule on upgrade (legacy genesis templates default it to disabled).
 * (keplr) Accept Keplr Web3-extension EIP-712 transactions: legacy `/ethermint.types.v1.ExtensionOptionsWeb3Tx` and `/ethermint.crypto.v1.ethsecp256k1.PubKey` type URLs map onto the complete cosmos/evm types at runtime (v0.4.1 Keplr compatibility).
 * (erc721/cw721) Reject commas in denom ids and make the NFT-mapping UID parser split on the last comma, keeping NFT UID round-trips safe (L-3).

@@ -3,6 +3,7 @@ package keeper
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	nfttransfertypes "github.com/bianjieai/nft-transfer/types"
@@ -19,6 +20,10 @@ import (
 // IsAwayFromOrigin mint/unescrow decision is preserved.
 type captureICS721 struct {
 	classIDs *[]string
+	// localClasses names the class ids that exist on chain. Mirrors the
+	// ICS-721 keeper's HasClass-first rule: an id that exists locally is
+	// returned unchanged, any other id containing "/" resolves to ibc/<hash>.
+	localClasses map[string]bool
 }
 
 func (m *captureICS721) OnAcknowledgementPacket(_ sdk.Context, _ channeltypes.Packet, data nfttransfertypes.NonFungibleTokenPacketData, _ channeltypes.Acknowledgement) error {
@@ -32,7 +37,10 @@ func (m *captureICS721) OnTimeoutPacket(_ sdk.Context, _ channeltypes.Packet, da
 }
 
 func (m *captureICS721) GetVoucherClassID(_ sdk.Context, classID string) (string, error) {
-	return classID, nil
+	if !strings.Contains(classID, "/") || m.localClasses[classID] {
+		return classID, nil
+	}
+	return nfttransfertypes.ParseClassTrace(classID).IBCClassID(), nil
 }
 
 // captureERC721 records the ClassId handed to the ERC721 reverse-conversion
@@ -74,22 +82,35 @@ func (m *captureCW721) RefundPacketToken(_ sdk.Context, data nfttransfertypes.No
 func TestRefundClassIDSplit(t *testing.T) {
 	// shape-2: voucher prefix matches this packet's (port, channel).
 	// shape-3: voucher prefix does not match (multi-hop).
+	// local:   a class id containing "/" that exists locally on chain -- a
+	//          natively issued `sub/collection`, not a trace path.
 	cases := []struct {
-		name     string
-		fullPath string
+		name         string
+		fullPath     string
+		classIsLocal bool
 	}{
-		{"shape2 matching prefix", nfttransfertypes.PortID + "/channel-0/kitty"},
-		{"shape3 non-matching channel", nfttransfertypes.PortID + "/channel-1/kitty"},
+		{"shape2 matching prefix", nfttransfertypes.PortID + "/channel-0/kitty", false},
+		{"shape3 non-matching channel", nfttransfertypes.PortID + "/channel-1/kitty", false},
+		{"local class containing a slash", "sub/collection", true},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			localID := nfttransfertypes.ParseClassTrace(tc.fullPath).IBCClassID()
+			// The module-side refund must get the local class id: the id itself
+			// when such a class exists locally, ibc/<hash> otherwise.
+			localID := tc.fullPath
+			if !tc.classIsLocal {
+				localID = nfttransfertypes.ParseClassTrace(tc.fullPath).IBCClassID()
+			}
+			localClasses := map[string]bool{}
+			if tc.classIsLocal {
+				localClasses[tc.fullPath] = true
+			}
 			packet := channeltypes.Packet{SourcePort: nfttransfertypes.PortID, SourceChannel: "channel-0"}
 
 			t.Run("timeout erc721", func(t *testing.T) {
 				ibcIDs, ercIDs := &[]string{}, &[]string{}
-				k := NewKeeper(&captureICS721{classIDs: ibcIDs})
+				k := NewKeeper(&captureICS721{classIDs: ibcIDs, localClasses: localClasses})
 				k.SetErc721Keeper(&captureERC721{classIDs: ercIDs})
 				k.SetCw721Keeper(&captureCW721{classIDs: &[]string{}})
 
@@ -106,7 +127,7 @@ func TestRefundClassIDSplit(t *testing.T) {
 
 			t.Run("timeout cw721", func(t *testing.T) {
 				ibcIDs, cwIDs := &[]string{}, &[]string{}
-				k := NewKeeper(&captureICS721{classIDs: ibcIDs})
+				k := NewKeeper(&captureICS721{classIDs: ibcIDs, localClasses: localClasses})
 				k.SetErc721Keeper(&captureERC721{classIDs: &[]string{}})
 				k.SetCw721Keeper(&captureCW721{classIDs: cwIDs})
 
@@ -123,7 +144,7 @@ func TestRefundClassIDSplit(t *testing.T) {
 
 			t.Run("ack erc721", func(t *testing.T) {
 				ibcIDs, ercIDs := &[]string{}, &[]string{}
-				k := NewKeeper(&captureICS721{classIDs: ibcIDs})
+				k := NewKeeper(&captureICS721{classIDs: ibcIDs, localClasses: localClasses})
 				k.SetErc721Keeper(&captureERC721{classIDs: ercIDs})
 				k.SetCw721Keeper(&captureCW721{classIDs: &[]string{}})
 
@@ -141,7 +162,7 @@ func TestRefundClassIDSplit(t *testing.T) {
 
 			t.Run("ack cw721", func(t *testing.T) {
 				ibcIDs, cwIDs := &[]string{}, &[]string{}
-				k := NewKeeper(&captureICS721{classIDs: ibcIDs})
+				k := NewKeeper(&captureICS721{classIDs: ibcIDs, localClasses: localClasses})
 				k.SetErc721Keeper(&captureERC721{classIDs: &[]string{}})
 				k.SetCw721Keeper(&captureCW721{classIDs: cwIDs})
 

@@ -79,3 +79,18 @@ func (e *GenesisExportError) Error() string {
 func issuesToError(module string, issues []GenesisExportIssue) error {
 	return &GenesisExportError{Module: module, Issues: issues}
 }
+
+// MergeExportIssues flattens the per-store issue lists into a single list, so
+// every caller reports them in the same order instead of repeating (and
+// eventually drifting on) the append sequence.
+func MergeExportIssues(groups ...[]GenesisExportIssue) []GenesisExportIssue {
+	total := 0
+	for _, g := range groups {
+		total += len(g)
+	}
+	merged := make([]GenesisExportIssue, 0, total)
+	for _, g := range groups {
+		merged = append(merged, g...)
+	}
+	return merged
+}

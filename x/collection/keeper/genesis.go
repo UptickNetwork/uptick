@@ -13,9 +13,18 @@ func (k Keeper) InitGenesis(ctx sdk.Context, data types.GenesisState) {
 	}
 
 	for _, c := range data.Collections {
-		creator, err := sdk.AccAddressFromBech32(c.Denom.Creator)
-		if err != nil {
-			panic(err)
+		// An empty creator is a legitimate on-chain state, not corruption:
+		// ICS-721 voucher classes are written straight into the underlying nft
+		// store by nft-transfer and have no collection-level issuer at all,
+		// and ValidateGenesis accepts them. Only a NON-empty value that does
+		// not decode is damage, and validation has already rejected that.
+		var creator sdk.AccAddress
+		if c.Denom.Creator != "" {
+			acc, err := sdk.AccAddressFromBech32(c.Denom.Creator)
+			if err != nil {
+				panic(err)
+			}
+			creator = acc
 		}
 		if err := k.SaveDenom(ctx,
 			c.Denom.Id,
@@ -43,7 +52,10 @@ func (k Keeper) InitGenesis(ctx sdk.Context, data types.GenesisState) {
 //
 // Degradations reported by GetCollectionsWithReport are logged at Error level
 // and summarized: the export still succeeds (no class or NFT is dropped), but
-// an operator must be able to see that some metadata fields were lost.
+// an operator must be able to see that some metadata fields were lost. The
+// app-level export path additionally writes the same list to
+// <home>/export-issues.json (see app/export_diagnostics.go) so the report
+// survives the process that produced it.
 func (k Keeper) ExportGenesis(ctx sdk.Context) *types.GenesisState {
 	collections, issues := k.GetCollectionsWithReport(ctx)
 	for _, issue := range issues {

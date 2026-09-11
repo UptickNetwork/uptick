@@ -37,6 +37,29 @@ func (app *Uptick) ExportAppStateAndValidators(
 	if err != nil {
 		return servertypes.ExportedApp{}, err
 	}
+
+	// A module export never fails on damaged state: it degrades, logs, and
+	// still returns its genesis (decision 第 22 轮: one export policy for the
+	// whole repository). Persist that degradation list next to the node home so
+	// it outlives the process -- otherwise the only trace would be a log line,
+	// and an operator restoring from a partially degraded backup would have no
+	// way to know what was missing.
+	if diags := app.collectExportDiagnostics(ctx); len(diags) > 0 {
+		if path, writeErr := app.writeExportDiagnosticsReport(height, diags); writeErr != nil {
+			// Never fail the export over the sidecar: the degradations are
+			// already logged by each module, and the genesis itself is valid.
+			ctx.Logger().Error("failed to write the export diagnostics report", "err", writeErr)
+		} else {
+			ctx.Logger().Error(
+				"genesis export was degraded; the full list of affected records was written to the diagnostics report",
+				"path", path,
+				"affected_records", len(diags),
+			)
+		}
+	} else {
+		app.removeStaleExportDiagnosticsReport()
+	}
+
 	appState, err := json.MarshalIndent(genState, "", "  ")
 	if err != nil {
 		return servertypes.ExportedApp{}, err
@@ -150,35 +173,51 @@ func (app *Uptick) prepForZeroHeightGenesis(ctx sdk.Context, jailAllowedAddrs []
 	ctx = ctx.WithBlockHeight(0)
 
 	// reinitialize all validators
+	//
+	// IterateValidators takes a `func(...) bool`, so the closure has no error
+	// channel. The previous version panicked at each of the five failure
+	// points, which crashes the node process and diverges from the fail-closed
+	// error style this same function uses everywhere else (errors.Join for the
+	// commission/reward passes above, fmt.Errorf further down). Capture the
+	// first failure, stop the iteration and return it instead.
+	var reinitErr error
 	if err := app.StakingKeeper.IterateValidators(ctx, func(_ int64, val stakingtypes.ValidatorI) (stop bool) {
 		// donate any unwithdrawn outstanding reward fraction tokens to the community pool
 		valBz, err := app.StakingKeeper.ValidatorAddressCodec().StringToBytes(val.GetOperator())
 		if err != nil {
 			ctx.Logger().Error("failed to decode validator operator address", "operator", val.GetOperator(), "err", err)
-			panic(err)
+			reinitErr = fmt.Errorf("decode validator operator %s: %w", val.GetOperator(), err)
+			return true
 		}
 		scraps, err := app.DistrKeeper.GetValidatorOutstandingRewardsCoins(ctx, valBz)
 		if err != nil {
 			ctx.Logger().Error("get validator outstanding rewards failed", "operator", val.GetOperator(), "err", err)
-			panic(err)
+			reinitErr = fmt.Errorf("get outstanding rewards for %s: %w", val.GetOperator(), err)
+			return true
 		}
 		feePool, err := app.DistrKeeper.FeePool.Get(ctx)
 		if err != nil {
 			ctx.Logger().Error("get fee pool failed", "err", err)
-			panic(err)
+			reinitErr = fmt.Errorf("get fee pool: %w", err)
+			return true
 		}
 		feePool.CommunityPool = feePool.CommunityPool.Add(scraps...)
 		if err := app.DistrKeeper.FeePool.Set(ctx, feePool); err != nil {
 			ctx.Logger().Error("set fee pool failed", "err", err)
-			panic(err)
+			reinitErr = fmt.Errorf("set fee pool: %w", err)
+			return true
 		}
 		if err := app.DistrKeeper.Hooks().AfterValidatorCreated(ctx, valBz); err != nil {
 			ctx.Logger().Error("AfterValidatorCreated hook failed", "operator", val.GetOperator(), "err", err)
-			panic(err)
+			reinitErr = fmt.Errorf("AfterValidatorCreated hook for %s: %w", val.GetOperator(), err)
+			return true
 		}
 		return false
 	}); err != nil {
 		return fmt.Errorf("failed to iterate validators: %w", err)
+	}
+	if reinitErr != nil {
+		return fmt.Errorf("zero-height export failed to reinitialise validators: %w", reinitErr)
 	}
 
 	// reinitialize all delegations

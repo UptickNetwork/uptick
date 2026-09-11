@@ -149,6 +149,17 @@ func (k Keeper) ExportRefundReceiversWithReport(ctx sdk.Context) ([]types.Refund
 	return receivers, issues
 }
 
+// ExportIssues aggregates every degradation the genesis export can report,
+// without requiring the caller to build the genesis state first. The app-level
+// diagnostics report uses it to describe a degraded export without a second
+// full export pass.
+func (k Keeper) ExportIssues(ctx sdk.Context) []GenesisExportIssue {
+	_, pairIssues := k.GetTokenPairsWithReport(ctx)
+	_, uidIssues := k.ExportNFTUIDPairsWithReport(ctx)
+	_, refundIssues := k.ExportRefundReceiversWithReport(ctx)
+	return MergeExportIssues(pairIssues, uidIssues, refundIssues)
+}
+
 // splitContractTokenKey recovers the (contract, tokenID) parts of a refund
 // store key. The longest registered-contract prefix with a non-empty remainder
 // wins; zero or ambiguous matches are rejected. Matching is case-insensitive

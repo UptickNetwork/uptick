@@ -241,20 +241,38 @@ func NewCLILogger(cmd *cobra.Command) CLILogger {
 	return CLILogger{cmd}
 }
 
-// New creates a new Network for integration tests or in-process testnets run via the CLI
+// New creates a new Network for integration tests or in-process testnets run via the CLI.
+//
+// The package-level lock is acquired here and released by Network.Cleanup, NOT
+// by this function: a network owns the process for its whole lifetime,
+// including the block production that happens after New returns. Every early
+// return therefore has to release the lock by hand, which is what the split
+// between New and newLockedNetwork exists for. A bare `return nil, err` used to
+// leave the lock held forever, deadlocking every later New for the rest of the
+// process — and testutil/network is on the uptickd binary's dependency graph.
 func New(l Logger, baseDir string, cfg Config) (*Network, error) {
 	initPortPool()
 	// only one caller/test can create and use a network at a time
 	l.Log("acquiring test network lock")
 	lock.Lock()
 
-	if cfg.NumValidators != 1 {
+	network, err := newLockedNetwork(l, baseDir, cfg)
+	if err != nil {
 		lock.Unlock()
+		return nil, err
+	}
+	return network, nil
+}
+
+// newLockedNetwork builds and starts the network. It assumes the package lock
+// is already held: the caller releases it on error, and it stays held until
+// Network.Cleanup on success.
+func newLockedNetwork(l Logger, baseDir string, cfg Config) (*Network, error) {
+	if cfg.NumValidators != 1 {
 		return nil, fmt.Errorf("in-process network supports 1 validator (cosmos/evm chainConfig is process-global), got %d", cfg.NumValidators)
 	}
 
 	if !upticktypes.IsValidChainID(cfg.ChainID) {
-		lock.Unlock()
 		return nil, fmt.Errorf("invalid chain-id: %s", cfg.ChainID)
 	}
 

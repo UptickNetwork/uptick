@@ -103,10 +103,11 @@ func TestGenesisRoundTripPreservesPerTokenState(t *testing.T) {
 	require.Equal(t, first, second, "export -> import -> export must round-trip losslessly")
 }
 
-// TestExportRejectsInconsistentIndex: a forward entry without its reverse
-// half is corrupt state; export must abort instead of writing a genesis that
-// loses the binding.
-func TestExportRejectsInconsistentIndex(t *testing.T) {
+// TestExportDegradesOnInconsistentIndex: a forward entry without its reverse
+// half is corrupt state. The export must not abort -- one bad key may not lock
+// the chain out of its own backup -- but the damaged binding must be excluded
+// from the genesis AND reported, never dropped silently.
+func TestExportDegradesOnInconsistentIndex(t *testing.T) {
 	k, ctx := newRoundTripKeeper(t)
 	seedPairAndRuntimeState(t, k, ctx)
 
@@ -117,23 +118,45 @@ func TestExportRejectsInconsistentIndex(t *testing.T) {
 		types.CreateNFTUID("kitty", "ghost"),
 	)
 
-	require.Panics(t, func() {
-		ExportGenesis(ctx, k)
-	})
+	var exported *types.GenesisState
+	require.NotPanics(t, func() { exported = ExportGenesis(ctx, k) },
+		"a single corrupt index entry must not abort the export")
+	require.NotNil(t, exported)
+
+	for _, pair := range exported.NftUidPairs {
+		require.NotEqual(t, types.CreateNFTUID("kitty", "ghost"), pair.NftUid,
+			"the binding without its reverse half must not be exported")
+	}
+
+	issues := k.ExportIssues(ctx)
+	require.Len(t, issues, 1)
+	require.Equal(t, keeper.GenesisExportIssueUIDIndexForward, issues[0].Kind)
 }
 
-// TestExportRejectsOrphanedRefundRecord: a refund record whose contract is
-// not a registered pair cannot be attributed; export must fail loudly rather
-// than silently drop refund state.
-func TestExportRejectsOrphanedRefundRecord(t *testing.T) {
+// TestExportDegradesOnOrphanedRefundRecord: a refund record whose contract is
+// not a registered pair cannot be attributed. It is excluded from the genesis
+// and reported, instead of aborting the whole export.
+func TestExportDegradesOnOrphanedRefundRecord(t *testing.T) {
+	const orphan = "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
+
 	k, ctx := newRoundTripKeeper(t)
 	seedPairAndRuntimeState(t, k, ctx)
 
-	k.SetEvmAddressByContractTokenId(ctx, "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef", "7", rtOwner)
+	k.SetEvmAddressByContractTokenId(ctx, orphan, "7", rtOwner)
 
-	require.Panics(t, func() {
-		ExportGenesis(ctx, k)
-	})
+	var exported *types.GenesisState
+	require.NotPanics(t, func() { exported = ExportGenesis(ctx, k) },
+		"an unattributable refund record must not abort the export")
+	require.NotNil(t, exported)
+
+	for _, receiver := range exported.RefundReceivers {
+		require.NotEqual(t, orphan, receiver.EvmContractAddress,
+			"the orphaned refund record must not be exported")
+	}
+
+	issues := k.ExportIssues(ctx)
+	require.Len(t, issues, 1)
+	require.Equal(t, keeper.GenesisExportIssueRefundKeyOrphan, issues[0].Kind)
 }
 
 // TestImportRejectsDuplicateNFTUID: one-to-one must hold after import.
@@ -210,7 +233,8 @@ func TestDeletePairPerTokenStateClearsOrphans(t *testing.T) {
 
 // The store accessor must not panic on a corrupt record: it is reachable from
 // the gRPC query path. The corruption is reported instead of hidden, and the
-// fail-closed genesis export turns that report into a diagnosable abort.
+// genesis export degrades (drops the damaged record) rather than aborting, so
+// a single bad key cannot lock the chain out of its own backup.
 func TestGetTokenPairsSkipsAndReportsCorruptValue(t *testing.T) {
 	key := storetypes.NewKVStoreKey(types.StoreKey)
 	tkey := storetypes.NewTransientStoreKey(types.StoreKey + "-t")
@@ -233,16 +257,17 @@ func TestGetTokenPairsSkipsAndReportsCorruptValue(t *testing.T) {
 	require.Equal(t, keeper.GenesisExportIssueTokenPairCorrupt, issues[0].Kind)
 	require.NotEmpty(t, issues[0].Key)
 
-	// ExportGenesis must fail closed with the structured repair list.
-	defer func() {
-		r := recover()
-		require.NotNil(t, r, "ExportGenesis must abort on corrupt state")
-		exportErr, ok := r.(*keeper.GenesisExportError)
-		require.True(t, ok, "panic value must be the structured export error, got %T", r)
-		require.Len(t, exportErr.Issues, 1)
-		require.Contains(t, exportErr.Error(), string(keeper.GenesisExportIssueTokenPairCorrupt))
-	}()
-	_ = ExportGenesis(ctx, k)
+	// ExportGenesis must degrade, not abort: the damaged record is excluded
+	// from the genesis, the export still succeeds (disaster recovery stays
+	// possible), and the drop stays reportable.
+	var exported *types.GenesisState
+	require.NotPanics(t, func() { exported = ExportGenesis(ctx, k) },
+		"ExportGenesis must not abort on corrupt state")
+	require.NotNil(t, exported)
+	require.Empty(t, exported.TokenPairs, "the corrupt pair is excluded, not exported")
+
+	require.Equal(t, issues, k.ExportIssues(ctx),
+		"the aggregation used by the app-level diagnostics report must match what the export dropped")
 }
 
 // TestGenesisRoundTripPreservesDualKeyRefundReceivers covers the runtime

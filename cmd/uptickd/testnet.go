@@ -5,6 +5,7 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -90,6 +91,93 @@ type startArgs struct {
 // This transaction consumes approximately 220,000 gas when executed in the genesis block.
 const createValidatorMsgGasLimit = 250_000
 
+// assignFlag* read a registered flag into dst and return the lookup error
+// instead of discarding it.
+//
+// pflag reports "flag accessed but not defined" when the name was never
+// registered, so the `, _ =` form these replace silently handed the caller the
+// zero value — an empty --chain-id, an empty --output-dir, a zero --v. The
+// consequence is not a crash but a wrong one: genesis files generated with no
+// chain-id, or testnet directories created in the current working directory
+// because --output-dir came back as "". Nothing downstream can tell the
+// difference between "the user passed an empty value" and "the flag was never
+// registered".
+//
+// The call sites group them with errors.Join so that one mis-registration
+// reports every affected flag in a single run rather than one per invocation.
+func assignStringFlag(dst *string, cmd *cobra.Command, name string) error {
+	v, err := cmd.Flags().GetString(name)
+	if err != nil {
+		return fmt.Errorf("read flag --%s: %w", name, err)
+	}
+	*dst = v
+	return nil
+}
+
+func assignIntFlag(dst *int, cmd *cobra.Command, name string) error {
+	v, err := cmd.Flags().GetInt(name)
+	if err != nil {
+		return fmt.Errorf("read flag --%s: %w", name, err)
+	}
+	*dst = v
+	return nil
+}
+
+func assignBoolFlag(dst *bool, cmd *cobra.Command, name string) error {
+	v, err := cmd.Flags().GetBool(name)
+	if err != nil {
+		return fmt.Errorf("read flag --%s: %w", name, err)
+	}
+	*dst = v
+	return nil
+}
+
+// readInitArgs collects the flags of the `testnet init-files` command. It is a
+// standalone function rather than a closure body so that tests can drive it
+// against the real command and assert that every flag it reads is actually
+// registered — the property the previous `, _ =` form could not express.
+func readInitArgs(cmd *cobra.Command) (initArgs, error) {
+	args := initArgs{}
+	err := errors.Join(
+		assignStringFlag(&args.outputDir, cmd, flagOutputDir),
+		assignStringFlag(&args.keyringBackend, cmd, flags.FlagKeyringBackend),
+		assignStringFlag(&args.chainID, cmd, flags.FlagChainID),
+		assignStringFlag(&args.minGasPrices, cmd, sdkserver.FlagMinGasPrices),
+		assignStringFlag(&args.nodeDirPrefix, cmd, flagNodeDirPrefix),
+		assignStringFlag(&args.nodeDaemonHome, cmd, flagNodeDaemonHome),
+		assignStringFlag(&args.startingIPAddress, cmd, flagStartingIPAddress),
+		assignIntFlag(&args.numValidators, cmd, flagNumValidators),
+		assignStringFlag(&args.algo, cmd, flags.FlagKeyType),
+	)
+	if err != nil {
+		return initArgs{}, err
+	}
+	return args, nil
+}
+
+// readStartArgs is the `testnet start` counterpart to readInitArgs.
+func readStartArgs(cmd *cobra.Command) (startArgs, error) {
+	args := startArgs{}
+	err := errors.Join(
+		assignStringFlag(&args.outputDir, cmd, flagOutputDir),
+		assignStringFlag(&args.chainID, cmd, flags.FlagChainID),
+		assignStringFlag(&args.minGasPrices, cmd, sdkserver.FlagMinGasPrices),
+		assignIntFlag(&args.numValidators, cmd, flagNumValidators),
+		assignStringFlag(&args.algo, cmd, flags.FlagKeyType),
+		assignBoolFlag(&args.enableLogging, cmd, flagEnableLogging),
+		assignStringFlag(&args.rpcAddress, cmd, flagRPCAddress),
+		assignStringFlag(&args.apiAddress, cmd, flagAPIAddress),
+		assignStringFlag(&args.grpcAddress, cmd, srvflags.GRPCAddress),
+		assignStringFlag(&args.jsonrpcAddress, cmd, srvflags.JSONRPCAddress),
+		assignBoolFlag(&args.printMnemonic, cmd, flagPrintMnemonic),
+	)
+	if err != nil {
+		return startArgs{}, err
+	}
+	return args, nil
+}
+
+// addTestnetFlagsToCmd registers flags shared by both testnet subcommands.
 func addTestnetFlagsToCmd(cmd *cobra.Command, numValidators int) {
 	cmd.Flags().Int(flagNumValidators, numValidators, "Number of validators to initialize the testnet with")
 	cmd.Flags().StringP(flagOutputDir, "o", "./.testnets", "Directory to store initialization data for the testnet")
@@ -139,16 +227,10 @@ Example:
 
 			serverCtx := sdkserver.GetServerContextFromCmd(cmd)
 
-			args := initArgs{}
-			args.outputDir, _ = cmd.Flags().GetString(flagOutputDir)
-			args.keyringBackend, _ = cmd.Flags().GetString(flags.FlagKeyringBackend)
-			args.chainID, _ = cmd.Flags().GetString(flags.FlagChainID)
-			args.minGasPrices, _ = cmd.Flags().GetString(sdkserver.FlagMinGasPrices)
-			args.nodeDirPrefix, _ = cmd.Flags().GetString(flagNodeDirPrefix)
-			args.nodeDaemonHome, _ = cmd.Flags().GetString(flagNodeDaemonHome)
-			args.startingIPAddress, _ = cmd.Flags().GetString(flagStartingIPAddress)
-			args.numValidators, _ = cmd.Flags().GetInt(flagNumValidators)
-			args.algo, _ = cmd.Flags().GetString(flags.FlagKeyType)
+			args, err := readInitArgs(cmd)
+			if err != nil {
+				return err
+			}
 
 			return initTestnetFiles(clientCtx, cmd, serverCtx.Config, mbm, genBalIterator, args)
 		},
@@ -176,18 +258,10 @@ Example:
 	uptickd testnet --v 4 --output-dir ./.testnets
 	`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			args := startArgs{}
-			args.outputDir, _ = cmd.Flags().GetString(flagOutputDir)
-			args.chainID, _ = cmd.Flags().GetString(flags.FlagChainID)
-			args.minGasPrices, _ = cmd.Flags().GetString(sdkserver.FlagMinGasPrices)
-			args.numValidators, _ = cmd.Flags().GetInt(flagNumValidators)
-			args.algo, _ = cmd.Flags().GetString(flags.FlagKeyType)
-			args.enableLogging, _ = cmd.Flags().GetBool(flagEnableLogging)
-			args.rpcAddress, _ = cmd.Flags().GetString(flagRPCAddress)
-			args.apiAddress, _ = cmd.Flags().GetString(flagAPIAddress)
-			args.grpcAddress, _ = cmd.Flags().GetString(srvflags.GRPCAddress)
-			args.jsonrpcAddress, _ = cmd.Flags().GetString(srvflags.JSONRPCAddress)
-			args.printMnemonic, _ = cmd.Flags().GetBool(flagPrintMnemonic)
+			args, err := readStartArgs(cmd)
+			if err != nil {
+				return err
+			}
 
 			return startTestnet(cmd, args)
 		},
@@ -386,6 +460,15 @@ func initGenFiles(
 	genFiles []string,
 	numValidators int,
 ) error {
+	// mint's MintDenom and crisis' ConstantFee are derived from
+	// sdk.DefaultBondDenom while DefaultGenesis runs, and the SDK zero value
+	// for it is "stake". Without this the testnet genesis ended up with staking
+	// on the chain denom while mint kept issuing a phantom "stake" nobody holds
+	// and MsgVerifyInvariant was unfundable. Must happen before the defaults
+	// are materialised below, and shared with cmd/uptickd/init.go so both
+	// genesis entry points agree.
+	app.PrepareDefaultGenesisDenom(coinDenom)
+
 	appGenState := mbm.DefaultGenesis(clientCtx.Codec)
 	app.CustomizeDefaultGenesis(clientCtx.Codec, appGenState)
 	// set the accounts in the genesis state

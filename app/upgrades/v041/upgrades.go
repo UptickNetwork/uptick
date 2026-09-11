@@ -58,24 +58,39 @@ func upgradeHandlerConstructor(
 		// the legacy x/params defaults carry controller_enabled=false, and the
 		// ibc-go v10 param migration keeps the stored value as-is, so every
 		// ICA register fails with "controller submodule is disabled".
-		migrateICAControllerParams(sdkCtx, box)
+		migrateICAControllerParams(sdkCtx, box.ICAControllerKeeper)
 
 		return box.ModuleManager.RunMigrations(sdkCtx, c, vm)
 	}
+}
+
+// icaControllerParamsStore is the slice of the ICA controller keeper this
+// migration needs.
+//
+// It is an interface rather than the concrete keeper for the same reason as
+// evmParamsStore above, plus one specific to this call: the write is guarded by
+// a read of the value it is about to write, and against the real keeper that
+// guard is invisible. ibc-go's SetParams returns nothing (it panics on a store
+// error) and writing true over an already-true param produces byte-identical
+// state, so "did we write when we should not have?" cannot be observed from the
+// store. Recording the calls makes the guard fail-able from a test.
+type icaControllerParamsStore interface {
+	GetParams(ctx sdk.Context) icacontrollertypes.Params
+	SetParams(ctx sdk.Context, params icacontrollertypes.Params)
 }
 
 // migrateICAControllerParams flips the ICA controller submodule on if it is
 // currently disabled. Chains initialized from legacy genesis templates (e.g.
 // the origin testnet) store controller_enabled=false; fresh chains already
 // default to true and are left untouched. Host params are not modified.
-func migrateICAControllerParams(ctx sdk.Context, box upgrades.Toolbox) {
-	if !shouldEnableICAController(box.ICAControllerKeeper.GetParams(ctx).ControllerEnabled) {
+//
+// SetParams has no error to propagate: ibc-go's controller keeper panics
+// internally if the store rejects the write, so the only failure mode left for
+// this function to get wrong is the guard.
+func migrateICAControllerParams(ctx sdk.Context, store icaControllerParamsStore) {
+	if store.GetParams(ctx).ControllerEnabled {
 		return
 	}
-	box.ICAControllerKeeper.SetParams(ctx, icacontrollertypes.NewParams(true))
+	store.SetParams(ctx, icacontrollertypes.NewParams(true))
 	ctx.Logger().Info("ica controller submodule enabled", "upgrade", upgradeName)
-}
-
-func shouldEnableICAController(currentlyEnabled bool) bool {
-	return !currentlyEnabled
 }

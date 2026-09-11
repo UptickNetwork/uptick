@@ -1,0 +1,138 @@
+name: sim-soak
+
+# These targets are release blockers that no workflow ran: `ci.yml`'s
+# `simulation` job covers the same harness through `make test-sim-ci`, but at
+# CI block counts and a single seed. What was missing is the soak layer — the
+# repeated-seed runs that shake out state that only diverges over longer,
+# differently-seeded histories, plus the full-size non-determinism pass.
+#
+# They do not belong on a pull request: `test-sim-multi-seed-long` alone drives
+# 500 seeds of 50 blocks and runs for hours. Nightly (and on demand) keeps the
+# cost off the PR path while still giving every target an owner.
+on:
+  schedule:
+    # 03:17 UTC. Deliberately off the hour: the top of the hour is GitHub's
+    # busiest scheduling slot, where runs are frequently delayed or dropped.
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+    inputs:
+      include_long:
+        description: "Also run the long multi-seed soak (500 seeds x 50 blocks). Takes hours."
+        type: boolean
+        default: false
+
+# Same rule as ci.yml: third-party actions are pinned to an immutable commit SHA
+# with the release in a trailing comment. A tag can be re-pointed at any time by
+# whoever controls the upstream repo, which turns a scheduled soak run into
+# arbitrary code execution inside the job with access to the repo token.
+permissions:
+  contents: read
+
+jobs:
+  # The soak targets are driven by `runsim`, and the guard step exists because
+  # runsim cannot tell "ran 50 seeds and all passed" apart from "the test name
+  # no longer exists": it shells out to `go test -run <name>`, and `go test`
+  # exits 0 when nothing matches. A rename of any of these functions would
+  # therefore leave the job green while testing nothing. This is the same class
+  # of vacuous pass that scripts/test-gate.sh exists to catch on the CI-sized
+  # targets, which runsim's binary interface does not accommodate.
+  guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Every soak target must still exist
+        run: |
+          set -euo pipefail
+          missing=0
+          for t in TestAppStateDeterminism TestAppImportExport \
+                   TestAppSimulationAfterImport TestFullAppSimulation; do
+            if ! grep -rq --include='*.go' "func ${t}(" app/; then
+              echo "::error::${t} not found under app/ — the matching Makefile target would pass vacuously"
+              missing=1
+            fi
+          done
+          exit "${missing}"
+
+  # `make test-sim-nondeterminism` at full size (100 blocks x 200 txs). ci.yml
+  # runs the same test at 5 x 4; this is the one that actually exercises
+  # ordering differences between runs.
+  nondeterminism:
+    needs: guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Set up Go
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version: "1.25.13"
+
+      - name: Non-determinism (full size)
+        run: make test-sim-nondeterminism
+
+  # Export/import symmetry and resume-from-export, 50 seeds each. An asymmetry
+  # here corrupts state on a chain upgrade, which is why both are release
+  # blockers rather than nice-to-haves.
+  import-export:
+    needs: guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Set up Go
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version: "1.25.13"
+
+      - name: Import/export soak (50 seeds)
+        run: make test-sim-import-export
+
+      - name: Resume-from-export soak (50 seeds)
+        run: make test-sim-after-import
+
+  # 50 seeds x 10 blocks of the full app simulation. Cheaper per seed than the
+  # import/export pair above, but it varies the seed, which is what catches
+  # state that a single-seed CI run cannot reach.
+  multi-seed-short:
+    needs: guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Set up Go
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version: "1.25.13"
+
+      - name: Multi-seed soak (50 seeds)
+        run: make test-sim-multi-seed-short
+
+  # 500 seeds x 50 blocks. Hours of runtime, so it is opt-in via the manual
+  # dispatch input rather than nightly. `github.event_name == 'workflow_dispatch'`
+  # is required because `inputs.include_long` is unset (not false) on schedule
+  # events, which would otherwise make the expression error instead of skipping.
+  multi-seed-long:
+    needs: guard
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.include_long }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 1440
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Set up Go
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version: "1.25.13"
+
+      - name: Multi-seed soak (500 seeds)
+        run: make test-sim-multi-seed-long

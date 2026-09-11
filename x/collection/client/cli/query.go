@@ -42,7 +42,7 @@ func GetCmdQuerySupply() *cobra.Command {
 		Example: fmt.Sprintf("$ %s query collection supply <denom-id>", version.AppName),
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			clientCtx, err := client.GetClientTxContext(cmd)
+			clientCtx, err := client.GetClientQueryContext(cmd)
 			if err != nil {
 				return err
 			}
@@ -85,7 +85,7 @@ func GetCmdQueryOwner() *cobra.Command {
 		Example: fmt.Sprintf("$ %s query collection owner <address> --denom-id=<denom-id>", version.AppName),
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			clientCtx, err := client.GetClientTxContext(cmd)
+			clientCtx, err := client.GetClientQueryContext(cmd)
 			if err != nil {
 				return err
 			}
@@ -128,7 +128,7 @@ func GetCmdQueryCollection() *cobra.Command {
 		Example: fmt.Sprintf("$ %s query collection collection <denom-id>", version.AppName),
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			clientCtx, err := client.GetClientTxContext(cmd)
+			clientCtx, err := client.GetClientQueryContext(cmd)
 			if err != nil {
 				return err
 			}
@@ -164,7 +164,7 @@ func GetCmdQueryDenoms() *cobra.Command {
 		Long:    "Query all denominations of all collections of NFTs.",
 		Example: fmt.Sprintf("$ %s query collection denoms", version.AppName),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			clientCtx, err := client.GetClientTxContext(cmd)
+			clientCtx, err := client.GetClientQueryContext(cmd)
 			if err != nil {
 				return err
 			}
@@ -194,7 +194,7 @@ func GetCmdQueryDenom() *cobra.Command {
 		Example: fmt.Sprintf("$ %s query collection denom <denom-id>", version.AppName),
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			clientCtx, err := client.GetClientTxContext(cmd)
+			clientCtx, err := client.GetClientQueryContext(cmd)
 			if err != nil {
 				return err
 			}
@@ -223,7 +223,7 @@ func GetCmdQueryNFT() *cobra.Command {
 		Example: fmt.Sprintf("$ %s query collection token <denom-id> <nft-id>", version.AppName),
 		Args:    cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			clientCtx, err := client.GetClientTxContext(cmd)
+			clientCtx, err := client.GetClientQueryContext(cmd)
 			if err != nil {
 				return err
 			}

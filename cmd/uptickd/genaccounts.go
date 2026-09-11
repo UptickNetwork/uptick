@@ -66,8 +66,20 @@ contain valid denominations. Accounts may optionally be supplied with vesting pa
 					if err != nil {
 						return err
 					}
-				} else {
+				} else if clientCtx.Keyring != nil {
 					kr = clientCtx.Keyring
+				} else {
+					// --keyring-backend was left empty and the command context
+					// carries no keyring either, so there is nothing to resolve
+					// the name in. Falling through used to call Key on a nil
+					// interface, which panics; report the actual cause instead.
+					//
+					// Reachable via `--keyring-backend=`: the flag defaults to
+					// "os", so an unset flag never gets here, but an explicitly
+					// empty value does.
+					return fmt.Errorf(
+						"cannot resolve %q: pass a bech32 address or set --%s",
+						args[0], flags.FlagKeyringBackend)
 				}
 
 				info, err := kr.Key(args[0])

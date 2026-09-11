@@ -46,10 +46,16 @@ func MakeEncodingConfigChecked() (EncodingConfig, error) {
 			erc20types.MsgConvertERC20CustomGetSigner.MsgType: erc20types.MsgConvertERC20CustomGetSigner.Fn,
 		},
 	}
-	interfaceRegistry, _ := types.NewInterfaceRegistryWithOptions(types.InterfaceRegistryOptions{
+	interfaceRegistry, err := types.NewInterfaceRegistryWithOptions(types.InterfaceRegistryOptions{
 		ProtoFiles:     proto.HybridResolver,
 		SigningOptions: signingOptions,
 	})
+	if err != nil {
+		// This function has an explicit error path for exactly this reason:
+		// the constructor returns (nil, err) on failure, and NewProtoCodec /
+		// RegisterInterfaces against a nil registry panic far from here.
+		return EncodingConfig{}, fmt.Errorf("create interface registry: %w", err)
+	}
 	marshaler := codec.NewProtoCodec(interfaceRegistry)
 	txCfg := tx.NewTxConfig(marshaler, tx.DefaultSignModes)
 

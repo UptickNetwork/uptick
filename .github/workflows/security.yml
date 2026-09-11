@@ -8,6 +8,11 @@ on:
   push:
     branches:
       - main
+      - development
+      # Mirror ci.yml's branch list: without this, a push to a release branch
+      # only ever gets the weekly cron, so a vulnerable dependency could be
+      # released before anything scanned it.
+      - "release/**"
 
 permissions:
   contents: read

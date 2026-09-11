@@ -39,6 +39,13 @@ var (
 	idString = `[a-z][a-zA-Z0-9/]{2,127}`
 	regexpID = regexp.MustCompile(fmt.Sprintf(`^%s$`, idString)).MatchString
 
+	// uptickSuffix matches the address component of a module-derived class id.
+	// x/erc721 derives "uptick-<hex contract address>" and x/cw721 derives
+	// "uptick-<bech32 contract address>", so alphanumerics plus hyphens cover
+	// every shape the chain itself can produce while still rejecting
+	// whitespace, punctuation and control characters.
+	regexpUptickSuffix = regexp.MustCompile(`^[a-zA-Z0-9-]+$`).MatchString
+
 	keywords          = strings.Join([]string{ReservedIBC}, "|")
 	regexpKeywordsFmt = fmt.Sprintf("^(%s).*", keywords)
 	regexpKeyword     = regexp.MustCompile(regexpKeywordsFmt).MatchString
@@ -60,6 +67,22 @@ func ValidateDenomID(denomID string) error {
 		suffix := strings.TrimPrefix(denomID, "uptick-")
 		if suffix == "" || strings.Contains(suffix, "/") {
 			return sdkerrors.Wrapf(ErrInvalidDenom, "invalid uptick-prefixed denomID (%s)", denomID)
+		}
+		// This branch used to return right here after the two shape checks
+		// above, so an oversized or oddly punctuated class id in a genesis
+		// file was accepted even though keeper.SaveDenom documents
+		// ValidateDenomID as the single place enforcing the charset and the
+		// [3,128] bound. Enforce both here too. The lower bound needs no
+		// check: the "uptick-" prefix alone is 7 bytes. The charset is
+		// deliberately the loosest superset of the shapes the module derives
+		// (40 hex nibbles from x/erc721, bech32 from x/cw721) so that no class
+		// the chain can actually produce is rejected.
+		if len(denomID) > MaxDenomLen {
+			return sdkerrors.Wrapf(ErrInvalidDenom, "denomID length exceeds %d (%s)", MaxDenomLen, denomID)
+		}
+		if !regexpUptickSuffix(suffix) {
+			return sdkerrors.Wrapf(ErrInvalidDenom,
+				"uptick-prefixed denomID(%s) may only contain alphanumerics and hyphens after the prefix", denomID)
 		}
 		return ValidateKeywords(denomID)
 	}

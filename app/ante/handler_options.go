@@ -46,13 +46,40 @@ type HandlerOptions struct {
 	TXCounterStoreService corestoretypes.KVStoreService
 }
 
-// Validate checks if the keepers are defined
+// Validate checks if the keepers are defined.
+//
+// This is the only startup gate for the ante wire-up: cosmos/evm's own
+// NewAnteHandler does not validate its options (see ante/ante.go:74), so a
+// missing keeper is not caught until the first transaction reaches the
+// decorator that dereferences it. Every field checked below is one that
+// cosmosAnteDecorators passes to a decorator unconditionally — IBCKeeper to
+// NewRedundantRelayDecorator and SigGasConsumer to NewSigGasConsumeDecorator —
+// so nil there is a guaranteed panic on the first tx rather than a degraded
+// feature.
+//
+// The required set deliberately matches cosmos/evm@v0.6.2's own
+// ante.HandlerOptions.Validate except for PendingTxListener, which this package
+// pins to nil in toEvmHandlerOptions.
+//
+// Deliberately NOT required:
+//
+//   - FeegrantKeeper: cosmos-sdk's DeductFeeDecorator reads nil as "feegrant
+//     disabled", i.e. a supported configuration. app.go always wires the real
+//     keeper, but rejecting nil here would turn a supported wire-up into a
+//     startup failure. Upstream's Validate omits it for the same reason.
+//   - WasmKeeper / WasmNodeConfig / TXCounterStoreService: each guards an
+//     optional decorator inside cosmosAnteDecorators, and
+//     TestWasmDecoratorsOmittedWhenKeepersNil pins the nil form as supported
+//     input. Requiring them would break that contract.
 func (options HandlerOptions) Validate() error {
 	if options.AccountKeeper == nil {
 		return sdkerrors.Wrap(errortypes.ErrLogic, "account keeper is required for AnteHandler")
 	}
 	if options.BankKeeper == nil {
 		return sdkerrors.Wrap(errortypes.ErrLogic, "bank keeper is required for AnteHandler")
+	}
+	if options.IBCKeeper == nil {
+		return sdkerrors.Wrap(errortypes.ErrLogic, "ibc keeper is required for AnteHandler")
 	}
 	if options.SignModeHandler == nil {
 		return sdkerrors.Wrap(errortypes.ErrLogic, "sign mode handler is required for ante builder")
@@ -62,6 +89,9 @@ func (options HandlerOptions) Validate() error {
 	}
 	if options.EvmKeeper == nil {
 		return sdkerrors.Wrap(errortypes.ErrLogic, "evm keeper is required for AnteHandler")
+	}
+	if options.SigGasConsumer == nil {
+		return sdkerrors.Wrap(errortypes.ErrLogic, "signature gas consumer is required for AnteHandler")
 	}
 	if options.Cdc == nil {
 		return sdkerrors.Wrap(errortypes.ErrLogic, "cdc is required for AnteHandler")

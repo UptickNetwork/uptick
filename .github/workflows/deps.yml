@@ -24,11 +24,23 @@ jobs:
         run: go install golang.org/x/vuln/cmd/govulncheck@latest
 
       - name: Run govulncheck
-        run: govulncheck ./...
+        # Must go through the baseline script, not a bare `govulncheck ./...`.
+        # scripts/vuln-baseline.txt lists 8 advisories that are confirmed
+        # unfixable today (upstream won't-fix, or waiting on wasmd / cosmos-evm
+        # releases), so a bare scan is red by construction every single week.
+        # A job that is always red is a job nobody reads, which is the same end
+        # state as having no job at all.
+        #
+        # Division of labour — both run the same script, so the two workflows
+        # cannot disagree about what "vulnerable" means:
+        #   - security.yml (pull_request / push): the gate, fast feedback.
+        #   - this job (weekly + manual): the same verdict on a schedule, so a
+        #     finding cannot sit unnoticed between releases.
+        run: bash scripts/govulncheck-baseline.sh
 
       # Audit P2-8 policy decision: this job intentionally has NO
-      # continue-on-error. A confirmed vulnerability in the symbol graph must
-      # turn the weekly check red — silence is how P1-2/P2-9-style "declared
-      # protection that does nothing" bugs survive. If a finding cannot be
-      # fixed immediately, track it in an issue and reference the issue here
-      # rather than muting the job.
+      # continue-on-error. A vulnerability OUTSIDE the baseline must turn the
+      # weekly check red — silence is how P1-2/P2-9-style "declared protection
+      # that does nothing" bugs survive. If a finding genuinely cannot be fixed,
+      # add its ID to scripts/vuln-baseline.txt with a justification comment
+      # (see that file's header for the rules) rather than muting the job.

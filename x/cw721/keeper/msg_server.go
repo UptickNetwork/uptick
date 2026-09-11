@@ -563,6 +563,21 @@ func (k Keeper) RefundPacketToken(
 		// mapping no longer protects any escrowed asset and deleting it
 		// converges the state. erc721 checks HasNFT BEFORE its EVM owner query
 		// and keeps its mappings — see its nft_already_gone comment.
+		//
+		// (round 25) That "by the time we get here the refund side is settled"
+		// property is NOT a consequence of the order of the statements — it is
+		// produced by the two `continue`s between the cleanup and the top of
+		// the loop: len(cwReceiver) == 0 (:508) and the TransferCw721 failure
+		// (:530) both exit before the cleanup runs, so every path that falls
+		// through to :551 has either completed the CW721 transfer or confirmed
+		// the token was never the module's. Deleting either `continue` makes
+		// "clean up, then check" unsafe — the token would lose its pair
+		// mappings while its CW721 side is still unresolved. Do not reorder
+		// this loop without re-deriving that argument.
+		//
+		// The skip event here deliberately omits pairs_retained: the pair
+		// mappings are gone by this point, so this state is converged, while
+		// the same reason from x/erc721 means the opposite (residue to triage).
 		if !k.nftKeeper.HasNFT(ctx, data.ClassId, tokenId) {
 			ctx.EventManager().EmitEvent(
 				sdk.NewEvent(
@@ -576,7 +591,7 @@ func (k Keeper) RefundPacketToken(
 			)
 			continue
 		}
-		if ownerAddr := k.nftKeeper.NFTkeeper().GetOwner(ctx, data.ClassId, tokenId); !moduleOwnsCW721(ownerAddr.String()) {
+		if ownerAddr := k.nftKeeper.GetOwner(ctx, data.ClassId, tokenId); !moduleOwnsCW721(ownerAddr.String()) {
 			ctx.EventManager().EmitEvent(
 				sdk.NewEvent(
 					types.EventTypeRefundPacketTokenSkip,
@@ -597,7 +612,25 @@ func (k Keeper) RefundPacketToken(
 			Sender:  types.AccModuleAddress.String(),
 		}
 		if _, err := k.nftKeeper.BurnNFT(ctx, &burnMsg); err != nil {
-			return err
+			// Skip, do not abort. The CW721 refund for this token was already
+			// recorded above and the pair mappings are already gone, so
+			// returning the error here would (a) abandon every remaining token
+			// in the packet, (b) leave the ack unwritten, which makes the
+			// relayer retry this packet forever, and (c) on that retry take a
+			// different branch, recording two contradictory outcomes for one
+			// token. Same policy as the nft_owner_not_module branch above.
+			ctx.EventManager().EmitEvent(
+				sdk.NewEvent(
+					types.EventTypeRefundPacketTokenSkip,
+					sdk.NewAttribute(types.AttributeKeyNFTClass, data.ClassId),
+					sdk.NewAttribute(types.AttributeKeyNFTID, tokenId),
+					sdk.NewAttribute(types.AttributeKeyCW721Token, cwContractAddress),
+					sdk.NewAttribute(types.AttributeKeyCW721TokenID, cwTokenId),
+					sdk.NewAttribute("reason", "nft_burn_failed"),
+					sdk.NewAttribute("error", err.Error()),
+				),
+			)
+			continue
 		}
 
 	}
@@ -631,6 +664,25 @@ func cw721RefundEvents(sender, classID string, groups []refundGroup) sdk.Events 
 // token. It is the gate for the IBC refund: a token that is no longer escrowed
 // must be skipped rather than refunded, otherwise the refund aborts the IBC
 // callback and strands the packet (see RefundPacketToken).
+//
+// The comparison must not be a plain string equality. The owner value comes
+// straight out of the CW721 contract's `all_nft_info` response
+// (QueryCW721TokenOwner), and bech32 is case-insensitive, so a contract that
+// echoes the address in a non-canonical case would be read as "not the module".
+// The refund would then be skipped even though the module really does hold the
+// token — leaving the native NFT escrowed with no way back. x/erc721 compares
+// decoded addresses for the same reason.
 func moduleOwnsCW721(owner string) bool {
-	return owner == types.AccModuleAddress.String()
+	// Covers any case variant of the canonical display form, including mixed
+	// case, which a strict bech32 decoder is allowed to reject.
+	if strings.EqualFold(owner, types.AccModuleAddress.String()) {
+		return true
+	}
+	// Falls back to comparing the decoded payload, so a contract that echoes
+	// the address under a different-but-valid display form still matches.
+	addr, err := sdk.AccAddressFromBech32(owner)
+	if err != nil {
+		return false
+	}
+	return addr.Equals(types.AccModuleAddress)
 }

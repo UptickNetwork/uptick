@@ -15,4 +15,9 @@ var (
 	ErrInvalidDenom      = sdkerrors.Register(ModuleName, 16, "invalid denom")
 	ErrInvalidTokenID    = sdkerrors.Register(ModuleName, 17, "invalid nft id")
 	ErrInvalidTokenURI   = sdkerrors.Register(ModuleName, 18, "invalid nft uri")
+	// ErrNFTBoundToContract rejects burning a native NFT that a conversion has
+	// paired with a token held by an ERC721/CW721 contract: the contract-side
+	// token is escrowed in a module account and this module has no way to reach
+	// it, so the burn would destroy the only on-chain record of it.
+	ErrNFTBoundToContract = sdkerrors.Register(ModuleName, 19, "nft is bound to a contract token")
 )

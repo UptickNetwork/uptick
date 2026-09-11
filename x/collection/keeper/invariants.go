@@ -22,17 +22,11 @@ func SupplyInvariant(k Keeper) sdk.Invariant {
 		var msg string
 		count := 0
 
-		collections, err := k.GetCollections(ctx)
-		if err != nil {
-			count++
-			msg += fmt.Sprintf("failed to get collections: %s\n", err.Error())
-			return sdk.FormatInvariant(
-				types.ModuleName, "supply",
-				fmt.Sprintf("%d NFT supply invariants found\n%s", count, msg),
-			), true
-		}
-
-		for _, collection := range collections {
+		// GetCollections cannot fail: degradations are per class and are
+		// reported as ExportIssues (and logged), so there is no whole-call
+		// error to branch on. The previous "failed to get collections" branch
+		// was unreachable because the error was always nil.
+		for _, collection := range k.GetCollections(ctx) {
 			ownersCollectionsSupply[collection.Denom.Id] = uint64(len(collection.NFTs))
 		}
 

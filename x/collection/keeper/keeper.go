@@ -19,6 +19,11 @@ type Keeper struct {
 	storeService store.KVStoreService // Unexposed key to access store from sdk.Context
 	cdc          codec.Codec
 	nk           nftkeeper.Keeper
+	// convertedNFTs answers "does this native NFT have a contract-side
+	// counterpart?". Wiring it is what lets RemoveNFT refuse to burn a token
+	// whose contract half is escrowed -- see converted_nft.go. It is set after
+	// construction because x/erc721 and x/cw721 are built from this keeper.
+	convertedNFTs ConvertedNFTChecker
 }
 
 // NewKeeper creates a new instance of the NFT Keeper

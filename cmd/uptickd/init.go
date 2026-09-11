@@ -126,10 +126,9 @@ func InitCmd(mbm module.BasicManager, defaultNodeHome string) *cobra.Command {
 				return fmt.Errorf("genesis.json file already exists: %v", genFile)
 			}
 
-			// Overwrites the SDK default denom for side-effects
-			if defaultDenom != "" {
-				sdk.DefaultBondDenom = defaultDenom
-			}
+			// Overwrites the SDK default denom for side-effects, before any
+			// BasicManager default genesis is materialised below.
+			app.PrepareDefaultGenesisDenom(defaultDenom)
 
 			genesis := mbm.DefaultGenesis(cdc)
 			app.CustomizeDefaultGenesis(cdc, genesis)

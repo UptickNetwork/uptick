@@ -62,19 +62,37 @@ func (app *Uptick) setupUpgradeStoreLoaders() {
 		panic(fmt.Errorf("failed to read upgrade info from disk: %w", err))
 	}
 
-	// If upgradeInfo has no height, return without setting up store loader
+	// If upgradeInfo has no height, return without setting up store loader.
+	// Silent on purpose: this is the steady state of a node with nothing
+	// scheduled, so logging it would print a line on every startup.
 	if upgradeInfo.Height == 0 {
 		return
 	}
 
 	if app.UpgradeKeeper.IsSkipHeight(upgradeInfo.Height) {
+		// An operator asked for this height to be skipped. Say so - the node
+		// will keep running the old logic while its peers migrate, and the only
+		// other record of that decision is a number in app.toml.
+		app.Logger().Info(
+			"skipping the upgrade scheduled at this height",
+			"name", upgradeInfo.Name,
+			"height", upgradeInfo.Height,
+		)
 		return
 	}
 
 	// Check if the upgrade exists in our router
 	upgrade, exists := router.Routers()[upgradeInfo.Name]
 	if !exists {
-		// If upgrade doesn't exist in our router, return without setting up store loader
+		// A plan this binary does not know about: there are no store upgrades
+		// to load, but do not return silently. This is what a binary that
+		// reached a peer's upgrade height looks like, and an operator needs to
+		// be able to tell it apart from "no upgrade pending".
+		app.Logger().Info(
+			"upgrade plan is not registered in this binary; no store loader installed",
+			"name", upgradeInfo.Name,
+			"height", upgradeInfo.Height,
+		)
 		return
 	}
 

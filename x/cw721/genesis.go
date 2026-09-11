@@ -64,25 +64,23 @@ func importPerTokenState(ctx sdk.Context, k keeper.Keeper, data types.GenesisSta
 
 // ExportGenesis export module status
 //
-// Fail-closed, and diagnosable: every damaged record in the live store is
-// collected first, and the export is aborted with the complete repair list
-// instead of either panicking on the first bad key (the old bare panic gave an
-// operator nothing to act on) or dropping records from a "successful" genesis.
-// A genesis that silently loses conversions or refunds is worse than a failed
-// export.
+// Degrade and report, never abort: the records that can be represented are
+// exported, and every damaged record is listed at Error level (and, on the
+// node's export path, in <home>/export-issues.json -- see
+// app/export_diagnostics.go). This matches x/collection.
+//
+// The previous behaviour was fail-closed (panic with the list of damaged
+// keys). That made the diagnosis excellent but the export unusable: a single
+// corrupt key locked the whole chain out of its own backup, which is the worst
+// possible failure mode on a disaster-recovery path. Reporting the damage and
+// still producing a genesis keeps both properties -- the operator can see
+// exactly what was dropped, and the chain can still be restored.
 func ExportGenesis(ctx sdk.Context, k keeper.Keeper) *types.GenesisState {
 	tokenPairs, pairIssues := k.GetTokenPairsWithReport(ctx)
 	nftUIDPairs, uidIssues := k.ExportNFTUIDPairsWithReport(ctx)
 	refundReceivers, refundIssues := k.ExportRefundReceiversWithReport(ctx)
 
-	issues := make([]keeper.GenesisExportIssue, 0, len(pairIssues)+len(uidIssues)+len(refundIssues))
-	issues = append(issues, pairIssues...)
-	issues = append(issues, uidIssues...)
-	issues = append(issues, refundIssues...)
-
-	if len(issues) > 0 {
-		panic(&keeper.GenesisExportError{Module: types.ModuleName, Issues: issues})
-	}
+	logExportIssues(ctx, keeper.MergeExportIssues(pairIssues, uidIssues, refundIssues))
 
 	return &types.GenesisState{
 		Params:          k.GetParams(ctx),
@@ -90,4 +88,20 @@ func ExportGenesis(ctx sdk.Context, k keeper.Keeper) *types.GenesisState {
 		NftUidPairs:     nftUIDPairs,
 		RefundReceivers: refundReceivers,
 	}
+}
+
+// logExportIssues records the degradations of a genesis export at Error level
+// so they are visible in the node log even when nobody reads the diagnostics
+// file.
+func logExportIssues(ctx sdk.Context, issues []keeper.GenesisExportIssue) {
+	if len(issues) == 0 {
+		return
+	}
+
+	logger := ctx.Logger()
+	for _, issue := range issues {
+		logger.Error("ExportGenesis: export degraded", "module", types.ModuleName, "issue", issue.String())
+	}
+	logger.Error("ExportGenesis: exported genesis is partially degraded; the records listed above are missing from it",
+		"module", types.ModuleName, "dropped_records", len(issues))
 }

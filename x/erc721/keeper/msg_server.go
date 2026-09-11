@@ -216,6 +216,22 @@ func (k Keeper) ConvertNFT(
 		return nil, types.ErrERC721Disabled
 	}
 
+	// Pre-validate the batch size before deploying any contract or touching
+	// state. A caller who passes an oversized batch would otherwise reach the
+	// check inside convertCosmos2Evm only after GetContractAddressAndTokenIds
+	// has already deployed an ERC721 contract for an unregistered class: the
+	// SDK rolls the handler back, but the transaction has by then burned a
+	// whole contract deployment's worth of gas and store writes for a batch
+	// that could never succeed. x/cw721 bounds the batch before deploying; this
+	// is the same order on the erc721 side.
+	//
+	// msg.CosmosTokenIds is the caller's list; EvmTokenIds is the handler's
+	// output and is still empty here, so checking it would compare against
+	// nothing and let an oversized batch through.
+	if len(msg.CosmosTokenIds) > maxERC721BatchSize {
+		return nil, sdkerrors.Wrapf(errortypes.ErrInvalidRequest, "ERC721 batch size %d exceeds maximum %d", len(msg.CosmosTokenIds), maxERC721BatchSize)
+	}
+
 	// classId, nftIDs
 	contractAddress, tokenIds, err := k.GetContractAddressAndTokenIds(ctx, msg)
 	if err != nil {
@@ -720,6 +736,12 @@ func (k Keeper) RefundPacketToken(
 		// with no on-chain record of where it lives — undiscoverable and
 		// unrecoverable. Keeping the mapping makes the residue triageable; the
 		// skip is idempotent, so retries just re-emit this event.
+		//
+		// (round 25) The event carries pairs_retained=true for the same reason
+		// the comment is needed: the two modules publish the same event type
+		// with the same reason for opposite states, so a reason-keyed alert
+		// table cannot tell "residue to triage" from "already converged"
+		// without a cross-module lookup. x/cw721 omits the attribute.
 		if !k.nftKeeper.HasNFT(ctx, data.ClassId, tokenId) {
 			ctx.EventManager().EmitEvent(
 				sdk.NewEvent(
@@ -728,6 +750,7 @@ func (k Keeper) RefundPacketToken(
 					sdk.NewAttribute(types.AttributeKeyNFTID, tokenId),
 					sdk.NewAttribute(types.AttributeKeyERC721Token, evmContractAddress),
 					sdk.NewAttribute(types.AttributeKeyERC721TokenID, evmTokenId),
+					sdk.NewAttribute(types.AttributeKeyPairsRetained, "true"),
 					sdk.NewAttribute("reason", "nft_already_gone"),
 				),
 			)
@@ -855,7 +878,26 @@ func (k Keeper) RefundPacketToken(
 			Sender:  types.AccModuleAddress.String(),
 		}
 		if _, err = k.nftKeeper.BurnNFT(ctx, &burnMsg); err != nil {
-			return err
+			// Skip, do not abort. The ERC721 refund for this token has already
+			// been recorded above (or the ERC721 was confirmed non-module-owned)
+			// and the pair mappings are already gone, so returning the error
+			// here would (a) abandon every remaining token in the packet,
+			// (b) leave the ack unwritten, which makes the relayer retry this
+			// packet forever, and (c) on that retry take a different branch,
+			// recording two contradictory outcomes for one token. Same policy
+			// as the nft_owner_not_module branch above.
+			ctx.EventManager().EmitEvent(
+				sdk.NewEvent(
+					types.EventTypeRefundPacketTokenSkip,
+					sdk.NewAttribute(types.AttributeKeyNFTClass, data.ClassId),
+					sdk.NewAttribute(types.AttributeKeyNFTID, tokenId),
+					sdk.NewAttribute(types.AttributeKeyERC721Token, evmContractAddress),
+					sdk.NewAttribute(types.AttributeKeyERC721TokenID, evmTokenId),
+					sdk.NewAttribute("reason", "nft_burn_failed"),
+					sdk.NewAttribute("error", err.Error()),
+				),
+			)
+			continue
 		}
 
 		if shouldRefundERC721 {

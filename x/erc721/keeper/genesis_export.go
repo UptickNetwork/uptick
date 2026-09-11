@@ -146,6 +146,17 @@ func (k Keeper) ExportRefundReceiversWithReport(ctx sdk.Context) ([]types.Refund
 	return receivers, issues
 }
 
+// ExportIssues aggregates every degradation the genesis export can report,
+// without requiring the caller to build the genesis state first. The app-level
+// diagnostics report uses it to describe a degraded export without a second
+// full export pass.
+func (k Keeper) ExportIssues(ctx sdk.Context) []GenesisExportIssue {
+	_, pairIssues := k.GetTokenPairsWithReport(ctx)
+	_, uidIssues := k.ExportNFTUIDPairsWithReport(ctx)
+	_, refundIssues := k.ExportRefundReceiversWithReport(ctx)
+	return MergeExportIssues(pairIssues, uidIssues, refundIssues)
+}
+
 // splitContractTokenKey recovers the (contract, tokenID) parts of a refund
 // store key. The longest registered-contract prefix with a non-empty
 // remainder wins; zero or ambiguous matches are rejected.
@@ -200,7 +211,8 @@ func (k Keeper) SetGenesisRefundReceiver(ctx sdk.Context, receiver types.RefundR
 
 // DeletePairPerTokenState removes the bidirectional NFT UID index entries and
 // IBC refund receivers that belong to pair, so a self-destructed (or otherwise
-// deleted) TokenPair cannot leave orphans that make ExportGenesis panic.
+// deleted) TokenPair cannot leave orphans behind and degrade every subsequent
+// genesis export.
 func (k Keeper) DeletePairPerTokenState(ctx sdk.Context, pair types.TokenPair) {
 	tokenStore := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixNFTUIDPairByTokenUID)
 	nftStore := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixNFTUIDPairByNFTUID)

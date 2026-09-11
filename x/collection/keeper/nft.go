@@ -199,11 +199,33 @@ func (k Keeper) TransferOwnership(ctx sdk.Context, denomID,
 	return k.nk.Transfer(ctx, denomID, tokenID, dstOwner)
 }
 
-// RemoveNFT deletes a specified NFT
+// RemoveNFT deletes a specified NFT.
+//
+// A token paired with an ERC721/CW721 contract token is refused: the conversion
+// escrowed the contract-side half in a module account, and only this module
+// knows the binding, so burning the native half would delete the last on-chain
+// record of the escrowed asset. The state is what x/erc721 itself describes as
+// "undiscoverable and unrecoverable". The user must un-wrap first.
 func (k Keeper) RemoveNFT(ctx sdk.Context, denomID, tokenID string, owner sdk.AccAddress) error {
+	// Existence is checked before Authorize on purpose: GetOwner reports an
+	// empty address for a missing token, so burning a non-existent NFT used to
+	// surface as ErrUnauthorized against a blank address instead of
+	// ErrUnknownNFT. UpdateNFT and TransferOwnership order the two checks the
+	// same way.
+	if _, exist := k.nk.GetNFT(ctx, denomID, tokenID); !exist {
+		return sdkerrors.Wrapf(types.ErrUnknownNFT, "not found NFT %s from collection %s", tokenID, denomID)
+	}
+
 	if err := k.Authorize(ctx, denomID, tokenID, owner); err != nil {
 		return err
 	}
+
+	if k.IsConvertedNFT(ctx, denomID, tokenID) {
+		return sdkerrors.Wrapf(types.ErrNFTBoundToContract,
+			"nft %s/%s is paired with a contract token; convert it back (un-wrap) before burning it",
+			denomID, tokenID)
+	}
+
 	return k.nk.Burn(ctx, denomID, tokenID)
 }
 

@@ -7,8 +7,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"cosmossdk.io/log"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	evmtypes "github.com/cosmos/evm/x/vm/types"
+	icacontrollertypes "github.com/cosmos/ibc-go/v10/modules/apps/27-interchain-accounts/controller/types"
 )
 
 // failingEVMStore drives the SetParams failure branch of
@@ -109,7 +111,73 @@ func TestWithDefaultActiveStaticPrecompiles(t *testing.T) {
 	require.Equal(t, existing, unchanged.ActiveStaticPrecompiles)
 }
 
-func TestShouldEnableICAController(t *testing.T) {
-	require.True(t, shouldEnableICAController(false))
-	require.False(t, shouldEnableICAController(true))
+// recordingICAParamsStore drives the guard in migrateICAControllerParams.
+//
+// The real ICA controller keeper cannot express the question these tests ask.
+// ibc-go's SetParams returns nothing, and writing true over an already-true
+// param leaves byte-identical state behind, so "the migration wrote when it
+// should have skipped" is invisible in the store. Counting the calls is the
+// only way to make dropping the guard fail a test.
+type recordingICAParamsStore struct {
+	params icacontrollertypes.Params
+	writes []icacontrollertypes.Params
+}
+
+func (s *recordingICAParamsStore) GetParams(sdk.Context) icacontrollertypes.Params {
+	return s.params
+}
+
+// SetParams mirrors the real keeper's read-your-writes behavior so a second
+// call observes the first one's flip.
+func (s *recordingICAParamsStore) SetParams(_ sdk.Context, params icacontrollertypes.Params) {
+	s.writes = append(s.writes, params)
+	s.params = params
+}
+
+// icaTestCtx is a context whose Logger() is safe to call.
+// migrateICAControllerParams logs on the write path, and sdk.Context{}.Logger()
+// returns a nil logger whose Info() panics; the real handler always runs on a
+// context that has one.
+func icaTestCtx() sdk.Context {
+	return sdk.Context{}.WithLogger(log.NewNopLogger())
+}
+
+// TestMigrateICAControllerParams_EnablesWhenDisabled is the case the migration
+// exists for: genesis templates derived from the legacy x/params defaults ship
+// controller_enabled=false, and every ICA registration fails with "controller
+// submodule is disabled" until it is flipped.
+func TestMigrateICAControllerParams_EnablesWhenDisabled(t *testing.T) {
+	store := &recordingICAParamsStore{params: icacontrollertypes.NewParams(false)}
+
+	migrateICAControllerParams(icaTestCtx(), store)
+
+	require.Len(t, store.writes, 1, "a disabled controller must be enabled")
+	require.True(t, store.writes[0].ControllerEnabled)
+}
+
+// TestMigrateICAControllerParams_SkipsWriteWhenAlreadyEnabled is the guard.
+// A fresh chain already stores controller_enabled=true. Deleting the early
+// return in migrateICAControllerParams makes this test red - which it was not
+// before, because the store cannot tell the two runs apart.
+func TestMigrateICAControllerParams_SkipsWriteWhenAlreadyEnabled(t *testing.T) {
+	store := &recordingICAParamsStore{params: icacontrollertypes.NewParams(true)}
+
+	migrateICAControllerParams(icaTestCtx(), store)
+
+	require.Empty(t, store.writes, "an already-enabled controller must be left untouched")
+}
+
+// TestMigrateICAControllerParams_IsIdempotent pins the property the missing
+// UpgradeAlreadyApplied guard relies on: a replayed plan leaves the store where
+// a single run would have. The second call goes through the real transition
+// (disabled -> enabled on the first pass) rather than starting from the steady
+// state, which is what a crash-restart of the upgrade actually does.
+func TestMigrateICAControllerParams_IsIdempotent(t *testing.T) {
+	store := &recordingICAParamsStore{params: icacontrollertypes.NewParams(false)}
+
+	migrateICAControllerParams(icaTestCtx(), store)
+	migrateICAControllerParams(icaTestCtx(), store)
+
+	require.Len(t, store.writes, 1, "the second run must observe the flip and skip")
+	require.True(t, store.params.ControllerEnabled)
 }

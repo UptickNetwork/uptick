@@ -426,15 +426,20 @@ test-sim-benchmark:
 #
 # Every test here is skipped unless -Enabled=true, which is why the flag is not
 # optional: without it the target would report success while doing nothing.
+#
+# Each line also goes through scripts/test-gate.sh, which requires one top-level
+# test to have actually PASSED. -Enabled=false is not the only way to make this
+# target vacuous: `go test` also exits 0 when -run matches no test at all, which
+# is what a rename would produce.
 test-sim-ci:
 	@echo "Running the CI-sized simulation gate..."
-	@go test -mod=readonly $(SIMAPP) -run TestAppStateDeterminism -Enabled=true \
+	@./scripts/test-gate.sh 1 -- -mod=readonly $(SIMAPP) -run TestAppStateDeterminism -Enabled=true \
 		-NumBlocks=5 -BlockSize=4 -Commit=true -Seed=1 -Period=0 -v -timeout 20m
-	@go test -mod=readonly $(SIMAPP) -run TestAppImportExport -Enabled=true \
+	@./scripts/test-gate.sh 1 -- -mod=readonly $(SIMAPP) -run TestAppImportExport -Enabled=true \
 		-NumBlocks=5 -BlockSize=4 -Commit=true -Seed=1 -Period=0 -v -timeout 20m
-	@go test -mod=readonly $(SIMAPP) -run TestAppSimulationAfterImport -Enabled=true \
+	@./scripts/test-gate.sh 1 -- -mod=readonly $(SIMAPP) -run TestAppSimulationAfterImport -Enabled=true \
 		-NumBlocks=4 -BlockSize=3 -Commit=true -Seed=1 -Period=0 -v -timeout 20m
-	@go test -mod=readonly $(SIMAPP) -run TestFullAppSimulation -Enabled=true \
+	@./scripts/test-gate.sh 1 -- -mod=readonly $(SIMAPP) -run TestFullAppSimulation -Enabled=true \
 		-NumBlocks=5 -BlockSize=4 -Commit=true -Seed=1 -Period=0 -v -timeout 20m
 .PHONY: test-sim-ci
 
@@ -448,6 +453,14 @@ test-sim-ci:
 #
 # UPTICK_E2E_STRICT=1 makes an unreachable node a failure instead of a skip -
 # otherwise this target could pass without ever talking to a chain.
+#
+# On top of that, every e2e run below goes through scripts/test-gate.sh and must
+# actually pass E2E_MIN_TESTS top-level tests. UPTICK_E2E_STRICT only covers a
+# node that cannot be reached; a deleted test file, or a -build-tag change that
+# excludes the file, would still exit 0. Update this count when the suite
+# changes on purpose.
+E2E_MIN_TESTS = 5
+
 e2e-localnet-start:
 	@./scripts/e2e-localnet.sh start
 
@@ -467,7 +480,7 @@ test-e2e-localnet:
 	@status=0; \
 	./scripts/e2e-localnet.sh start || status=$$?; \
 	if [ $$status -eq 0 ]; then \
-		UPTICK_E2E_STRICT=1 go test -mod=readonly ./tests/e2e/... -count=1 -v -timeout 15m || status=$$?; \
+		UPTICK_E2E_STRICT=1 ./scripts/test-gate.sh $(E2E_MIN_TESTS) -- -mod=readonly ./tests/e2e/... -count=1 -v -timeout 15m || status=$$?; \
 	fi; \
 	./scripts/e2e-localnet.sh stop || true; \
 	exit $$status
@@ -475,7 +488,7 @@ test-e2e-localnet:
 
 # Run the e2e suite against an already running node (see e2e-localnet-start).
 test-e2e:
-	@go test -mod=readonly ./tests/e2e/... -count=1 -v -timeout 15m
+	@./scripts/test-gate.sh $(E2E_MIN_TESTS) -- -mod=readonly ./tests/e2e/... -count=1 -v -timeout 15m
 .PHONY: test-e2e
 
 .PHONY: \

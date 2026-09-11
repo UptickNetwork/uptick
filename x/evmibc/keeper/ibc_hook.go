@@ -270,9 +270,14 @@ func (k Keeper) OnTimeoutPacket(ctx sdk.Context, packet channeltypes.Packet, dat
 //  1. Bare class id (no "/"): original NFT is native to this chain — return as-is.
 //  2. Voucher matching this packet's (port, channel) prefix: strip and return
 //     the canonical ibc/<hash> form (single-hop).
-//     3/4. Voucher with a different channel or unrelated port prefix: multi-hop
-//     ICS-721 (or unrelated string) — emit `cross_channel_refund` and derive
-//     the canonical ibc/<hash> form.
+//  3. Anything else: ask the ICS-721 keeper, which resolves the id the same way
+//     nft-transfer does on the receive path (`HasClass(id) ? id : ibc/<hash>`).
+//     That covers the multi-hop case (different channel or unrelated port
+//     prefix) without guessing from the string: a class id that already exists
+//     locally IS the local class, even when it contains "/" — idString allows
+//     the slash, so a natively issued `sub/collection` is a legal class on this
+//     chain, and rewriting it to ibc/<hash> would hand the module-side refund a
+//     class that does not exist. Emits `cross_channel_refund` for observability.
 func (k Keeper) getRefundClassId(ctx sdk.Context, packet channeltypes.Packet, data types.NonFungibleTokenPacketData) (string, error) {
 	// Shape 1: bare class id (no "/" anywhere). Nothing to rewrite.
 	if !strings.Contains(data.ClassId, "/") {
@@ -292,10 +297,10 @@ func (k Keeper) getRefundClassId(ctx sdk.Context, packet channeltypes.Packet, da
 	}
 
 	// Shape 3 / 4: voucher prefix does not match this packet's (port,
-	// channel) — multi-hop ICS-721 or unrelated string. Emit for
-	// observability and derive the canonical local voucher id.
+	// channel) — multi-hop ICS-721, or a local class id that merely contains
+	// slashes. Emit for observability and let the ICS-721 keeper decide.
 	k.Logger(ctx).Info(
-		"getRefundClassId: cross-channel or non-matching voucher prefix, deriving local voucher id",
+		"getRefundClassId: cross-channel or non-matching voucher prefix, resolving local class id",
 		"class_id", data.ClassId,
 		"packet_source_port", packet.GetSourcePort(),
 		"packet_source_channel", packet.GetSourceChannel(),
@@ -310,5 +315,11 @@ func (k Keeper) getRefundClassId(ctx sdk.Context, packet channeltypes.Packet, da
 			sdk.NewAttribute("sequence", fmt.Sprintf("%d", packet.Sequence)),
 		),
 	)
-	return types.ParseClassTrace(data.ClassId).IBCClassID(), nil
+	// GetVoucherClassID is the ICS-721 keeper's own resolver: it returns the id
+	// unchanged when a class with exactly that id exists locally, and the
+	// canonical ibc/<hash> otherwise. Deriving the id from the string shape
+	// alone (ParseClassTrace) cannot express the first case, and the two paths
+	// must agree or the refund and the receive disagree about which class an
+	// NFT belongs to.
+	return k.ibcKeeper.GetVoucherClassID(ctx, data.ClassId)
 }

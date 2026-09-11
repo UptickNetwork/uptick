@@ -57,15 +57,29 @@ func NewClassBuilder(cdc codec.Codec,
 
 // BuildMetadata encode class into the metadata format defined by ics721
 func (cb ClassBuilder) BuildMetadata(class nft.Class) (string, error) {
-	var message proto.Message
-
-	if err := cb.cdc.UnpackAny(class.Data, &message); err != nil {
-		return "", err
-	}
-
-	metadata, ok := message.(*DenomMetadata)
-	if !ok {
-		return "", errors.New("unsupported class metadata: expected DenomMetadata")
+	// A class created before the metadata wrapper existed — a legacy record
+	// surviving a migration, or one written straight through the base nft
+	// keeper — carries nil Data. UnpackAny(nil, ...) reports success and leaves
+	// the message nil, so the type assertion used to reject exactly those
+	// classes: InterNftKeeper.GetClass then answered "not found" and every
+	// ICS-721 transfer of the class aborted. Degrade to zero-value metadata
+	// instead, which is what GetDenomInfo (x/collection/keeper/denom.go) already
+	// does for the same input — so the query API and the ICS-721 export now
+	// describe an unrecorded class identically.
+	//
+	// A class whose Data is present but not a DenomMetadata is still a hard
+	// error: that is a corrupt record, not a missing one.
+	metadata := &DenomMetadata{}
+	if class.Data != nil {
+		var message proto.Message
+		if err := cb.cdc.UnpackAny(class.Data, &message); err != nil {
+			return "", err
+		}
+		unpacked, ok := message.(*DenomMetadata)
+		if !ok {
+			return "", errors.New("unsupported class metadata: expected DenomMetadata")
+		}
+		metadata = unpacked
 	}
 
 	kvals := make(map[string]interface{})
@@ -80,7 +94,17 @@ func (cb ClassBuilder) BuildMetadata(class nft.Class) (string, error) {
 			kvals = make(map[string]interface{})
 		}
 	}
-	creator, err := sdk.AccAddressFromBech32(metadata.Creator)
+	// The creator is the one field the encoder cannot leave blank: an empty
+	// string fails AccAddressFromBech32 and would take the whole export down
+	// with it (including the degraded case above, one line later). Fall back to
+	// the module address — the same default Build applies to an inbound packet
+	// that carries no creator — so a class with no recorded creator still
+	// travels, and encode/decode stay symmetric for that case.
+	creatorBech32 := metadata.Creator
+	if creatorBech32 == "" {
+		creatorBech32 = cb.getModuleAddress(ModuleName).String()
+	}
+	creator, err := sdk.AccAddressFromBech32(creatorBech32)
 	if err != nil {
 		return "", err
 	}

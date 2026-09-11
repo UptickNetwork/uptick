@@ -1,54 +1,37 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
-	"strings"
-	"time"
 
 	"github.com/spf13/cobra"
 
-	tmjson "github.com/cometbft/cometbft/libs/json"
-	cmttypes "github.com/cometbft/cometbft/types"
-
-	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/flags"
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/version"
-	genutiltypes "github.com/cosmos/cosmos-sdk/x/genutil/types"
 )
 
-const (
-	// MainnetChainID
-	MainnetChainID = "uptick_117-1"
-	// TestnetChainID
-	TestnetChainID = "uptick_1170-3"
-)
+// MainnetChainID is the chain id of the Uptick mainnet, used as the default by
+// `init`.
+const MainnetChainID = "uptick_117-1"
 
 // FlagGenesisTime defines the genesis time in string format
 const FlagGenesisTime = "genesis-time"
 
-var migrationMap = genutiltypes.MigrationMap{}
-
-// GetMigrationCallback returns a MigrationCallback for a given version.
-func GetMigrationCallback(version, chainID string) genutiltypes.MigrationCallback {
-	if !IsMainnet(chainID) {
-		version = fmt.Sprintf("%s%s", "t", version)
-	}
-
-	return migrationMap[version]
-}
-
-func IsMainnet(chainID string) bool {
-	return strings.HasPrefix(chainID, MainnetChainID)
-}
-
 // MigrateGenesisCmd returns a command to execute genesis state migration.
+//
+// The command is deliberately inert. This build registers no genutil migration
+// callbacks — the `migrationMap` this used to consult was a permanently empty
+// package var that nothing ever wrote to — so the "read genesis → look up
+// callback → re-marshal" pipeline below the guard was unreachable code. Keeping
+// it around invited the (false) impression that offline migration works.
+//
+// Today the command does the only thing it could ever have done: refuse and
+// point at the in-place x/upgrade handler.
 func MigrateGenesisCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "migrate TARGET_VERSION GENESIS_FILE",
 		Short: "Migrate genesis to a specified target version",
-		Long:  "Migrate the source genesis into the target version and print to STDOUT.",
+		Long: "Offline genesis migration is disabled in this build. " +
+			"Upgrade chain state in place with a governance MsgSoftwareUpgrade plan.",
 		Example: fmt.Sprintf(
 			// v0.4.x upgrades run in place via the on-chain x/upgrade handler,
 			// not offline genesis migration; the command returns an error.
@@ -57,79 +40,16 @@ func MigrateGenesisCmd() *cobra.Command {
 			version.AppName,
 		),
 		Args: cobra.ExactArgs(2),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			clientCtx := client.GetClientContextFromCmd(cmd)
-
-			target := args[0]
-			importGenesis := args[1]
-
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			// v0.4.x registers no offline genesis migrations; state upgrades run
-			// in place through the on-chain x/upgrade handler. Fail early with
-			// clear guidance.
-			if len(migrationMap) == 0 {
-				return fmt.Errorf(
-					"offline genesis migration is not supported: %s registers no legacy genesis migration callbacks. "+
-						"Upgrade chain state with the in-app software-upgrade handler (governance MsgSoftwareUpgrade plan) as documented in docs/guides/upgrades; "+
-						"do not hand-edit or re-generate genesis files for a chain upgrade",
-					version.AppName,
-				)
-			}
-
-			genDoc, err := cmttypes.GenesisDocFromFile(importGenesis)
-			if err != nil {
-				return fmt.Errorf("failed to retrieve genesis.json: %w", err)
-			}
-
-			var initialState genutiltypes.AppMap
-			if err := json.Unmarshal(genDoc.AppState, &initialState); err != nil {
-				return fmt.Errorf("failed to JSON unmarshal initial genesis state: %w", err)
-			}
-
-			chainID, _ := cmd.Flags().GetString(flags.FlagChainID)
-			if chainID != "" {
-				genDoc.ChainID = chainID
-			}
-
-			migrationFn := GetMigrationCallback(target, chainID)
-			if migrationFn == nil {
-				return fmt.Errorf("unknown migration function for version: %s", target)
-			}
-
-			newGenState, err := migrationFn(initialState, clientCtx)
-			if err != nil {
-				return fmt.Errorf("failed to when running migration function: %w", err)
-			}
-
-			appState, err := json.Marshal(newGenState)
-			if err != nil {
-				return fmt.Errorf("failed to JSON marshal migrated genesis state: %w", err)
-			}
-
-			genDoc.AppState = appState
-
-			genesisTime, _ := cmd.Flags().GetString(FlagGenesisTime)
-			if genesisTime != "" {
-				var t time.Time
-
-				if err := t.UnmarshalText([]byte(genesisTime)); err != nil {
-					return fmt.Errorf("failed to unmarshal genesis time: %w", err)
-				}
-
-				genDoc.GenesisTime = t
-			}
-
-			bz, err := tmjson.Marshal(genDoc)
-			if err != nil {
-				return fmt.Errorf("failed to marshal genesis doc: %w", err)
-			}
-
-			sortedBz, err := sdk.SortJSON(bz)
-			if err != nil {
-				return fmt.Errorf("failed to sort JSON genesis doc: %w", err)
-			}
-
-			cmd.Println(string(sortedBz))
-			return nil
+			// in place through the on-chain x/upgrade handler. Fail with clear
+			// guidance instead of half-running a pipeline that cannot work.
+			return fmt.Errorf(
+				"offline genesis migration is not supported: %s registers no legacy genesis migration callbacks. "+
+					"Upgrade chain state with the in-app software-upgrade handler (governance MsgSoftwareUpgrade plan) as documented in docs/guides/upgrades; "+
+					"do not hand-edit or re-generate genesis files for a chain upgrade",
+				version.AppName,
+			)
 		},
 	}
 
