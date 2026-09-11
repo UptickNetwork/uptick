@@ -154,7 +154,11 @@ type AppKeepers struct {
 
 	ICAHostKeeper icahostkeeper.Keeper
 
-	IBCNFTTransferKeeper  ibcnfttransferkeeper.Keeper
+	IBCNFTTransferKeeper ibcnfttransferkeeper.Keeper
+	// InterNftKeeper is the ICS-721 adapter handed to IBCNFTTransferKeeper. It
+	// is held here so the app can reach the late conversion-guard wiring below:
+	// nft-transfer stores its ICS721Keeper by value and exposes no accessor.
+	InterNftKeeper        internft.InterNftKeeper
 	ConsensusParamsKeeper consensusparamkeeper.Keeper
 	AuthzKeeper           authzkeeper.Keeper
 	// cosmos/evm keepers
@@ -497,6 +501,12 @@ func New(
 	transferIBCModule := transfer.NewIBCModule(appKeepers.IBCTransferKeeper)
 	transferStack := cosmoserc20.NewIBCMiddleware(appKeepers.Erc20Keeper, transferIBCModule)
 
+	// The ICS-721 adapter carries the burn-guard slot. Its value travels into
+	// IBCNFTTransferKeeper by copy, which is why the slot itself is a pointer:
+	// the checker cannot exist yet here (x/erc721 and x/cw721 are constructed
+	// further down) and has to be wired afterwards.
+	appKeepers.InterNftKeeper = internft.NewInterNftKeeper(appCodec, appKeepers.NFTKeeper, appKeepers.AccountKeeper)
+
 	appKeepers.IBCNFTTransferKeeper = ibcnfttransferkeeper.NewKeeper(
 		appCodec,
 		appKeepers.keys[ibcnfttransfertypes.StoreKey],
@@ -504,7 +514,7 @@ func New(
 		appKeepers.IBCKeeper.ChannelKeeper,
 		appKeepers.IBCKeeper.ChannelKeeper,
 		appKeepers.AccountKeeper,
-		internft.NewInterNftKeeper(appCodec, appKeepers.NFTKeeper, appKeepers.AccountKeeper),
+		appKeepers.InterNftKeeper,
 	)
 
 	wasmDir := filepath.Join(homePath, "data")
@@ -568,6 +578,12 @@ func New(
 	// half is escrowed, but it cannot see the erc721/cw721 pair stores and may
 	// not import them (they are built from it). The check is therefore injected
 	// here. TestConvertedNFTCheckerIsWired fails if this wiring is ever removed.
+	//
+	// One call covers every holder of the guard, because the slot it writes to
+	// is shared with each copy of the collection keeper taken earlier:
+	// x/collection's own RemoveNFT, x/erc721's refund path (whose nftKeeper copy
+	// calls BurnNFT -> RemoveNFT) and x/internft's ICS-721 burn. Test
+	// InternftBurnGuardIsWired pins the ICS-721 half of that claim.
 	appKeepers.NFTKeeper.SetConvertedNFTChecker(convertedNFTChecker{
 		erc721: appKeepers.Erc721Keeper,
 		cw721:  appKeepers.Cw721Keeper,

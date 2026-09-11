@@ -36,3 +36,33 @@ func TestConvertedNFTCheckerIsWired(t *testing.T) {
 	// A sibling token of the same class has no binding of its own.
 	require.False(t, app.NFTKeeper.IsConvertedNFT(ctx, classID, "sibling-nft"))
 }
+
+// TestInternftBurnGuardIsWired pins the ICS-721 half of the same wiring.
+//
+// app/keepers builds the ICS-721 adapter before the checker can exist, so the
+// adapter holds a *copy* of the collection keeper and reaches the guard through
+// it. If someone turned Keeper.convertedNFTs back into a plain field, that copy
+// would keep a nil checker and InterNftKeeper.Burn would go back to destroying
+// bound NFTs -- silently, with every other test still green. Only the app can
+// observe the real wiring, so it is pinned here.
+func TestInternftBurnGuardIsWired(t *testing.T) {
+	app, ctx := sharedTestApp(t)
+
+	const (
+		classID  = "wired-ics721-class"
+		nftID    = "wired-ics721-nft"
+		contract = "0x00000000000000000000000000000000000000B2"
+	)
+
+	require.False(t, app.InterNftKeeper.IsConvertedNFT(ctx, classID, nftID),
+		"nothing is bound yet")
+
+	require.NoError(t, app.Erc721Keeper.SetNFTPairs(
+		ctx, common.HexToAddress(contract).Hex(), "9", classID, nftID))
+
+	require.True(t, app.InterNftKeeper.IsConvertedNFT(ctx, classID, nftID),
+		"the ICS-721 adapter must see the pair store through the collection keeper it copied")
+
+	// Negative control: the same predicate is not a blanket true.
+	require.False(t, app.InterNftKeeper.IsConvertedNFT(ctx, classID, "sibling-nft"))
+}

@@ -1,6 +1,7 @@
 package internft
 
 import (
+	sdkerrors "cosmossdk.io/errors"
 	"cosmossdk.io/log"
 
 	"cosmossdk.io/x/nft"
@@ -22,11 +23,25 @@ func NewInterNftKeeper(cdc codec.Codec,
 ) InterNftKeeper {
 	return InterNftKeeper{
 		nk:  k.NFTkeeper(),
+		ck:  k,
 		cdc: cdc,
 		ak:  ak,
 		cb:  types.NewClassBuilder(cdc, ak.GetModuleAddress),
 		tb:  types.NewTokenBuilder(cdc),
 	}
+}
+
+// IsConvertedNFT reports whether the native NFT has a contract-side
+// counterpart, i.e. whether destroying it would strand the escrowed contract
+// half.
+//
+// It delegates to the collection keeper's guard, which the application wires
+// once x/erc721 and x/cw721 exist (collectionkeeper.SetConvertedNFTChecker).
+// The copy of the collection keeper held here shares the guard's slot, so that
+// later wiring reaches this adapter too -- see the field comment in
+// interface.go and Keeper.convertedNFTs.
+func (ik InterNftKeeper) IsConvertedNFT(ctx sdk.Context, classID, nftID string) bool {
+	return ik.ck.IsConvertedNFT(ctx, classID, nftID)
 }
 
 // CreateOrUpdateClass implement the method of ICS721Keeper.CreateOrUpdateClass
@@ -153,6 +168,24 @@ func (ik InterNftKeeper) GetNFT(ctx sdk.Context, classID, tokenID string) (nfttr
 // RefundPacketToken): if the NFT is already gone, skipping keeps the IBC
 // refund path alive instead of rolling back the whole cache context.
 //
+// A bound NFT is refused. nft-transfer reaches this method through the
+// ICS721Keeper interface, so it does not pass through x/collection.RemoveNFT,
+// which is where the conversion guard normally lives; without this check the
+// ICS-721 path would destroy the native half of a converted NFT and leave the
+// escrowed contract half with no on-chain record of its existence --
+// "undiscoverable and unrecoverable", in x/erc721's own words. The checker is
+// injected by app/keepers (see SetConvertedNFTChecker).
+//
+// This does NOT restrict ordinary ICS-721 traffic. Only the destroy branch
+// calls Burn: nft-transfer picks escrow or destroy from IsAwayFromOrigin
+// (nft-transfer keeper/relay.go:238-248), and the class a conversion produces
+// is always "uptick-<contract>" (x/erc721 and x/cw721 both pin it in
+// Register*), which never carries a "<port>/<channel>/" prefix -- so the
+// outbound transfer of a converted NFT always escrows. A genuine voucher
+// being returned to its origin chain also arrives here with no pair recorded
+// (pairs are only ever written for "uptick-<contract>" classes), so it is
+// released by the same check.
+//
 // The absence check is a plain HasNFT read on purpose. An earlier version
 // wrapped it in a blanket recover(), which swallowed every panic — including
 // the SDK gas meter's OutOfGas and store/runtime panics — and then reported
@@ -178,6 +211,13 @@ func (ik InterNftKeeper) Burn(ctx sdk.Context, classID string, tokenID string) e
 		)
 		return nil
 	}
+
+	if ik.IsConvertedNFT(ctx, classID, tokenID) {
+		return sdkerrors.Wrapf(types.ErrNFTBoundToContract,
+			"nft %s/%s is paired with a contract token; convert it back (un-wrap) before transferring it over ICS-721",
+			classID, tokenID)
+	}
+
 	return ik.nk.Burn(ctx, classID, tokenID)
 }
 

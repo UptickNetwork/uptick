@@ -4,9 +4,11 @@ import (
 	context "context"
 
 	nftkeeper "cosmossdk.io/x/nft/keeper"
-	nfttypes "github.com/UptickNetwork/uptick/x/collection/types"
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+
+	collectionkeeper "github.com/UptickNetwork/uptick/x/collection/keeper"
+	nfttypes "github.com/UptickNetwork/uptick/x/collection/types"
 )
 
 type (
@@ -19,7 +21,16 @@ type (
 	}
 	// InterNftKeeper defines the ICS721 Keeper
 	InterNftKeeper struct {
-		nk  nftkeeper.Keeper
+		nk nftkeeper.Keeper
+		// ck is the x/collection keeper this adapter was built from. It is kept
+		// so Burn can ask the collection module's conversion guard whether a
+		// native NFT still has a contract-side half escrowed.
+		//
+		// Holding a *copy* is correct and deliberate: the guard lives in a slot
+		// the collection keeper shares with every copy of itself, so the wiring
+		// performed later by app/keepers is visible here too. That is also why
+		// this type carries no checker of its own.
+		ck  collectionkeeper.Keeper
 		cdc codec.Codec
 		ak  AccountKeeper
 		cb  nfttypes.ClassBuilder

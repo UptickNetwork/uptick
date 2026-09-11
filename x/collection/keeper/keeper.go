@@ -21,9 +21,18 @@ type Keeper struct {
 	nk           nftkeeper.Keeper
 	// convertedNFTs answers "does this native NFT have a contract-side
 	// counterpart?". Wiring it is what lets RemoveNFT refuse to burn a token
-	// whose contract half is escrowed -- see converted_nft.go. It is set after
-	// construction because x/erc721 and x/cw721 are built from this keeper.
-	convertedNFTs ConvertedNFTChecker
+	// whose contract half is escrowed -- see converted_nft.go.
+	//
+	// It is a *pointer* to a slot rather than a plain interface field, and that
+	// is load-bearing. This keeper is copied by value into x/erc721, x/cw721
+	// and x/internft, all of which are constructed *before* the checker can
+	// exist (it is built from x/erc721 and x/cw721 themselves). A plain field
+	// would be frozen as nil inside those copies, so the late wiring in
+	// app/keepers would only reach the one instance the app holds -- and the
+	// guard that x/erc721's refund path depends on (it calls
+	// nftKeeper.BurnNFT -> RemoveNFT through its own copy) would silently never
+	// fire. Sharing one slot keeps the wiring visible through every copy.
+	convertedNFTs *convertedNFTCheckerSlot
 }
 
 // NewKeeper creates a new instance of the NFT Keeper
@@ -33,9 +42,10 @@ func NewKeeper(cdc codec.Codec,
 	bk nft.BankKeeper,
 ) Keeper {
 	return Keeper{
-		storeService: storeService,
-		cdc:          cdc,
-		nk:           nftkeeper.NewKeeper(storeService, cdc, ak, bk),
+		storeService:  storeService,
+		cdc:           cdc,
+		nk:            nftkeeper.NewKeeper(storeService, cdc, ak, bk),
+		convertedNFTs: &convertedNFTCheckerSlot{},
 	}
 }
 
