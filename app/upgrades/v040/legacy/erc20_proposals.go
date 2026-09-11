@@ -181,9 +181,18 @@ func legacyProposalBytesSize(field int, bz []byte) int {
 	return legacyProposalUvarintSize(uint64(field<<3|2)) + legacyProposalUvarintSize(uint64(len(bz))) + len(bz)
 }
 
+// consumeLegacyProposalVarint reads a base-128 varint.
+//
+// The 64-bit shift bound matters: without it the loop keeps shifting past the
+// width of a uint64 (Go defines that as zero rather than trapping) and accepts
+// an over-long encoding as a small value instead of rejecting it. Generated
+// marshallers in cosmos/gogoproto stop at the same point with ErrIntOverflow.
 func consumeLegacyProposalVarint(dAtA []byte, i int) (uint64, int, error) {
 	var v uint64
 	for shift := uint(0); ; shift += 7 {
+		if shift >= 64 {
+			return 0, 0, fmt.Errorf("proto: integer overflow")
+		}
 		if i >= len(dAtA) {
 			return 0, 0, fmt.Errorf("proto: unexpected EOF")
 		}
@@ -211,7 +220,12 @@ func skipLegacyProposal(dAtA []byte, i int, wireType int) (int, error) {
 		if err != nil {
 			return 0, err
 		}
-		if ni+int(length) > len(dAtA) {
+		// Compare the declared length against what is left instead of
+		// computing ni+int(length): a length varint is a uint64, so int()
+		// can make it negative and the sum can overflow, and both would pass
+		// the old guard and then index out of range. See the note above the
+		// field reads below.
+		if length > uint64(len(dAtA)-ni) {
 			return 0, fmt.Errorf("proto: unexpected EOF")
 		}
 		return ni + int(length), nil
@@ -226,6 +240,19 @@ func skipLegacyProposal(dAtA []byte, i int, wireType int) (int, error) {
 }
 
 // ---- proto marshal/unmarshal implementations ----
+
+// Every length-delimited field read below uses
+//
+//	if length > uint64(len(dAtA)-i) { ... unexpected EOF ... }
+//
+// rather than the generated-code spelling `if i+int(length) > len(dAtA)`.
+// A length is a uint64 varint: int(2^63) and int(math.MaxInt64) are negative or
+// overflow the addition, and the comparison then passes on a declared length
+// that cannot possibly fit. The slice that follows panics with a Go stack trace
+// -- reachable from a genesis file, because these types are registered on the
+// application registry. Comparing against the remainder keeps both sides
+// non-negative and bounded, so the check cannot be bypassed. Do not "simplify"
+// these back into an addition.
 
 func (m *RegisterCoinProposal) Marshal() ([]byte, error) {
 	size := m.Size()
@@ -273,7 +300,7 @@ func (m *RegisterCoinProposal) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			i = ni
-			if i+int(length) > len(dAtA) {
+			if length > uint64(len(dAtA)-i) {
 				return fmt.Errorf("proto: unexpected EOF")
 			}
 			m.Title = string(dAtA[i : i+int(length)])
@@ -287,7 +314,7 @@ func (m *RegisterCoinProposal) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			i = ni
-			if i+int(length) > len(dAtA) {
+			if length > uint64(len(dAtA)-i) {
 				return fmt.Errorf("proto: unexpected EOF")
 			}
 			m.Description = string(dAtA[i : i+int(length)])
@@ -301,7 +328,7 @@ func (m *RegisterCoinProposal) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			i = ni
-			if i+int(length) > len(dAtA) {
+			if length > uint64(len(dAtA)-i) {
 				return fmt.Errorf("proto: unexpected EOF")
 			}
 			if err := proto.Unmarshal(dAtA[i:i+int(length)], &m.Metadata); err != nil {
@@ -354,7 +381,7 @@ func (m *RegisterERC20Proposal) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			i = ni
-			if i+int(length) > len(dAtA) {
+			if length > uint64(len(dAtA)-i) {
 				return fmt.Errorf("proto: unexpected EOF")
 			}
 			m.Title = string(dAtA[i : i+int(length)])
@@ -368,7 +395,7 @@ func (m *RegisterERC20Proposal) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			i = ni
-			if i+int(length) > len(dAtA) {
+			if length > uint64(len(dAtA)-i) {
 				return fmt.Errorf("proto: unexpected EOF")
 			}
 			m.Description = string(dAtA[i : i+int(length)])
@@ -382,7 +409,7 @@ func (m *RegisterERC20Proposal) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			i = ni
-			if i+int(length) > len(dAtA) {
+			if length > uint64(len(dAtA)-i) {
 				return fmt.Errorf("proto: unexpected EOF")
 			}
 			m.Erc20Address = string(dAtA[i : i+int(length)])
@@ -433,7 +460,7 @@ func (m *ToggleTokenRelayProposal) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			i = ni
-			if i+int(length) > len(dAtA) {
+			if length > uint64(len(dAtA)-i) {
 				return fmt.Errorf("proto: unexpected EOF")
 			}
 			m.Title = string(dAtA[i : i+int(length)])
@@ -447,7 +474,7 @@ func (m *ToggleTokenRelayProposal) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			i = ni
-			if i+int(length) > len(dAtA) {
+			if length > uint64(len(dAtA)-i) {
 				return fmt.Errorf("proto: unexpected EOF")
 			}
 			m.Description = string(dAtA[i : i+int(length)])
@@ -461,7 +488,7 @@ func (m *ToggleTokenRelayProposal) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			i = ni
-			if i+int(length) > len(dAtA) {
+			if length > uint64(len(dAtA)-i) {
 				return fmt.Errorf("proto: unexpected EOF")
 			}
 			m.Token = string(dAtA[i : i+int(length)])
@@ -516,7 +543,7 @@ func (m *UpdateTokenPairERC20Proposal) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			i = ni
-			if i+int(length) > len(dAtA) {
+			if length > uint64(len(dAtA)-i) {
 				return fmt.Errorf("proto: unexpected EOF")
 			}
 			m.Title = string(dAtA[i : i+int(length)])
@@ -530,7 +557,7 @@ func (m *UpdateTokenPairERC20Proposal) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			i = ni
-			if i+int(length) > len(dAtA) {
+			if length > uint64(len(dAtA)-i) {
 				return fmt.Errorf("proto: unexpected EOF")
 			}
 			m.Description = string(dAtA[i : i+int(length)])
@@ -544,7 +571,7 @@ func (m *UpdateTokenPairERC20Proposal) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			i = ni
-			if i+int(length) > len(dAtA) {
+			if length > uint64(len(dAtA)-i) {
 				return fmt.Errorf("proto: unexpected EOF")
 			}
 			m.Erc20Address = string(dAtA[i : i+int(length)])
@@ -558,7 +585,7 @@ func (m *UpdateTokenPairERC20Proposal) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			i = ni
-			if i+int(length) > len(dAtA) {
+			if length > uint64(len(dAtA)-i) {
 				return fmt.Errorf("proto: unexpected EOF")
 			}
 			m.NewErc20Address = string(dAtA[i : i+int(length)])
