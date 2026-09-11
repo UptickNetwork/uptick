@@ -25,10 +25,18 @@ func (k Keeper) TokenPairs(
 	}
 	ctx := sdk.UnwrapSDKContext(c)
 
+	// Shape the page request before it reaches the store: an unbounded
+	// offset/count_total/limit turns this query into a full scan of the pair
+	// table, which is exactly what x/collection already refuses to do.
+	pageReq, err := shapePageRequest(req.Pagination)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
 	var pairs []types.TokenPair
 	store := prefix.NewStore(ctx.KVStore(k.storeKey), types.KeyPrefixTokenPair)
 
-	pageRes, err := query.Paginate(store, req.Pagination, func(_, value []byte) error {
+	pageRes, err := query.Paginate(store, pageReq, func(_, value []byte) error {
 		var pair types.TokenPair
 		if err := k.cdc.Unmarshal(value, &pair); err != nil {
 			return err
