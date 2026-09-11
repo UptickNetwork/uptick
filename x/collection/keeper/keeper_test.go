@@ -403,6 +403,41 @@ func (s *KeeperTestSuite) TestSupplyInvariant() {
 		s.Require().False(broke)
 		s.Require().Empty(msg)
 	})
+
+	// The reporting branch is the whole point of the invariant, so it is
+	// exercised rather than left to the empty-state case. The mismatch is
+	// planted by writing the upstream counter key directly: no public API can
+	// produce one, which is exactly why a divergence would survive unnoticed
+	// (decrTotalSupply on a zero counter wraps to 2^64-1, and a historical
+	// bypass is invisible to the mint/burn accounting).
+	s.Run("a diverged supply counter breaks the invariant and the export walk", func() {
+		creator := sdk.AccAddress([]byte("supply-owner"))
+		s.Require().NoError(s.keeper.SaveDenom(
+			s.ctx, "supply", "Supply", "", "", creator, false, false, "", "", "", ""))
+		s.Require().NoError(s.keeper.SaveNFT(
+			s.ctx, "supply", "t1", "T1", "", "", "", creator))
+
+		// Mint kept both sides in agreement to begin with.
+		s.Require().Equal(uint64(1), s.keeper.GetTotalSupply(s.ctx, "supply"))
+
+		key := append(append([]byte{}, nftkeeper.ClassTotalSupply...), []byte("supply")...)
+		s.Require().NoError(s.storeSvc.OpenKVStore(s.ctx).Set(key, sdk.Uint64ToBigEndian(42)))
+
+		msg, broke := SupplyInvariant(s.keeper)(s.ctx)
+		s.Require().True(broke, "a diverged counter must break the invariant")
+		s.Require().Contains(msg, "supply")
+
+		// The export walk must reach the same conclusion through the same
+		// predicate; if these two ever disagree the diagnostic is worthless.
+		_, issues := s.keeper.GetCollectionsWithReport(s.ctx)
+		reported := false
+		for _, issue := range issues {
+			if issue.Kind == ExportIssueSupplyMismatch && issue.ClassID == "supply" {
+				reported = true
+			}
+		}
+		s.Require().True(reported, "the export walk must report the same mismatch")
+	})
 }
 
 // ============================================================================

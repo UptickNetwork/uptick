@@ -62,6 +62,18 @@ const (
 	// genesis will contain those classes with empty metadata, so the export
 	// says so instead of passing for a faithful copy.
 	ExportIssueClassMetadataMissing ExportIssueKind = "class_metadata_missing"
+	// ExportIssueSupplyMismatch means the class' stored total-supply counter
+	// disagrees with the number of NFTs actually stored under that class.
+	//
+	// The counter is maintained by the upstream nft keeper's mint/burn, and
+	// every write path in this repository goes through them, so a mismatch
+	// means the counter was diverged by a historical bypass -- or by
+	// decrTotalSupply wrapping a zero counter to 2^64-1. Either way the supply
+	// every nft query reports for that class is wrong, and it is the one
+	// degradation that a round-tripped genesis preserves (the counter is not
+	// part of GenesisState, so it is recomputed on import and the mismatch
+	// quietly disappears). Reported here so it cannot disappear unobserved.
+	ExportIssueSupplyMismatch ExportIssueKind = "supply_mismatch"
 )
 
 // ExportIssue is one recoverable problem encountered during genesis export. It
@@ -133,6 +145,13 @@ func (k Keeper) GetCollectionsWithReport(ctx sdk.Context) ([]types.Collection, [
 			issues = append(issues, *issue)
 		}
 
+		// The supply check rides along with the NFT walk that is already
+		// happening: len(nfts) is the independent count, the class' stored
+		// counter is the other side of the comparison.
+		if issue := k.supplyIssue(ctx, class.Id, uint64(len(nfts))); issue != nil {
+			issues = append(issues, *issue)
+		}
+
 		cs = append(cs, types.NewCollection(*denom, nfts))
 	}
 	return cs, issues
@@ -162,14 +181,44 @@ func (k Keeper) classMetadataIssue(class *nft.Class) *ExportIssue {
 	return nil
 }
 
+// supplyIssue reports a class whose stored total-supply counter disagrees with
+// the number of NFTs it actually holds. held is passed in because every caller
+// already has the class' NFT list in hand; reading it again here would double
+// the cost of the only scan that can observe this.
+//
+// This is the single predicate behind both the export diagnostic and
+// SupplyInvariant, so the two can never disagree about what counts as a broken
+// supply -- the same reason classMetadataIssue is shared between the export
+// path and the standalone ExportIssues scan.
+func (k Keeper) supplyIssue(ctx sdk.Context, classID string, held uint64) *ExportIssue {
+	stored := k.GetTotalSupply(ctx, classID)
+	if stored == held {
+		return nil
+	}
+	return &ExportIssue{
+		ClassID: classID,
+		Kind:    ExportIssueSupplyMismatch,
+		Detail: fmt.Sprintf(
+			"class holds %d nft(s) but its stored total supply counter is %d", held, stored),
+	}
+}
+
 // ExportIssues scans for the class-level degradations described by
 // classMetadataIssue, without building the collection list.
 //
 // It exists so the app-level export diagnostics report can list what an export
 // degraded without walking every NFT a second time: the checks here only read
-// the class records themselves. A class whose NFT list fails to read is only
-// observable while the NFTs are being iterated, and is reported by
-// GetCollectionsWithReport (and the export log) instead.
+// the class records themselves.
+//
+// Two kinds are therefore NOT visible to this scan, because observing them
+// needs the NFT list that only the export walk builds:
+//
+//   - ExportIssueNFTListFailed, and
+//   - ExportIssueSupplyMismatch,
+//
+// which are reported by GetCollectionsWithReport (and, on the export path, by
+// the export log). Adding a count of NFTs here would defeat the point of the
+// split and walk every NFT twice on a disaster-recovery path.
 func (k Keeper) ExportIssues(ctx sdk.Context) []ExportIssue {
 	var issues []ExportIssue
 	for _, class := range k.nk.GetClasses(ctx) {

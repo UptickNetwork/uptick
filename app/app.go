@@ -577,6 +577,19 @@ func NewUptick(
 	// Create and set the configurator
 	app.configurator = module.NewConfigurator(app.codec, app.MsgServiceRouter(), app.GRPCQueryRouter())
 
+	// Registers NOTHING. cosmos-sdk v0.53.6 implements
+	// module.Manager.RegisterInvariants as a deliberate no-op
+	// (types/module/module.go:454-457), so crisis' route set stays empty and
+	// the three places that assert invariants assert an empty set:
+	//
+	//   - x/crisis EndBlocker (skipped entirely while inv-check-period is 0),
+	//   - x/crisis InitGenesis -> AssertInvariants,
+	//   - app/export.go's zero-height export -> AssertInvariants.
+	//
+	// It is kept because the alternative is a hole in a list of registrations
+	// that reads as if it worked. The one real invariant this repository owns
+	// (x/collection's supply check) is observed on the export path instead;
+	// see app/invariants_wiring_test.go before changing that.
 	app.mm.RegisterInvariants(app.CrisisKeeper)
 	if err := app.mm.RegisterServices(app.configurator); err != nil {
 		panic(err)
