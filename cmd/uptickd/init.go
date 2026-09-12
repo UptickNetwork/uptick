@@ -127,7 +127,7 @@ func InitCmd(mbm module.BasicManager, defaultNodeHome string) *cobra.Command {
 			}
 
 			// Overwrites the SDK default denom for side-effects, before any
-			// BasicManager default genesis is materialised below.
+			// BasicManager default genesis is materialized below.
 			app.PrepareDefaultGenesisDenom(defaultDenom)
 
 			genesis := mbm.DefaultGenesis(cdc)

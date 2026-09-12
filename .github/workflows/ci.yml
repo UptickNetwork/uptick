@@ -118,6 +118,34 @@ jobs:
         with:
           version: v2.13.2
 
+  # T-G7 / audit gap: the committed Swagger bundle
+  # (client/docs/statik/statik.go) is generated from client/docs/swagger-ui by
+  # rakyll/statik, but nothing in CI ever regenerated it. A change to the
+  # swagger-ui sources could therefore land without its embedded bundle, and the
+  # REST gateway would go on serving the stale spec.
+  #
+  # `make update-swagger-docs` regenerates the bundle and then fails on a
+  # non-empty `git status` for the generated package. (The target's check used to
+  # be a no-op: `$(git status --porcelain)` was an undefined Make variable, so it
+  # never failed; it is now a real shell substitution.) In a fresh checkout the
+  # only file the generator can touch is the bundle itself, so a non-empty diff
+  # is proof of drift and the target doubles as the check -- it never "fixes and
+  # passes".
+  swagger-docs-sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Set up Go
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version: "1.25.13"
+
+      - name: Verify swagger docs are in sync
+        run: make update-swagger-docs
+
   contracts-reproducible:
     runs-on: ubuntu-latest
     steps:

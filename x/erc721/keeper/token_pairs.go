@@ -56,7 +56,7 @@ func (k Keeper) GetTokenPairsWithReport(ctx sdk.Context) ([]types.TokenPair, []G
 
 // GetTokenPairID returns the pair id from either of the registered tokens.
 //
-// DEPRECATED: dispatches by string shape, which is unsafe for hex-shaped
+// Deprecated: dispatches by string shape, which is unsafe for hex-shaped
 // class ids. Kept only for backwards compatibility with the gRPC TokenPair
 // read query. Handlers and write paths MUST use GetPairByClass /
 // GetPairByEVM instead.

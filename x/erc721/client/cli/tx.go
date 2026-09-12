@@ -176,7 +176,7 @@ const (
 
 // defaultPacketTimeout is the fallback applied by the CLI when both timeout
 // flags are left at their zero defaults: a 10 minute relative timestamp,
-// mirroring the pre-migration behaviour of ibc-go's transfer CLI.
+// mirroring the pre-migration behavior of ibc-go's transfer CLI.
 const defaultPacketTimeout = 10 * time.Minute
 
 // resolvePacketTimeouts fills in a relative timeout timestamp when both the

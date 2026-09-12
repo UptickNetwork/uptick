@@ -12,7 +12,7 @@ type GenesisExportIssueKind string
 const (
 	// GenesisExportIssueTokenPairCorrupt means a registered TokenPair record
 	// could not be decoded.
-	GenesisExportIssueTokenPairCorrupt GenesisExportIssueKind = "token_pair_corrupt"
+	GenesisExportIssueTokenPairCorrupt GenesisExportIssueKind = "token_pair_corrupt" //nolint:gosec // G101 false positive: the identifier name contains "Token"; the value is a non-secret issue-kind code.
 	// GenesisExportIssueUIDIndexBackward means a reverse (nftUID -> tokenUID)
 	// index entry has no matching forward entry.
 	GenesisExportIssueUIDIndexBackward GenesisExportIssueKind = "nft_uid_index_reverse_without_forward"

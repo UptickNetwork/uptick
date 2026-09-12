@@ -51,14 +51,22 @@ type ExportDiagnosticsReport struct {
 // collectExportDiagnostics asks every genesis-exporting module for the records
 // it could not represent faithfully.
 //
-// It runs after the module manager has already exported, and deliberately uses
-// the modules' cheap issue scanners rather than re-exporting: the export path
-// itself only logs what it drops, and the alternative -- re-running the full
-// export -- would walk every NFT twice on a disaster-recovery path.
+// It runs after the module manager has already exported, and uses the modules'
+// issue scanners rather than re-exporting: the export path itself only logs
+// what it drops, and re-running the full export would be a second full export.
+//
+// For collection the scanner is ExportIssuesWithReport rather than the
+// class-only ExportIssues: the supply_mismatch and nft_list_failed kinds can
+// only be observed while walking a class' NFT list, so the class-only scan
+// would silently drop the one check in the repository that detects a diverged
+// supply counter (D-G1). That walk is the exact one the module's own
+// ExportGenesis performs, so the sidecar and the export agree by construction;
+// it costs a second traversal only on this operator-initiated path, never in
+// consensus. erc721/cw721 already report their full issue sets here.
 func (app *Uptick) collectExportDiagnostics(ctx sdk.Context) []ExportDiagnostic {
 	var diags []ExportDiagnostic
 
-	for _, issue := range app.NFTKeeper.ExportIssues(ctx) {
+	for _, issue := range app.NFTKeeper.ExportIssuesWithReport(ctx) {
 		diags = append(diags, ExportDiagnostic{
 			Module: collectiontypes.ModuleName,
 			Kind:   string(issue.Kind),

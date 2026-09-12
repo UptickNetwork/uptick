@@ -207,7 +207,7 @@ func (k Keeper) PruneDuplicateUIDIndexEntries(ctx sdk.Context) UIDIndexPruneRepo
 	return report
 }
 
-// readUIDIndex materialises one of the two UID indexes as a map. It is a whole-
+// readUIDIndex materializes one of the two UID indexes as a map. It is a whole-
 // map read on purpose: the prune has to compare every forward key against every
 // reverse entry, and the indexes are per-token conversion state — a few thousand
 // records at most — so a map is cheaper than repeated iterator passes.

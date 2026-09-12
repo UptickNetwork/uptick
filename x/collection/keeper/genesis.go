@@ -54,11 +54,12 @@ func (k Keeper) InitGenesis(ctx sdk.Context, data types.GenesisState) {
 // and summarized: the export still succeeds (no class or NFT is dropped), but
 // an operator must be able to see that some metadata fields were lost.
 //
-// Only the class-metadata kinds reach <home>/export-issues.json: the app-level
-// report is built from ExportIssues, which reads class records alone. The two
-// kinds that need the NFT list (nft_list_failed, supply_mismatch) are therefore
-// log-only here -- see ExportIssues for why that split is deliberate. Do not
-// describe this file and the sidecar as carrying the same list.
+// The app-level report (<home>/export-issues.json) is built from
+// ExportIssuesWithReport, which re-runs this exact walk, so the sidecar and the
+// log below now carry the SAME set of degradations — including the two kinds
+// that need the NFT list (nft_list_failed, supply_mismatch). The cheap
+// class-only ExportIssues scan no longer feeds the sidecar; see its comment for
+// why the split exists and ExportIssuesWithReport for the cost of closing it.
 func (k Keeper) ExportGenesis(ctx sdk.Context) *types.GenesisState {
 	collections, issues := k.GetCollectionsWithReport(ctx)
 	for _, issue := range issues {

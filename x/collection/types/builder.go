@@ -288,15 +288,35 @@ func NewTokenBuilder(cdc codec.Codec) TokenBuilder {
 
 // BuildMetadata encode nft into the metadata format defined by ics721
 func (tb TokenBuilder) BuildMetadata(token nft.NFT) (string, error) {
-	var message proto.Message
-	if err := tb.cdc.UnpackAny(token.Data, &message); err != nil {
-		return "", err
+	// Mirror the tolerance ClassBuilder.BuildMetadata applies to a nil Data
+	// blob: a token created before the metadata wrapper existed — a legacy
+	// record surviving a migration, or one written straight through the base
+	// nft keeper — carries nil Data. UnpackAny(nil, ...) reports success and
+	// leaves the message nil, so the type assertion used to reject exactly
+	// those tokens: InterNftKeeper.GetNFT then answered "not found", so every
+	// ICS-721 outbound send and ack -- and every genesis export -- of a token
+	// that plainly exists aborted. (Only the outbound path runs through here;
+	// an inbound packet is minted via the fork's Mint, not BuildMetadata.)
+	// Degrade to zero-value metadata instead, which is what the class
+	// side already does for the same input, so the two read paths describe an
+	// unrecorded record identically.
+	//
+	// A token whose Data is present but not an NFTMetadata is still a hard
+	// error: that is a corrupt record, not a missing one — the same judgement
+	// the class side makes.
+	nftMetadata := &NFTMetadata{}
+	if token.Data != nil {
+		var message proto.Message
+		if err := tb.cdc.UnpackAny(token.Data, &message); err != nil {
+			return "", err
+		}
+		unpacked, ok := message.(*NFTMetadata)
+		if !ok {
+			return "", errors.New("unsupported nft metadata: expected NFTMetadata")
+		}
+		nftMetadata = unpacked
 	}
 
-	nftMetadata, ok := message.(*NFTMetadata)
-	if !ok {
-		return "", errors.New("unsupported nft metadata: expected NFTMetadata")
-	}
 	kvals := make(map[string]interface{})
 	if len(nftMetadata.Data) > 0 {
 		err := json.Unmarshal([]byte(nftMetadata.Data), &kvals)

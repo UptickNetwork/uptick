@@ -149,6 +149,22 @@ For example, in vscode your `.vscode/settings.json` should look like:
 
 Uptick uses [GitHub Actions](https://github.com/features/actions) for automated testing.
 
+### <span id="local_green_is_not_ci_green">A local `go test ./...` is not the CI gate</span>
+
+A plain `go test ./...` finishes with a handful of **SKIP**s, and those skips are exactly the
+heaviest gates — including `TestAppImportExport` (the export/import round trip that disaster
+recovery depends on), the whole `tests/e2e` suite, and the simulation entry point. The
+`tests/e2e` package still reports `ok` when it skips, so a local run **looks** green while
+proving none of them. In CI those gates are not skipped — each has its own job. Before you
+treat a change as verified, run the two commands CI uses to close the gap:
+
+```bash
+make test-sim-ci                                # simulation, incl. export/import (-Enabled=true, no skips)
+UPTICK_E2E_STRICT=1 make test-e2e-localnet      # real node; an unreachable node FAILS instead of skipping
+```
+
+`go test ./...` is still worth running — it is just not sufficient on its own.
+
 ## <span id="updating_doc">Updating Documentation</span>
 
 If you open a PR on the Uptick repo, it is mandatory to update the relevant documentation in `/docs`. Please refer to

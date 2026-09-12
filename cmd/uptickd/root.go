@@ -122,6 +122,7 @@ func NewRootCmd() *cobra.Command {
 			tempApplication.GetTxConfig().SigningContext().ValidatorAddressCodec(),
 		),
 		MigrateGenesisCmd(),
+		PrecheckCollectionMigrationCmd(app.DefaultNodeHome),
 		genutilcli.GenTxCmd(tempApplication.BasicManager(), tempApplication.GetTxConfig(), banktypes.GenesisBalancesIterator{}, app.DefaultNodeHome, tempApplication.GetTxConfig().SigningContext().ValidatorAddressCodec()),
 		genutilcli.ValidateGenesisCmd(tempApplication.BasicManager()),
 		AddGenesisAccountCmd(app.DefaultNodeHome),

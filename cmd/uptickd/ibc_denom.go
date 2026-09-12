@@ -23,7 +23,7 @@ func IBCDenom(port, channel, denom string) (string, error) {
 	}
 
 	// Validate the hop before parsing. Without this, a port/channel pair that
-	// is not in the "port/channel-<n>" shape is not recognised as a hop at all,
+	// is not in the "port/channel-<n>" shape is not recognized as a hop at all,
 	// the parse then yields no trace, and the caller was told the input "is a
 	// native denom" -- a message that was both wrong and unactionable, because
 	// the input was never native, it was just unparseable.

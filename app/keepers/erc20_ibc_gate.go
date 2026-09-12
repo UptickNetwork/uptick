@@ -48,11 +48,11 @@ const EventTypeAutoRegistrationSuppressed = "erc20_auto_registration_suppressed"
 //
 // Scope. The gate suppresses exactly one branch - the registration above. Every
 // other outcome is delegated verbatim, so under the default params
-// (PermissionlessRegistration = true, see types.DefaultParams) behaviour is
+// (PermissionlessRegistration = true, see types.DefaultParams) behavior is
 // unchanged. With the switch off, an inbound packet for an unknown denom is
 // still received and credited; it simply stays a bank voucher instead of
 // silently becoming an ERC20. Turning the switch back on restores the old
-// behaviour, and no state written by the gate needs undoing.
+// behavior, and no state written by the gate needs undoing.
 type ERC20IBCGate struct {
 	keeper *cosmoserc20keeper.Keeper
 }

@@ -124,3 +124,83 @@ func TestBuildMetadataRejectsForeignData(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "unsupported class metadata")
 }
+
+// newBuilderTestTokenBuilder wires the real proto codec + interface registry so
+// TokenBuilder.BuildMetadata exercises the same UnpackAny path the app does
+// (mirrors newBuilderTestClassBuilder for the class side).
+func newBuilderTestTokenBuilder() TokenBuilder {
+	registry := codectypes.NewInterfaceRegistry()
+	RegisterInterfaces(registry)
+	return NewTokenBuilder(codec.NewProtoCodec(registry))
+}
+
+// TestTokenBuildMetadataToleratesNilData pins the B-1 fix on the token side: an
+// NFT stored without the NFTMetadata wrapper — a record that predates it, or
+// one written straight through the base nft keeper — must still be encodable
+// for ICS-721, exactly as TestBuildMetadataToleratesNilClassData requires for
+// the class side.
+//
+// Before the fix this returned "unsupported nft metadata", because
+// UnpackAny(nil, ...) succeeds and leaves the message nil, so the type
+// assertion rejected the token. InterNftKeeper.GetNFT
+// (x/internft/keeper.go:152) then answered not-found and nft-transfer aborted
+// the recv/ack of a token that plainly exists on chain.
+func TestTokenBuildMetadataToleratesNilData(t *testing.T) {
+	tb := newBuilderTestTokenBuilder()
+
+	encoded, err := tb.BuildMetadata(nft.NFT{
+		ClassId: "legacy",
+		Id:      "1",
+		Uri:     "ipfs://token-1",
+		UriHash: "hash-token-1",
+		Data:    nil,
+	})
+	require.NoError(t, err, "a token with nil Data must still be exportable over ICS-721")
+
+	// The token bag shares the class decoder: TokenKeyName / TokenKeyURIhash
+	// carry the same "irismod:" keys the class encoder uses.
+	decoded := decodeClassMetadata(t, encoded)
+
+	// The token-level field survives untouched; the metadata name degrades to
+	// the zero value, which is what the class side reports for the same input.
+	require.Equal(t, "", decoded[TokenKeyName].Value)
+	require.Equal(t, "hash-token-1", decoded[TokenKeyURIhash].Value)
+}
+
+// TestTokenBuildMetadataPreservesRecordedName is the reverse sentinel for
+// TestTokenBuildMetadataToleratesNilData: a token that DOES carry metadata must
+// still have its name and uri_hash exported, so the tolerance cannot have
+// become "ignore whatever is stored".
+func TestTokenBuildMetadataPreservesRecordedName(t *testing.T) {
+	tb := newBuilderTestTokenBuilder()
+
+	anyVal, err := codectypes.NewAnyWithValue(&NFTMetadata{Name: "Recorded"})
+	require.NoError(t, err)
+
+	encoded, err := tb.BuildMetadata(nft.NFT{
+		ClassId: "issued",
+		Id:      "1",
+		UriHash: "hash-issued",
+		Data:    anyVal,
+	})
+	require.NoError(t, err)
+
+	decoded := decodeClassMetadata(t, encoded)
+	require.Equal(t, "Recorded", decoded[TokenKeyName].Value)
+	require.Equal(t, "hash-issued", decoded[TokenKeyURIhash].Value)
+}
+
+// TestTokenBuildMetadataRejectsForeignData pins that the token-side tolerance
+// is scoped to *missing* metadata only. A token whose Data is present but holds
+// a different message type is a corrupt record, not a legacy one, and must
+// still fail — the same judgement the class side makes.
+func TestTokenBuildMetadataRejectsForeignData(t *testing.T) {
+	tb := newBuilderTestTokenBuilder()
+
+	anyVal, err := codectypes.NewAnyWithValue(&DenomMetadata{})
+	require.NoError(t, err)
+
+	_, err = tb.BuildMetadata(nft.NFT{ClassId: "corrupt", Id: "1", Data: anyVal})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "unsupported nft metadata")
+}

@@ -53,7 +53,8 @@ contain valid denominations. Accounts may optionally be supplied with vesting pa
 				inBuf := bufio.NewReader(cmd.InOrStdin())
 				keyringBackend, _ := cmd.Flags().GetString(flags.FlagKeyringBackend)
 
-				if keyringBackend != "" && clientCtx.Keyring == nil {
+				switch {
+				case keyringBackend != "" && clientCtx.Keyring == nil:
 					var err error
 					kr, err = keyring.New(
 						sdk.KeyringServiceName(),
@@ -66,9 +67,9 @@ contain valid denominations. Accounts may optionally be supplied with vesting pa
 					if err != nil {
 						return err
 					}
-				} else if clientCtx.Keyring != nil {
+				case clientCtx.Keyring != nil:
 					kr = clientCtx.Keyring
-				} else {
+				default:
 					// --keyring-backend was left empty and the command context
 					// carries no keyring either, so there is nothing to resolve
 					// the name in. Falling through used to call Key on a nil

@@ -209,7 +209,7 @@ func withRepairedBaseFee(params feemarkettypes.Params) (feemarkettypes.Params, b
 // The interface is here for the ordinary reason (it makes the dependency of the
 // migration legible) rather than for the injectable-failure reason the two
 // params stores above have: the prune cannot fail, it only reports. Its result
-// type is the module's own, because a summarised version of it would throw away
+// type is the module's own, because a summarized version of it would throw away
 // exactly the keys an operator needs.
 type erc721UIDIndexStore interface {
 	PruneDuplicateUIDIndexEntries(ctx sdk.Context) erc721keeper.UIDIndexPruneReport
@@ -283,9 +283,9 @@ func uidIndexPruneClean(report erc721keeper.UIDIndexPruneReport) bool {
 // so the sample is the same on every validator — a log line that differs
 // between nodes is worse than no log line.
 func firstFew(keys []string) []string {
-	const max = 5
-	if len(keys) <= max {
+	const maxSample = 5
+	if len(keys) <= maxSample {
 		return keys
 	}
-	return keys[:max]
+	return keys[:maxSample]
 }

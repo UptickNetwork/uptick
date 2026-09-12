@@ -231,15 +231,6 @@ func typeURLSet(urls []string) map[string]bool {
 	return out
 }
 
-func sortedKeys(set map[string]bool) []string {
-	out := make([]string, 0, len(set))
-	for k := range set {
-		out = append(out, k)
-	}
-	sort.Strings(out)
-	return out
-}
-
 // disabledIBCTypeURLs returns the "/ibc." entries of the production list.
 func disabledIBCTypeURLs() []string {
 	var out []string

@@ -184,7 +184,12 @@ all: build
 
 build-all: tools build lint test
 
-.PHONY: distclean clean build-all
+# `build` and `install` are BUILD_TARGETS (Makefile:130) declared as
+# `$(BUILD_TARGETS): go.sum $(BUILDDIR)/`. Because BUILDDIR is `./build`, the
+# target name `build` collides with the directory it writes into: once `build/`
+# exists, GNU Make treats the target as already up to date and skips the compile
+# entirely (rc=0, stale binary). Marking them phony forces the recipe to run.
+.PHONY: distclean clean build-all build install build-linux
 
 ###############################################################################
 ###                          Tools & Dependencies                           ###
@@ -293,9 +298,23 @@ go.sum: go.mod
 ###                              Documentation                              ###
 ###############################################################################
 
+# Regenerate the embedded Swagger bundle and fail if the result differs from
+# what is committed.
+#
+# The previous check was written as `[ -n "$(git status --porcelain)" ]`. With a
+# single `$`, `$(git status --porcelain)` is a *Make* variable reference (to an
+# undefined variable), so it always expanded to the empty string and the target
+# always printed "Swagger docs are in sync" and exited 0 -- even when the bundle
+# was stale. It is replaced with a real shell command substitution, scoped to
+# the generated package so a developer's unrelated working-tree changes do not
+# trip it.
+#
+# `-c ""` is required for byte-identical output: the committed bundle carries no
+# package comment, whereas statik v0.1.6 injects "Package statik contains static
+# assets." by default. Without it, every run would report that comment as drift.
 update-swagger-docs: statik
-	$(BINDIR)/statik -src=client/docs/swagger-ui -dest=client/docs -f -m
-	@if [ -n "$(git status --porcelain)" ]; then \
+	$(BINDIR)/statik -src=client/docs/swagger-ui -dest=client/docs -f -m -c ""
+	@if [ -n "$$(git status --porcelain -- client/docs/statik)" ]; then \
         echo "\033[91mSwagger docs are out of sync!!!\033[0m";\
         exit 1;\
     else \
@@ -510,7 +529,7 @@ benchmark:
 ###############################################################################
 
 lint:
-	golangci-lint run --out-format=tab
+	golangci-lint run
 
 lint-contracts:
 	@cd contracts && \
@@ -518,7 +537,7 @@ lint-contracts:
 	npm run lint
 
 lint-fix:
-	golangci-lint run --fix --out-format=tab --issues-exit-code=0
+	golangci-lint run --fix --issues-exit-code=0
 
 lint-fix-contracts:
 	@cd contracts && \

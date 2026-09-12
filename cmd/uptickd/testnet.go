@@ -465,7 +465,7 @@ func initGenFiles(
 	// for it is "stake". Without this the testnet genesis ended up with staking
 	// on the chain denom while mint kept issuing a phantom "stake" nobody holds
 	// and MsgVerifyInvariant was unfundable. Must happen before the defaults
-	// are materialised below, and shared with cmd/uptickd/init.go so both
+	// are materialized below, and shared with cmd/uptickd/init.go so both
 	// genesis entry points agree.
 	app.PrepareDefaultGenesisDenom(coinDenom)
 

@@ -206,9 +206,12 @@ func (k Keeper) supplyIssue(ctx sdk.Context, classID string, held uint64) *Expor
 // ExportIssues scans for the class-level degradations described by
 // classMetadataIssue, without building the collection list.
 //
-// It exists so the app-level export diagnostics report can list what an export
-// degraded without walking every NFT a second time: the checks here only read
-// the class records themselves.
+// It remains the CHEAP scan for callers that must not walk every NFT: the
+// checks here only read the class records themselves. The app-level export
+// diagnostics sidecar no longer uses it — that report needs the complete set
+// and now calls ExportIssuesWithReport — but the class-only scan is still the
+// right tool for a caller that only cares about metadata degradations, and is
+// what the round-trip tests assert on.
 //
 // Two kinds are therefore NOT visible to this scan, because observing them
 // needs the NFT list that only the export walk builds:
@@ -226,6 +229,38 @@ func (k Keeper) ExportIssues(ctx sdk.Context) []ExportIssue {
 			issues = append(issues, *issue)
 		}
 	}
+	return issues
+}
+
+// ExportIssuesWithReport returns the FULL set of degradations an export of the
+// collection module can report — including the two kinds ExportIssues cannot
+// see, ExportIssueNFTListFailed and ExportIssueSupplyMismatch, because
+// observing them needs the per-class NFT list.
+//
+// It is what the app-level diagnostics sidecar (<home>/export-issues.json)
+// reads, so the durable report and the module's own export walk can never
+// disagree about what a degraded collection is: both are
+// GetCollectionsWithReport, the only place the supply and NFT-list checks are
+// evaluated. This is what closes the D-G1 gap, where supply_mismatch — the one
+// check in the repository that can detect a diverged supply counter — was
+// logged but never persisted, and so vanished with the process.
+//
+// COST, stated up front: GetCollectionsWithReport walks every class' NFT list,
+// and the module's ExportGenesis has already run that walk by the time the app
+// collects diagnostics, so this pays for it a second time. That is accepted
+// deliberately: it only happens on an operator-initiated genesis export
+// (disaster recovery / chain restart), never inside a consensus handler, so the
+// extra traversal buys a complete, durable report at zero consensus cost.
+//
+// The alternative — have ExportGenesis stash its issue list on the keeper for
+// the app to read back — would avoid the second walk but would add hidden
+// mutable state to a keeper that is copied by value into x/erc721, x/cw721 and
+// x/internft (see the convertedNFTs field comment in keeper.go), and would make
+// the report's contents depend on whether ExportGenesis had run. A pure re-read
+// is preferred: the walk is the module's only source of truth for these two
+// kinds, and re-deriving it keeps the keeper stateless.
+func (k Keeper) ExportIssuesWithReport(ctx sdk.Context) []ExportIssue {
+	_, issues := k.GetCollectionsWithReport(ctx)
 	return issues
 }
 

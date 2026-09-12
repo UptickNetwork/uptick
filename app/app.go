@@ -1041,7 +1041,7 @@ func NoOpMempoolOption() func(*baseapp.BaseApp) {
 // chain denom while mint keeps issuing a phantom "stake" nobody holds and
 // MsgVerifyInvariant cannot be funded.
 //
-// It MUST be called before the BasicManager's DefaultGenesis is materialised;
+// It MUST be called before the BasicManager's DefaultGenesis is materialized;
 // setting the denom afterwards has no effect on the defaults already built.
 // Both genesis entry points (init and testnet init-files) go through here so
 // they cannot drift apart.

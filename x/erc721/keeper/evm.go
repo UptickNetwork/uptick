@@ -182,7 +182,7 @@ func (k Keeper) QueryClassEnhance(
 // testable: abi.Unpack against the canonical signature always yields the
 // declared types, so a contract answering with an unexpected type in one slot
 // can only be reproduced by calling this with hand-built values (see
-// evm_enhance_test.go). Kept inline, that behaviour would be both unreachable
+// evm_enhance_test.go). Kept inline, that behavior would be both unreachable
 // and untested.
 //
 // Policy (round 10, G-3) — the two field kinds are treated deliberately

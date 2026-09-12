@@ -69,7 +69,7 @@ func importPerTokenState(ctx sdk.Context, k keeper.Keeper, data types.GenesisSta
 // node's export path, in <home>/export-issues.json -- see
 // app/export_diagnostics.go). This matches x/collection.
 //
-// The previous behaviour was fail-closed (panic with the list of damaged
+// The previous behavior was fail-closed (panic with the list of damaged
 // keys). That made the diagnosis excellent but the export unusable: a single
 // corrupt key locked the whole chain out of its own backup, which is the worst
 // possible failure mode on a disaster-recovery path. Reporting the damage and

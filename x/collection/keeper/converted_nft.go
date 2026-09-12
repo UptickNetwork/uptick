@@ -29,7 +29,7 @@ type convertedNFTCheckerSlot struct {
 // IsConvertedNFT reports whether the NFT is bound to a contract token,
 // consulting the wiring-time checker. A nil slot or an unwired checker (a
 // module-only setup with no contract side, such as the collection module's own
-// unit tests) reports false, which preserves the unguarded behaviour those
+// unit tests) reports false, which preserves the unguarded behavior those
 // callers expect.
 func (k Keeper) IsConvertedNFT(ctx sdk.Context, classID, nftID string) bool {
 	if k.convertedNFTs == nil || k.convertedNFTs.checker == nil {

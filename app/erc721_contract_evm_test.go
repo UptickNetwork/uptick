@@ -174,12 +174,6 @@ func (h *erc721EVMHarness) call(method string, args ...interface{}) error {
 	return err
 }
 
-// callOn sends a state-changing call to an arbitrary contract.
-func (h *erc721EVMHarness) callOn(target common.Address, method string, args ...interface{}) error {
-	_, err := h.app.Erc721Keeper.CallEVM(h.ctx, h.abi, erc721types.ModuleAddress, target, true, method, args...)
-	return err
-}
-
 // query reads one accessor on an arbitrary contract.
 func (h *erc721EVMHarness) query(t *testing.T, target common.Address, a abi.ABI, method string, args ...interface{}) []interface{} {
 	t.Helper()

@@ -116,7 +116,7 @@ const LegacyNFTTransferPortID = "nft-transfer"
 // "nft" catches "nft-transfer" - and it wins over the ICS-20 "transfer" key only
 // because "nft" sorts first. "nft" is also a prefix of "nft-transfer", so the
 // mapping survives a future tightening of that fallback from Contains to
-// HasPrefix. TestICS721LegacyPortStillResolves pins the behaviour against the
+// HasPrefix. TestICS721LegacyPortStillResolves pins the behavior against the
 // real router, because a silent change here re-strands escrowed NFTs.
 //
 // The ICS-721 module tolerates arriving under the old port: OnRecvPacket,
@@ -500,7 +500,7 @@ func New(
 	// ibc_callbacks.go implements the conversion; the middleware invokes them.
 	//
 	// The middleware is handed the gate rather than the bare keeper so the
-	// inbound RegisterERC20Extension branch honours
+	// inbound RegisterERC20Extension branch honors
 	// Params.PermissionlessRegistration. Upstream never reads that parameter on
 	// this path, so without the gate the switch is bypassed by anyone who can
 	// get an unseen denom delivered. See erc20_ibc_gate.go.
