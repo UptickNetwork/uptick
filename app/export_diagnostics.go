@@ -22,6 +22,20 @@ import (
 // to a file next to the exported genesis is what keeps a degraded export
 // auditable after the process exits -- the same information also goes to the
 // node log, but a log stream is not a durable artifact.
+//
+// CONSUMER CONTRACT -- READ THIS BEFORE ADDING A GATE
+// --------------------------------------------------
+// This sidecar is a diagnostic artifact for an OPERATOR to read after a real
+// `uptickd export`; it is deliberately NOT a CI gate input. Nothing under
+// scripts/, .github/ or the Makefile reads it, and it is not committed to the
+// repository -- it lives in the node home of the machine that ran the export.
+// Therefore a non-empty report blocks no pipeline and fails no job: its whole
+// value is that it makes a degraded export *visible* to the operator before
+// they schedule an upgrade, instead of the degradation surviving only in a log
+// stream that scrolls away. If a future change wants to turn this file into a
+// gate, it must first define where the file comes from in CI (it never exists
+// in a fresh checkout) -- bolting a "must be empty" check onto an artifact that
+// is absent by default would be a gate that always passes.
 const ExportDiagnosticsFileName = "export-issues.json"
 
 // ExportDiagnostic is one record that a genesis export could not represent

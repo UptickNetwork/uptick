@@ -118,6 +118,22 @@ jobs:
         with:
           version: v2.13.2
 
+      # The action above is the pinned installer; this step is the contract.
+      # Keeping BOTH is deliberate, not redundant: the action owns "pin the
+      # version and put the binary on PATH" (it installs into
+      # $HOME/golangci-lint-<ver>-<os>-<arch>/ and adds that dir to PATH via
+      # core.addPath), while `make lint` owns "the exact command a developer
+      # runs". They must stay separate because the failure this guards against
+      # is precisely a Makefile target that rots while the action keeps the job
+      # green: golangci-lint v2 removed `--out-format`, `make lint` began dying
+      # on every invocation, and nobody noticed because CI had quietly switched
+      # to invoking the action directly instead of the target. Do not "simplify"
+      # this by deleting either step -- deleting this one re-opens that hole.
+      - name: Lint via the Makefile target
+        run: |
+          command -v golangci-lint || { echo "::error::golangci-lint not on PATH"; exit 1; }
+          make lint
+
   # T-G7 / audit gap: the committed Swagger bundle
   # (client/docs/statik/statik.go) is generated from client/docs/swagger-ui by
   # rakyll/statik, but nothing in CI ever regenerated it. A change to the
@@ -188,3 +204,79 @@ jobs:
       - name: Verify committed artifacts and embedded copy
         working-directory: contracts
         run: make verify-contracts
+
+  # `app/upgrades/v040/` is a frozen tree: the v0.4.0 upgrade handler plus its
+  # legacy registry shims, which run exactly once on live state during a chain
+  # halt. The freeze used to exist only as prose in .golangci.yml -- nothing
+  # could go red -- so a `style(lint)` commit that rewrote a frozen file landed
+  # unnoticed. This job is the mechanical gate that replaces the prose. It has
+  # two parts (see scripts/check-v040-frozen.sh):
+  #
+  #   A. A CONTENT pin: the blob shas of every TRACKED file under
+  #      app/upgrades/v040/, read from the WORKING TREE (git ls-files + git
+  #      hash-object), are compared, as a set, to scripts/v040-frozen.sha256 --
+  #      the same source the generator writes, so an uncommitted edit is caught
+  #      too. Neither git history nor merge semantics are consulted, so the merge
+  #      shapes part B deliberately ignores cannot hide anything from A either --
+  #      with ONE recorded exception: a merge commit that edits a frozen file and
+  #      the manifest TOGETHER is invisible to both parts (residual (1a) in the
+  #      script, accepted on purpose). It runs first and needs no fetch depth.
+  #
+  #   B. A LABEL check: of the non-merge commits that modified the pin
+  #      (scripts/v040-frozen.sha256), the FRONTIER -- those not superseded by a
+  #      later pin write -- must all have a `fix(v040):` subject. The only exempt
+  #      case is the pin BIRTH WINDOW (residual (1b)): when the pin does not exist
+  #      at base, its in-range writes are the first pin -- the trust anchor -- and
+  #      are not re-pins. The window is keyed on the ABSENCE of the pin at base,
+  #      not on the pin's first creation, so a base that is itself a post-deletion
+  #      pin-absent commit reopens it. Once the pin exists at base, ANY in-range
+  #      commit that (re)adds or rewrites it is a re-pin and must be labelled,
+  #      including a re-add whose delete was hidden inside a merge. It is NOT
+  #      `git log -1 -- <path>`: that orders by committer date, which on a DAG is
+  #      not topology, so a backdated child could hide behind a label. Requiring
+  #      EVERY in-range pin write (not just the frontier) is red-forever once a
+  #      bad commit lands, which is how such a gate gets bypassed with `|| true`;
+  #      a later `fix(v040):` re-pin is the sanctioned remedy. This is
+  #      why `fetch-depth: 0` is mandatory -- the shallow default hides the base
+  #      and the gate exits non-zero (never 0) when it cannot resolve it, so the
+  #      shallow default would make the job red, not green. A branch-creating
+  #      push whose `before` is the all-zero sha is ignored in favour of the
+  #      built-in anchor. There is no `git ... || true` anywhere: a git failure
+  #      is fatal, never a "nothing to check" success.
+  v040-frozen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+
+      # Pure git; no Go toolchain needed. The PR base comes from the event; the
+      # push "before" covers pushes to release/** (an all-zero value means a new
+      # branch and is ignored in favour of the built-in anchor).
+      - name: Verify app/upgrades/v040 is frozen
+        env:
+          V040_PR_BASE: ${{ github.event.pull_request.base.sha }}
+          V040_PUSH_BEFORE: ${{ github.event.before }}
+        run: make check-v040-frozen
+
+  # CONTRIBUTING.md instructs contributors to run `make <target>` commands, so
+  # it is a contract. It claimed `development` must never fail `make
+  # test-import`, but no `test-import` rule has ever existed in the Makefile
+  # (only a stale `.PHONY` mention) -- running it fails with "No rule to make
+  # target". A documented-but-absent gate misleads contributors exactly like a
+  # gate that returns 0 while checking nothing. This job fails whenever the doc
+  # advertises a target the Makefile does not define. It reads BOTH inline code
+  # spans and fenced code blocks (where the CI commands live, e.g.
+  # `UPTICK_E2E_STRICT=1 make test-e2e-localnet`); bare prose verbs such as
+  # "make sure" are not commands and are never treated as targets.
+  contributing-targets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Verify documented make targets exist
+        run: make check-doc-make-targets

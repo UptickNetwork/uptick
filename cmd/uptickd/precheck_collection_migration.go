@@ -90,15 +90,17 @@ func PrecheckCollectionMigrationCmd(defaultNodeHome string) *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("open application database under %s: %w", config.RootDir, err)
 			}
-			defer func() {
-				if cerr := db.Close(); cerr != nil {
-					fmt.Fprintf(cmd.ErrOrStderr(), "warning: closing application database: %v\n", cerr)
-				}
-			}()
 
 			// loadLatest=true reads the latest committed version; the app is only
 			// used to resolve the collection store key and codec, never to build a
 			// block.
+			//
+			// The app OWNS db: its BaseApp is constructed with this exact handle
+			// (app.NewUptick -> baseapp.NewBaseApp(db)), so uptickApp.Close() already
+			// closes it through the app's CommitMultiStore. Closing db a second time
+			// here would make leveldb report "leveldb: closed" on the success path --
+			// a warning on a run whose whole point is to give an operator a clean,
+			// trustworthy signal. The app's Close below is therefore the ONLY close.
 			uptickApp := app.NewUptick(serverCtx.Logger, db, nil, true, serverCtx.Viper, nil)
 			defer func() { _ = uptickApp.Close() }()
 

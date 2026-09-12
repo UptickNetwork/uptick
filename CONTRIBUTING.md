@@ -113,8 +113,8 @@ installed on your machine, or head to [Docker's website](https://docs.docker.com
 
 For formatting code in `.proto` files, you can run `make proto-format` command.
 
-For linting and checking breaking changes, we use [buf](https://buf.build/). You can use the commands `make proto-lint`
-and `make proto-check-breaking` to respectively lint your proto files and check for breaking changes.
+For linting proto files, we use [buf](https://buf.build/). You can run `make proto-lint` to lint your proto files.
+Breaking-change detection runs `buf breaking` directly against the target branch; there is no Make target for it.
 
 To generate the protobuf stubs, you can run `make proto-gen`.
 
@@ -139,7 +139,7 @@ For example, in vscode your `.vscode/settings.json` should look like:
 ## <span id="dev_procedure">Development Procedure</span>
 
 1. The latest state of development is on `development`.
-2. `development` must never fail `make lint, make test, make test-race, make test-rpc, make test-import`
+2. `development` must never fail `make lint, make test, make test-race, make test-rpc, make test-sim-import-export`
 3. No `--force` onto `development` (except when reverting a broken commit, which should seldom happen).
 4. Create your feature branch from `development` either on `github.com/UptickNetwork/uptick`, or your fork (
    using `git remote add origin`).

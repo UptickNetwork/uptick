@@ -66,6 +66,7 @@ Ref: https://keepachangelog.com/en/1.0.0/
 * (ibc) Enable the ICA controller submodule on upgrade (legacy genesis templates default it to disabled).
 * (keplr) Accept Keplr Web3-extension EIP-712 transactions: legacy `/ethermint.types.v1.ExtensionOptionsWeb3Tx` and `/ethermint.crypto.v1.ethsecp256k1.PubKey` type URLs map onto the complete cosmos/evm types at runtime (v0.4.1 Keplr compatibility).
 * (erc721/cw721) Reject commas in denom ids and make the NFT-mapping UID parser split on the last comma, keeping NFT UID round-trips safe (L-3).
+* (cli) Add `uptickd precheck-collection-migration`, an offline, read-only pre-upgrade check: it scans a pre-upgrade database copy with the collection module's own v1→v2 legacy-store precheck and reports every record that would abort the migration, so an operator sees the whole problem before scheduling the upgrade. It migrates nothing and writes no state; a clean store exits 0, a dirty one exits non-zero with the full report.
 
 ### Improvements
 
@@ -77,6 +78,7 @@ Ref: https://keepachangelog.com/en/1.0.0/
 * (genesis) erc721/cw721 genesis validation rejects empty, duplicated, or pair-unrelated per-token bindings and refund receivers instead of panicking in `InitGenesis` (H-02 follow-up).
 * (contracts) Pin OpenZeppelin and solc; add checksums and deterministic recompile + artifact-integrity verification to CI (L-11, R-NEW-3).
 * (ci) golangci-lint v2.13.2 (v2 config schema); run CI on every `release/**` push; drop the flaky e2e-keplr-eip712 job; contract bytecode reproducibility job.
+* (ci) Repair the gates that returned 0 while checking nothing and add two fail-closed ones. Repaired: `make build` was skipped by Make once `build/` existed (missing `.PHONY`); the Swagger drift check used a single-`$` Make reference so it was always "in sync"; `make lint` no longer passes the golangci-lint v2-removed `--out-format`. Added: a `v040-frozen` job that pins the blob shas of the frozen `app/upgrades/v040/` tree in `scripts/v040-frozen.sha256`, read from the working tree (so an uncommitted edit is caught), failing on any content drift that is not accompanied by a matching re-pin, and requiring every surviving (frontier) change to the pin to be a `fix(v040):` commit so that a later re-pin clears an earlier slip (`make v040-frozen-manifest` re-pins it) -- the sole exemption is a base that has no pin (the window is keyed on the pin's absence at base, not on its first creation, so a base that is itself a post-deletion pin-absent commit reopens it); once the pin exists at base, any in-range commit that re-adds or rewrites the pin must be labelled, including a delete hidden inside a merge; and a `contributing-targets` job that fails when `CONTRIBUTING.md` documents a `make` target the Makefile does not define (the documented `make test-import` gate never existed). Test failures can no longer be masked by the `tparse` pipe in `run-tests`.
 * (cli) Default `uptickd testnet --print-mnemonic` to `false`.
 * (docker) Run as a non-root user and add a healthcheck.
 * (build) Add the `ledger` build tag to goreleaser artifacts.

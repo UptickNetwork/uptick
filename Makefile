@@ -17,7 +17,11 @@ endif
 PACKAGES_NOSIMULATION=$(shell go list ./... | grep -v '/simulation')
 PACKAGES_SIMTEST=$(shell go list ./... | grep '/simulation')
 
-TMVERSION := $(shell go list -m github.com/cometbft/cometbft | sed 's:.* ::')
+# The value is forced at parse time by `ldflags := $(strip $(ldflags))` below, for
+# EVERY target. Guard the `go` call so a lightweight, pure-git target (e.g.
+# check-v040-frozen) no longer prints "/bin/sh: go: command not found" on a
+# machine without Go; when Go is present the result is identical.
+TMVERSION := $(shell command -v go >/dev/null 2>&1 && go list -m github.com/cometbft/cometbft | sed 's:.* ::')
 COMMIT := $(shell git log -1 --format='%H')
 LEDGER_ENABLED ?= true
 BINDIR ?= $(GOPATH)/bin
@@ -355,6 +359,35 @@ build-docs-versioned:
 .PHONY: docs-serve build-docs build-docs-versioned
 
 ###############################################################################
+###                          Repository invariants                          ###
+###############################################################################
+
+# Keep app/upgrades/v040/ pinned to known content, and require that every
+# surviving (frontier) change to the pin (scripts/v040-frozen.sha256) is a
+# `fix(v040):` commit. See scripts/check-v040-frozen.sh for the full rationale,
+# the two rejected "who changed this path" designs (false-green / false-red), and
+# the deliberate residual gaps (including the accepted forgery cost).
+check-v040-frozen:
+	@./scripts/check-v040-frozen.sh
+.PHONY: check-v040-frozen
+
+# Regenerate scripts/v040-frozen.sha256 from the working tree. The remediation
+# flow for an intentional v040 change is: edit the files, run this target, then
+# commit the file changes AND the refreshed manifest TOGETHER in ONE commit whose
+# subject starts with `fix(v040):`.
+v040-frozen-manifest:
+	@./scripts/check-v040-frozen.sh --write-manifest
+.PHONY: v040-frozen-manifest
+
+# CONTRIBUTING.md advertises `make <target>` commands, so it is a contract.
+# This fails when a documented target has no rule in this Makefile -- the same
+# class of bug as the `make test-import` gate that was documented but never
+# existed.
+check-doc-make-targets:
+	@./scripts/check-doc-make-targets.sh
+.PHONY: check-doc-make-targets
+
+###############################################################################
 ###                           Tests & Simulation                            ###
 ###############################################################################
 
@@ -382,9 +415,16 @@ $(TEST_TARGETS): run-tests
 test-unit-cover: ARGS=-timeout=10m -race -coverprofile=coverage.txt -covermode=atomic
 test-unit-cover: TEST_PACKAGES=$(PACKAGES_UNIT)
 
+# `go test -json ... | tparse` hides the suite exit code: a pipeline returns the
+# status of its LAST command, and tparse exits 0 after formatting, so a failing
+# run would still exit 0. CI installs tparse and would therefore report a red
+# suite as green, while the bare `go test` fallback below did not -- the two
+# branches disagreed. `bash -o pipefail` is used rather than `set -o pipefail`
+# because Make runs recipe lines with /bin/sh (dash), where pipefail is not
+# available. The fallback branch needs no wrapper: its exit code is go test's.
 run-tests:
 ifneq (,$(shell which tparse 2>/dev/null))
-	go test -mod=readonly -json $(ARGS) $(EXTRA_ARGS) $(TEST_PACKAGES) | tparse
+	bash -o pipefail -c 'go test -mod=readonly -json $(ARGS) $(EXTRA_ARGS) $(TEST_PACKAGES) | tparse'
 else
 	go test -mod=readonly $(ARGS)  $(EXTRA_ARGS) $(TEST_PACKAGES)
 endif
@@ -395,7 +435,7 @@ test-rpc:
 test-rpc-pending:
 	./scripts/integration-test-all.sh -t "pending" -q 1 -z 1 -s 2 -m "pending" -r "true"
 
-.PHONY: run-tests test test-all test-import test-rpc $(TEST_TARGETS)
+.PHONY: run-tests test test-all test-rpc $(TEST_TARGETS)
 
 test-sim-nondeterminism:
 	@echo "Running non-determinism test..."
@@ -528,6 +568,16 @@ benchmark:
 ###                                Linting                                  ###
 ###############################################################################
 
+# `golangci-lint run` deliberately carries no `--out-format` flag: that flag was
+# removed in golangci-lint v2, and passing it to the v2 binary (the version this
+# repo pins) makes the linter fail to start, not merely ignore the flag. v2 also
+# replaced the old output/`issues.exclude-*` schema with `linters.exclusions`
+# and a top-level `formatters` section -- see .golangci.yml. This target IS
+# executed in CI (.github/workflows/ci.yml, `lint` job, the "Lint via the
+# Makefile target" step) with golangci-lint v2.13.2, the version the job's
+# `version:` input pins, so a flag that breaks the binary fails CI instead of
+# letting this target rot. Do NOT reintroduce `--out-format`: the cause of its
+# removal is this comment.
 lint:
 	golangci-lint run
 

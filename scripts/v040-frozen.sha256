@@ -1,0 +1,8 @@
+ad62b8cc0569b0dd14d4d318d902af0b0c3e9149  app/upgrades/v040/legacy/account.pb.go
+9cef628168f53c8940c44d9b828cff8caa8ea21f  app/upgrades/v040/legacy/codec.go
+98bc54b2c0770783f2c302711975b6447d138823  app/upgrades/v040/legacy/codec_test.go
+97143183f7028a68c5d5687f6e702bd7efd12791  app/upgrades/v040/legacy/erc20_proposals.go
+12aa36ed0540a48c452c19b75ea84e8f475bbc90  app/upgrades/v040/legacy/erc20_proposals_test.go
+263bedcc5827c7dae7b24300c311e4d1bd8f2f82  app/upgrades/v040/legacy/ethsecp256k1.go
+5e58167d9bae22608e1a4b3af281313bdf2cca96  app/upgrades/v040/upgrades.go
+19e20d44d5a8a107f89bf35f5a8dd42b1f7196ef  app/upgrades/v040/upgrades_test.go
