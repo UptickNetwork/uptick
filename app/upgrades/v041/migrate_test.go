@@ -3,6 +3,7 @@ package v041
 import (
 	"encoding/hex"
 	"errors"
+	"reflect"
 	"slices"
 	"testing"
 
@@ -183,6 +184,188 @@ func TestMigrateICAControllerParams_IsIdempotent(t *testing.T) {
 
 	require.Len(t, store.writes, 1, "the second run must observe the flip and skip")
 	require.True(t, store.params.ControllerEnabled)
+}
+
+// TestMigrateICAControllerParams_WritesBackEveryFieldRead is the fidelity check
+// on the write migrateICAControllerParams performs. It fills EVERY field of
+// icacontrollertypes.Params with a non-zero sentinel, sets the controller flag
+// back to false, runs the migration, and requires the stored value to equal the
+// read value with exactly that one field flipped. A whole-struct rebuild
+// (icacontrollertypes.NewParams(true)) would instead zero every other field, so
+// when ibc-go adds a second field this comparison fails and poses the real
+// question -- "what should the new field be during this migration?" -- instead
+// of a field count that a human would have to remember to bump.
+//
+// Sensitivity ceiling, stated honestly: today icacontrollertypes.Params has
+// exactly ONE field, and that field is precisely the one the migration flips,
+// so this assertion CANNOT fail today -- there is no other field to drop. Its
+// teeth are on the SECOND and later fields. Until such a field appears, NO test
+// in this package can tell a whole-struct rebuild apart from a read-modify-write
+// (revert the write in upgrades.go to icacontrollertypes.NewParams(true) and the
+// suite still passes). TestParamsWriteBackComparisonIsFieldSensitive proves only
+// that the comparison predicate is not a tautology; it reads nothing from the
+// production code, so it is not a guard.
+//
+// Two blind spots belong here rather than in a review comment. The assertion
+// only sees fields that exist, so it says nothing at all until the field it
+// would drop has been added. And it catches a pointer or non-[]byte slice field
+// being dropped to nil or to a zero-length value, but not one being swapped for
+// a freshly allocated zero-valued object -- a fresh pointer, or a fresh slice of
+// the SAME length, compares equal to the sentinel.
+//
+// A field-count canary -- pinning
+// reflect.TypeOf(icacontrollertypes.Params{}).NumField() -- was considered and
+// dropped: once a second field exists this test already goes red if the write
+// stops carrying fields through, so a count canary would add no detection, only
+// a red build on the day ibc-go adds a field while the write is still correct. A
+// gate that fires on correct code is how gates get bypassed.
+func TestMigrateICAControllerParams_WritesBackEveryFieldRead(t *testing.T) {
+	sentinel := fillNonZeroStruct(t, reflect.TypeOf(icacontrollertypes.Params{}))
+
+	ctrl := sentinel.FieldByName("ControllerEnabled")
+	require.True(t, ctrl.IsValid(),
+		"icacontrollertypes.Params no longer has ControllerEnabled; the migration and this test must be revisited")
+	ctrl.SetBool(false)
+
+	store := &recordingICAParamsStore{params: sentinel.Interface().(icacontrollertypes.Params)}
+
+	migrateICAControllerParams(icaTestCtx(), store)
+
+	require.Len(t, store.writes, 1, "a disabled controller must be enabled")
+
+	want := sentinel.Interface().(icacontrollertypes.Params)
+	want.ControllerEnabled = true
+
+	require.Equal(t, want, store.writes[0],
+		"the write-back must be the value just read with exactly one field "+
+			"flipped; failing here means the write did not carry through every "+
+			"field it read -- a whole-struct construction "+
+			"(icacontrollertypes.NewParams(true)) zeroes every field it does not "+
+			"set, including any ibc-go adds later")
+}
+
+// fillNonZeroStruct returns a value of typ with every field set to a non-zero
+// sentinel, so that a field silently dropped by a write shows up in an equality
+// check. Whenever it cannot fill a field it FAILS rather than leaving that field
+// zero: a silently-zero field would be a false negative on exactly the drift
+// this helper exists to make visible, and a false negative is invisible while a
+// failure is not.
+//
+// Failure is reachable two ways, and neither is a mechanical fix:
+//
+//   - a kind this helper cannot build a non-zero value for;
+//   - an unexported field reached by recursing into a struct -- math.Int and
+//     time.Time are both built that way, and no reflection can set them.
+//
+// The second case is a decision, not a missing case: that field has to be
+// compared some other way (its own Equal or String, usually) and someone has to
+// decide which. A failure names the field by a dotted path rooted at the type it
+// was asked to fill, so a nested one reads e.g. "types.Params.Amount.i" rather
+// than a bare "i".
+func fillNonZeroStruct(t *testing.T, typ reflect.Type) reflect.Value {
+	t.Helper()
+
+	return fillNonZeroStructAt(t, typ, typ.String())
+}
+
+// fillNonZeroStructAt is fillNonZeroStruct with a running path. The root comes
+// from typ.String(), which is the package NAME and not the import path: for
+// icacontrollertypes.Params it reads "types.Params", and several packages in this
+// module are named "types". Read the path as orientation for locating the field,
+// not as a unique identifier.
+func fillNonZeroStructAt(t *testing.T, typ reflect.Type, path string) reflect.Value {
+	t.Helper()
+
+	v := reflect.New(typ).Elem()
+	for i := 0; i < typ.NumField(); i++ {
+		field := typ.Field(i)
+		fv := v.Field(i)
+		at := path + "." + field.Name
+		if !fv.CanSet() {
+			t.Fatalf("fillNonZeroStruct: %s is unexported, so no reflection can put a "+
+				"sentinel in it; leaving it zero would make this comparison blind to "+
+				"a write that drops it. This needs a decision rather than a new case: "+
+				"choose how that wrapper should be compared (its own Equal or String, "+
+				"usually) and teach this helper.", at)
+		}
+		switch fv.Kind() {
+		case reflect.Bool:
+			fv.SetBool(true)
+		case reflect.String:
+			fv.SetString("sentinel")
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			fv.SetInt(1)
+		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+			fv.SetUint(1)
+		case reflect.Slice:
+			if field.Type.Elem().Kind() == reflect.Uint8 {
+				fv.SetBytes([]byte{0x01})
+			} else {
+				fv.Set(reflect.MakeSlice(field.Type, 1, 1))
+			}
+		case reflect.Struct:
+			fv.Set(fillNonZeroStructAt(t, field.Type, at))
+		case reflect.Ptr:
+			fv.Set(reflect.New(field.Type.Elem()))
+		default:
+			t.Fatalf("fillNonZeroStruct: %s has kind %s, which this helper cannot build "+
+				"a non-zero value for; leaving it zero would make this comparison blind "+
+				"to a write that drops it. Teach this helper that kind.", at, fv.Kind())
+		}
+	}
+	return v
+}
+
+// TestParamsWriteBackComparisonIsFieldSensitive proves the fidelity comparison
+// above is not vacuously true. It plays the same "sentinel + flip + compare"
+// shape against a multi-field stand-in struct, twice: once as a read-modify-write
+// and once as a whole-struct rebuild. The SAME comparison must accept the first
+// and reject the second -- one predicate, two outcomes. What it does NOT claim
+// is that the fidelity assertion above discriminates today: with a single field
+// in icacontrollertypes.Params it passes under either write. The control only
+// shows the comparison has a false outcome available to it, which is what makes
+// the assertion worth having once a second field exists.
+//
+// The stand-in takes icahosttypes.Params' shape -- a bool plus a []string, the
+// one other params message in ibc-go's ICA modules -- and adds a second scalar
+// so that a String-branch field exists too. It is shaped for the branches it has
+// to reach, not for convenience. Routing it through the SAME helper the fidelity
+// test uses is the point: it exercises the multi-field path and the String and
+// non-byte-Slice branches, which a one-field icacontrollertypes.Params cannot
+// reach.
+func TestParamsWriteBackComparisonIsFieldSensitive(t *testing.T) {
+	type standInParams struct {
+		ControllerEnabled bool
+		Extra             string
+		AllowMessages     []string
+	}
+
+	// Fill the stand-in through the SAME helper the fidelity test uses, so its
+	// multi-field path and the String and Slice branches actually execute.
+	sentinel := fillNonZeroStruct(t, reflect.TypeOf(standInParams{}))
+	sentinel.FieldByName("ControllerEnabled").SetBool(false)
+
+	want := sentinel.Interface().(standInParams)
+	want.ControllerEnabled = true
+
+	// same mirrors require.Equal's predicate for a non-[]byte struct
+	// (reflect.DeepEqual), so the control exercises the real comparison.
+	same := func(a, b standInParams) bool { return reflect.DeepEqual(a, b) }
+
+	// (i) Read-modify-write: the value read, with only the bool flipped.
+	readModifyWrite := sentinel.Interface().(standInParams)
+	readModifyWrite.ControllerEnabled = true
+
+	// (ii) Whole-struct rebuild: only the bool is set; the other two fields are
+	// left zero, which is exactly what icacontrollertypes.NewParams(true) does to
+	// the fields it does not know about.
+	wholeStruct := standInParams{ControllerEnabled: true}
+
+	require.True(t, same(want, readModifyWrite),
+		"read-modify-write carries the fields it read, so it must equal the sentinel with the bool flipped")
+	require.False(t, same(want, wholeStruct),
+		"a whole-struct rebuild drops every field it does not set; it must NOT "+
+			"equal, or the fidelity assertion would assert nothing")
 }
 
 // ---------------------------------------------------------------------------

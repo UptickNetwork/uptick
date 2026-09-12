@@ -103,15 +103,37 @@ type icaControllerParamsStore interface {
 // migrateICAControllerParams flips the ICA controller submodule on if it is
 // currently disabled. Chains initialized from legacy genesis templates (e.g.
 // the origin testnet) store controller_enabled=false; fresh chains already
-// default to true and are left untouched. Host params are not modified.
+// default to true and are left untouched.
+//
+// The host submodule's params are not "carefully left alone" here -- they are
+// unreachable at the type level. The only store this function can touch is an
+// icaControllerParamsStore, whose GetParams/SetParams are bound to
+// icacontrollertypes.Params; nothing in scope exposes icahosttypes.Params, so
+// no current or future edit *inside this signature* can read or write it. That
+// is why there is no host-side guard: the compiler is the guard.
 //
 // SetParams has no error to propagate: ibc-go's controller keeper panics
 // internally if the store rejects the write, so the only failure mode left for
 // this function to get wrong is the guard.
+//
+// The write is a read-modify-write on purpose: it flips ControllerEnabled on
+// the value it just read and stores that same value, so any field ibc-go adds
+// to icacontrollertypes.Params later is carried through untouched. Rebuilding
+// the struct instead -- e.g. icacontrollertypes.NewParams(true) -- compiles and
+// passes every test in this repository today, because the single field that
+// exists is the one being set. It only diverges once ibc-go adds a second field:
+// the rebuild would zero that field and persist the zero on-chain, because the
+// store is exactly where the value already lives. Nothing about the rebuild
+// itself would flag that, which is why the write-back test in migrate_test.go
+// pins that the write carries through every field it read -- and why the
+// question to answer when such a field appears is "what should it be during this
+// migration?", not "bump a count in a test".
 func migrateICAControllerParams(ctx sdk.Context, store icaControllerParamsStore) {
-	if store.GetParams(ctx).ControllerEnabled {
+	params := store.GetParams(ctx)
+	if params.ControllerEnabled {
 		return
 	}
-	store.SetParams(ctx, icacontrollertypes.NewParams(true))
+	params.ControllerEnabled = true
+	store.SetParams(ctx, params)
 	ctx.Logger().Info("ica controller submodule enabled", "upgrade", upgradeName)
 }

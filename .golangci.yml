@@ -122,14 +122,34 @@ linters:
       # source edit, i.e. exactly the class 3424c91 reverted. Excluded by
       # configuration instead; lint is not what verifies the freeze.
       #
+      # Residual: the exclusion is path-wide and not history-aware, so it also
+      # silences a NEWLY-introduced dupl/unconvert/unparam/gofmt finding -- a
+      # future fix(v040): that adds one slips past lint. Nothing in this file
+      # bounds that; the only mitigation is procedural, and it lives in the
+      # freeze script: part (A) of scripts/check-v040-frozen.sh hashes these
+      # files from the WORKING TREE and fails on any content drift -- an
+      # uncommitted edit included -- until the pin is refreshed. Part (B) then
+      # requires that refresh to be an explicit fix(v040): commit; the label is
+      # what it checks, not who reviewed it. That rule has two documented
+      # residuals: an evil merge that rewrites the pin alongside the content it
+      # carries, and any range whose base does not carry the pin -- (1b) is keyed
+      # on the pin's ABSENCE at base, not on its first creation, so a base that is
+      # itself a post-deletion pin-absent commit reopens the window. Both are
+      # RESIDUAL (1a)/(1b) in that script. Inside those two ranges new bytes can
+      # enter without such a commit. Outside them this is the bound: part (A)
+      # still catches drift not accompanied by a matching re-pin.
+      #
       # WHAT verifies the freeze is scripts/check-v040-frozen.sh
       # (`make check-v040-frozen`, CI job v040-frozen): (A) it pins the blob
       # shas of every tracked file under app/upgrades/v040/, read from the
       # WORKING TREE, in scripts/v040-frozen.sha256 and fails on any content or
       # file-set drift (including an uncommitted edit), and (B) it requires every
       # surviving (frontier) change to that pin to be an explicit fix(v040):
-      # commit -- a later `fix(v040):` re-pin is the sanctioned remedy. The rule
-      # above only keeps lint from nagging about files it must not edit.
+      # commit -- a later `fix(v040):` re-pin is the sanctioned remedy. Two ranges
+      # escape that requirement, as the residual paragraph above records: one
+      # whose change hides inside a merge, and one whose base carries no pin to
+      # compare against. The rule above only keeps lint from nagging about files
+      # it must not edit.
       #
       # The reference is the tree AS IT STANDS, not tag v0.4.1: 1c51378
       # legitimately moved it past that tag. Do NOT "restore" this tree to the
