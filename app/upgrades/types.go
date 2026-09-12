@@ -11,18 +11,16 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/module"
 )
 
-// Upgrade defines a struct containing necessary fields that a SoftwareUpgradeProposal
-// must have written, in order for the state migration to go smoothly.
-// An upgrade must implement this struct, and then set it in the app.go.
-// The app.go will then define the handler.
+// Upgrade is one registered upgrade: its version name, a constructor for the
+// handler, and any store upgrades.
 type Upgrade struct {
-	// Upgrade version name, for the upgrade handler, e.g. `v7`
+	// Version name this upgrade is registered under, e.g. `v7`.
 	UpgradeName string
 
-	// UpgradeHandlerConstructor defines the function that creates an upgrade handler
+	// UpgradeHandlerConstructor builds the upgrade handler.
 	UpgradeHandlerConstructor func(*module.Manager, module.Configurator, Toolbox) upgradetypes.UpgradeHandler
 
-	// Store upgrades, should be used for any new modules introduced, new modules deleted, or store names renamed.
+	// StoreUpgrades is required for any module added, removed or renamed.
 	StoreUpgrades *store.StoreUpgrades
 }
 
@@ -44,10 +42,7 @@ type UpgradeRouter struct {
 	mu map[string]Upgrade
 }
 
-// NewUpgradeRouter creates a new upgrade router.
-//
-// No parameters.
-// Returns a pointer to UpgradeRouter.
+// NewUpgradeRouter returns an empty router.
 func NewUpgradeRouter() *UpgradeRouter {
 	return &UpgradeRouter{make(map[string]Upgrade)}
 }
@@ -69,34 +64,30 @@ func (r *UpgradeRouter) UpgradeInfo(planName string) Upgrade {
 }
 
 // UpgradeAlreadyApplied reports whether every module managed by the module
-// manager is already stored at its current consensus version — i.e. this
+// manager is already stored at its current consensus version -- i.e. this
 // upgrade handler has run before.
 //
-// It is the idempotency guard for one-shot upgrade migrations: if an upgrade
-// plan is re-scheduled by mistake (same name re-registered at a new height,
-// crash-restart replay, operator error), re-running non-idempotent migrations
-// can corrupt state or hard-stop the whole chain. Handlers must check this
-// before executing their custom migration steps and return early when true.
+// It is the idempotency guard for one-shot migrations: if a plan is re-scheduled
+// by mistake (same name re-registered at a new height, crash-restart replay,
+// operator error), re-running non-idempotent migrations can corrupt state or
+// hard-stop the chain. Handlers must check this before their custom steps and
+// return early when it is true.
 //
-// The comparison only covers modules present in the manager; versions of
-// modules removed by the upgrade (e.g. capability in v0.4.0) are irrelevant.
-// A module missing from vm (newly added by this upgrade) means the first run
-// has not completed, so the result is false.
+// Only modules present in the manager are compared: one removed by this upgrade
+// (e.g. capability in v0.4.0) is irrelevant, and one missing from vm was added
+// by this upgrade, so the first run has not completed and the result is false.
 //
-// Modules that do not expose a ConsensusVersion (IBC light clients such as
-// 06-solomachine and 07-tendermint, plus other genesis-only / legacy modules)
-// carry no migratable consensus state and are SKIPPED. Returning false for
-// them — as an earlier revision did — made the guard unreachable on any
-// manager that contains such a module, silently disabling idempotency
-// protection for every upgrade handler relying on it.
+// Modules with no ConsensusVersion (IBC light clients 06-solomachine and
+// 07-tendermint, plus genesis-only and legacy modules) carry no migratable
+// consensus state and must be SKIPPED -- returning false for them makes the
+// guard unreachable on any manager containing one, silently disabling
+// idempotency protection for every handler that relies on it.
 //
-// PRECONDITION: the guard is only sound for upgrades that bump at least one
-// module's ConsensusVersion (or add/remove modules). For an upgrade that
-// changes no consensus versions, a chain coming from the previous release
-// already satisfies "all stored versions == current" and the guard would
-// wrongly report "applied" on the first legitimate run (this bit v0.4.1 —
-// do not add this guard to such upgrade handlers; rely on the migrations
-// being idempotent instead).
+// PRECONDITION: only sound for an upgrade that bumps at least one module's
+// ConsensusVersion or adds/removes modules. One that changes no consensus version
+// leaves a chain from the previous release already satisfying "all stored versions
+// == current", so the guard would wrongly report "applied" on the first legitimate
+// run (this bit v0.4.1 -- rely on the migrations being idempotent instead).
 func (b Toolbox) UpgradeAlreadyApplied(vm module.VersionMap) bool {
 	if len(vm) == 0 {
 		return false
@@ -104,9 +95,7 @@ func (b Toolbox) UpgradeAlreadyApplied(vm module.VersionMap) bool {
 	for name, mod := range b.ModuleManager.Modules {
 		cv, ok := mod.(interface{ ConsensusVersion() uint64 })
 		if !ok {
-			// Module does not expose a consensus version (light client,
-			// legacy or genesis-only module) — it has no consensus version
-			// to compare and must not block the guard.
+			// No consensus version to compare -- must not block the guard.
 			continue
 		}
 		from, ok := vm[name]

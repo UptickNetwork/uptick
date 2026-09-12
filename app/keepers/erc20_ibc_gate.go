@@ -15,53 +15,46 @@ import (
 	cosmoserc20types "github.com/cosmos/evm/x/erc20/types"
 )
 
-// EventTypeAutoRegistrationSuppressed is emitted when an inbound ICS-20
-// transfer is left as a plain bank voucher because
-// Params.PermissionlessRegistration is off. It is the observable counterpart of
-// the gate below: without it, a suppressed registration is indistinguishable
-// from a packet that never reached the registration branch.
+// EventTypeAutoRegistrationSuppressed is the observable counterpart of the gate
+// below: emitted when an inbound ICS-20 transfer is left as a plain bank voucher
+// because Params.PermissionlessRegistration is off, so a suppressed registration
+// can be told apart from a packet that never reached the registration branch.
 const EventTypeAutoRegistrationSuppressed = "erc20_auto_registration_suppressed"
 
-// ERC20IBCGate sits between the ERC20 IBC middleware and the ERC20 keeper so the
-// inbound ICS-20 callback can be gated by the module's own
-// Params.PermissionlessRegistration switch. It implements
-// cosmoserc20types.Erc20Keeper - a four method interface - so it can be handed
-// to cosmoserc20.NewIBCMiddleware in place of the bare keeper.
+// ERC20IBCGate sits between the ERC20 IBC middleware and the keeper so the inbound
+// ICS-20 callback can be gated by Params.PermissionlessRegistration. It implements
+// cosmoserc20types.Erc20Keeper, so NewIBCMiddleware can be handed it instead of the
+// bare keeper.
 //
-// Why the gate exists. The ERC20 IBC callback creates a token pair - and with it
-// a dynamic precompile account - for any previously unseen `ibc/` denom it is
-// handed:
+// Why the gate exists. The callback creates a token pair - and with it a dynamic
+// precompile account - for any previously unseen `ibc/` denom it is handed
+// (cosmos/evm v0.6.2 x/erc20/keeper/ibc_callbacks.go:100):
 //
-//	cosmos/evm v0.6.2 x/erc20/keeper/ibc_callbacks.go:100
-//	    case !found && strings.HasPrefix(coin.Denom, "ibc/"):
-//	        tokenPair, err := k.RegisterERC20Extension(ctx, coin.Denom)
+//	case !found && strings.HasPrefix(coin.Denom, "ibc/"):
+//	    tokenPair, err := k.RegisterERC20Extension(ctx, coin.Denom)
 //
-// Neither RegisterERC20Extension nor EnableDynamicPrecompile consults any
-// governance parameter, whereas MsgRegisterERC20 goes through
-// Params.PermissionlessRegistration (keeper/msg_server.go:181-185). Every denom
-// a counterparty chain chooses to send hashes to a distinct `ibc/<hash>`, so
-// the number of pairs this branch can create has no upper bound, and the
-// callback runs with a zeroed KV gas config (ibc_callbacks.go:53-56) so the
-// state it writes is not charged to the relayer. That asymmetry is the whole
-// finding: governance can turn permissionless registration off and the IBC path
-// keeps creating pairs anyway.
+// Neither RegisterERC20Extension nor EnableDynamicPrecompile reads any governance
+// parameter, whereas MsgRegisterERC20 goes through Params.PermissionlessRegistration
+// (keeper/msg_server.go:181-185). Every denom a counterparty chain picks hashes to a
+// distinct `ibc/<hash>` and the callback runs with a zeroed KV gas config
+// (ibc_callbacks.go:53-56), so this branch can create unbounded pairs that are never
+// charged to the relayer: governance can switch permissionless registration off and
+// the IBC path keeps creating them.
 //
-// Scope. The gate suppresses exactly one branch - the registration above. Every
-// other outcome is delegated verbatim, so under the default params
-// (PermissionlessRegistration = true, see types.DefaultParams) behavior is
-// unchanged. With the switch off, an inbound packet for an unknown denom is
-// still received and credited; it simply stays a bank voucher instead of
-// silently becoming an ERC20. Turning the switch back on restores the old
-// behavior, and no state written by the gate needs undoing.
+// Scope. The gate suppresses exactly one branch - the registration above. Everything
+// else is delegated verbatim, so under the default params (PermissionlessRegistration
+// = true, see types.DefaultParams) behavior is unchanged. With the switch off an
+// inbound packet for an unknown denom is still received and credited; it just stays a
+// bank voucher instead of silently becoming an ERC20. Turning the switch back on
+// restores the old behavior, and no state written by the gate needs undoing.
 type ERC20IBCGate struct {
 	keeper *cosmoserc20keeper.Keeper
 }
 
 var _ cosmoserc20types.Erc20Keeper = ERC20IBCGate{}
 
-// NewERC20IBCGate wraps the ERC20 keeper. The keeper must be non-nil: a nil
-// keeper would make every callback a no-op and silently disable auto
-// registration in both directions.
+// NewERC20IBCGate wraps the ERC20 keeper, which must be non-nil: a nil keeper
+// would make every callback a no-op and silently disable auto registration.
 func NewERC20IBCGate(keeper *cosmoserc20keeper.Keeper) ERC20IBCGate {
 	if keeper == nil {
 		panic("erc20 ibc gate: keeper cannot be nil")
@@ -95,12 +88,10 @@ func (g ERC20IBCGate) OnTimeoutPacket(
 }
 
 // OnRecvPacket returns the ICS-20 acknowledgement untouched when permissionless
-// registration is off and the callback's only remaining effect would be to
-// create a token pair; otherwise it delegates to the keeper.
-//
-// The switch is read first on purpose. Under the default params it is true and
-// the packet is delegated after a single parameter lookup, so the common path
-// costs the relayer one extra store read and nothing else.
+// registration is off and the callback's only remaining effect would be to create a
+// token pair; otherwise it delegates. The switch is read first on purpose: under the
+// default params it is true, so the common path costs one extra store read and
+// nothing else.
 func (g ERC20IBCGate) OnRecvPacket(
 	ctx sdk.Context,
 	packet channeltypes.Packet,
@@ -112,9 +103,8 @@ func (g ERC20IBCGate) OnRecvPacket(
 		return g.keeper.OnRecvPacket(ctx, packet, ack)
 	}
 
-	// Permissionless registration is off. The callback would mint a token pair
-	// nobody asked for, so return the acknowledgement unchanged: the ICS-20
-	// credit stays committed and the receiver keeps the plain bank voucher.
+	// Registration is off: the callback would mint a token pair nobody asked for, so
+	// return the acknowledgement unchanged - credit stays committed, voucher stays plain.
 	denom, _ := receivedDenom(packet)
 
 	g.keeper.Logger(ctx).Info(
@@ -138,24 +128,19 @@ func (g ERC20IBCGate) permissionlessRegistrationEnabled(ctx sdk.Context) bool {
 	return g.keeper.GetParams(ctx).PermissionlessRegistration
 }
 
-// wouldAutoRegisterTokenPair reports whether the upstream callback would take
-// its RegisterERC20Extension branch for this packet.
+// wouldAutoRegisterTokenPair reports whether the upstream callback would take its
+// RegisterERC20Extension branch for this packet.
 //
-// The predicate mirrors ibc_callbacks.go:95-100 - no pair for the received
-// denom and that denom carries the `ibc/` prefix - and is deliberately loose in
-// the safe direction:
+// The predicate mirrors ibc_callbacks.go:95-100 - no pair for the received denom and
+// that denom carries the `ibc/` prefix - and is deliberately loose in the safe
+// direction: answering true requires the received denom to have no token pair, which is
+// the registration branch's precondition. The callback's other state-writing branch
+// (ibc_callbacks.go:119) requires a pair to exist, and the remaining branches (module
+// account receiver, `factory/` denom, bond denom) write no state at all, so in each case
+// answering true returns the same acknowledgement the callback would have returned.
 //
-//   - it can only answer true when the received denom has no token pair, which
-//     is the precondition of the registration branch;
-//   - the callback's other state-writing branch (ibc_callbacks.go:119) requires
-//     a pair to exist, so answering true can never suppress a conversion. On the
-//     receive side that branch is the only other one that writes anything;
-//   - the callback's remaining branches (module account receiver, `factory/`
-//     denom, bond denom) write no state either, so answering true there returns
-//     the same acknowledgement the callback would have returned.
-//
-// The only way it can be wrong is by answering false when the callback would in
-// fact register, which leaks the gate rather than breaking a legitimate path.
+// The only way it can be wrong is by answering false when the callback would in fact
+// register, which leaks the gate rather than breaking a legitimate path.
 func wouldAutoRegisterTokenPair(
 	ctx sdk.Context,
 	keeper *cosmoserc20keeper.Keeper,
@@ -175,9 +160,8 @@ func wouldAutoRegisterTokenPair(
 	return strings.HasPrefix(denom, "ibc/")
 }
 
-// receivedDenom mirrors the denom computation of the upstream callback
-// (ibc_callbacks.go:72-77) and reuses the very helpers it calls, so the two
-// cannot drift apart silently.
+// receivedDenom mirrors the upstream callback's denom computation
+// (ibc_callbacks.go:72-77) and reuses the helpers it calls, so the two cannot drift.
 func receivedDenom(packet channeltypes.Packet) (string, bool) {
 	var data transfertypes.FungibleTokenPacketData
 	if err := transfertypes.ModuleCdc.UnmarshalJSON(packet.GetData(), &data); err != nil {

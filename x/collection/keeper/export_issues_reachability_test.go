@@ -9,31 +9,24 @@ import (
 )
 
 // ExportIssuesWithReport is the scan the app-level diagnostics sidecar
-// (<home>/export-issues.json, app/export_diagnostics.go) reads, and it is the
-// module's own GetCollectionsWithReport -- the only place the class-level AND
-// the list-level checks are evaluated. This test measures the "complete report"
-// claim against the real reachability of each kind.
+// (<home>/export-issues.json, app/export_diagnostics.go) reads; it delegates to
+// the module's own GetCollectionsWithReport, the only place the class-level AND
+// the list-level checks are evaluated. This test pins two reachability facts
+// the app-level sidecar test cannot see:
 //
-// It pins TWO facts that the app-level sidecar test cannot see:
+//  1. ExportIssueSupplyMismatch is reachable and reaches the full report. The
+//     counter can only diverge through a historical bypass or a decrTotalSupply
+//     wrap, so it is planted by writing the upstream counter key directly (no
+//     public API can produce one).
 //
-//  1. ExportIssueSupplyMismatch is reachable and reaches the full report. This
-//     is the D-G1 half: the counter can only diverge through a historical
-//     bypass or a decrTotalSupply wrap, so it is planted by writing the
-//     upstream counter key directly (no public API can produce one).
-//
-//  2. ExportIssueNFTListFailed is NOT reachable, so it can be asserted nowhere
-//     -- not at the app layer, not here. The branch that reports it
-//     (collection.go, GetCollectionsWithReport: `if nftErr != nil`) fires only
-//     when k.GetNFTs returns a non-nil error, but GetNFTs (nft.go) has returned
-//     a nil error on every path since cbc0372 replaced its `return nil, err`
-//     with a graceful downgrade (see TestGetNFTsSkipsUndecodableNFT). The enum
-//     value, the branch and its comment are therefore dead code: no on-chain
-//     shape can make a class' NFT list "unreadable". Writing a test that
-//     asserted this kind would be asserting a value that cannot exist, so this
-//     test instead proves the precondition cannot hold (step 4 below) and
-//     records the finding. (This is intentionally NOT a t.Skip: a skip would be
-//     indistinguishable from a pass, which is the failure mode this repository
-//     keeps guarding against.)
+//  2. ExportIssueNFTListFailed is NOT reachable. The branch that reports it
+//     (collection.go:117, `if nftErr != nil`) needs k.GetNFTs to return a non-nil
+//     error, but GetNFTs (nft.go:272) has returned nil on every path since
+//     cbc0372 replaced its `return nil, err` with a graceful downgrade (see
+//     TestGetNFTsSkipsUndecodableNFT) -- so the enum value, the branch and its
+//     comment are dead code. Instead of asserting a value that cannot exist,
+//     this test proves the precondition cannot hold. Deliberately NOT a t.Skip:
+//     a skip is indistinguishable from a pass.
 func (s *KeeperTestSuite) TestExportIssuesWithReportSurfacesSupplyMismatchAndCannotReportNFTListFailure() {
 	creator := sdk.AccAddress([]byte("reachability-creator"))
 

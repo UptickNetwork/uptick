@@ -36,17 +36,15 @@ func InitGenesis(
 
 	// Restore the per-token conversion bindings and IBC refund receivers that
 	// collection-level TokenPairs cannot represent. Integrity violations
-	// (duplicates, orphans) must abort genesis import, not pass
-	// silently.
+	// (duplicates, orphans) must abort genesis import, not pass silently.
 	if err := importPerTokenState(ctx, k, data); err != nil {
 		panic(err)
 	}
 }
 
 // importPerTokenState validates and restores the per-token runtime state
-// (bidirectional NFT UID pairs and IBC refund receivers). It is a separate
-// function so the integrity checks are unit-testable without constructing a
-// full auth AccountKeeper.
+// (bidirectional NFT UID pairs and IBC refund receivers). It is separate so the
+// integrity checks are unit-testable without a full auth AccountKeeper.
 func importPerTokenState(ctx sdk.Context, k keeper.Keeper, data types.GenesisState) error {
 	if err := types.ValidateGenesisPairs(data.NftUidPairs, data.RefundReceivers, data.TokenPairs); err != nil {
 		return err
@@ -65,16 +63,13 @@ func importPerTokenState(ctx sdk.Context, k keeper.Keeper, data types.GenesisSta
 // ExportGenesis export module status
 //
 // Degrade and report, never abort: the records that can be represented are
-// exported, and every damaged record is listed at Error level (and, on the
+// exported and every damaged record is listed at Error level (and, on the
 // node's export path, in <home>/export-issues.json -- see
 // app/export_diagnostics.go). This matches x/collection.
 //
-// The previous behavior was fail-closed (panic with the list of damaged
-// keys). That made the diagnosis excellent but the export unusable: a single
-// corrupt key locked the whole chain out of its own backup, which is the worst
-// possible failure mode on a disaster-recovery path. Reporting the damage and
-// still producing a genesis keeps both properties -- the operator can see
-// exactly what was dropped, and the chain can still be restored.
+// Fail-closed was rejected: one corrupt key would lock the whole chain out of
+// its own backup, the worst failure mode on a disaster-recovery path. Degrading
+// keeps the chain restorable while still showing the operator what was dropped.
 func ExportGenesis(ctx sdk.Context, k keeper.Keeper) *types.GenesisState {
 	tokenPairs, pairIssues := k.GetTokenPairsWithReport(ctx)
 	nftUIDPairs, uidIssues := k.ExportNFTUIDPairsWithReport(ctx)

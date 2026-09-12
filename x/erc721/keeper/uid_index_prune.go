@@ -10,8 +10,8 @@ import (
 )
 
 // UIDIndexPruneReport is the outcome of one PruneDuplicateUIDIndexEntries pass:
-// what it removed, and — just as important — what it refused to touch. Every
-// list is sorted so the caller's log line is reproducible.
+// what it removed and what it refused to touch. Every list is sorted so the
+// caller's log line is reproducible.
 type UIDIndexPruneReport struct {
 	// Scanned is the number of reverse-index entries inspected.
 	Scanned int
@@ -33,30 +33,26 @@ type UIDIndexPruneReport struct {
 // ForwardAfter returns the forward key count once the pass has been applied.
 func (r UIDIndexPruneReport) ForwardAfter() int { return r.ForwardBefore - len(r.Deleted) }
 
-// Balanced reports whether the forward and reverse indexes agree in size after
-// the pass. That is the property a healthy store has and the one the genesis
-// export checks record by record, so it doubles as the migration's postcondition.
+// Balanced reports whether the forward and reverse indexes agree in size after the
+// pass: the property a healthy store has, so it doubles as the migration's
+// postcondition (app/upgrades/v041/migrate.go, uidIndexPruneClean).
 func (r UIDIndexPruneReport) Balanced() bool { return r.ForwardAfter() == r.Scanned }
 
 // PruneDuplicateUIDIndexEntries removes the duplicate forward keys the
-// pre-v0.4.1 write path could leave behind, and is the one-shot half of the
+// pre-v0.4.1 write path could leave behind; it is the one-shot half of the
 // A-3/A-4 key-spelling work.
 //
 // WHY A MIGRATION IS NEEDED AT ALL. The runtime fixes make both components of a
 // forward key readable under either spelling and make every write canonical, but
-// they can only rewrite a pair that a write path actually touches. A forward key
-// that was already written and then superseded stays in the store forever, and
-// that is not a cosmetic problem: it has no reverse partner, which is exactly
-// the GenesisExportIssueUIDIndexForward that makes every genesis export report
-// degraded (B-1) and buries real corruption in fixed noise.
+// they only rewrite a pair a write path actually touches; a superseded forward key
+// persists with no reverse partner -- exactly the GenesisExportIssueUIDIndexForward
+// that degrades every genesis export (B-1) and buries real corruption in fixed noise.
 //
-// THE REVERSE INDEX IS THE AUTHORITY. A forward key is a string built from two
-// components, so a binding can be stored under a cross product of spellings and
-// no single key is self-evidently "the" one. The reverse index does not have
-// that problem: it is keyed by nftUID, so every Cosmos NFT has exactly one
-// entry, and that entry names the spelling its binding lives under. Every
-// decision below is anchored on it, which is what makes "is this key
-// redundant?" answerable at all.
+// THE REVERSE INDEX IS THE AUTHORITY. A forward key is built from two components, so
+// a binding can be stored under a cross product of spellings and no single key is
+// self-evidently "the" one. The reverse index is keyed by nftUID -- one entry per
+// Cosmos NFT, naming the spelling its binding lives under -- so every decision below
+// is anchored on it, which is what makes "is this key redundant?" answerable at all.
 //
 // WHAT IS DELETED, AND ONLY THIS. A forward key K is removed iff all of:
 //
@@ -66,45 +62,36 @@ func (r UIDIndexPruneReport) Balanced() bool { return r.ForwardAfter() == r.Scan
 //     reverse entry's tokenUID, i.e. K is one of its spelling variants;
 //  3. forward[K] is that reverse entry's very nftUID.
 //
-// Condition 2 must cover BOTH axes. A duplicate can differ in the token-id
-// segment (the v0.3.3 "0x"+hex spelling versus the v0.4.0 sha256 base-10 one)
-// just as easily as in the address segment, and a prune that only knew about
-// addresses would leave the token-id axis behind. On mainnet and testnet the
-// address axis is in fact the only one that fires today — the legacy token-id
-// keys are all still the authority of their binding, so there is nothing
-// duplicated about them — but the axis is covered so that the criterion does not
-// have to be revisited if that changes.
+// Condition 2 must cover BOTH axes: a duplicate can differ in the token-id
+// segment (the v0.3.3 "0x"+hex spelling versus the v0.4.0 sha256 base-10 one) as
+// easily as in the address segment. Only the address axis fires today -- the
+// legacy token-id keys are all still the authority of their binding -- but the
+// axis is covered so the criterion need not be revisited if that changes.
 //
-// Condition 1 is deliberately "K is not an authority" rather than the blunter
-// "K is not disputed": mainnet has six canonical bindings that TWO reverse
-// entries each point at, so one key can be a provable duplicate of binding A
-// while also being a same-spelling sibling of binding B that holds a different
-// nft. A's own key is intact in that case, so dropping the duplicate loses
-// nothing, while refusing on B's account would leave the store unconverged.
+// Condition 1 is deliberately "K is not an authority" rather than the blunter "K is
+// not disputed": mainnet holds six bindings that TWO reverse entries each point at,
+// so a key can be B's spelling sibling while duplicating A -- whose own key survives,
+// so dropping the duplicate loses nothing, while refusing on B's account would leave
+// the store unconverged.
 //
-// WHAT IS LEFT ALONE. Anything that cannot self-prove as a duplicate survives,
-// and is reported instead of guessed at:
+// WHAT IS LEFT ALONE. Anything that cannot self-prove as a duplicate is reported
+// instead of guessed at:
 //
-//   - a forward key no reverse entry accounts for ("orphan"): the reverse half
-//     is gone, so the forward key is the only remaining record of a binding and
-//     deleting it would destroy state;
-//   - a spelling variant of a reverse entry's tokenUID whose value no reverse
-//     entry vouches for ("conflict"): two NFTs claim one token, and picking a
-//     winner is exactly what SetNFTPairs refuses to do;
-//   - the authoritative key of a binding that is not spelled canonically: the
-//     runtime reads it and the next write canonicalises it, so it is not a
-//     duplicate to delete, it is a pair that simply has not been written since.
-//     Rewriting it would be a full normalisation of the store rather than a
-//     shadow removal, with an action surface thirty times larger.
+//   - a forward key no reverse entry accounts for ("orphan"): the reverse half is
+//     gone, so deleting it would destroy the only remaining record of a binding;
+//   - a spelling variant of a reverse entry's tokenUID whose value no reverse entry
+//     vouches for ("conflict"): two NFTs claim one token, and picking a winner is
+//     exactly what SetNFTPairs refuses to do;
+//   - the authoritative key of a non-canonically spelled binding: the runtime reads
+//     it and the next write canonicalises it, so it is a pair not written since, not
+//     a duplicate. Rewriting it would be a full normalisation, not a shadow removal.
 //
-// NO ERROR, NO PANIC, IDEMPOTENT. This runs from an upgrade handler. Failing
-// would halt the chain at the upgrade height over pre-existing state that the
-// handler is not required to be able to repair, and a residual orphan or
-// conflict is reported by the caller at Error level instead — the same
-// fail-closed-but-keep-running posture the genesis export uses. For the same
-// reason the pass is idempotent: after it, no deletable key remains, so a
-// replay removes nothing. v0.4.1 requires that, because it deliberately carries
-// no UpgradeAlreadyApplied guard.
+// NO ERROR, NO PANIC, IDEMPOTENT. This runs from an upgrade handler: failing would
+// halt the chain at the upgrade height over pre-existing state the handler is not
+// required to repair, so a residual orphan or conflict is logged at Error level
+// instead -- the genesis export's fail-closed-but-keep-running posture. After the
+// pass no deletable key remains, so a replay removes nothing; v0.4.1 needs that, as
+// it deliberately carries no UpgradeAlreadyApplied guard.
 func (k Keeper) PruneDuplicateUIDIndexEntries(ctx sdk.Context) UIDIndexPruneReport {
 	forward := k.readUIDIndex(ctx, types.KeyPrefixNFTUIDPairByTokenUID)
 	reverse := k.readUIDIndex(ctx, types.KeyPrefixNFTUIDPairByNFTUID)
@@ -150,15 +137,11 @@ func (k Keeper) PruneDuplicateUIDIndexEntries(ctx sdk.Context) UIDIndexPruneRepo
 			if _, isAuthority := authorities[variant]; isAuthority {
 				continue
 			}
-			// Present by construction — the group was built by ranging over the
-			// forward index, so every candidate in it has a value. The check
-			// stays anyway, as the difference between skipping an absent key
-			// and reporting it as a conflict: the group index is what keeps the
-			// two in sync, and the day it is built from the variant list rather
-			// than from the stored keys, "absent" would silently become
-			// "conflict" for every spelling a chain has never used. It is not
-			// reachable through the current construction, and no test can make
-			// it fail — that is a property of the design, not a coverage gap.
+			// Present by construction: the group was built by ranging over the
+			// forward index, so every candidate in it has a value. The check stays
+			// to keep "absent" from silently becoming "conflict" if that ever
+			// changes -- unreachable now, and no test can make it fail: a property
+			// of the design, not a coverage gap.
 			stored, ok := forward[variant]
 			if !ok {
 				continue
@@ -209,8 +192,8 @@ func (k Keeper) PruneDuplicateUIDIndexEntries(ctx sdk.Context) UIDIndexPruneRepo
 
 // readUIDIndex materializes one of the two UID indexes as a map. It is a whole-
 // map read on purpose: the prune has to compare every forward key against every
-// reverse entry, and the indexes are per-token conversion state — a few thousand
-// records at most — so a map is cheaper than repeated iterator passes.
+// reverse entry, and the indexes are per-token conversion state, so a map is
+// cheaper than repeated iterator passes.
 func (k Keeper) readUIDIndex(ctx sdk.Context, prefixKey []byte) map[string]string {
 	store := prefix.NewStore(ctx.KVStore(k.storeKey), prefixKey)
 	iter := store.Iterator(nil, nil)

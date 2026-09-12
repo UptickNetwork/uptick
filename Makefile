@@ -17,10 +17,9 @@ endif
 PACKAGES_NOSIMULATION=$(shell go list ./... | grep -v '/simulation')
 PACKAGES_SIMTEST=$(shell go list ./... | grep '/simulation')
 
-# The value is forced at parse time by `ldflags := $(strip $(ldflags))` below, for
-# EVERY target. Guard the `go` call so a lightweight, pure-git target (e.g.
-# check-v040-frozen) no longer prints "/bin/sh: go: command not found" on a
-# machine without Go; when Go is present the result is identical.
+# TMVERSION is expanded at parse time, i.e. for EVERY target, so the `go` call is
+# guarded: a pure-git target (e.g. check-v040-frozen) must not print
+# "/bin/sh: go: command not found" on a machine without Go.
 TMVERSION := $(shell command -v go >/dev/null 2>&1 && go list -m github.com/cometbft/cometbft | sed 's:.* ::')
 COMMIT := $(shell git log -1 --format='%H')
 LEDGER_ENABLED ?= true
@@ -188,11 +187,10 @@ all: build
 
 build-all: tools build lint test
 
-# `build` and `install` are BUILD_TARGETS (Makefile:130) declared as
-# `$(BUILD_TARGETS): go.sum $(BUILDDIR)/`. Because BUILDDIR is `./build`, the
-# target name `build` collides with the directory it writes into: once `build/`
-# exists, GNU Make treats the target as already up to date and skips the compile
-# entirely (rc=0, stale binary). Marking them phony forces the recipe to run.
+# `build`/`install` (BUILD_TARGETS) write into ./build, so the
+# target name `build` collides with its own output directory: once `build/`
+# exists GNU Make treats it as up to date and skips the compile (rc=0, stale
+# binary). Phony forces the recipe to run.
 .PHONY: distclean clean build-all build install build-linux
 
 ###############################################################################
@@ -205,13 +203,10 @@ RUNSIM         = $(TOOLS_DESTDIR)/runsim
 
 # Install the runsim binary.
 #
-# The previous recipe ran `go get github.com/cosmos/tools/cmd/runsim@master`
-# from /tmp to keep go.{mod,sum} untouched. That no longer works: `go get`
-# installs nothing outside a module ("go.mod file not found in current
-# directory or any parent directory"), so the target and every simulation
-# target that depends on it failed before running a single test. A versioned
-# `go install` is the supported replacement and never touches the module of the
-# directory it is run from.
+# A versioned `go install`, not `go get`: `go get` installs nothing outside a
+# module ("go.mod file not found in current directory or any parent directory"),
+# so the old recipe failed before running a single test, and `go install` never
+# touches the module of the directory it runs from.
 runsim: $(RUNSIM)
 $(RUNSIM):
 	@echo "Installing runsim..."
@@ -305,17 +300,12 @@ go.sum: go.mod
 # Regenerate the embedded Swagger bundle and fail if the result differs from
 # what is committed.
 #
-# The previous check was written as `[ -n "$(git status --porcelain)" ]`. With a
-# single `$`, `$(git status --porcelain)` is a *Make* variable reference (to an
-# undefined variable), so it always expanded to the empty string and the target
-# always printed "Swagger docs are in sync" and exited 0 -- even when the bundle
-# was stale. It is replaced with a real shell command substitution, scoped to
-# the generated package so a developer's unrelated working-tree changes do not
-# trip it.
-#
-# `-c ""` is required for byte-identical output: the committed bundle carries no
-# package comment, whereas statik v0.1.6 injects "Package statik contains static
-# assets." by default. Without it, every run would report that comment as drift.
+# The check uses `$$(...)`, NOT `$(...)`: a single `$` makes it a *Make* variable
+# reference to an undefined variable, which always expands to empty and lets a
+# stale bundle pass. It is scoped to the generated package so unrelated
+# working-tree changes do not trip it. `-c ""` is required for byte-identical
+# output: statik v0.1.6 otherwise injects "Package statik contains static
+# assets." and every run reports it as drift.
 update-swagger-docs: statik
 	$(BINDIR)/statik -src=client/docs/swagger-ui -dest=client/docs -f -m -c ""
 	@if [ -n "$$(git status --porcelain -- client/docs/statik)" ]; then \
@@ -362,27 +352,24 @@ build-docs-versioned:
 ###                          Repository invariants                          ###
 ###############################################################################
 
-# Keep app/upgrades/v040/ pinned to known content, and require that every
-# surviving (frontier) change to the pin (scripts/v040-frozen.sha256) is a
-# `fix(v040):` commit. See scripts/check-v040-frozen.sh for the full rationale,
-# the two rejected "who changed this path" designs (false-green / false-red), and
-# the deliberate residual gaps (including the accepted forgery cost).
+# Keep app/upgrades/v040/ pinned to known content, and require every surviving
+# (frontier) change to the pin (scripts/v040-frozen.sha256) to be a `fix(v040):`
+# commit. Rationale, rejected designs and residual gaps (including the accepted
+# forgery cost): see scripts/check-v040-frozen.sh.
 check-v040-frozen:
 	@./scripts/check-v040-frozen.sh
 .PHONY: check-v040-frozen
 
-# Regenerate scripts/v040-frozen.sha256 from the working tree. The remediation
-# flow for an intentional v040 change is: edit the files, run this target, then
-# commit the file changes AND the refreshed manifest TOGETHER in ONE commit whose
-# subject starts with `fix(v040):`.
+# Regenerate scripts/v040-frozen.sha256 from the working tree. Remediation for
+# an intentional v040 change: edit, run this target, then commit the file changes
+# AND the refreshed manifest TOGETHER in ONE `fix(v040):` commit.
 v040-frozen-manifest:
 	@./scripts/check-v040-frozen.sh --write-manifest
 .PHONY: v040-frozen-manifest
 
-# CONTRIBUTING.md advertises `make <target>` commands, so it is a contract.
-# This fails when a documented target has no rule in this Makefile -- the same
-# class of bug as the `make test-import` gate that was documented but never
-# existed.
+# CONTRIBUTING.md advertises `make <target>` commands, so it is a contract: this
+# fails when a documented target has no rule here (the `make test-import` gate
+# was documented but never existed).
 check-doc-make-targets:
 	@./scripts/check-doc-make-targets.sh
 .PHONY: check-doc-make-targets
@@ -416,12 +403,10 @@ test-unit-cover: ARGS=-timeout=10m -race -coverprofile=coverage.txt -covermode=a
 test-unit-cover: TEST_PACKAGES=$(PACKAGES_UNIT)
 
 # `go test -json ... | tparse` hides the suite exit code: a pipeline returns the
-# status of its LAST command, and tparse exits 0 after formatting, so a failing
-# run would still exit 0. CI installs tparse and would therefore report a red
-# suite as green, while the bare `go test` fallback below did not -- the two
-# branches disagreed. `bash -o pipefail` is used rather than `set -o pipefail`
+# LAST command's status and tparse exits 0 after formatting, so a failing run
+# would report green. `bash -o pipefail` is used rather than `set -o pipefail`
 # because Make runs recipe lines with /bin/sh (dash), where pipefail is not
-# available. The fallback branch needs no wrapper: its exit code is go test's.
+# available; the bare `go test` fallback needs no wrapper.
 run-tests:
 ifneq (,$(shell which tparse 2>/dev/null))
 	bash -o pipefail -c 'go test -mod=readonly -json $(ARGS) $(EXTRA_ARGS) $(TEST_PACKAGES) | tparse'
@@ -470,26 +455,22 @@ test-sim-multi-seed-short: runsim
 	@$(RUNSIM) -Jobs=4 -SimAppPkg=$(SIMAPP) -ExitOnFail 50 10 TestFullAppSimulation
 
 # The invariant benchmark that used to live here is gone: SDK v0.53 made
-# module.Manager.RegisterInvariants a no-op and x/simulation stopped asserting
-# invariants, so no benchmark could assert anything. This one measures the same
-# harness the simulation targets drive.
+# module.Manager.RegisterInvariants a no-op, so it could assert nothing. This one
+# measures the harness the simulation targets drive.
 test-sim-benchmark:
 	@echo "Benchmarking the application simulation..."
 	@go test -mod=readonly $(SIMAPP) -benchmem -bench=BenchmarkSimulation -run=^$ \
 		-Enabled=true -NumBlocks=10 -BlockSize=200 -Commit=true -Seed=57 -v -timeout 24h
 
-# CI-sized simulation gate (audit G-05/G-06). The targets above are soak runs
-# driven by runsim; this one drives the same harness with block counts small
-# enough for every pull request, so determinism, export/import and
-# resume-from-export stop being "only run by hand" checks.
+# CI-sized simulation gate (audit G-05/G-06): the same harness as the runsim soak
+# targets above, with block counts small enough for every pull request, so
+# determinism, export/import and resume-from-export stop being "run by hand"
+# checks.
 #
-# Every test here is skipped unless -Enabled=true, which is why the flag is not
-# optional: without it the target would report success while doing nothing.
-#
-# Each line also goes through scripts/test-gate.sh, which requires one top-level
-# test to have actually PASSED. -Enabled=false is not the only way to make this
-# target vacuous: `go test` also exits 0 when -run matches no test at all, which
-# is what a rename would produce.
+# -Enabled=true is not optional (without it every test is skipped and the target
+# reports success while doing nothing), and each line goes through
+# scripts/test-gate.sh, which requires a top-level test to actually PASS: `go
+# test` also exits 0 when -run matches nothing (a rename).
 test-sim-ci:
 	@echo "Running the CI-sized simulation gate..."
 	@./scripts/test-gate.sh 1 -- -mod=readonly $(SIMAPP) -run TestAppStateDeterminism -Enabled=true \
@@ -510,14 +491,12 @@ test-sim-ci:
 # the EVM JSON-RPC endpoint. scripts/e2e-localnet.sh owns the node lifecycle so
 # the same command works locally and in CI.
 #
-# UPTICK_E2E_STRICT=1 makes an unreachable node a failure instead of a skip -
-# otherwise this target could pass without ever talking to a chain.
-#
-# On top of that, every e2e run below goes through scripts/test-gate.sh and must
-# actually pass E2E_MIN_TESTS top-level tests. UPTICK_E2E_STRICT only covers a
-# node that cannot be reached; a deleted test file, or a -build-tag change that
-# excludes the file, would still exit 0. Update this count when the suite
-# changes on purpose.
+# UPTICK_E2E_STRICT=1 makes an unreachable node a failure instead of a skip;
+# otherwise this target could pass without ever talking to a chain. That covers
+# only an unreachable node, so every e2e run below also goes through
+# scripts/test-gate.sh and must actually pass E2E_MIN_TESTS top-level tests: a
+# deleted test file, or a -build-tag change that excludes it, would otherwise
+# still exit 0. Update E2E_MIN_TESTS when the suite changes on purpose.
 E2E_MIN_TESTS = 5
 
 e2e-localnet-start:
@@ -529,12 +508,11 @@ e2e-localnet-stop:
 # Start a node, run the e2e suite against it with strict mode on, always stop
 # the node.
 #
-# Node, test and teardown are joined into ONE shell on purpose. Make runs each
-# recipe line in its own shell, and a job runner reaps a step's process tree
-# when that shell exits - so `start` in its own recipe line reliably leaves the
-# test talking to a node that is already dead. Keeping it a single shell is
-# also what makes `exit $$status` meaningful: the failure of the test, not of
-# the teardown, decides the target's exit code.
+# Node, test and teardown share ONE shell on purpose: Make runs each recipe line
+# in its own shell and a job runner reaps the step's process tree when that shell
+# exits, so `start` in its own line leaves the test talking to a dead node. One
+# shell is also what makes `exit $$status` report the test's failure, not the
+# teardown's, as the target's exit code.
 test-e2e-localnet:
 	@status=0; \
 	./scripts/e2e-localnet.sh start || status=$$?; \
@@ -568,16 +546,13 @@ benchmark:
 ###                                Linting                                  ###
 ###############################################################################
 
-# `golangci-lint run` deliberately carries no `--out-format` flag: that flag was
-# removed in golangci-lint v2, and passing it to the v2 binary (the version this
-# repo pins) makes the linter fail to start, not merely ignore the flag. v2 also
-# replaced the old output/`issues.exclude-*` schema with `linters.exclusions`
-# and a top-level `formatters` section -- see .golangci.yml. This target IS
-# executed in CI (.github/workflows/ci.yml, `lint` job, the "Lint via the
-# Makefile target" step) with golangci-lint v2.13.2, the version the job's
-# `version:` input pins, so a flag that breaks the binary fails CI instead of
-# letting this target rot. Do NOT reintroduce `--out-format`: the cause of its
-# removal is this comment.
+# `golangci-lint run` deliberately carries no `--out-format` flag: v2 removed it,
+# and passing it to the v2 binary makes the linter fail to start, not merely
+# ignore the flag. v2 also replaced the old output/`issues.exclude-*` schema with
+# `linters.exclusions` and a top-level `formatters` section -- see .golangci.yml.
+# This target IS executed in CI (.github/workflows/ci.yml, "Lint via the Makefile
+# target" step) with golangci-lint v2.13.2, so a flag that breaks the binary
+# fails CI instead of letting this target rot. Do NOT reintroduce `--out-format`.
 lint:
 	golangci-lint run
 

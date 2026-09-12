@@ -12,32 +12,27 @@ import (
 	"github.com/UptickNetwork/uptick/x/erc721/types"
 )
 
-// These tests pin the P0 fix in QueryClassEnhance / QueryNFTEnhance
-// (evm.go): an external, user-registered ERC721 contract that returns
-// malformed / short / type-mismatched data must NOT panic the node.
-// Before the fix, the ABI-unpacked []interface{} was indexed without a
-// length guard and asserted with non comma-ok type assertions, so a
-// non-conforming contract could take down the validating node.
+// These tests pin the P0 fix in QueryClassEnhance / QueryNFTEnhance (evm.go):
+// an external, user-registered ERC721 contract that returns malformed / short /
+// type-mismatched data must NOT panic the node.
 //
-// The fix added: (1) a len guard (len != 7 / len < 4 -> ErrABIUnpack),
-// (2) comma-ok type assertions that degrade the offending field to its
-// zero value + a Debug log instead of panicking.
+// Before the fix, QueryNFTEnhance indexed the ABI-unpacked []interface{} with no
+// length guard (QueryClassEnhance already had one) and both functions asserted
+// the element types without comma-ok, so a non-conforming contract could take
+// down the validating node. The fix added the missing length guards
+// (len < 1 / len < 4 -> ErrABIUnpack) and the comma-ok assertions.
 //
-// The single prerequisite was that fakeEVMKeeper.ApplyMessage could
-// return a *controlled* Ret (it previously returned an empty one, which
-// made the entire ABI-unpack path untestable). convert_test.go's
-// fakeEVMKeeper now carries retBytes / retErr / seq for this purpose.
+// The prerequisite was that fakeEVMKeeper.ApplyMessage could return a
+// *controlled* Ret, which convert_test.go's fakeEVMKeeper now does through
+// retBytes / retErr / seq.
 //
-// NOTE on coverage of the len-guard and type-mismatch branches: a real
-// go-ethereum abi.Unpack against the canonical method signature always
-// returns exactly the declared number of outputs with the declared types
-// (or an error). The len != 7 / len < 4 / non-string branches are pure
-// defense-in-depth against ABI-library edge cases and non-conforming
-// contracts, and are not directly reachable through a single legal ABI
-// encoding. The tests below therefore exercise the *reachable* facets of
-// the P0 surface: EVM-call failure, Unpack failure (malformed bytes),
-// and the happy path (valid ABI-encoded return) — proving none of them
-// panics and each returns the correct error / value.
+// NOTE on coverage: a real go-ethereum abi.Unpack against the canonical method
+// signature always returns exactly the declared number of outputs with the
+// declared types (or an error), so none of these guards is reachable through a
+// legal ABI encoding. The tests below cover EVM-call failure, Unpack failure
+// (malformed bytes), the happy path, and — by calling classEnhanceFromReturn
+// directly — the type-mismatch policy. The length guards themselves have no
+// test: they are defense-in-depth only.
 
 const testEnhanceContract = "0x1111111111111111111111111111111111111111"
 
@@ -200,13 +195,12 @@ func TestQueryNFTEnhance_ValidRetReturnsEnhance(t *testing.T) {
 }
 
 // The restriction flags are authorization-bearing: their zero value `false`
-// means "NOT restricted", i.e. the permissive end. They reach the denom via
-// CreateNFTClass and gate x/collection's mint path, so a type mismatch must
+// means "NOT restricted", the permissive end. CreateNFTClass passes them into
+// the denom and they gate x/collection's mint path, so a type mismatch must
 // fail CLOSED (reject the conversion) rather than silently degrade.
 //
-// These cases are exercised against classEnhanceFromReturn directly because
-// abi.Unpack against the canonical signature always produces the declared
-// types — the mismatch simply cannot be produced through legal ABI encoding.
+// classEnhanceFromReturn is called directly because abi.Unpack against the
+// canonical signature always produces the declared types.
 func TestClassEnhanceFromReturn_RestrictionFlagsFailClosed(t *testing.T) {
 	k, ctx, _ := setupConvertKeeper(t)
 	contract := common.HexToAddress(testEnhanceContract)

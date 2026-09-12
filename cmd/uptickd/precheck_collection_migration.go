@@ -24,40 +24,25 @@ import (
 // module's v1->v2 legacy-store precheck against a node's on-disk state, without
 // migrating or writing anything.
 //
-// WHY THIS IS A COMMAND AND NOT AN UPGRADE-HANDLER STEP
-// -----------------------------------------------------
-// v2.PrecheckLegacyStore documents that it "must run on the pre-migration store,
-// i.e. before the module's RunMigrations call in the upgrade handler". Before
-// wiring it into the v0.4.0 handler, that premise was verified and found false:
+// WHY A COMMAND, NOT AN UPGRADE-HANDLER STEP
+// ------------------------------------------
+// v2.PrecheckLegacyStore says it "must run on the pre-migration store". That is
+// false here: the collection module already reports ConsensusVersion 2 and
+// registers its 1->2 migration at v0.3.3, so every v0.3.3 chain has
+// "collection" == 2 in its x/upgrade version map, and RunMigrations skips a
+// module when fromVersion == toVersion (cosmos-sdk@v0.53.6/types/module/
+// configurator.go:126) -- the v0.4.0 upgrade never runs the 1->2 migration, so a
+// handler step would be dead weight.
 //
-//   - The collection module has reported ConsensusVersion 2 and registered its
-//     1->2 migration in RegisterServices since long before v0.3.3
-//     (`git show v0.3.3:x/collection/module/module.go`: ConsensusVersion returns
-//     2 and RegisterMigration(types.ModuleName, 1, m.Migrate1to2) is present).
-//   - Any chain running v0.3.3 therefore already has "collection" == 2 in its
-//     x/upgrade version map (set at genesis and/or by the v0.3.3 handler's own
-//     RunMigrations; the v0.3.3 handler is app/upgrades/v033/upgrades.go).
-//   - module.Manager.RunMigrations is a no-op when fromVersion == toVersion
-//     (cosmos-sdk@v0.53.6/types/module/configurator.go:126), so the v0.4.0
-//     upgrade does NOT run the collection 1->2 migration at all.
+// The check iterates the legacy, "/"-delimited prefixes (KeyDenom("") = 0x04+"/",
+// KeyNFT("", "") = 0x01+"/"), a different namespace from the bare-prefix keys the
+// post-migration nft keeper writes (0x01+classID, 0x04+classID, 0x05+classID), so
+// on an already-migrated store it finds nothing and is inert, not harmful.
 //
-// Calling the precheck inside the v0.4.0 handler would therefore be not merely
-// unnecessary but a no-op: because the migration never runs at v0.4.0, a
-// handler step would be dead weight. The check iterates the legacy,
-// "/"-delimited prefixes (KeyDenom("") = 0x04 + "/", KeyNFT("", "") = 0x01 +
-// "/"), which live in a different namespace from the bare-prefix keys the
-// post-migration nft keeper writes (0x01 + classID, 0x04 + owner,
-// 0x05 + classID). On an already-migrated store the legacy keys are gone and
-// the scan simply finds nothing, so it is inert rather than harmful: a
-// post-migration store, and a store seeded with post-migration nft key shapes,
-// both report zero problems.
-//
-// Exposing the check offline is what remains useful: an operator can run it
-// against a pre-upgrade database (a backup or a snapshot) before scheduling an
-// upgrade, which is the - and the only - point at which the legacy records it
-// looks for can still exist. On a clean store the command prints that nothing
-// would abort the migration; on a dirty one it fails with the complete list of
-// offending records instead of the single first error v2.Migrate would return.
+// Running it offline against a pre-upgrade database (backup or snapshot) -- the
+// only point at which the legacy records can still exist -- is what remains
+// useful: a clean store prints that nothing would abort the migration, a dirty
+// one fails with the complete list rather than v2.Migrate's single first error.
 func PrecheckCollectionMigrationCmd(defaultNodeHome string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "precheck-collection-migration",
@@ -91,16 +76,15 @@ func PrecheckCollectionMigrationCmd(defaultNodeHome string) *cobra.Command {
 				return fmt.Errorf("open application database under %s: %w", config.RootDir, err)
 			}
 
-			// loadLatest=true reads the latest committed version; the app is only
-			// used to resolve the collection store key and codec, never to build a
-			// block.
+			// loadLatest=true reads the latest committed version; the app only
+			// resolves the collection store key and codec, it is never used to
+			// build a block.
 			//
-			// The app OWNS db: its BaseApp is constructed with this exact handle
-			// (app.NewUptick -> baseapp.NewBaseApp(db)), so uptickApp.Close() already
-			// closes it through the app's CommitMultiStore. Closing db a second time
-			// here would make leveldb report "leveldb: closed" on the success path --
-			// a warning on a run whose whole point is to give an operator a clean,
-			// trustworthy signal. The app's Close below is therefore the ONLY close.
+			// The app OWNS db (app.NewUptick -> baseapp.NewBaseApp(db)), and
+			// uptickApp.Close() closes that same handle (baseapp.go:1188). Closing
+			// db here as well would make leveldb report "leveldb: closed" on the
+			// success path -- a warning on a run whose whole point is a clean
+			// signal. The app's Close below is therefore the ONLY close.
 			uptickApp := app.NewUptick(serverCtx.Logger, db, nil, true, serverCtx.Viper, nil)
 			defer func() { _ = uptickApp.Close() }()
 
@@ -123,9 +107,8 @@ func PrecheckCollectionMigrationCmd(defaultNodeHome string) *cobra.Command {
 //
 //   - a clean store prints a confirmation and returns nil;
 //   - a dirty store returns an error whose message is the FULL report (every
-//     offending record, not just the first), which is exactly what
-//     v2.PrecheckLegacyStore is designed to produce so an operator sees the
-//     whole problem before any state change.
+//     offending record, not just the first), which is what v2.PrecheckLegacyStore
+//     produces so an operator sees the whole problem before any state change.
 //
 // Keeping the store access in the caller lets this be exercised with an
 // in-memory store in tests, without building a full application.

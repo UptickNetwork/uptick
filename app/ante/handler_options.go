@@ -25,9 +25,9 @@ import (
 	txsigning "cosmossdk.io/x/tx/signing"
 )
 
-// HandlerOptions defines the list of module keepers required to run the Uptick
-// AnteHandler decorators. It wraps cosmos/evm's HandlerOptions and adds
-// Uptick-specific fields.
+// HandlerOptions defines the module keepers required to run the Uptick
+// AnteHandler decorators: cosmos/evm's HandlerOptions plus Uptick-specific
+// fields.
 type HandlerOptions struct {
 	AccountKeeper         anteinterfaces.AccountKeeper
 	BankKeeper            anteinterfaces.BankKeeper
@@ -55,18 +55,16 @@ type HandlerOptions struct {
 // cosmosAnteDecorators passes to a decorator unconditionally — IBCKeeper to
 // NewRedundantRelayDecorator and SigGasConsumer to NewSigGasConsumeDecorator —
 // so nil there is a guaranteed panic on the first tx rather than a degraded
-// feature.
-//
-// The required set deliberately matches cosmos/evm@v0.6.2's own
+// feature. The required set matches cosmos/evm@v0.6.2's own
 // ante.HandlerOptions.Validate except for PendingTxListener, which this package
 // pins to nil in toEvmHandlerOptions.
 //
 // Deliberately NOT required:
 //
 //   - FeegrantKeeper: cosmos-sdk's DeductFeeDecorator reads nil as "feegrant
-//     disabled", i.e. a supported configuration. app.go always wires the real
-//     keeper, but rejecting nil here would turn a supported wire-up into a
-//     startup failure. Upstream's Validate omits it for the same reason.
+//     disabled", a supported configuration (upstream's Validate omits it too),
+//     so rejecting nil here would turn a supported wire-up into a startup
+//     failure.
 //   - WasmKeeper / WasmNodeConfig / TXCounterStoreService: each guards an
 //     optional decorator inside cosmosAnteDecorators, and
 //     TestWasmDecoratorsOmittedWhenKeepersNil pins the nil form as supported
@@ -135,32 +133,23 @@ func newEthAnteHandler(options HandlerOptions) sdk.AnteHandler {
 	return evmante.NewAnteHandler(options.toEvmHandlerOptions())
 }
 
-// newCosmosAnteHandler creates the default ante handler for Cosmos transactions.
-// SetUpContext runs before the wasm CountTX / GasRegister / TxContracts so their
-// KV writes (CountTX counter) are metered by the tx gas meter rather than the
-// infinite meter BaseApp presets. LimitSimulationGas must run after SetUpContext
-// so the simulation gas meter is not overwritten. AuthzLimiter uses
-// DisabledAuthzMsgs from app.go.
-//
-// cosmos/evm v0.6.1's NewAuthzLimiterDecorator recursively descends into
-// authz.MsgExec (see ante/cosmos/authz.go), so nested MsgExec is not a bypass.
 // cosmosAnteDecorators returns the AnteDecorator chain shared by
-// newCosmosAnteHandler and newCosmosAnteHandlerEip712. Extracting the chain
-// here (rather than inlining it in each handler) serves two purposes:
+// newCosmosAnteHandler and newCosmosAnteHandlerEip712. Extracting it here (rather
+// than inlining it in each handler) keeps the two in lock-step -- a refactor to
+// one without the other would otherwise silently regress one tx path -- and lets
+// tests pin the relative order of decorators by reflecting over the slice.
 //
-//  1. The two handlers must stay in lock-step on every decorator they have in
-//     common; refactors to one without the other would otherwise silently
-//     regress on one transaction path.
-//  2. Tests can pin the relative order of decorators (e.g. SetUpContext before
-//     CountTX) by reflecting over the returned slice.
+// Two orderings are load-bearing:
 //
-// SetUpContext is intentionally placed BEFORE the wasm CountTX / GasRegister /
-// TxContracts decorators so their KV writes are metered by the tx gas meter
-// rather than the infinite meter BaseApp presets before ante. LimitSimulationGas
-// must run after SetUpContext so the simulation gas meter is not overwritten.
+//   - SetUpContext precedes the wasm CountTX / GasRegister / TxContracts
+//     decorators, so their KV writes (the CountTX counter) are metered by the tx
+//     gas meter rather than the infinite meter BaseApp presets before ante.
+//   - LimitSimulationGas follows SetUpContext, so the simulation gas meter is not
+//     overwritten.
 //
-// cosmos/evm v0.6.1's NewAuthzLimiterDecorator recursively descends into
-// authz.MsgExec (see ante/cosmos/authz.go), so nested MsgExec is not a bypass.
+// AuthzLimiter uses DisabledAuthzMsgs from app.go. cosmos/evm@v0.6.2's
+// NewAuthzLimiterDecorator recursively descends into authz.MsgExec
+// (ante/cosmos/authz.go), so a nested MsgExec is not a bypass.
 func cosmosAnteDecorators(
 	options HandlerOptions,
 	feemarketParams *feemarkettypes.Params,
@@ -176,9 +165,8 @@ func cosmosAnteDecorators(
 	decorators := []sdk.AnteDecorator{
 		NewMessageSecurityDecorator(options.Cdc, options.MaxTxGasWanted),
 		NewValidatorCommissionDecorator(options.Cdc),
-		// SetUpContext must precede the wasm decorators so their KV writes
-		// (CountTX counter) are metered by the tx gas meter, not the
-		// infinite meter BaseApp presets before ante.
+		// SetUpContext first: the wasm decorators' KV writes must hit the tx gas
+		// meter, not BaseApp's infinite preset meter.
 		ante.NewSetUpContextDecorator(),
 	}
 	if options.TXCounterStoreService != nil {
@@ -211,6 +199,7 @@ func cosmosAnteDecorators(
 	return decorators
 }
 
+// newCosmosAnteHandler creates the default ante handler for Cosmos transactions.
 func newCosmosAnteHandler(options HandlerOptions) sdk.AnteHandler {
 	return func(ctx sdk.Context, tx sdk.Tx, simulate bool) (sdk.Context, error) {
 		feemarketParams := options.FeeMarketKeeper.GetParams(ctx)
@@ -230,19 +219,18 @@ func newCosmosAnteHandler(options HandlerOptions) sdk.AnteHandler {
 
 // newCosmosAnteHandlerEip712 creates the ante handler for Cosmos transactions
 // signed with the legacy ethermint EIP-712 scheme (e.g. Keplr). It differs from
-// newCosmosAnteHandler in that it skips the extension-option rejection decorator
-// (the EIP-712 Web3 extension is handled here) and verifies the EIP-712
-// signature through Eip712SigVerificationDecorator instead of the standard
-// signature verification decorator.
+// newCosmosAnteHandler in the extension-option checker it accepts
+// (HasWeb3ExtensionOption, so the EIP-712 Web3 extension passes) and in the
+// signature verifier it uses (Eip712SigVerificationDecorator instead of the
+// standard one).
 func newCosmosAnteHandlerEip712(options HandlerOptions) sdk.AnteHandler {
 	return func(ctx sdk.Context, tx sdk.Tx, simulate bool) (sdk.Context, error) {
 		feemarketParams := options.FeeMarketKeeper.GetParams(ctx)
 		txFeeChecker := evmevm.NewDynamicFeeChecker(&feemarketParams)
 
-		// accept exactly the Web3 extension the EIP-712 signature
-		// verifier requires. The previous DynamicFee-only checker rejected
-		// valid Keplr txs with "unknown extension options" before they
-		// could reach Eip712SigVerificationDecorator below.
+		// Accept exactly the Web3 extension the EIP-712 verifier requires: a
+		// DynamicFee-only checker rejects valid Keplr txs with "unknown extension
+		// options" before they reach Eip712SigVerificationDecorator.
 		decorators := cosmosAnteDecorators(
 			options,
 			&feemarketParams,

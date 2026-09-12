@@ -19,41 +19,37 @@ import (
 	storetypes "cosmossdk.io/store/types"
 )
 
-// This file closes the "in-flight packet" half of the migration review: a
-// packet that was sent by the v0.3.3 binary but whose acknowledgement or timeout
-// is delivered after the v0.4.0 upgrade, when the state it was written against
-// has partly been deleted.
+// This file closes the "in-flight packet" half of the migration review: a packet
+// sent by v0.3.3 whose acknowledgement or timeout lands after the v0.4.0 upgrade,
+// when the state it was written against has partly been deleted.
 //
-// The concern is specific. v0.3.3's custom MsgTransferERC20 wrote an
-// IBCTransferProvenance record per outbound packet and its refund hook read that
-// record back:
+// v0.3.3's custom MsgTransferERC20 wrote an IBCTransferProvenance record per
+// outbound packet and its refund hook read that record back:
 //
 //	v0.3.3 x/erc20/keeper/msg_server.go:538
 //	    if !k.ConsumeIBCTransferProvenance(ctx, packet, data) { return nil }
 //
-// v0.4.0 deletes those records (app/upgrades/v040/upgrades.go:227) together
-// with the legacy OWNER_MODULE token pairs (Step 3). If the replacement hook
-// treated "no provenance" or "no token pair" as a failure it would return an
-// error, and an error from OnAcknowledgementPacket aborts the ack transaction -
-// including the refund the transfer module had just made in the same
-// transaction. The packet would then be un-acknowledgeable forever and the funds
-// would be stuck.
+// v0.4.0 deletes those records (app/upgrades/v040/upgrades.go:227) and the legacy
+// OWNER_MODULE token pairs (Step 3). If the replacement hook treated "no
+// provenance" or "no token pair" as a failure it would return an error, and an
+// error from OnAcknowledgementPacket aborts the ack transaction - including the
+// refund the transfer module had just made in the same transaction - leaving the
+// packet un-acknowledgeable and the funds stuck.
 //
 // Two facts make that impossible, and this test pins the second one:
 //
-//  1. Nothing in the v0.4.x tree reads provenance any more. The identifier only
-//     survives inside the v040 cleanup code that deletes it, so the records are
-//     unreachable rather than merely stale.
-//  2. The replacement hook treats an unresolvable denom as a no-op, not an
-//     error: cosmos/evm v0.6.2 x/erc20/keeper/ibc_callbacks.go
-//     ConvertCoinToERC20FromPacket returns nil when GetTokenPair finds nothing,
-//     and even a failed conversion only emits an event before returning nil.
+//  1. Nothing in v0.4.x reads provenance any more. The identifier survives only
+//     in the v040 cleanup code that deletes it, so the records are unreachable
+//     rather than merely stale.
+//  2. The replacement hook treats an unresolvable denom as a no-op: cosmos/evm
+//     v0.6.2 x/erc20/keeper/ibc_callbacks.go ConvertCoinToERC20FromPacket returns
+//     nil when GetTokenPair finds nothing, and a failed conversion only emits an
+//     event before returning nil.
 //
-// The user-visible consequence of (2) is mild and worth stating precisely:
-// v0.3.3 converted the ERC20 into the Cosmos representation *before* sending, so
-// ibc-go's own refund hands back exactly what the sender held at send time. What
-// is lost is the automatic re-conversion to ERC20, which the sender can redo
-// with MsgConvertCoin.
+// Only the automatic re-conversion to ERC20 is lost: v0.3.3 converted the ERC20
+// into the Cosmos representation *before* sending, so ibc-go's own refund hands
+// back exactly what the sender held, and the sender can re-convert with
+// MsgConvertCoin.
 func TestLegacyERC20PacketRefundCannotStrandThePacket(t *testing.T) {
 	app, baseCtx := sharedTestApp(t)
 
@@ -77,8 +73,8 @@ func TestLegacyERC20PacketRefundCannotStrandThePacket(t *testing.T) {
 	}
 	ack := channeltypes.NewErrorAcknowledgement(errors.New("counterparty rejected"))
 
-	// The error acknowledgement path. Returning nil here is what keeps the
-	// refund that the transfer module made earlier in the same transaction alive.
+	// The error acknowledgement path. Returning nil here keeps alive the refund the
+	// transfer module made earlier in the same transaction.
 	require.NoError(t, app.Erc20Keeper.OnAcknowledgementPacket(ctx, packet, data, ack),
 		"a packet whose token pair no longer exists must not fail the acknowledgement")
 
@@ -92,10 +88,9 @@ func TestLegacyERC20PacketRefundCannotStrandThePacket(t *testing.T) {
 			"the legacy denom must be skipped before any conversion is attempted")
 	}
 
-	// Negative control: the hook is not simply incapable of failing. A sender
-	// the address codec cannot decode is rejected, which proves the nil above
-	// came from the "no token pair" branch rather than from a function that
-	// swallows everything.
+	// Negative control: the hook is not simply incapable of failing. A sender the
+	// address codec cannot decode is rejected, so the nil above came from the "no
+	// token pair" branch rather than from a function that swallows everything.
 	bad := data
 	bad.Sender = "not-an-address"
 	require.Error(t, app.Erc20Keeper.OnAcknowledgementPacket(ctx, packet, bad, ack),
@@ -104,32 +99,30 @@ func TestLegacyERC20PacketRefundCannotStrandThePacket(t *testing.T) {
 
 // The rest of this file closes the denom-form half of the same review.
 //
-// ConvertCoinToERC20FromPacket does mix two denom forms: it resolves the pair
-// with the raw packet denom (ibc_callbacks.go:200, a literal denom-store key)
-// and then gates the conversion on ibc.GetSentCoin(data.Denom, ...).Denom,
-// which normalises the denom through transfertypes.ExtractDenomFromPath
-// (:207, :224). The two forms only diverge when the denom carries a trace, i.e.
-// when it is a path shaped "<port>/<channel>/<base>" whose second segment is a
-// channel or client identifier.
+// ConvertCoinToERC20FromPacket mixes two denom forms: it resolves the pair with
+// the raw packet denom (ibc_callbacks.go:200, a literal denom-store key) and then
+// gates the conversion on ibc.GetSentCoin(data.Denom, ...).Denom (called at
+// ibc_callbacks.go:207), which normalises the denom through
+// transfertypes.ExtractDenomFromPath inside GetSentCoin (ibc/utils.go:70).
+// The two forms diverge only when the denom carries a trace, i.e. when it is a
+// path shaped "<port>/<channel>/<base>" whose second segment is a channel or
+// client identifier.
 //
-// Nothing the chain can store as a token pair denom has that shape:
+// No denom the chain can store as a token pair has that shape:
 //
 //	external ERC20, cosmos/evm scheme    MsgRegisterERC20 -> CreateDenom("erc20:"+addr)
 //	external ERC20, legacy uptick scheme v0.4.0 keeps the "erc20/"+addr pairs
 //	IBC coin auto-extension              RegisterERC20Extension -> "ibc/<hash>", OWNER_MODULE
 //
-// and the third shape never reaches the gate at all: the switch at :212 answers
-// "no-op, received coin is a native coin" for every OWNER_MODULE pair first. So
-// on this chain the gate always compares GetSentCoin(denom).Denom against the
-// very denom that was just found in the store, and the callback cannot skip a
-// refund it should have converted.
+// and the third never reaches the gate: the switch at :212 answers "no-op,
+// received coin is a native coin" for every OWNER_MODULE pair first. So the gate
+// always compares GetSentCoin(denom).Denom against the denom just found in the
+// store, and the callback cannot skip a refund it should have converted.
 //
-// Mainnet confirms it: the erc20 store holds four token pairs and all four are
-// OWNER_MODULE pairs over "ibc/..." denoms, with no OWNER_EXTERNAL pair at all
-// (testnet holds none). The assertions below are bound to the upstream helpers
-// that would have to change for that to stop being true, so a future cosmos/evm
-// that starts registering trace-shaped denoms turns this red instead of
-// silently dropping the automatic re-conversion to ERC20.
+// The assertions below are bound to the upstream helpers that would have to
+// change for that to stop being true, so a future cosmos/evm that registers
+// trace-shaped denoms turns this red instead of silently dropping the automatic
+// re-conversion to ERC20.
 func TestERC20RefundDenomFormsCannotDiverge(t *testing.T) {
 	const contract = "0xAbC0000000000000000000000000000000000aBc"
 
@@ -147,8 +140,8 @@ func TestERC20RefundDenomFormsCannotDiverge(t *testing.T) {
 		t.Run(shape.name, func(t *testing.T) {
 			require.NoError(t, sdk.ValidateDenom(shape.denom))
 
-			// The denom the lookup at :200 uses is already the normalised form,
-			// so the form computed at :207 cannot differ from it.
+			// The denom the lookup at :200 uses is already the normalised form, so
+			// the form computed at :207 cannot differ from it.
 			require.True(t, transfertypes.ExtractDenomFromPath(shape.denom).IsNative())
 			require.Equal(t, shape.denom, transfertypes.ExtractDenomFromPath(shape.denom).IBCDenom())
 			require.Equal(t, shape.denom, ibc.GetSentCoin(shape.denom, "1").Denom)
@@ -161,28 +154,27 @@ func TestERC20RefundDenomFormsCannotDiverge(t *testing.T) {
 		})
 	}
 
-	// Negative control: the helper really does produce two different forms, so
-	// the assertions above are not vacuous.
+	// Negative control: the helper really does produce two different forms, so the
+	// assertions above are not vacuous.
 	trace := transfertypes.ExtractDenomFromPath("transfer/channel-0/uatom")
 	require.False(t, trace.IsNative())
 	require.NotEqual(t, "transfer/channel-0/uatom", trace.IBCDenom())
 
-	// And the reason a legacy "erc20/0x..." denom stays on the safe side of it:
-	// ExtractDenomFromPath only reads a hop out of the second segment when that
-	// segment looks like a channel or client identifier.
+	// And the reason a legacy "erc20/0x..." denom stays safe: ExtractDenomFromPath
+	// only reads a hop out of the second segment when that segment looks like a
+	// channel or client identifier.
 	require.False(t, channeltypes.IsValidChannelID(contract))
 	require.True(t, channeltypes.IsValidChannelID("channel-0"))
 }
 
-// TestERC20RefundOfAnExternalPairReachesTheConversion is the end-to-end half.
-// With a pair whose denom and owner are exactly what MsgRegisterERC20 writes,
-// the refund hook must get past the denom gate.
+// TestERC20RefundOfAnExternalPairReachesTheConversion is the end-to-end half:
+// with a pair whose denom and owner are exactly what MsgRegisterERC20 writes, the
+// refund hook must get past the denom gate.
 //
-// The pair is registered with no contract behind it, so the EVM call that
-// follows fails and the hook records EventTypeFailedConvertERC20 - and that
-// event is the evidence: it can only be emitted after the gate, and a gate that
-// fired would leave no event at all (that is what the test above this one pins
-// for the unroutable denom).
+// The pair has no contract behind it, so the EVM call that follows fails and the
+// hook records EventTypeFailedConvertERC20 - the evidence, since that event can
+// only be emitted after the gate, while a gate that fired leaves no event at all
+// (what the test above pins for the unroutable denom).
 func TestERC20RefundOfAnExternalPairReachesTheConversion(t *testing.T) {
 	app, baseCtx := sharedTestApp(t)
 

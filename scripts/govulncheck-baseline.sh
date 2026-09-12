@@ -1,19 +1,13 @@
 #!/usr/bin/env bash
 #
-# govulncheck baseline filter.
+# govulncheck baseline filter: full scan, extract the GO-IDs that affect this
+# code, then diff them against scripts/vuln-baseline.txt. New IDs outside the
+# baseline fail CI; baseline-only IDs pass with informational output.
 #
-# govulncheck has no official baseline support, so this script:
-#   1. scans ./... in full;
-#   2. extracts the vulnerability IDs that affect this code;
-#   3. compares them against scripts/vuln-baseline.txt:
-#      - new vulnerabilities outside the baseline -> non-zero exit, CI fails;
-#      - only baseline entries remain             -> pass (informational output).
-#
-# Maintenance rules:
-#   - when a baseline entry gets a fixed version (govulncheck stops reporting
-#     it), upgrade the dependency and remove the ID from the baseline;
-#   - NEVER add newly found vulnerabilities to the baseline directly: a manual
-#     assessment with a justification comment in the baseline file is required.
+# Maintenance: when a baseline entry gets a fixed version (govulncheck stops
+# reporting it), upgrade the dependency and delete the ID. NEVER add a new
+# finding to the baseline directly -- it needs a manual assessment and a
+# justification comment in the baseline file.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -33,18 +27,15 @@ fi
 LOG="$(mktemp)"
 trap 'rm -f "$LOG"' EXIT
 
-# govulncheck exits with 3 when it finds vulnerabilities; build/network errors
-# return other non-zero codes. Keep set -e from terminating early while
-# preserving the original exit code for the validity checks below.
+# govulncheck exits 3 for findings and other non-zero codes for build/network
+# errors; capture the rc instead of letting set -e abort, for the checks below.
 govulncheck_rc=0
 govulncheck ./... >"$LOG" 2>&1 || govulncheck_rc=$?
 
-# Triple validity check to avoid a silent false PASS from a broken environment:
-#   1) govulncheck must have actually run (zero output must not pass);
-#   2) exit code must be 0 (clean) or 3 (vulnerabilities) — anything else is a
-#      build/network/toolchain error;
-#   3) the report must contain govulncheck's signature section
-#      (Symbol Results / No vulnerabilities found).
+# Three validity checks so a broken environment cannot produce a silent false
+# PASS: govulncheck must have actually run, its rc must be 0 (clean) or 3
+# (findings) -- anything else is a build/network/toolchain error -- and the
+# report must carry its signature section (Symbol Results / No vulnerabilities).
 if [[ "$govulncheck_rc" -ne 0 && "$govulncheck_rc" -ne 3 ]]; then
   echo "FAIL: govulncheck exited with unexpected code $govulncheck_rc (build/network/tooling error)." >&2
   echo "Treating this as a CI failure to avoid silently passing on a broken environment." >&2

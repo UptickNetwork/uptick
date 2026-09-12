@@ -7,10 +7,10 @@ import (
 // ConvertedNFTChecker reports whether a native NFT is paired with a token held
 // by an ERC721 or CW721 contract.
 //
-// x/collection owns the native half of a conversion but not the contract-side
-// bookkeeping, and it must not import x/erc721 or x/cw721 -- both of them
-// depend on collection, so importing back would invert the module dependency.
-// The check is therefore an interface, supplied by the app at wiring time.
+// It is an interface supplied by the app at wiring time: x/collection owns the
+// native half of a conversion but not the contract-side bookkeeping, and it must
+// not import x/erc721 or x/cw721 -- both depend on collection, so importing back
+// would invert the dependency.
 type ConvertedNFTChecker interface {
 	// IsConvertedNFT reports whether (classID, nftID) has a contract-side
 	// counterpart, i.e. whether burning the native NFT would strand a token
@@ -40,17 +40,15 @@ func (k Keeper) IsConvertedNFT(ctx sdk.Context, classID, nftID string) bool {
 
 // SetConvertedNFTChecker wires the cross-module burn guard.
 //
-// It is called by the application once x/erc721 and x/cw721 exist -- they are
-// constructed *from* this keeper (their NewKeeper takes it by value), so the
-// dependency cannot be a constructor parameter. app/keepers/keepers.go
-// performs the wiring and TestConvertedNFTCheckerIsWired fails if it is ever
-// dropped, because a silently unwired checker turns the burn guard back into
-// the silent asset loss it exists to prevent.
+// Called by app/keepers/keepers.go once x/erc721 and x/cw721 exist: they are
+// constructed *from* this keeper (NewKeeper takes it by value), so the
+// dependency cannot be a constructor parameter. TestConvertedNFTCheckerIsWired
+// fails if this wiring is ever dropped, because an unwired checker turns the
+// burn guard back into the silent asset loss it exists to prevent.
 //
-// The write lands in the shared slot, so it is visible through every copy of
-// this keeper taken before the call -- which is what makes it reach the refund
-// path in x/erc721 (whose nftKeeper field is such a copy) and the ICS-721 path
-// in x/internft.
+// The write lands in the shared slot, so it is visible through every copy taken
+// before the call -- which reaches the refund path in x/erc721 (whose nftKeeper
+// field is such a copy) and the ICS-721 path in x/internft.
 func (k *Keeper) SetConvertedNFTChecker(checker ConvertedNFTChecker) {
 	if k.convertedNFTs == nil {
 		k.convertedNFTs = &convertedNFTCheckerSlot{}

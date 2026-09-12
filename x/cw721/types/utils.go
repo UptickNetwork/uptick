@@ -9,10 +9,10 @@ import (
 )
 
 const (
-	// (?m)^(\d+) remove leading numbers
+	// (?m)^(\d+) strips every leading digit
 	reLeadingNumbers = `(?m)^(\d+)`
-	// ^[^A-Za-z] forces first chars to be letters
-	// [^a-zA-Z0-9/-] deletes special characters
+	// ^[^A-Za-z] strips ONE leading non-letter; [^a-zA-Z0-9/-] strips every
+	// character that is not a letter, a digit, '/' or '-'.
 	reDnmString = `^[^A-Za-z]|[^a-zA-Z0-9/-]`
 )
 
@@ -40,8 +40,10 @@ func removeInvalidPrefixes(str string) string {
 	return str
 }
 
-// SanitizeCW721Name enforces 128 max string length, deletes leading numbers
-// removes special characters  (except /)  and spaces from the CW721 name
+// SanitizeCW721Name removes leading digits and every character that is not a
+// letter, a digit, '/' or '-', truncates to 128 bytes (byte slicing, so a
+// multi-byte rune can be split -- x/erc721 counts runes instead), and then
+// strips a leading "ibc/" or "cw721/" prefix.
 func SanitizeCW721Name(name string) string {
 	name = removeLeadingNumbers(name)
 	name = removeSpecialChars(name)
@@ -95,19 +97,21 @@ func removeAddress0x(address string) string {
 	return strAddress
 }
 
-// CreateClassIDFromContractAddress create classId from cw721 address
+// CreateClassIDFromContractAddress derives a class id from a CW721 contract
+// address.
 func CreateClassIDFromContractAddress(address string) string {
 
 	return fmt.Sprintf("%s-%s", DefaultPrefix, removeAddress0x(address))
 }
 
-// CreateContractAddressFromClassID create classId from cw721 address
+// CreateContractAddressFromClassID derives the CW721 contract address from a
+// class id.
 func CreateContractAddressFromClassID(classID string) string {
 
 	return strings.Replace(classID, DefaultPrefix+"-", "", 1)
 }
 
-// CreateNFTIDFromTokenID create classId from cw721 address
+// CreateNFTIDFromTokenID derives a Cosmos NFT id from a CW721 token id.
 func CreateNFTIDFromTokenID(id string) string {
 
 	return fmt.Sprintf("%s%s", DefaultPrefix, removeAddress0x(id))

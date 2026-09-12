@@ -15,12 +15,10 @@ import (
 const upgradeName = "v0.4.1"
 
 // Upgrade is the v0.4.1 upgrade. It repairs state left behind by earlier
-// versions: activates the static precompiles, enables the ICA controller
-// submodule, re-scales the feemarket base fee, and collapses the duplicate
-// entries in the ERC721 conversion index. The Keplr compatibility fix
-// (legacy ethermint pubkey and EIP-712 extension option decoding) lives entirely
-// in the binary runtime (encoding config + ante handler), so no migration is
-// needed for it.
+// versions: static precompiles, the ICA controller flag, the feemarket base fee
+// and the ERC721 conversion index. The Keplr compatibility fix (legacy ethermint
+// pubkey, EIP-712 extension option decoding) lives in the binary runtime
+// (encoding config + ante handler), so it needs no migration.
 var Upgrade = upgrades.Upgrade{
 	UpgradeName:               upgradeName,
 	UpgradeHandlerConstructor: upgradeHandlerConstructor,
@@ -35,17 +33,11 @@ func upgradeHandlerConstructor(
 	return func(ctx context.Context, _ upgradetypes.Plan, vm module.VersionMap) (module.VersionMap, error) {
 		sdkCtx := sdk.UnwrapSDKContext(ctx)
 
-		// No UpgradeAlreadyApplied guard here (unlike v040): v0.4.1 bumps no
-		// module ConsensusVersion, so a chain upgrading from v0.4.0 already
-		// has a version map equal to the current consensus versions and the
-		// guard would wrongly skip the one-shot repairs below on their first
-		// (and only legitimate) run. All four repairs are inherently
-		// idempotent — migrateActiveStaticPrecompiles only writes when the
-		// param is empty, migrateICAControllerParams only flips a disabled
-		// flag, migrateFeeMarketBaseFee only rescales a value that is still in
-		// the legacy-encoded range, and pruneErc721UIDIndex deletes only keys
-		// it can prove duplicate a binding that survives — so a replayed plan
-		// is harmless without the guard.
+		// No UpgradeAlreadyApplied guard (unlike v040): v0.4.1 bumps no module
+		// ConsensusVersion, so a chain from v0.4.0 already matches the current
+		// version map and the guard would skip these repairs on their first and
+		// only legitimate run. Each repair is idempotent on its own -- see the
+		// per-repair comments below -- so a replayed plan is harmless without it.
 
 		sdkCtx.Logger().Info(
 			"executing upgrade plan",
@@ -73,12 +65,10 @@ func upgradeHandlerConstructor(
 		}
 
 		// Collapse the duplicate forward keys the pre-v0.4.1 write path left in
-		// the ERC721 conversion index. Position relative to RunMigrations is not
-		// load-bearing here: x/erc721 has no pending module migration (its
-		// consensus version did not move), so the handler is the only thing that
-		// can reach this state. It is kept with the other repairs because it is
-		// one, and because it must not run its own writes after the module
-		// manager has had a say in the same store.
+		// the ERC721 conversion index. Its position relative to RunMigrations is
+		// not load-bearing (x/erc721 has no pending module migration, so nothing
+		// else can reach this state), but it is a repair, so it runs with the
+		// repairs and before the module manager gets a say in the same store.
 		pruneErc721UIDIndex(sdkCtx, box.Erc721Keeper)
 
 		return box.ModuleManager.RunMigrations(sdkCtx, c, vm)
@@ -86,48 +76,32 @@ func upgradeHandlerConstructor(
 }
 
 // icaControllerParamsStore is the slice of the ICA controller keeper this
-// migration needs.
-//
-// It is an interface rather than the concrete keeper for the same reason as
-// evmParamsStore above, plus one specific to this call: the write is guarded by
-// a read of the value it is about to write, and against the real keeper that
-// guard is invisible. ibc-go's SetParams returns nothing (it panics on a store
-// error) and writing true over an already-true param produces byte-identical
-// state, so "did we write when we should not have?" cannot be observed from the
-// store. Recording the calls makes the guard fail-able from a test.
+// migration needs. It is an interface for the reason evmParamsStore is, plus one
+// of its own: the write is guarded by a read of the value it writes, and against
+// the real keeper that guard is invisible -- ibc-go's SetParams returns nothing
+// and writing true over an already-true param leaves byte-identical state.
+// Recording the calls is what makes dropping the guard fail a test.
 type icaControllerParamsStore interface {
 	GetParams(ctx sdk.Context) icacontrollertypes.Params
 	SetParams(ctx sdk.Context, params icacontrollertypes.Params)
 }
 
 // migrateICAControllerParams flips the ICA controller submodule on if it is
-// currently disabled. Chains initialized from legacy genesis templates (e.g.
-// the origin testnet) store controller_enabled=false; fresh chains already
-// default to true and are left untouched.
+// disabled. Chains from legacy genesis templates (e.g. the origin testnet) store
+// controller_enabled=false; fresh chains already default to true.
 //
-// The host submodule's params are not "carefully left alone" here -- they are
-// unreachable at the type level. The only store this function can touch is an
-// icaControllerParamsStore, whose GetParams/SetParams are bound to
-// icacontrollertypes.Params; nothing in scope exposes icahosttypes.Params, so
-// no current or future edit *inside this signature* can read or write it. That
-// is why there is no host-side guard: the compiler is the guard.
+// Nothing guards the host submodule's params, because they are unreachable at
+// the type level: icaControllerParamsStore is bound to
+// icacontrollertypes.Params and nothing in scope exposes icahosttypes.Params, so
+// no edit inside this signature can read or write them. The compiler is the
+// guard.
 //
-// SetParams has no error to propagate: ibc-go's controller keeper panics
-// internally if the store rejects the write, so the only failure mode left for
-// this function to get wrong is the guard.
-//
-// The write is a read-modify-write on purpose: it flips ControllerEnabled on
-// the value it just read and stores that same value, so any field ibc-go adds
-// to icacontrollertypes.Params later is carried through untouched. Rebuilding
-// the struct instead -- e.g. icacontrollertypes.NewParams(true) -- compiles and
-// passes every test in this repository today, because the single field that
-// exists is the one being set. It only diverges once ibc-go adds a second field:
-// the rebuild would zero that field and persist the zero on-chain, because the
-// store is exactly where the value already lives. Nothing about the rebuild
-// itself would flag that, which is why the write-back test in migrate_test.go
-// pins that the write carries through every field it read -- and why the
-// question to answer when such a field appears is "what should it be during this
-// migration?", not "bump a count in a test".
+// The write is a read-modify-write on purpose: it flips one field on the value
+// it just read and stores that same value, so a field ibc-go adds to Params
+// later is carried through instead of being zeroed. Rebuilding the struct
+// (icacontrollertypes.NewParams(true)) compiles and passes every test in this
+// repo today, because the one field that exists is the one being set; it only
+// diverges once a second field exists.
 func migrateICAControllerParams(ctx sdk.Context, store icaControllerParamsStore) {
 	params := store.GetParams(ctx)
 	if params.ControllerEnabled {

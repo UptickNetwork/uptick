@@ -9,13 +9,11 @@ on:
       - release/**
 
 # Audit O-05: every third-party action below is pinned to an immutable commit
-# SHA with the human-readable release in a trailing comment, instead of a
-# mutable tag ("@v4"). A tag can be re-pointed at any time by whoever controls
-# the upstream repo, which turns a normal `make test` run into arbitrary code
-# execution inside the job - with access to the repo token. To update one:
-# resolve the new tag (`git ls-remote --tags <repo> refs/tags/<tag>`), review
-# the diff between the old and new commit, then replace the SHA and the comment
-# together.
+# SHA (with the human-readable release in a trailing comment) instead of a
+# mutable tag: a tag can be re-pointed by whoever controls the upstream repo,
+# turning a normal run into arbitrary code execution with access to the repo
+# token. To update one, resolve the new tag, review the old->new diff, then
+# replace the SHA and the comment together.
 permissions:
   contents: read
 
@@ -35,23 +33,21 @@ jobs:
       - name: Build
         run: make build
 
-      # `make test` is `go test -race ./...`, so this covers the unit suites
-      # AND the real-EVM ERC721 suite in app/erc721_contract_evm_test.go
-      # (audit G-07/G-08/O-04): it deploys the embedded bytecode on a live EVM
-      # keeper, which is the only way to prove _safeMint honours receiver
-      # hooks, that a revert/gas-burn rolls the mint back, and that _burn
-      # clears the enhance metadata.
+      # `make test` is `go test -race ./...`, so this covers the unit suites AND
+      # the real-EVM ERC721 suite in app/erc721_contract_evm_test.go (audit
+      # G-07/G-08/O-04), which deploys the embedded bytecode on a live EVM keeper
+      # -- the only way to prove _safeMint honours receiver hooks, that a
+      # revert/gas-burn rolls the mint back, and that _burn clears the enhance
+      # metadata.
       - name: Test
         run: make test
 
   # Audit G-06 (part 1): determinism, export/import and resume-from-export were
-  # only ever run by hand. Each of these is a release blocker - an
-  # export/import asymmetry corrupts state on an upgrade, and a nondeterministic
-  # app forks the chain - yet none of them ran in CI. They run here with
-  # CI-sized block counts so the cost stays inside a normal PR.
-  #
-  # `-Enabled=true` is mandatory: simulation tests skip themselves without it,
-  # which is precisely how a "green" job can prove nothing.
+  # only ever run by hand, yet each is a release blocker (an export/import
+  # asymmetry corrupts state on upgrade; a nondeterministic app forks the chain).
+  # They run here with CI-sized block counts. `-Enabled=true` is mandatory --
+  # simulation tests skip themselves without it, which is how a "green" job
+  # proves nothing.
   simulation:
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -67,11 +63,11 @@ jobs:
       - name: Short-seed simulation gate
         run: make test-sim-ci
 
-  # Audit G-06 (part 2): the unit suite cannot reach the REST gateway or the
-  # EVM JSON-RPC endpoint. This job boots a real single-node chain
-  # (scripts/e2e-localnet.sh), then runs tests/e2e with UPTICK_E2E_STRICT=1 so
-  # an unreachable node FAILS the job instead of skipping it - a suite that
-  # quietly skips itself never proved a Keplr broadcast ever worked.
+  # Audit G-06 (part 2): the unit suite cannot reach the REST gateway or the EVM
+  # JSON-RPC endpoint. This job boots a real node (scripts/e2e-localnet.sh), then
+  # runs tests/e2e with UPTICK_E2E_STRICT=1 so an unreachable node FAILS instead
+  # of skipping -- a suite that skips itself never proved a Keplr broadcast
+  # worked.
   e2e-localnet:
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -119,34 +115,29 @@ jobs:
           version: v2.13.2
 
       # The action above is the pinned installer; this step is the contract.
-      # Keeping BOTH is deliberate, not redundant: the action owns "pin the
-      # version and put the binary on PATH" (it installs into
-      # $HOME/golangci-lint-<ver>-<os>-<arch>/ and adds that dir to PATH via
-      # core.addPath), while `make lint` owns "the exact command a developer
-      # runs". They must stay separate because the failure this guards against
-      # is precisely a Makefile target that rots while the action keeps the job
-      # green: golangci-lint v2 removed `--out-format`, `make lint` began dying
-      # on every invocation, and nobody noticed because CI had quietly switched
-      # to invoking the action directly instead of the target. Do not "simplify"
-      # this by deleting either step -- deleting this one re-opens that hole.
+      # Keeping BOTH is deliberate: the action owns "pin the version and put the
+      # binary on PATH", while `make lint` owns "the exact command a developer
+      # runs". They must stay separate because the failure guarded against is a
+      # Makefile target that rots while the action keeps the job green --
+      # golangci-lint v2 removed `--out-format`, `make lint` began dying on every
+      # invocation, and nobody noticed because CI had switched to the action
+      # directly. Do not delete either step -- deleting this one re-opens that
+      # hole.
       - name: Lint via the Makefile target
         run: |
           command -v golangci-lint || { echo "::error::golangci-lint not on PATH"; exit 1; }
           make lint
 
-  # T-G7 / audit gap: the committed Swagger bundle
-  # (client/docs/statik/statik.go) is generated from client/docs/swagger-ui by
-  # rakyll/statik, but nothing in CI ever regenerated it. A change to the
-  # swagger-ui sources could therefore land without its embedded bundle, and the
-  # REST gateway would go on serving the stale spec.
+  # T-G7 / audit gap: the committed Swagger bundle (client/docs/statik/statik.go)
+  # is generated from client/docs/swagger-ui by rakyll/statik, but nothing in CI
+  # regenerated it, so a source change could land without its bundle and the REST
+  # gateway would serve the stale spec.
   #
   # `make update-swagger-docs` regenerates the bundle and then fails on a
-  # non-empty `git status` for the generated package. (The target's check used to
-  # be a no-op: `$(git status --porcelain)` was an undefined Make variable, so it
-  # never failed; it is now a real shell substitution.) In a fresh checkout the
-  # only file the generator can touch is the bundle itself, so a non-empty diff
-  # is proof of drift and the target doubles as the check -- it never "fixes and
-  # passes".
+  # non-empty `git status` (its check used to be a no-op -- `$(git status
+  # --porcelain)` was an undefined Make variable -- and is now a real shell
+  # substitution). In a fresh checkout the generator can only touch the bundle, so
+  # a non-empty diff is proof of drift; the target never "fixes and passes".
   swagger-docs-sync:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -178,8 +169,8 @@ jobs:
       - name: Install pinned solc
         run: |
           # Audit follow-up: verify the downloaded binary against the official
-          # v0.8.28 release asset (size 15,708,640 B) so a supply-chain swap of
-          # the compiler cannot silently change contract bytecode.
+          # v0.8.28 release asset so a supply-chain swap of the compiler cannot
+          # silently change contract bytecode.
           curl -fsSL https://github.com/ethereum/solidity/releases/download/v0.8.28/solc-static-linux \
             -o /usr/local/bin/solc
           echo "9a0fb7e0db2c0641dbae1c5cc645dc686820c83af516226abb1c0a2f76636f25  /usr/local/bin/solc" | sha256sum -c -
@@ -190,11 +181,10 @@ jobs:
         working-directory: contracts
         run: make verify-contracts-reproducible
 
-      # The ERC721 receiver fixtures the EVM integration suite deploys are
-      # compiled into app/erc721_evm_receivers_gen_test.go. Without this check a
-      # change to contracts/test/EVMReceiverFixtures.sol would silently keep the
-      # tests running the OLD bytecode, i.e. the suite would keep passing while
-      # testing something other than the committed Solidity.
+      # The ERC721 receiver fixtures the EVM suite deploys are compiled into
+      # app/erc721_evm_receivers_gen_test.go. Without this check a change to
+      # contracts/test/EVMReceiverFixtures.sol would leave the tests running the
+      # OLD bytecode -- passing while testing other than the committed Solidity.
       - name: Verify generated receiver fixtures are current
         working-directory: contracts/test
         run: ./gen_receivers.py --check
@@ -205,44 +195,31 @@ jobs:
         working-directory: contracts
         run: make verify-contracts
 
-  # `app/upgrades/v040/` is a frozen tree: the v0.4.0 upgrade handler plus its
-  # legacy registry shims, which run exactly once on live state during a chain
-  # halt. The freeze used to exist only as prose in .golangci.yml -- nothing
-  # could go red -- so a `style(lint)` commit that rewrote a frozen file landed
-  # unnoticed. This job is the mechanical gate that replaces the prose. It has
-  # two parts (see scripts/check-v040-frozen.sh):
+  # `app/upgrades/v040/` is a frozen tree: the v0.4.0 handler plus its legacy
+  # registry shims, which run once on live state during a chain halt. The freeze
+  # was once prose in .golangci.yml (nothing could go red), so a `style(lint)`
+  # commit rewriting a frozen file landed unnoticed. This job is the mechanical
+  # gate (scripts/check-v040-frozen.sh), in two parts:
   #
   #   A. A CONTENT pin: the blob shas of every TRACKED file under
-  #      app/upgrades/v040/, read from the WORKING TREE (git ls-files + git
-  #      hash-object), are compared, as a set, to scripts/v040-frozen.sha256 --
-  #      the same source the generator writes, so an uncommitted edit is caught
-  #      too. Neither git history nor merge semantics are consulted, so the merge
-  #      shapes part B deliberately ignores cannot hide anything from A either --
-  #      with ONE recorded exception: a merge commit that edits a frozen file and
-  #      the manifest TOGETHER is invisible to both parts (residual (1a) in the
-  #      script, accepted on purpose). It runs first and needs no fetch depth.
+  #      app/upgrades/v040/, read from the WORKING TREE, are compared as a set to
+  #      scripts/v040-frozen.sha256, so an uncommitted edit is caught. History and
+  #      merge semantics are not consulted, so the merges part B ignores cannot
+  #      hide anything from A either -- with ONE recorded exception: a merge that
+  #      edits a frozen file and the manifest TOGETHER is invisible to both
+  #      (RESIDUAL (1a)). Needs no fetch depth.
   #
-  #   B. A LABEL check: of the non-merge commits that modified the pin
-  #      (scripts/v040-frozen.sha256), the FRONTIER -- those not superseded by a
-  #      later pin write -- must all have a `fix(v040):` subject. The only exempt
-  #      case is the pin BIRTH WINDOW (residual (1b)): when the pin does not exist
-  #      at base, its in-range writes are the first pin -- the trust anchor -- and
-  #      are not re-pins. The window is keyed on the ABSENCE of the pin at base,
-  #      not on the pin's first creation, so a base that is itself a post-deletion
-  #      pin-absent commit reopens it. Once the pin exists at base, ANY in-range
-  #      commit that (re)adds or rewrites it is a re-pin and must be labelled,
-  #      including a re-add whose delete was hidden inside a merge. It is NOT
-  #      `git log -1 -- <path>`: that orders by committer date, which on a DAG is
-  #      not topology, so a backdated child could hide behind a label. Requiring
-  #      EVERY in-range pin write (not just the frontier) is red-forever once a
-  #      bad commit lands, which is how such a gate gets bypassed with `|| true`;
-  #      a later `fix(v040):` re-pin is the sanctioned remedy. This is
-  #      why `fetch-depth: 0` is mandatory -- the shallow default hides the base
-  #      and the gate exits non-zero (never 0) when it cannot resolve it, so the
-  #      shallow default would make the job red, not green. A branch-creating
-  #      push whose `before` is the all-zero sha is ignored in favour of the
-  #      built-in anchor. There is no `git ... || true` anywhere: a git failure
-  #      is fatal, never a "nothing to check" success.
+  #   B. A LABEL check: of the non-merge commits that modified the pin, the
+  #      FRONTIER (those not superseded by a later pin write) must all have a
+  #      `fix(v040):` subject; the only exempt case is the pin BIRTH WINDOW
+  #      (RESIDUAL (1b)). Requiring EVERY in-range pin write is red-forever once a
+  #      bad commit lands (how a gate gets bypassed with `|| true`); a later
+  #      `fix(v040):` re-pin is the sanctioned remedy. It is NOT `git log -1 --
+  #      <path>` (committer date, not topology). `fetch-depth: 0` is mandatory --
+  #      the shallow default hides the base and the gate exits non-zero, never 0,
+  #      when it cannot resolve it. A branch-creating push whose `before` is the
+  #      all-zero sha falls back to the built-in anchor, and there is no
+  #      `git ... || true`: a git failure is fatal, never "nothing to check".
   v040-frozen:
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -261,16 +238,13 @@ jobs:
           V040_PUSH_BEFORE: ${{ github.event.before }}
         run: make check-v040-frozen
 
-  # CONTRIBUTING.md instructs contributors to run `make <target>` commands, so
-  # it is a contract. It claimed `development` must never fail `make
-  # test-import`, but no `test-import` rule has ever existed in the Makefile
-  # (only a stale `.PHONY` mention) -- running it fails with "No rule to make
-  # target". A documented-but-absent gate misleads contributors exactly like a
-  # gate that returns 0 while checking nothing. This job fails whenever the doc
-  # advertises a target the Makefile does not define. It reads BOTH inline code
-  # spans and fenced code blocks (where the CI commands live, e.g.
-  # `UPTICK_E2E_STRICT=1 make test-e2e-localnet`); bare prose verbs such as
-  # "make sure" are not commands and are never treated as targets.
+  # CONTRIBUTING.md tells contributors to run `make <target>` commands, so it is
+  # a contract. It claimed `development` must never fail `make test-import`, but
+  # no `test-import` rule has ever existed in the Makefile (only a stale `.PHONY`
+  # mention) -- running it fails with "No rule to make target". This job fails
+  # whenever the doc advertises a target the Makefile does not define; it reads
+  # both inline spans and fenced code blocks (where the CI commands live, e.g.
+  # `UPTICK_E2E_STRICT=1 make test-e2e-localnet`), never bare prose verbs.
   contributing-targets:
     runs-on: ubuntu-latest
     timeout-minutes: 5

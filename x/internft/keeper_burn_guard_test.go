@@ -34,9 +34,8 @@ func (b boundNFTs) IsConvertedNFT(_ sdk.Context, classID, nftID string) bool {
 }
 
 // newBurnGuardFixture builds a real collection keeper over a real (in-memory)
-// store, wrapped in the ICS-721 adapter that nft-transfer is constructed with.
-// The store is real so the burn is observable in state; the adapters are the
-// same minimal stubs the other x/internft tests use.
+// store, wrapped in the ICS-721 adapter nft-transfer is constructed with. The
+// store is real so the burn is observable in state.
 func newBurnGuardFixture(t *testing.T) (InterNftKeeper, collectionkeeper.Keeper, sdk.Context) {
 	t.Helper()
 
@@ -62,22 +61,17 @@ const destroyBranchClass = "nonfungibletokentransfer/channel-0/pinned"
 
 // TestICS721BurnRefusesABoundNFT pins the burn guard on the ICS-721 path.
 //
-// Two different functions can destroy a native NFT:
+// Two functions can destroy a native NFT. x/collection.RemoveNFT
+// (keeper/nft.go:223) consults the conversion guard and refuses when a contract
+// token is escrowed. InterNftKeeper.Burn instead reaches the underlying x/nft
+// keeper through Keeper.NFTkeeper() because nft-transfer calls it via the
+// ICS721Keeper interface, so it never passed that guard and used to destroy
+// bound NFTs.
 //
-//   - x/collection.RemoveNFT (keeper/nft.go:223) consults the conversion guard
-//     and refuses when a contract token is escrowed.
-//   - InterNftKeeper.Burn reaches the underlying x/nft keeper directly
-//     (NFTkeeper(), collection/keeper/keeper.go:43) because nft-transfer calls
-//     it through the ICS721Keeper interface, so it never passed that guard.
-//
-// The second one used to destroy bound NFTs. An earlier revision of this file
-// pinned that bypass as load-bearing, on the theory that
-// MsgTransferERC721/MsgTransferCW721 convert and then send, so every such send
-// would land in the destroy branch. That theory is wrong, and the counter-
-// evidence is TestOrdinaryConversionClassCanNeverReachTheDestroyBranch below:
-// a conversion class is always "uptick-<contract>", which takes the escrow
-// branch. Nothing legitimate reaches Burn with a pair recorded, so the guard
-// costs the ICS-721 path nothing and closes the hole.
+// The guard costs the ICS-721 path nothing: MsgTransferERC721/MsgTransferCW721
+// always take the escrow branch, because a conversion class is always
+// "uptick-<contract>" (TestOrdinaryConversionClassCanNeverReachTheDestroyBranch
+// pins that), so nothing legitimate reaches Burn with a pair recorded.
 func TestICS721BurnRefusesABoundNFT(t *testing.T) {
 	ik, ck, ctx := newBurnGuardFixture(t)
 	owner := sdk.AccAddress([]byte("owner"))
@@ -86,8 +80,8 @@ func TestICS721BurnRefusesABoundNFT(t *testing.T) {
 	require.NoError(t, ik.Mint(ctx, destroyBranchClass, "token1", "ipfs://token", "", owner))
 	require.NoError(t, ik.Mint(ctx, destroyBranchClass, "token2", "", "", owner))
 
-	// Wire the check exactly as app/keepers does: once, on the collection
-	// keeper. The adapter above was built before this call and must still see it.
+	// Wire the check exactly as app/keepers does: once, on the collection keeper.
+	// The adapter above was built before this call and must still see it.
 	ck.SetConvertedNFTChecker(boundNFTs{classID: destroyBranchClass, nftID: "token1"})
 
 	// The collection module's own burn refuses the bound token.
@@ -95,8 +89,8 @@ func TestICS721BurnRefusesABoundNFT(t *testing.T) {
 	require.ErrorIs(t, err, collectiontypes.ErrNFTBoundToContract,
 		"burning a bound native NFT through the collection module must be refused")
 
-	// The ICS-721 path must now refuse it too. Before the guard was added this
-	// returned nil and the token was gone from the store.
+	// The ICS-721 path must refuse it too; before the guard it returned nil and the
+	// token was gone from the store.
 	err = ik.Burn(ctx, destroyBranchClass, "token1")
 	require.ErrorIs(t, err, collectiontypes.ErrNFTBoundToContract,
 		"the ICS-721 burn must not destroy a native NFT whose contract half is escrowed")
@@ -105,7 +99,7 @@ func TestICS721BurnRefusesABoundNFT(t *testing.T) {
 
 	// Negative control: the same call succeeds for a token the checker does not
 	// report as bound, so the refusal above came from the guard and not from an
-	// unrelated precondition (existence or ownership).
+	// unrelated precondition.
 	require.NoError(t, ik.Burn(ctx, destroyBranchClass, "token2"))
 	_, ok := ik.GetNFT(ctx, destroyBranchClass, "token2")
 	require.False(t, ok, "an unbound token must still be destroyed -- the guard is not a blanket refusal")
@@ -125,9 +119,9 @@ func TestICS721BurnRefusesABoundNFT(t *testing.T) {
 func TestConversionGuardReachesCopiesTakenBeforeWiring(t *testing.T) {
 	ik, ck, ctx := newBurnGuardFixture(t)
 
-	// Both copies predate the wiring. erc721KeeperCopy stands in for the
-	// nftKeeper field x/erc721 holds (it calls BurnNFT -> RemoveNFT on it);
-	// internftCopy already lives inside the adapter returned above.
+	// Both copies predate the wiring. erc721KeeperCopy stands in for the nftKeeper
+	// field x/erc721 holds (it calls BurnNFT -> RemoveNFT on it); internftCopy
+	// already lives inside the adapter returned above.
 	erc721KeeperCopy := ck
 	require.False(t, erc721KeeperCopy.IsConvertedNFT(ctx, "someclass", "token1"),
 		"nothing is bound before the checker is wired")
@@ -141,24 +135,22 @@ func TestConversionGuardReachesCopiesTakenBeforeWiring(t *testing.T) {
 	require.False(t, ik.IsConvertedNFT(ctx, "someclass", "token2"),
 		"sibling tokens have no binding of their own")
 
-	// An unwired keeper reports false rather than panicking: module-only setups
-	// (this package's other tests) rely on that.
+	// An unwired keeper reports false rather than panicking: module-only setups,
+	// such as this package's other tests, rely on that.
 	var zero collectionkeeper.Keeper
 	require.False(t, zero.IsConvertedNFT(ctx, "someclass", "token1"))
 	require.NotPanics(t, func() { zero.SetConvertedNFTChecker(boundNFTs{classID: "x", nftID: "y"}) })
 }
 
 // TestOrdinaryConversionClassCanNeverReachTheDestroyBranch is the evidence that
-// the guard above does not restrict normal traffic -- the claim an earlier
-// revision of this file got backwards.
+// the guard above does not restrict normal traffic.
 //
-// nft-transfer picks escrow or destroy from the class name alone
-// (nft-transfer keeper/relay.go:238-248 -> types.IsAwayFromOrigin): a class
-// carrying this chain's own "<port>/<channel>/" prefix is destroyed on the way
-// out, anything else is escrowed. The class a conversion produces is always
-// "uptick-<contract>" (x/erc721 and x/cw721 both pin it in Register*; both are
-// asserted here), and that contains no "/" at all -- so it can never carry an
-// ICS-721 prefix, IsAwayFromOrigin is true for it, and
+// nft-transfer picks escrow or destroy from the class name alone (nft-transfer
+// keeper/relay.go:238-248 -> types.IsAwayFromOrigin): a class carrying this
+// chain's own "<port>/<channel>/" prefix is destroyed on the way out, anything
+// else is escrowed. A conversion class is always "uptick-<contract>" (x/erc721
+// and x/cw721 both derive it; both are asserted here) and contains no "/", so it
+// can never carry an ICS-721 prefix: IsAwayFromOrigin is true for it and
 // MsgTransferERC721/MsgTransferCW721 always escrow. They never reach Burn.
 func TestOrdinaryConversionClassCanNeverReachTheDestroyBranch(t *testing.T) {
 	const (

@@ -9,7 +9,8 @@ import (
 	"github.com/UptickNetwork/uptick/x/collection/types"
 )
 
-// SaveCollection saves all NFTs and returns an error if there already exists
+// SaveCollection saves every NFT in the collection, returning the first error
+// (an NFT that already exists is one: upstream Mint rejects duplicates).
 func (k Keeper) SaveCollection(ctx sdk.Context, collection types.Collection) error {
 	for _, nft := range collection.NFTs {
 		if err := k.SaveNFT(
@@ -54,25 +55,21 @@ const (
 	// decoded: only its base class fields could be exported.
 	ExportIssueClassMetadata ExportIssueKind = "class_metadata_undecodable"
 	// ExportIssueClassMetadataMissing means a class carries no metadata blob at
-	// all, so the collection-level fields it is supposed to hold (creator,
-	// schema, data, mint/update restrictions) are not on chain. This is the
-	// shape of an ICS-721 voucher class -- nft-transfer calls the underlying
-	// nft keeper directly -- and of classes created before the metadata wrapper
-	// existed. Nothing that the chain ever held is dropped, but a round-tripped
-	// genesis will contain those classes with empty metadata, so the export
-	// says so instead of passing for a faithful copy.
+	// all, so its collection-level fields (creator, schema, data, restrictions)
+	// are absent on chain. That is the shape nft-transfer leaves on ICS-721
+	// voucher classes (it calls the underlying nft keeper directly), and of
+	// classes predating the metadata wrapper. Nothing the chain held is dropped,
+	// but a round-tripped genesis carries those classes with empty metadata.
 	ExportIssueClassMetadataMissing ExportIssueKind = "class_metadata_missing"
 	// ExportIssueSupplyMismatch means the class' stored total-supply counter
-	// disagrees with the number of NFTs actually stored under that class.
-	//
-	// The counter is maintained by the upstream nft keeper's mint/burn, and
-	// every write path in this repository goes through them, so a mismatch
-	// means the counter was diverged by a historical bypass -- or by
-	// decrTotalSupply wrapping a zero counter to 2^64-1. Either way the supply
-	// every nft query reports for that class is wrong, and it is the one
-	// degradation that a round-tripped genesis preserves (the counter is not
-	// part of GenesisState, so it is recomputed on import and the mismatch
-	// quietly disappears). Reported here so it cannot disappear unobserved.
+	// disagrees with the number of NFTs actually stored under it. The counter is
+	// maintained by the upstream nft keeper's mint/burn, and every write path in
+	// this repo goes through them, so a mismatch means a historical bypass
+	// diverged it -- or decrTotalSupply wrapped a zero counter to 2^64-1 -- and
+	// every supply query for the class is now wrong. It is the one degradation a
+	// round-tripped genesis does NOT preserve: the counter is not in
+	// GenesisState and is recomputed on import, so the mismatch would quietly
+	// vanish. Reported so it cannot vanish unobserved.
 	ExportIssueSupplyMismatch ExportIssueKind = "supply_mismatch"
 )
 
@@ -89,18 +86,16 @@ func (i ExportIssue) String() string {
 	return fmt.Sprintf("%s: class %q: %s", i.Kind, i.ClassID, i.Detail)
 }
 
-// GetCollections returns all the collections.
+// GetCollections returns all collections, logging each degradation at Error
+// level; the machine-readable list is GetCollectionsWithReport.
 //
-// A class whose metadata cannot be decoded is exported with its base fields
-// only — never dropped. Skipping it used to remove the class AND all of its
-// NFTs from the exported genesis while the export still reported success.
-// Each degradation is logged at Error level; callers that need the machine
-// readable list should use GetCollectionsWithReport.
+// A class with undecodable metadata keeps its base fields -- never dropped
+// (skipping it used to delete the class and all its NFTs from the genesis
+// while the export still reported success).
 //
-// There is deliberately no error return. The iteration cannot fail as a whole
-// — every degradation is per class and already recorded as an ExportIssue —
-// and the error channel this used to have was never non-nil, which left the
-// failure branch in SupplyInvariant as unreachable code.
+// No error return, deliberately: the iteration cannot fail as a whole (every
+// degradation is per class, already an ExportIssue), and the error this used to
+// return was never non-nil, leaving a branch in SupplyInvariant unreachable.
 func (k Keeper) GetCollections(ctx sdk.Context) []types.Collection {
 	cs, issues := k.GetCollectionsWithReport(ctx)
 	for _, issue := range issues {
@@ -183,13 +178,13 @@ func (k Keeper) classMetadataIssue(class *nft.Class) *ExportIssue {
 
 // supplyIssue reports a class whose stored total-supply counter disagrees with
 // the number of NFTs it actually holds. held is passed in because every caller
-// already has the class' NFT list in hand; reading it again here would double
-// the cost of the only scan that can observe this.
+// already holds the NFT list; re-reading it would double the cost of the only
+// scan that can observe this.
 //
-// This is the single predicate behind both the export diagnostic and
-// SupplyInvariant, so the two can never disagree about what counts as a broken
-// supply -- the same reason classMetadataIssue is shared between the export
-// path and the standalone ExportIssues scan.
+// It is the single predicate behind both the export diagnostic and
+// SupplyInvariant, so the two cannot disagree about a broken supply -- the same
+// reason classMetadataIssue is shared between the export path and the
+// standalone ExportIssues scan.
 func (k Keeper) supplyIssue(ctx sdk.Context, classID string, held uint64) *ExportIssue {
 	stored := k.GetTotalSupply(ctx, classID)
 	if stored == held {
@@ -206,22 +201,16 @@ func (k Keeper) supplyIssue(ctx sdk.Context, classID string, held uint64) *Expor
 // ExportIssues scans for the class-level degradations described by
 // classMetadataIssue, without building the collection list.
 //
-// It remains the CHEAP scan for callers that must not walk every NFT: the
-// checks here only read the class records themselves. The app-level export
-// diagnostics sidecar no longer uses it — that report needs the complete set
-// and now calls ExportIssuesWithReport — but the class-only scan is still the
-// right tool for a caller that only cares about metadata degradations, and is
-// what the round-trip tests assert on.
+// It is the CHEAP scan for callers that must not walk every NFT: it reads only
+// the class records. The app-level sidecar no longer uses it (that report needs
+// the complete set and calls ExportIssuesWithReport), but it is what the
+// round-trip tests assert on.
 //
-// Two kinds are therefore NOT visible to this scan, because observing them
-// needs the NFT list that only the export walk builds:
-//
-//   - ExportIssueNFTListFailed, and
-//   - ExportIssueSupplyMismatch,
-//
-// which are reported by GetCollectionsWithReport (and, on the export path, by
-// the export log). Adding a count of NFTs here would defeat the point of the
-// split and walk every NFT twice on a disaster-recovery path.
+// Two kinds are NOT visible here, because observing them needs the NFT list that
+// only the export walk builds -- ExportIssueNFTListFailed and
+// ExportIssueSupplyMismatch -- and are reported by GetCollectionsWithReport
+// instead. Counting NFTs here would defeat the split and walk every NFT twice on
+// a disaster-recovery path.
 func (k Keeper) ExportIssues(ctx sdk.Context) []ExportIssue {
 	var issues []ExportIssue
 	for _, class := range k.nk.GetClasses(ctx) {
@@ -233,32 +222,26 @@ func (k Keeper) ExportIssues(ctx sdk.Context) []ExportIssue {
 }
 
 // ExportIssuesWithReport returns the FULL set of degradations an export of the
-// collection module can report — including the two kinds ExportIssues cannot
-// see, ExportIssueNFTListFailed and ExportIssueSupplyMismatch, because
-// observing them needs the per-class NFT list.
+// collection module can report, including the two kinds ExportIssues cannot see
+// (ExportIssueNFTListFailed, ExportIssueSupplyMismatch) because observing them
+// needs the per-class NFT list.
 //
-// It is what the app-level diagnostics sidecar (<home>/export-issues.json)
-// reads, so the durable report and the module's own export walk can never
-// disagree about what a degraded collection is: both are
-// GetCollectionsWithReport, the only place the supply and NFT-list checks are
-// evaluated. This is what closes the D-G1 gap, where supply_mismatch — the one
-// check in the repository that can detect a diverged supply counter — was
-// logged but never persisted, and so vanished with the process.
+// It is what the app-level sidecar (<home>/export-issues.json) reads, so the
+// durable report and the export walk cannot disagree: both are
+// GetCollectionsWithReport, the only place the supply and NFT-list checks run.
+// This closes the D-G1 gap, where supply_mismatch -- the one check in the repo
+// that can detect a diverged counter -- was logged but never persisted, and so
+// vanished with the process.
 //
-// COST, stated up front: GetCollectionsWithReport walks every class' NFT list,
-// and the module's ExportGenesis has already run that walk by the time the app
-// collects diagnostics, so this pays for it a second time. That is accepted
-// deliberately: it only happens on an operator-initiated genesis export
-// (disaster recovery / chain restart), never inside a consensus handler, so the
-// extra traversal buys a complete, durable report at zero consensus cost.
+// COST: this re-runs the full per-class NFT walk that ExportGenesis already did.
+// Accepted deliberately: it only happens on an operator-initiated export
+// (disaster recovery / chain restart), never in a consensus handler.
 //
-// The alternative — have ExportGenesis stash its issue list on the keeper for
-// the app to read back — would avoid the second walk but would add hidden
-// mutable state to a keeper that is copied by value into x/erc721, x/cw721 and
-// x/internft (see the convertedNFTs field comment in keeper.go), and would make
-// the report's contents depend on whether ExportGenesis had run. A pure re-read
-// is preferred: the walk is the module's only source of truth for these two
-// kinds, and re-deriving it keeps the keeper stateless.
+// The alternative -- stash the issue list on the keeper for the app to read
+// back -- would avoid the second walk but add hidden mutable state to a keeper
+// copied by value into x/erc721, x/cw721 and x/internft (see the convertedNFTs
+// field comment in keeper.go), and make the report depend on whether
+// ExportGenesis had run. A pure re-read keeps the keeper stateless.
 func (k Keeper) ExportIssuesWithReport(ctx sdk.Context) []ExportIssue {
 	_, issues := k.GetCollectionsWithReport(ctx)
 	return issues
@@ -283,12 +266,7 @@ func (k Keeper) GetTotalSupply(ctx sdk.Context, denomID string) uint64 {
 	return k.nk.GetTotalSupply(ctx, denomID)
 }
 
-// GetTotalSupplyOfOwner returns the amount of NFTs by the specified conditions
+// GetTotalSupplyOfOwner returns how many NFTs of `id` the owner holds.
 func (k Keeper) GetTotalSupplyOfOwner(ctx sdk.Context, id string, owner sdk.AccAddress) (supply uint64) {
 	return k.nk.GetBalance(ctx, id, owner)
 }
-
-//// GetBalance returns the amount of NFTs by the specified conditions
-// func (k Keeper) GetBalance(ctx sdk.Context, id string, owner sdk.AccAddress) (supply uint64) {
-//	return k.nk.GetBalance(ctx, id, owner)
-//}

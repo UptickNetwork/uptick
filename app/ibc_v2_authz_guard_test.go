@@ -13,37 +13,30 @@ import (
 )
 
 // TestAuthzClientMessagesRestOnAPermissiveClientV2Default is the tripwire behind
-// the two client messages that were removed from DisabledAuthzMsgTypeURLs in
-// round 25.
+// MsgUpdateClient's removal from DisabledAuthzMsgTypeURLs.
 //
-// MsgUpdateClient does read msg.Signer, through the ibc-go v2 relayer allow-list
-// at modules/core/keeper/msg_server.go:87-93, and that check is always reachable:
-// ibc-go's core keeper constructs ClientV2Keeper itself
-// (modules/core/keeper/keeper.go:53), so the `if k.ClientV2Keeper != nil` guard is
-// always taken. What makes the check inert is the default, not the wiring —
-// GetConfig returns an empty Config for any client that never called
-// MsgUpdateClientConfig, and an empty AllowedRelayers admits everyone. ibc-go
-// documents this as "DefaultConfig is empty and therefore permissionless"
-// (modules/core/02-client/v2/types/config.go:19).
+// MsgUpdateClient's relayer allow-list always runs -- ibc-go's core keeper
+// constructs ClientV2Keeper itself (modules/core/keeper/keeper.go:53), so the
+// `if k.ClientV2Keeper != nil` guard at msg_server.go:87-93 is always taken -- but
+// it is inert: GetConfig returns an empty Config for any client that never called
+// MsgUpdateClientConfig, and an empty AllowedRelayers admits everyone
+// ("DefaultConfig is empty and therefore permissionless",
+// modules/core/02-client/v2/types/config.go:19).
 //
-// Two things depend on that default, so both are asserted here against the real
-// keeper rather than against a constant:
+// MsgUpgradeClient's removal does not rest on this default (its handler never reads
+// a signer at all) and is pinned by ibc_authz_inventory_test.go instead.
 //
-//   - the authz list must not contain MsgUpdateClient while the default admits
-//     everyone, and
-//   - if a future ibc-go release flips IsAllowedRelayer's empty-list answer to
-//     false, every client becomes allow-list-only. No chain has an allow-list
-//     configured for a client it did not create, so relaying would stop and the
-//     message would become genuinely identity-gated. That has to fail loudly here
-//     rather than silently invert the meaning of the authz classification.
+// A future ibc-go release that flipped IsAllowedRelayer's empty-list answer to false
+// would make every client allow-list-only. No chain has an allow-list for a client
+// it did not create, so relaying would stop and MsgUpdateClient would become
+// genuinely identity-gated; that must fail loudly here rather than silently invert
+// the authz classification.
 //
-// The mechanism is asserted in both directions first, so the permissive case
-// cannot pass vacuously: an empty list admitting a stranger would also be "true"
-// from an implementation that ignored the list entirely.
-//
-// The client id does not have to exist: GetConfig reads a per-client prefix and
-// returns the default config when that prefix is empty
-// (02-client/v2/keeper/keeper.go:47-52).
+// The mechanism is asserted in both directions so the permissive case cannot pass
+// vacuously -- an empty list admitting a stranger would also be "true" from an
+// implementation that ignored the list entirely. The client id need not exist:
+// GetConfig reads a per-client prefix and returns the default config when that
+// prefix is empty (02-client/v2/keeper/keeper.go:47-52).
 func TestAuthzClientMessagesRestOnAPermissiveClientV2Default(t *testing.T) {
 	app, ctx := sharedTestApp(t)
 

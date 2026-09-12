@@ -17,25 +17,21 @@ import (
 // ExportDiagnosticsFileName is the diagnostics sidecar written into the node
 // home directory when a genesis export had to degrade.
 //
-// Cosmos SDK's AppModule interface gives ExportGenesis no error channel, so a
-// module cannot hand a structured report back to the CLI. Persisting the report
-// to a file next to the exported genesis is what keeps a degraded export
-// auditable after the process exits -- the same information also goes to the
-// node log, but a log stream is not a durable artifact.
+// AppModule.ExportGenesis has no error channel, so a module cannot hand a
+// structured report back to the CLI; persisting it next to the exported genesis
+// is what keeps a degraded export auditable after the process exits (the same
+// information also goes to the node log, but a log stream is not durable).
 //
 // CONSUMER CONTRACT -- READ THIS BEFORE ADDING A GATE
 // --------------------------------------------------
-// This sidecar is a diagnostic artifact for an OPERATOR to read after a real
-// `uptickd export`; it is deliberately NOT a CI gate input. Nothing under
-// scripts/, .github/ or the Makefile reads it, and it is not committed to the
-// repository -- it lives in the node home of the machine that ran the export.
-// Therefore a non-empty report blocks no pipeline and fails no job: its whole
-// value is that it makes a degraded export *visible* to the operator before
-// they schedule an upgrade, instead of the degradation surviving only in a log
-// stream that scrolls away. If a future change wants to turn this file into a
-// gate, it must first define where the file comes from in CI (it never exists
-// in a fresh checkout) -- bolting a "must be empty" check onto an artifact that
-// is absent by default would be a gate that always passes.
+// This sidecar is for an OPERATOR to read after a real `uptickd export`; it is
+// deliberately NOT a CI gate input. Nothing under scripts/, .github/ or the
+// Makefile reads it and it is not committed -- it lives in the node home of the
+// machine that ran the export, so a non-empty report blocks no pipeline. Its
+// value is making a degraded export *visible* to the operator instead of leaving
+// the degradation in a log stream that scrolls away. A future gate must first
+// define where the file comes from in CI (it never exists in a fresh checkout),
+// or it would always pass.
 const ExportDiagnosticsFileName = "export-issues.json"
 
 // ExportDiagnostic is one record that a genesis export could not represent
@@ -45,8 +41,7 @@ type ExportDiagnostic struct {
 	Module string `json:"module"`
 	// Kind classifies the damage, e.g. "token_pair_corrupt".
 	Kind string `json:"kind"`
-	// Key is the store key or class id the problem belongs to, so an operator
-	// can point at the exact record.
+	// Key is the store key or class id the problem belongs to.
 	Key string `json:"key"`
 	// Detail is the human-readable explanation.
 	Detail string `json:"detail"`
@@ -63,20 +58,18 @@ type ExportDiagnosticsReport struct {
 }
 
 // collectExportDiagnostics asks every genesis-exporting module for the records
-// it could not represent faithfully.
+// it could not represent faithfully. It runs after the module manager has
+// exported and uses the modules' issue scanners rather than re-exporting: the
+// export path itself only logs what it drops, and re-exporting would be a second
+// full export.
 //
-// It runs after the module manager has already exported, and uses the modules'
-// issue scanners rather than re-exporting: the export path itself only logs
-// what it drops, and re-running the full export would be a second full export.
-//
-// For collection the scanner is ExportIssuesWithReport rather than the
-// class-only ExportIssues: the supply_mismatch and nft_list_failed kinds can
-// only be observed while walking a class' NFT list, so the class-only scan
-// would silently drop the one check in the repository that detects a diverged
-// supply counter (D-G1). That walk is the exact one the module's own
-// ExportGenesis performs, so the sidecar and the export agree by construction;
-// it costs a second traversal only on this operator-initiated path, never in
-// consensus. erc721/cw721 already report their full issue sets here.
+// For collection it uses ExportIssuesWithReport rather than the class-only
+// ExportIssues: supply_mismatch and nft_list_failed can only be observed while
+// walking a class' NFT list, so the class-only scan would silently drop them. The
+// walk matches the one the module's ExportGenesis performs, so the sidecar and
+// the export agree by construction; the second traversal happens only on this
+// operator-initiated path, never in consensus. erc721/cw721 already report their
+// full issue sets here.
 func (app *Uptick) collectExportDiagnostics(ctx sdk.Context) []ExportDiagnostic {
 	var diags []ExportDiagnostic
 
@@ -134,9 +127,8 @@ func (app *Uptick) writeExportDiagnosticsReport(height int64, diags []ExportDiag
 	return path, nil
 }
 
-// removeStaleExportDiagnosticsReport clears the sidecar after a clean export so
-// that the file's presence always reports the outcome of the LAST export
-// rather than of some earlier degraded one.
+// removeStaleExportDiagnosticsReport clears the sidecar after a clean export (see
+// ExportDiagnosticsReport for the presence invariant this maintains).
 func (app *Uptick) removeStaleExportDiagnosticsReport() {
 	if app.homeDir == "" {
 		return

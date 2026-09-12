@@ -2,20 +2,15 @@ package types
 
 // cw721 events.
 //
-// This list used to mirror Evmos x/erc20's event skeleton, including
-// token_lock, token_unlock, mint, burn, register_nft, register_cw721,
-// toggle_token_conversion and even convert_nft — the last one because the
-// skeleton was copied before this module settled on convert_cw721 for its own
-// conversion event. Alongside them sat a CW721EventTransfer constant and a
-// hand-rolled LogTransfer decoder struct. None of them was ever referenced
-// here:
-//
-//   - Conversion emits convert_cw721; the contract call itself is what
-//     registers the token, so register_* had no emitter.
-//   - Cross-chain escrow and release are owned by nft-transfer, not by these
-//     events; the module only emits refund_packet_token(_skip).
-//   - Transfer logs are decoded with go-ethereum's abi in the keeper, so
-//     LogTransfer had no caller.
+// This list used to mirror Evmos x/erc20's event skeleton; every inherited
+// identifier was unused here: conversion emits convert_cw721 (the contract call
+// itself registers the token, so register_* had no emitter), cross-chain escrow
+// and release belong to nft-transfer (the module only emits
+// refund_packet_token(_skip)), and transfers are carried by CosmWasm
+// execute/query messages (keeper/wasm_adapter.go) rather than decoded from EVM
+// logs, so a hand-rolled LogTransfer had no caller. The inherited convert_nft
+// was never emitted either: the skeleton predates this module settling on
+// convert_cw721 as its conversion event.
 //
 // Unused exported identifiers are not free in a module that ships as a public
 // Go package: they read as supported surface and invite new code to adopt a

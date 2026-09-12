@@ -12,28 +12,27 @@ import (
 
 // RegisterInvariants registers all supply invariants
 //
-// NOTHING CALLS THIS AT RUNTIME. It satisfies module.HasInvariants, which
-// x/collection/module/module.go implements; the only caller of that interface
-// method is module.Manager.RegisterInvariants, and cosmos-sdk v0.53.6 ships it
-// as a deliberate no-op (types/module/module.go:454-457). The call in
-// app/app.go therefore registers zero routes, and every crisis entry point that
-// asserts invariants then asserts an empty set.
+// NOTHING CALLS THIS AT RUNTIME. It satisfies module.HasInvariants
+// (x/collection/module/module.go), but the only thing that would invoke it --
+// module.Manager.RegisterInvariants -- is a deliberate no-op in cosmos-sdk
+// v0.53.6 (types/module/module.go:454-457). app/app.go's call therefore
+// registers zero routes and every crisis entry point asserts an empty set;
+// app/app.go lists the sites.
 //
-// The supply check is observed through the export path instead
+// The supply check is observed on the export path instead
 // (GetCollectionsWithReport -> export log). Wiring it into x/crisis is a
 // decision, not a cleanup: see app/invariants_wiring_test.go.
 func RegisterInvariants(ir sdk.InvariantRegistry, k Keeper) {
 	ir.RegisterRoute(types.ModuleName, "supply", SupplyInvariant(k))
 }
 
-// SupplyInvariant checks that the total amount of NFTs on collections matches
-// the total amount owned by addresses.
+// SupplyInvariant checks that each class' stored total-supply counter matches the
+// number of NFTs it holds.
 //
 // It reports the ExportIssueSupplyMismatch records produced by the export walk
 // rather than re-deriving the comparison, so the invariant and the export
-// diagnostic can never disagree about what a broken supply is. The walk is the
-// only thing in this module that costs anything, which is why the invariant is
-// not run periodically anywhere.
+// diagnostic can never disagree about what a broken supply is. That walk is the
+// module's only costly operation, so the invariant is not run periodically.
 func SupplyInvariant(k Keeper) sdk.Invariant {
 	return func(ctx sdk.Context) (string, bool) {
 		// GetCollectionsWithReport rather than GetCollections: the latter logs

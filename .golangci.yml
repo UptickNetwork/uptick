@@ -1,9 +1,8 @@
 version: "2"
 run:
   tests: false
-  # Default is 1m: the 2-core GitHub runner needs >1m of wall time for this
-  # codebase (locally ~24s on an M-series Mac with ~146s of CPU time), so the
-  # gate died with "Timeout exceeded" on every CI run.
+  # Default is 1m; this codebase exceeds that on the 2-core GitHub runner (the
+  # gate died with "Timeout exceeded" on every run), so raise it to 10m.
   timeout: 10m
 linters:
   enable:
@@ -28,10 +27,9 @@ linters:
     dogsled:
       max-blank-identifiers: 3
     # gosec G115 (integer overflow conversion): nearly every finding is in
-    # SDK-forked boilerplate or legacy upgrade code with provably bounded
-    # ranges. Auditing/rewriting them is tracked separately; silencing the
-    # whole class here so the gate stays usable. Real gosec classes (G306,
-    # G118, ...) remain enabled — see the two fixed in this repo.
+    # SDK-forked boilerplate or legacy upgrade code with provably bounded ranges;
+    # auditing them is tracked separately, so the class is silenced to keep the
+    # gate usable. Other gosec classes (G306, G118, ...) stay enabled.
     gosec:
       excludes:
         - G115
@@ -39,11 +37,11 @@ linters:
     # deprecations we inherit from the fork. Upgrading those APIs is a
     # dependency-bump task, not a release-branch patch.
     staticcheck:
-      # golangci's default set minus SA1019 (see below) and QF1008: keep the
-      # ST* style checks off (never enabled in the v1 era either). QF1008
-      # ("could remove embedded field") would churn upgrade-critical code
-      # where the explicit embedded selector (app.BaseApp.X,
-      # legacyAccount.BaseAccount.X) is deliberately clearer.
+      # golangci's default set minus SA1019 (see below) and QF1008. ST* style
+      # checks stay off (never enabled in the v1 era either); QF1008 ("could
+      # remove embedded field") would churn upgrade-critical code where the
+      # explicit embedded selector (app.BaseApp.X, legacyAccount.BaseAccount.X)
+      # is deliberately clearer.
       checks:
         - all
         - -SA1019
@@ -54,10 +52,9 @@ linters:
         - -ST1020
         - -ST1021
         - -ST1022
-    # govet "inline" produces toolchain-mismatch noise: the published
-    # golangci-lint binary is built with a newer Go than go.mod targets
-    # ("cannot inline call to ioutil.ReadFile (declared using go1.27.0) into
-    # a file using go1.25.13"). Not a property of our code.
+    # govet "inline" produces toolchain-mismatch noise: the published golangci-lint
+    # binary is built with a newer Go than go.mod targets. Not a property of our
+    # code.
     govet:
       disable:
         - inline
@@ -90,74 +87,54 @@ linters:
       - linters:
           - lll
         source: https://
-      # revive var-naming / unused-parameter fire ~190 times across the
-      # Cosmos-SDK-forked boilerplate (init.go, genaccounts.go, msg types).
-      # Renaming forked structs/fields breaks proto/json wiring for zero
-      # behaviour gain; unused parameters are mandated by interface
-      # signatures. Everything else revive checks stays enforced.
+      # revive var-naming / unused-parameter fire across the Cosmos-SDK-forked
+      # boilerplate (init.go, genaccounts.go, msg types): renaming forked
+      # structs/fields breaks proto/json wiring for zero behaviour gain, and unused
+      # parameters are mandated by interface signatures. Everything else revive
+      # checks stays enforced.
       - linters:
           - revive
         text: "^(var-naming|unused-parameter):"
-      # internft.InterNftKeeper: renaming the type touches 16 ICS721 wiring
-      # sites right before a release; tracked for the next minor.
+      # internft.InterNftKeeper: renaming the type touches ICS721 wiring sites
+      # right before a release; tracked for the next minor.
       - linters:
           - revive
         text: "type name will be used as internft.InterNftKeeper"
-      # app/upgrades/v040/** is the FROZEN v0.4.0 handler. 3424c91
-      # "revert(upgrades): freeze the v0.4.0 handler at the released v0.4.1
-      # build" restored it from tag v0.4.1 (81bf79e) because the v0.4.0 plan had
-      # already executed on the testnet and this handler is release-critical.
+      # app/upgrades/v040/** is the FROZEN v0.4.0 handler. 3424c91 restored it from
+      # tag v0.4.1 (81bf79e) because the v0.4.0 plan had already executed on the
+      # testnet and this handler is release-critical.
       #
-      # Since then the tree accepts exactly ONE kind of edit: a genuine defect
-      # fix named fix(v040): -- e.g. 1c51378 "fix(v040): reject malformed legacy
-      # proposal protos instead of panicking", which hardened the hand-rolled
-      # legacy proto decoders. Style churn is not acceptable here even when it
-      # is behaviour-preserving: the freeze's whole value is that the diff
-      # against the testnet-validated build stays bounded and reviewable, and
-      # every cosmetic hunk spends that budget for nothing.
+      # Since then the tree accepts exactly ONE kind of edit: a genuine defect fix
+      # named fix(v040): (e.g. 1c51378, the legacy-proto panic hardening). Style churn
+      # is unacceptable even when behaviour-preserving: the freeze's value is a diff
+      # against the testnet-validated build that stays bounded, and every cosmetic hunk
+      # spends that budget for nothing.
       #
-      # So these findings cannot be fixed in place -- narrowing a signature
-      # (unparam), de-duplicating the two legacy Unmarshal decoders (dupl), or
-      # dropping a redundant int() / realigning a block (unconvert, gofmt) is a
-      # source edit, i.e. exactly the class 3424c91 reverted. Excluded by
-      # configuration instead; lint is not what verifies the freeze.
+      # So these findings cannot be fixed in place -- narrowing a signature (unparam),
+      # de-duplicating the two legacy Unmarshal decoders (dupl), or dropping a
+      # redundant int() / realigning a block (unconvert, gofmt) is a source edit, i.e.
+      # exactly the class 3424c91 reverted. Excluded by configuration instead; lint is
+      # not what verifies the freeze.
       #
-      # Residual: the exclusion is path-wide and not history-aware, so it also
-      # silences a NEWLY-introduced dupl/unconvert/unparam/gofmt finding -- a
-      # future fix(v040): that adds one slips past lint. Nothing in this file
-      # bounds that; the only mitigation is procedural, and it lives in the
-      # freeze script: part (A) of scripts/check-v040-frozen.sh hashes these
-      # files from the WORKING TREE and fails on any content drift -- an
-      # uncommitted edit included -- until the pin is refreshed. Part (B) then
-      # requires that refresh to be an explicit fix(v040): commit; the label is
-      # what it checks, not who reviewed it. That rule has two documented
-      # residuals: an evil merge that rewrites the pin alongside the content it
-      # carries, and any range whose base does not carry the pin -- (1b) is keyed
-      # on the pin's ABSENCE at base, not on its first creation, so a base that is
-      # itself a post-deletion pin-absent commit reopens the window. Both are
-      # RESIDUAL (1a)/(1b) in that script. Inside those two ranges new bytes can
-      # enter without such a commit. Outside them this is the bound: part (A)
-      # still catches drift not accompanied by a matching re-pin.
+      # Residual: the exclusion is path-wide and not history-aware, so it also silences
+      # a NEWLY-introduced dupl/unconvert/unparam/gofmt finding. The only mitigation is
+      # procedural, in scripts/check-v040-frozen.sh (`make check-v040-frozen`, CI job
+      # v040-frozen): part (A) hashes these files from the WORKING TREE and fails on any
+      # content drift (uncommitted edits included) until the pin is refreshed, and part
+      # (B) requires that refresh to be an explicit fix(v040): commit. Part (B) has two
+      # residuals, labelled RESIDUAL (1a)/(1b) there: an evil merge that rewrites the
+      # pin alongside the content it carries, and any range whose base does not carry
+      # the pin (keyed on the pin's ABSENCE at base, not its first creation -- a
+      # post-deletion pin-absent base reopens the window). Inside those two ranges new
+      # bytes enter without such a commit; outside them part (A) still catches drift
+      # not accompanied by a matching re-pin.
       #
-      # WHAT verifies the freeze is scripts/check-v040-frozen.sh
-      # (`make check-v040-frozen`, CI job v040-frozen): (A) it pins the blob
-      # shas of every tracked file under app/upgrades/v040/, read from the
-      # WORKING TREE, in scripts/v040-frozen.sha256 and fails on any content or
-      # file-set drift (including an uncommitted edit), and (B) it requires every
-      # surviving (frontier) change to that pin to be an explicit fix(v040):
-      # commit -- a later `fix(v040):` re-pin is the sanctioned remedy. Two ranges
-      # escape that requirement, as the residual paragraph above records: one
-      # whose change hides inside a merge, and one whose base carries no pin to
-      # compare against. The rule above only keeps lint from nagging about files
-      # it must not edit.
+      # The reference is the tree AS IT STANDS, not tag v0.4.1: 1c51378 legitimately
+      # moved it past that tag. Do NOT "restore" it -- that would delete 1c51378's panic
+      # hardening and reintroduce an out-of-range slice on malformed legacy proposal
+      # bytes.
       #
-      # The reference is the tree AS IT STANDS, not tag v0.4.1: 1c51378
-      # legitimately moved it past that tag. Do NOT "restore" this tree to the
-      # tag -- that would delete 1c51378's panic hardening and reintroduce an
-      # out-of-range slice on malformed legacy proposal bytes.
-      #
-      # To change this pattern, land it in the v0.4.1 handler
-      # (app/upgrades/v041/**) -- v0.4.0 is history.
+      # To change this pattern, land it in app/upgrades/v041/** -- v0.4.0 is history.
       - linters:
           - dupl
           - unconvert

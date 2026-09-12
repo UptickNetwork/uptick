@@ -3,36 +3,23 @@
 # Fail when prose documents a `make <target>` that the Makefile does not define.
 #
 # WHY THIS EXISTS
-# ---------------
-# CONTRIBUTING.md is a contract: it told contributors that `development` must
-# never fail `make test-import`, but no `test-import` rule has ever existed in
-# the Makefile (only a stale `.PHONY` mention). Running it fails with
-# "No rule to make target 'test-import'" -- so a documented, mandatory gate did
-# nothing but mislead. A doc that names a gate nobody can run is the same class
-# of "green that proves nothing" this repository keeps finding in its CI.
+# CONTRIBUTING.md told contributors that `development` must never fail
+# `make test-import`, but no `test-import` rule has ever existed (only a stale
+# `.PHONY` mention): running it fails with "No rule to make target
+# 'test-import'", so a documented, mandatory gate did nothing but mislead.
 #
-# WHAT IT CHECKS -- and it checks BOTH places that name commands
-# --------------------------------------------------------------
-#   1. Inline code spans (`like this`), which is where CONTRIBUTING.md puts
-#      runnable commands. A span is split on commas so one span listing several
-#      targets (`make lint, make test, make test-race`) is handled piece by
-#      piece, and only pieces of the exact form `make <target>` are considered.
+# WHAT IT CHECKS -- BOTH places that name commands
+#   1. Inline code spans: split on commas, so `make lint, make test, make test-race`
+#      is handled piece by piece; only pieces of the exact form `make <target>` count.
+#   2. Fenced (```-delimited) blocks, where the CI commands live (e.g.
+#      `UPTICK_E2E_STRICT=1 make test-e2e-localnet`): split on whitespace, every
+#      `make <target>` token taken, so an env-prefixed command still yields its target.
 #
-#   2. Fenced (```-delimited) code blocks. These are where the CI gate commands
-#      actually live -- `make test-sim-ci` and
-#      `UPTICK_E2E_STRICT=1 make test-e2e-localnet` are inside a ```bash block.
-#      Each fenced line is split on whitespace and every `make <target>` token
-#      is taken, so an env-prefixed command still yields its target.
-#
-# Prose verbs are not commands and are never mistaken for targets: "make sure",
-# "make changes" and "make a comment" appear only in plain sentences, and this
+# Prose verbs ("make sure", "make changes") are never mistaken for targets: this
 # script reads only spans and fenced blocks, never bare prose.
 #
-# USAGE
-# -----
-#   scripts/check-doc-make-targets.sh [DOC] [MAKEFILE]
+# USAGE: scripts/check-doc-make-targets.sh [DOC] [MAKEFILE]
 # Defaults: DOC=CONTRIBUTING.md, MAKEFILE=Makefile.
-#
 # Exit codes: 0 = every documented target exists; 1 = at least one does not;
 # 2 = a required input file is missing.
 set -euo pipefail
@@ -49,8 +36,7 @@ if [[ ! -f "$makefile" ]]; then
   exit 2
 fi
 
-# Three backticks, built from octal escapes so the fence never has to be quoted
-# inside this script.
+# Three backticks via octal escapes, so the fence needs no quoting here.
 FENCE=$'\x60\x60\x60'
 
 span_hits="$(mktemp)"

@@ -16,15 +16,14 @@ import (
 	txsigning "cosmossdk.io/x/tx/signing"
 )
 
-// The anteinterfaces fields are populated by embedding the interface in an
-// empty struct. The struct then satisfies every method of the interface without
-// the test having to implement — and maintain — the whole surface. Validate
-// only compares each field against nil and never calls a method, so the
+// The anteinterfaces fields are populated by embedding the interface in an empty
+// struct, which satisfies every method without the test having to implement it.
+// Validate only compares each field against nil and never calls a method, so the
 // embedded nil interface is never dereferenced.
 //
-// Note that a plain typed nil, e.g. (*stubAccountKeeper)(nil), would NOT work
-// here: assigning it to an interface field yields a non-nil interface value,
-// which is the opposite of what these tests need to control.
+// A plain typed nil, e.g. (*stubAccountKeeper)(nil), would NOT work here:
+// assigning it to an interface field yields a non-nil interface value, the
+// opposite of what these tests need to control.
 type stubAccountKeeper struct{ anteinterfaces.AccountKeeper }
 type stubBankKeeper struct{ anteinterfaces.BankKeeper }
 type stubFeeMarketKeeper struct{ anteinterfaces.FeeMarketKeeper }
@@ -93,16 +92,13 @@ func TestValidateRejectsMissingRequiredField(t *testing.T) {
 }
 
 // TestValidateAcceptsNilOptionalFields is the counter-sentinel for
-// TestValidateRejectsMissingRequiredField. Tightening Validate must not turn a
-// supported minimal wire-up into a boot failure:
+// TestValidateRejectsMissingRequiredField: tightening Validate must not turn a
+// supported minimal wire-up into a boot failure.
 //
 //   - FeegrantKeeper nil means "feegrant disabled" to cosmos-sdk's
 //     DeductFeeDecorator, and upstream's own Validate omits it for that reason.
 //   - WasmKeeper / WasmNodeConfig / TXCounterStoreService nil is exactly the
 //     input TestWasmDecoratorsOmittedWhenKeepersNil exists to protect.
-//
-// Without this test, the next person to "complete" Validate can silently break
-// both contracts and still see a green suite.
 func TestValidateAcceptsNilOptionalFields(t *testing.T) {
 	opts := completeHandlerOptions()
 	opts.FeegrantKeeper = nil

@@ -26,46 +26,41 @@ import (
 )
 
 // This file turns "which IBC messages may be delegated through authz" from a
-// hand-maintained list into a property that is checked against the protobuf
-// descriptors.
+// hand-maintained list into a property checked against the protobuf descriptors.
 //
-// Why it exists: the list in disabled_authz.go had been reconciled by hand, and
-// by hand it missed ibc.applications.nft_transfer.v1.MsgTransfer — the main
-// asset exit for an NFT chain, and the only IBC message whose delegation had no
-// scoped alternative (nft-transfer ships no Authorization type, so
-// GenericAuthorization, with no limit and no allow-list, was the only grant that
-// could be made). A table assembled from five modules cannot stay in sync by
-// inspection; discovery can.
+// Why it exists: the hand-reconciled list in disabled_authz.go missed
+// ibc.applications.nft_transfer.v1.MsgTransfer — the main asset exit for an NFT
+// chain, and the only IBC message whose delegation had no scoped alternative
+// (nft-transfer ships no Authorization type, so GenericAuthorization, with no
+// limit and no allow-list, was the only grant that could be made).
 //
-// The classification below is exhaustive by construction: every request message
+// The classification is exhaustive by construction: every request message
 // exposed by an "ibc.*" gRPC Msg service must appear in exactly one of
 // ibcAuthzGrantable and the "/ibc." entries of DisabledAuthzMsgTypeURLs(). When
 // an ibc-go bump adds or renames a message the enumeration grows, the partition
-// stops matching, and this file fails with the name of the unclassified type
-// instead of silently defaulting it to grantable.
+// stops matching, and this file fails naming the unclassified type instead of
+// silently defaulting it to grantable.
 
 // ibcAuthzGrantable is the deliberate complement of the "/ibc." entries in
-// DisabledAuthzMsgTypeURLs(): every IBC request message that stays grantable on
-// purpose, grouped by the reason it may stay.
-//
-// The test is what makes the deliberate part real. An entry here is a claim that
-// the message carries no signer check — that executing it as the granter achieves
-// nothing the grantee could not achieve by sending it from its own account. Each
-// group cites the handler that was read to make that claim.
+// DisabledAuthzMsgTypeURLs(): the IBC request messages that stay grantable on
+// purpose, grouped by reason. Listing one asserts it carries no signer check —
+// that executing it as the granter achieves nothing the grantee could not achieve
+// from its own account.
 var ibcAuthzGrantable = []string{
-	// Relayer packet flow (ibc-go modules/core/keeper/msg_server.go:230-430).
-	// No signer check in any of them: a packet is authenticated by its proofs
-	// and commitments, not by who submitted it. This is the surface an operator
-	// actually delegates to a relaying bot, and it must keep working.
+	// Relayer packet flow (Keeper.RecvPacket / Timeout / TimeoutOnClose /
+	// Acknowledgement, modules/core/keeper/msg_server.go). No signer check in any
+	// of them: a packet is authenticated by its proofs and commitments, not by
+	// who submitted it. This is the surface an operator actually delegates to a
+	// relaying bot, and it must keep working.
 	sdk.MsgTypeURL(&channeltypes.MsgRecvPacket{}),
 	sdk.MsgTypeURL(&channeltypes.MsgAcknowledgement{}),
 	sdk.MsgTypeURL(&channeltypes.MsgTimeout{}),
 	sdk.MsgTypeURL(&channeltypes.MsgTimeoutOnClose{}),
 
-	// Channel handshake (msg_server.go:296-400). MsgChannelCloseInit is the
-	// clearest case: it reads only msg.PortId and msg.ChannelId, never
-	// msg.Signer (msg_server.go:374-400), so anyone can close any channel from
-	// their own account. Blocking it would remove nothing.
+	// Channel handshake (Keeper.ChannelOpenInit ... ChannelCloseConfirm,
+	// msg_server.go:230-401). MsgChannelCloseInit is the clearest case: it reads
+	// only msg.PortId and msg.ChannelId, never msg.Signer, so anyone can close any
+	// channel from their own account. Blocking it would remove nothing.
 	sdk.MsgTypeURL(&channeltypes.MsgChannelOpenInit{}),
 	sdk.MsgTypeURL(&channeltypes.MsgChannelOpenTry{}),
 	sdk.MsgTypeURL(&channeltypes.MsgChannelOpenAck{}),
@@ -75,21 +70,20 @@ var ibcAuthzGrantable = []string{
 
 	// IBC v2 packet flow. ibc-go's core module registers the v2 Msg services
 	// unconditionally (modules/core/module.go:142 and :145), so these are
-	// routable — Uptick simply never calls SetRouterV2, so the packet paths would
-	// fail on a nil router. What matters for this list is who they read:
-	// MsgSendPacket and MsgTimeout read no signer at all, while RecvPacket and
-	// Acknowledgement call IsAllowedRelayer against the destination/source
-	// client's config (modules/core/04-channel/v2/keeper/msg_server.go:56-60 and
-	// :164-168). That allow-list is opt-in per client and empty by default, where
-	// IsAllowedRelayer returns true (02-client/v2/types/config.go:19), so
-	// unconfigured clients admit everybody — the same reasoning as MsgUpdateClient
-	// above, and the same test pins the default.
+	// routable — Uptick never calls SetRouterV2, so the packet paths would fail on
+	// a nil router. What matters here is who they read: MsgSendPacket and
+	// MsgTimeout read no signer, while RecvPacket and Acknowledgement call
+	// IsAllowedRelayer against the destination/source client's config
+	// (modules/core/04-channel/v2/keeper/msg_server.go:56-60 and :164-168). That
+	// allow-list is opt-in per client and empty by default, where IsAllowedRelayer
+	// returns true (02-client/v2/types/config.go:19), so unconfigured clients
+	// admit everybody — the same reasoning as for MsgUpdateClient below.
 	sdk.MsgTypeURL(&channelv2types.MsgSendPacket{}),
 	sdk.MsgTypeURL(&channelv2types.MsgRecvPacket{}),
 	sdk.MsgTypeURL(&channelv2types.MsgAcknowledgement{}),
 	sdk.MsgTypeURL(&channelv2types.MsgTimeout{}),
 
-	// Connection handshake (msg_server.go:176-290). No signer check.
+	// Connection handshake (msg_server.go:176-215). No signer check.
 	sdk.MsgTypeURL(&connectiontypes.MsgConnectionOpenInit{}),
 	sdk.MsgTypeURL(&connectiontypes.MsgConnectionOpenTry{}),
 	sdk.MsgTypeURL(&connectiontypes.MsgConnectionOpenAck{}),
@@ -105,27 +99,13 @@ var ibcAuthzGrantable = []string{
 	sdk.MsgTypeURL(&ibcclienttypes.MsgCreateClient{}),
 	sdk.MsgTypeURL(&ibcclienttypes.MsgSubmitMisbehaviour{}),
 
-	// IBC client maintenance. Both used to be disabled and were removed in round
-	// 25: neither satisfies the rule, so keeping them made the list look like it
-	// only mostly followed its own predicate.
-	//
-	// MsgUpdateClient's relayer allow-list always runs (ibc-go constructs
-	// ClientV2Keeper itself, modules/core/keeper/keeper.go:53) but admits everyone
-	// until a client's creator configures one — GetConfig returns an empty Config
-	// and IsAllowedRelayer reads that as "no restriction". ibc-go says so itself:
-	// "DefaultConfig is empty and therefore permissionless"
-	// (02-client/v2/types/config.go:19). Delegating an update for a client that
-	// *has* opted into an allow-list is the list owner consenting to be relayed
-	// for, not an escalation.
-	//
-	// MsgUpgradeClient has no signer check to find at all: its handler
-	// (msg_server.go:108-122) never reads msg.Signer and the keeper it calls
-	// (modules/core/02-client/keeper/client.go:88) takes no signer argument, so a
-	// grant for it could never restrict anything — it only looked like it did.
-	//
-	// Both are pinned by ibcAuthzMustStayGrantable so a future round cannot
-	// quietly re-add them, and the permissive default they rest on is pinned by
-	// app/ibc_v2_authz_guard_test.go.
+	// IBC client maintenance. Both were removed from the disabled set because
+	// neither satisfies the rule (see disabled_authz.go for the full derivation):
+	// MsgUpdateClient's relayer allow-list is inert until a client creator opts
+	// in, and MsgUpgradeClient reads no signer at all (msg_server.go:108-122).
+	// They are pinned by ibcAuthzMustStayGrantable so a future round cannot
+	// quietly re-add them, and the permissive allow-list default they rest on is
+	// pinned by app/ibc_v2_authz_guard_test.go.
 	sdk.MsgTypeURL(&ibcclienttypes.MsgUpdateClient{}),
 	sdk.MsgTypeURL(&ibcclienttypes.MsgUpgradeClient{}),
 
@@ -173,15 +153,14 @@ var ibcAuthzMustStayGrantable = []string{
 // "ibc.*" gRPC Msg service, read straight out of the protobuf file descriptors.
 //
 // Nothing about the result is written down ahead of time, which is the point:
-// the first run returned 38 types, eleven more than the hand-written table this
-// replaced, including the whole 27-interchain-accounts family and the ibc-go v2
-// channel messages.
+// the hand-written table this replaced had missed the whole
+// 27-interchain-accounts family and the ibc-go v2 channel messages.
 func ibcMsgServiceRequestTypeURLs(t *testing.T) map[string]bool {
 	t.Helper()
 
-	// Registering the modules is what puts the app-shaped set of modules under
-	// test; it mirrors app.go's ModuleBasics. The descriptors themselves come
-	// from the gogoproto registry, which every linked package populates in init.
+	// Registering the modules links in the IBC packages the app wires; the
+	// descriptors themselves come from the gogoproto registry, which every linked
+	// package populates in init.
 	registry := codectypes.NewInterfaceRegistry()
 	for _, register := range []func(codectypes.InterfaceRegistry){
 		ibcclienttypes.RegisterInterfaces,
@@ -439,9 +418,8 @@ func TestAuthzLimiterAllowsIBCRelayerMessagesInMsgExec(t *testing.T) {
 }
 
 // TestAuthzLimiterStillAllowsUnrelatedMessages keeps the broadest sentinel in
-// place: the list gained fifteen IBC entries this round and lost two, and a
-// predicate that over-matched (a prefix check instead of an equality check, say)
-// would start rejecting messages that have nothing to do with IBC.
+// place: a predicate that over-matched (a prefix check instead of an equality
+// check, say) would start rejecting messages that have nothing to do with IBC.
 func TestAuthzLimiterStillAllowsUnrelatedMessages(t *testing.T) {
 	grantee := sdk.AccAddress([]byte("grantee-address-bytes"))
 	// bank MsgSend is the canary because it is the message most likely to be

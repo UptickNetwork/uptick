@@ -15,10 +15,10 @@ import (
 )
 
 const (
-	// (?m)^(\d+) remove leading numbers
+	// (?m)^(\d+) strips every leading digit
 	reLeadingNumbers = `(?m)^(\d+)`
-	// ^[^A-Za-z] forces first chars to be letters
-	// [^a-zA-Z0-9/-] deletes special characters
+	// ^[^A-Za-z] strips ONE leading non-letter; [^a-zA-Z0-9/-] strips every
+	// character that is not a letter, a digit, '/' or '-'.
 	reDnmString = `^[^A-Za-z]|[^a-zA-Z0-9/-]`
 )
 
@@ -46,8 +46,9 @@ func removeInvalidPrefixes(str string) string {
 	return str
 }
 
-// SanitizeERC721Name enforces 128 max string length, deletes leading numbers
-// removes special characters  (except /)  and spaces from the ERC721 name
+// SanitizeERC721Name removes leading digits and every character that is not a
+// letter, a digit, '/' or '-', truncates to 128 runes, and then strips a
+// leading "ibc/" or "erc721/" prefix.
 func SanitizeERC721Name(name string) string {
 	name = removeLeadingNumbers(name)
 	name = removeSpecialChars(name)
@@ -102,19 +103,21 @@ func removeAddress0x(address string) string {
 	return strAddress
 }
 
-// CreateClassIDFromContractAddress create classId from erc721 address
+// CreateClassIDFromContractAddress derives a class id from an ERC721 contract
+// address.
 func CreateClassIDFromContractAddress(address string) string {
 
 	return fmt.Sprintf("%s-%s", DefaultPrefix, removeAddress0x(address))
 }
 
-// CreateContractAddressFromClassID create classId from erc721 address
+// CreateContractAddressFromClassID derives the ERC721 contract address from a
+// class id.
 func CreateContractAddressFromClassID(classID string) string {
 
 	return strings.Replace(classID, DefaultPrefix+"-", "", 1)
 }
 
-// CreateNFTIDFromTokenID create classId from erc721 address
+// CreateNFTIDFromTokenID derives a Cosmos NFT id from an ERC721 token id.
 func CreateNFTIDFromTokenID(id string) string {
 
 	return fmt.Sprintf("%s%s", DefaultPrefix, removeAddress0x(id))
@@ -160,35 +163,28 @@ func GetNFTFromUID(uid string) (string, string) {
 //     stripped, so nft id "nftmp123456789" becomes
 //     "0x6e66746d70313233343536373839".
 //   - canonical (v0.4.0+): the base-10 string of the uint256 token id, which
-//     for a freshly converted NFT is sha256(nft id).
+//     for a freshly converted NFT is sha256 of the stripped nft id.
 //
 // For one and the same NFT the two spellings denote DIFFERENT uint256 values
-// (the id bytes read as an integer, versus the digest of those bytes), so a
-// legacy binding cannot be re-hashed into the canonical value: the value
-// itself lives in the ERC721 contract on the EVM side and must not move. What
-// this module can and does unify is the KEY SPELLING of that value in its own
-// store, and the compatibility layer below is deliberately one-way:
+// (the id bytes read as an integer, versus the digest of those bytes), and the
+// legacy value already lives in the ERC721 contract on the EVM side, so it
+// cannot be re-hashed. What the module can unify is the KEY SPELLING of that
+// value in its own store, and the compatibility layer below is deliberately
+// one-way: ValidateEVMTokenID (the creation-time check, run from every
+// Msg*.ValidateBasic) takes the canonical spelling only, while ParseEVMTokenID
+// and the *KeyVariants helpers take both, so a value can be read back under
+// either spelling and upgraded to the canonical key in place on first touch.
 //
-//   - ValidateEVMTokenID runs from every Msg*.ValidateBasic, i.e. wherever a
-//     caller CREATES a binding: canonical base-10 only.
-//   - ParseEVMTokenID is for values read back out of state or handed to the
-//     ERC721 contract: both spellings, yielding the value.
-//   - CanonicalEVMTokenID / LegacyEVMTokenID / EVMTokenIDKeyVariants let the
-//     keeper find a value under either spelling and rewrite it under the
-//     canonical one, so a legacy key is upgraded in place on first touch
-//     instead of being duplicated or orphaned.
-//
-// Values wider than 256 bits stay rejected in both spellings. That is not a
-// regression: such a token id cannot be represented by the uint256 the ERC721
-// contract stores, so the state is already broken and must not be rewritten.
+// Values wider than 256 bits stay rejected in both spellings: such a token id
+// cannot be represented by the uint256 the ERC721 contract stores, so the state
+// is already broken and must not be rewritten.
 
 // ValidateEVMTokenID ensures an ERC721 token ID is a base-10 uint256 string.
 // fmt.Sscan historically accepted hexadecimal token IDs, which could create
-// duplicate NFT-pair keys for the same numerical token ID.
+// two NFT-pair keys for the same numerical token ID.
 //
-// This is the creation-time check — deliberately stricter than
-// ParseEVMTokenID, which also accepts the legacy "0x"+hex spelling for values
-// that are only being read back.
+// This is the creation-time check, deliberately stricter than ParseEVMTokenID,
+// which also accepts the legacy "0x"+hex spelling for values being read back.
 func ValidateEVMTokenID(tokenID string) error {
 	if _, _, err := parseEVMTokenIDValue(tokenID, false); err != nil {
 		return err
@@ -224,7 +220,7 @@ func CanonicalEVMTokenID(tokenID string) (canonical string, legacy bool, err err
 // Text(16) result means the leading byte was 0x01..0x0f and its dropped high
 // nibble has to be restored — otherwise "0x"+"b616263" would not match the
 // stored "0x0b616263". A token id whose bytes start with NUL would need more
-// than one nibble restored; those are rejected at mint time (the collection
+// than one nibble restored, and those are rejected at mint time (the collection
 // token id rules forbid NUL), so the single-nibble case is the only one.
 func LegacyEVMTokenID(tokenID string) (string, bool) {
 	n, ok := new(big.Int).SetString(tokenID, 10)
@@ -248,8 +244,8 @@ func LegacyEVMTokenID(tokenID string) (string, bool) {
 // the same uint256 value may have been written to the NFT-pair store, most
 // canonical first. Readers probe them in order, which is what makes a legacy
 // key readable without a state migration; writers use the first entry as the
-// key to write and drop the rest, which is what keeps one value from ending
-// up with two keys.
+// key to write and drop the rest, which keeps one value from ending up with
+// two keys.
 //
 // Input that is not a valid uint256 in either spelling yields itself as the
 // only variant, so a caller still performs an exact-match lookup against
@@ -292,13 +288,12 @@ func EqualEVMTokenID(a, b string) bool {
 // all-lowercase form and the EIP-55 checksummed form that the pre-v0.4.0
 // module wrote. Both mainnet and testnet still hold checksummed addresses.
 //
-// The parallel with EVMTokenIDKeyVariants stops at the mechanism, though. The
-// two token-id spellings denote DIFFERENT uint256 values — the legacy one is
-// already minted into the ERC721 contract and must not move — so there all the
-// module can unify is the key spelling. The two address spellings are the SAME
-// 20-byte value: common.HexToAddress round-trips either one to the same
-// address. Normalising an address is therefore safe, and is what lets the
-// module converge on one key per binding.
+// The parallel with EVMTokenIDKeyVariants stops at the mechanism: the two
+// token-id spellings denote DIFFERENT uint256 values (the legacy one is already
+// minted into the ERC721 contract and must not move), so there only the key
+// spelling can be unified. The two address spellings are the SAME 20-byte value
+// — common.HexToAddress round-trips either one to the same address — so
+// normalising is safe and lets the module converge on one key per binding.
 
 // CanonicalContractAddress returns the spelling used for every store key
 // derived from an ERC721 contract address: lowercase for a valid hex address,
@@ -349,19 +344,17 @@ func EqualContractAddress(a, b string) bool {
 // TokenUIDKeyVariants returns every spelling a forward (token id, contract
 // address) key may have been written under, canonical spelling first.
 //
-// The forward key is "<tokenId>,<contractAddress>" and BOTH of its components
-// have more than one historical spelling — the token id is either the v0.3.3
+// The forward key is "<tokenId>,<contractAddress>" and BOTH components have
+// more than one historical spelling — the token id is either the v0.3.3
 // "0x"+hex form or the v0.4.0 base-10 one, and the address is either EIP-55
 // checksummed or lowercase — so a key has to be looked up under the cross
-// product of the two. This is the same enumeration SetNFTPairs and
-// ResolveNFTUIDPair perform inline; it is factored out here because the index
-// prune needs it a third time.
+// product of the two. SetNFTPairs and ResolveNFTUIDPair enumerate the same set
+// inline; this is factored out because the index prune needs it a third time.
+// Note that CreateTokenUID takes (contract, tokenID) while the string it
+// builds puts the token id first.
 //
-// Note the argument order of CreateTokenUID: it takes (contract, tokenID) while
-// the string it builds puts the token id first.
-//
-// A key that cannot be split yields itself as its only variant, so already
-// broken state is compared exactly instead of being widened into a match.
+// A key that cannot be split yields itself as its only variant, so
+// already-broken state is compared exactly instead of widened into a match.
 func TokenUIDKeyVariants(tokenUID string) []string {
 	tokenID, address := GetNFTFromUID(tokenUID)
 	if tokenID == "" || address == "" {

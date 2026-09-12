@@ -18,13 +18,12 @@ import (
 )
 
 // failingEVMStore drives the SetParams failure branch of
-// migrateActiveStaticPrecompiles. The real keeper cannot produce that error for
-// this migration (it always writes a valid list), so without an injectable
-// store the branch that decides whether a failed write is reported or swallowed
-// would never run in CI.
+// migrateActiveStaticPrecompiles. The real keeper cannot produce that error (this
+// migration always writes a valid list), so without an injectable store the branch
+// deciding whether a failed write is reported or swallowed never runs.
 type failingEVMStore struct {
-	// populated is the stored precompile list GetParams reports. Empty means
-	// "never configured", which is the case that triggers the write.
+	// populated is the list GetParams reports. Empty ("never configured") is the
+	// case that triggers the write.
 	populated []string
 	written   evmtypes.Params
 }
@@ -65,9 +64,8 @@ func TestMigrateActiveStaticPrecompiles_NoWriteWhenAlreadyPopulated(t *testing.T
 func TestDefaultActiveStaticPrecompiles(t *testing.T) {
 	require.Len(t, defaultActiveStaticPrecompiles, 8)
 
-	// The vesting precompile (0x803) is not registered by Uptick and must not
-	// be activated, otherwise GetStaticPrecompileInstance panics with
-	// "precompiled contract not stored in memory".
+	// Uptick does not register the vesting precompile (0x803); activating it makes
+	// GetStaticPrecompileInstance panic with "precompiled contract not stored in memory".
 	require.NotContains(t, defaultActiveStaticPrecompiles, evmtypes.VestingPrecompileAddress)
 
 	for _, addr := range []string{
@@ -85,19 +83,14 @@ func TestDefaultActiveStaticPrecompiles(t *testing.T) {
 }
 
 func TestConfigureDefaultStaticPrecompiles(t *testing.T) {
-	// ConfigureDefaultStaticPrecompiles writes to a package-level variable in
-	// the EVM module - process-wide state shared with every other test in this
-	// binary, including other packages' (evmtypes.DefaultParams() reads it).
-	// Leaving it mutated makes failures depend on test ordering, so the
-	// original value is captured and restored. slices.Clone preserves the
-	// nil-vs-empty distinction instead of collapsing both to nil.
+	// The call mutates evmtypes.DefaultStaticPrecompiles, a process-wide variable
+	// shared with every other test in this binary: capture and restore it, or
+	// failures start depending on test ordering. Clone preserves nil vs empty.
 	original := slices.Clone(evmtypes.DefaultStaticPrecompiles)
 	t.Cleanup(func() {
 		evmtypes.DefaultStaticPrecompiles = original
 	})
 
-	// The app wires this explicitly instead of a package init(): the call
-	// must set the EVM module default deterministically.
 	ConfigureDefaultStaticPrecompiles()
 	require.Equal(t, defaultActiveStaticPrecompiles, evmtypes.DefaultStaticPrecompiles)
 }
@@ -115,13 +108,11 @@ func TestWithDefaultActiveStaticPrecompiles(t *testing.T) {
 	require.Equal(t, existing, unchanged.ActiveStaticPrecompiles)
 }
 
-// recordingICAParamsStore drives the guard in migrateICAControllerParams.
-//
-// The real ICA controller keeper cannot express the question these tests ask.
-// ibc-go's SetParams returns nothing, and writing true over an already-true
-// param leaves byte-identical state behind, so "the migration wrote when it
-// should have skipped" is invisible in the store. Counting the calls is the
-// only way to make dropping the guard fail a test.
+// recordingICAParamsStore drives the guard in migrateICAControllerParams. The real
+// keeper cannot express the question these tests ask: ibc-go's SetParams returns
+// nothing and writing true over an already-true param leaves byte-identical state,
+// so "wrote when it should have skipped" is invisible in the store. Counting the
+// calls is the only way to make dropping the guard fail a test.
 type recordingICAParamsStore struct {
 	params icacontrollertypes.Params
 	writes []icacontrollertypes.Params
@@ -138,18 +129,16 @@ func (s *recordingICAParamsStore) SetParams(_ sdk.Context, params icacontrollert
 	s.params = params
 }
 
-// icaTestCtx is a context whose Logger() is safe to call.
-// migrateICAControllerParams logs on the write path, and sdk.Context{}.Logger()
-// returns a nil logger whose Info() panics; the real handler always runs on a
-// context that has one.
+// icaTestCtx returns a context whose Logger() is safe to call:
+// migrateICAControllerParams logs on the write path and sdk.Context{}'s nil logger
+// panics on Info(). The real handler always runs on a context that has one.
 func icaTestCtx() sdk.Context {
 	return sdk.Context{}.WithLogger(log.NewNopLogger())
 }
 
 // TestMigrateICAControllerParams_EnablesWhenDisabled is the case the migration
-// exists for: genesis templates derived from the legacy x/params defaults ship
-// controller_enabled=false, and every ICA registration fails with "controller
-// submodule is disabled" until it is flipped.
+// exists for: legacy genesis templates ship controller_enabled=false, and every ICA
+// registration fails with "controller submodule is disabled" until it is flipped.
 func TestMigrateICAControllerParams_EnablesWhenDisabled(t *testing.T) {
 	store := &recordingICAParamsStore{params: icacontrollertypes.NewParams(false)}
 
@@ -160,9 +149,8 @@ func TestMigrateICAControllerParams_EnablesWhenDisabled(t *testing.T) {
 }
 
 // TestMigrateICAControllerParams_SkipsWriteWhenAlreadyEnabled is the guard.
-// A fresh chain already stores controller_enabled=true. Deleting the early
-// return in migrateICAControllerParams makes this test red - which it was not
-// before, because the store cannot tell the two runs apart.
+// Deleting the early return makes this test red -- which it was not before, because
+// the store cannot tell the two runs apart.
 func TestMigrateICAControllerParams_SkipsWriteWhenAlreadyEnabled(t *testing.T) {
 	store := &recordingICAParamsStore{params: icacontrollertypes.NewParams(true)}
 
@@ -172,10 +160,9 @@ func TestMigrateICAControllerParams_SkipsWriteWhenAlreadyEnabled(t *testing.T) {
 }
 
 // TestMigrateICAControllerParams_IsIdempotent pins the property the missing
-// UpgradeAlreadyApplied guard relies on: a replayed plan leaves the store where
-// a single run would have. The second call goes through the real transition
-// (disabled -> enabled on the first pass) rather than starting from the steady
-// state, which is what a crash-restart of the upgrade actually does.
+// UpgradeAlreadyApplied guard relies on: a replayed plan leaves the store where a
+// single run would have. The second call goes through the real transition rather
+// than starting from the steady state, which is what a crash-restart does.
 func TestMigrateICAControllerParams_IsIdempotent(t *testing.T) {
 	store := &recordingICAParamsStore{params: icacontrollertypes.NewParams(false)}
 
@@ -186,39 +173,25 @@ func TestMigrateICAControllerParams_IsIdempotent(t *testing.T) {
 	require.True(t, store.params.ControllerEnabled)
 }
 
-// TestMigrateICAControllerParams_WritesBackEveryFieldRead is the fidelity check
-// on the write migrateICAControllerParams performs. It fills EVERY field of
-// icacontrollertypes.Params with a non-zero sentinel, sets the controller flag
-// back to false, runs the migration, and requires the stored value to equal the
-// read value with exactly that one field flipped. A whole-struct rebuild
-// (icacontrollertypes.NewParams(true)) would instead zero every other field, so
-// when ibc-go adds a second field this comparison fails and poses the real
-// question -- "what should the new field be during this migration?" -- instead
-// of a field count that a human would have to remember to bump.
+// TestMigrateICAControllerParams_WritesBackEveryFieldRead is the fidelity check on
+// the write migrateICAControllerParams performs: fill every field of Params with a
+// non-zero sentinel, set the controller flag back to false, run the migration, and
+// require the stored value to equal the read value with exactly that one field
+// flipped. A whole-struct rebuild would zero every other field instead.
 //
-// Sensitivity ceiling, stated honestly: today icacontrollertypes.Params has
-// exactly ONE field, and that field is precisely the one the migration flips,
-// so this assertion CANNOT fail today -- there is no other field to drop. Its
-// teeth are on the SECOND and later fields. Until such a field appears, NO test
-// in this package can tell a whole-struct rebuild apart from a read-modify-write
-// (revert the write in upgrades.go to icacontrollertypes.NewParams(true) and the
-// suite still passes). TestParamsWriteBackComparisonIsFieldSensitive proves only
-// that the comparison predicate is not a tautology; it reads nothing from the
-// production code, so it is not a guard.
+// Sensitivity ceiling, stated honestly: today icacontrollertypes.Params has exactly
+// one field and it is the one the migration flips, so this assertion CANNOT fail
+// today -- no test in this package can tell a rebuild from a read-modify-write
+// (revert the write in upgrades.go and the suite still passes). Its teeth are on the
+// second and later fields. TestParamsWriteBackComparisonIsFieldSensitive proves only
+// that the comparison predicate is not a tautology, so it is not a guard.
 //
-// Two blind spots belong here rather than in a review comment. The assertion
-// only sees fields that exist, so it says nothing at all until the field it
-// would drop has been added. And it catches a pointer or non-[]byte slice field
-// being dropped to nil or to a zero-length value, but not one being swapped for
-// a freshly allocated zero-valued object -- a fresh pointer, or a fresh slice of
-// the SAME length, compares equal to the sentinel.
+// Two blind spots: the assertion only sees fields that exist, and it catches a
+// pointer or non-[]byte slice dropped to nil or length 0, but not one swapped for a
+// freshly allocated zero-valued object of the same length.
 //
-// A field-count canary -- pinning
-// reflect.TypeOf(icacontrollertypes.Params{}).NumField() -- was considered and
-// dropped: once a second field exists this test already goes red if the write
-// stops carrying fields through, so a count canary would add no detection, only
-// a red build on the day ibc-go adds a field while the write is still correct. A
-// gate that fires on correct code is how gates get bypassed.
+// No field-count canary here: it would add no detection this test lacks, only a red
+// build on the day ibc-go adds a field while the write is still correct.
 func TestMigrateICAControllerParams_WritesBackEveryFieldRead(t *testing.T) {
 	sentinel := fillNonZeroStruct(t, reflect.TypeOf(icacontrollertypes.Params{}))
 
@@ -245,23 +218,14 @@ func TestMigrateICAControllerParams_WritesBackEveryFieldRead(t *testing.T) {
 }
 
 // fillNonZeroStruct returns a value of typ with every field set to a non-zero
-// sentinel, so that a field silently dropped by a write shows up in an equality
-// check. Whenever it cannot fill a field it FAILS rather than leaving that field
-// zero: a silently-zero field would be a false negative on exactly the drift
-// this helper exists to make visible, and a false negative is invisible while a
-// failure is not.
-//
-// Failure is reachable two ways, and neither is a mechanical fix:
-//
-//   - a kind this helper cannot build a non-zero value for;
-//   - an unexported field reached by recursing into a struct -- math.Int and
-//     time.Time are both built that way, and no reflection can set them.
-//
-// The second case is a decision, not a missing case: that field has to be
-// compared some other way (its own Equal or String, usually) and someone has to
-// decide which. A failure names the field by a dotted path rooted at the type it
-// was asked to fill, so a nested one reads e.g. "types.Params.Amount.i" rather
-// than a bare "i".
+// sentinel, so a field silently dropped by a write shows up in an equality check.
+// It FAILS rather than leaving a field zero when it cannot fill one -- an unknown
+// kind, or an unexported field reached by recursing into a struct (math.Int and
+// time.Time are built that way). A silently-zero field would be a false negative on
+// the very drift this helper exists to expose, and invisible; a failure names the
+// field by a dotted path rooted at the type, e.g. "types.Params.Amount.i" rather than
+// a bare "i". For the unexported case the fix is a decision -- how should that
+// wrapper be compared -- not a new case.
 func fillNonZeroStruct(t *testing.T, typ reflect.Type) reflect.Value {
 	t.Helper()
 
@@ -376,12 +340,16 @@ func TestParamsWriteBackComparisonIsFieldSensitive(t *testing.T) {
 // stored at feemarkettypes.ParamsKey. It was produced by ethermint
 // v0.24.1-uptick's types.Params, which encodes base_fee as cosmossdk.io/math.Int:
 //
-//	10 08                                   field 2  varint  base_fee_change_denominator = 8
-//	18 02                                   field 3  varint  elasticity_multiplier     = 2
-//	28 00                                   field 5  varint  enable_height              = 0
-//	32 0a 31 30 ... 30                      field 6  bytes   base_fee    = "1000000000"
-//	3a 01 30                                field 7  bytes   min_gas_price = "0"
-//	42 12 35 30 ... 30                      field 8  bytes   min_gas_multiplier = "5e17"
+//	10 08                   field 2 varint  base_fee_change_denominator = 8
+//	18 02                   field 3 varint  elasticity_multiplier       = 2
+//	28 00                   field 5 varint  enable_height               = 0
+//	32 0a 31 30 ... 30      field 6 bytes   base_fee                    = "1000000000"
+//	3a 01 30                field 7 bytes   min_gas_price               = "0"
+//	42 12 35 30 ... 30      field 8 bytes   min_gas_multiplier          = "500000000000000000"
+//
+// Every quoted value is the literal payload, so its length must equal the
+// byte after the tag (0x0a, 0x01, 0x12). Field 1 is absent because proto3
+// omits a false bool, and field 4 is reserved.
 //
 // The field-6 payload is the ASCII of the math.Int, which is also how
 // math.LegacyDec marshals its raw big.Int - the two encodings are the same

@@ -12,10 +12,10 @@ import (
 	"github.com/UptickNetwork/uptick/x/erc721/types"
 )
 
-// pairIndexConvertedNFTs is the test twin of app/keepers.convertedNFTChecker:
-// it answers x/collection's "is this native NFT bound to a contract token?"
-// question from this module's pair index, exactly as the production wiring
-// does.
+// pairIndexConvertedNFTs is the erc721 half of the production
+// app/keepers.convertedNFTChecker (which ORs this module's pair index with
+// x/cw721's) and answers x/collection's "is this native NFT bound to a contract
+// token?" question the same way.
 type pairIndexConvertedNFTs struct{ erc721 Keeper }
 
 func (c pairIndexConvertedNFTs) IsConvertedNFT(ctx sdk.Context, classID, nftID string) bool {
@@ -23,23 +23,21 @@ func (c pairIndexConvertedNFTs) IsConvertedNFT(ctx sdk.Context, classID, nftID s
 }
 
 // TestRefundBurnRequiresThePairMappingsGone pins WHY RefundPacketToken deletes
-// the pair mappings BEFORE burning the native NFT -- the order a round-29
-// report flagged as a risk ("deletes the mapping, then burns; if the burn fails
-// the mapping is already lost, so the residue is undiscoverable").
+// the pair mappings BEFORE burning the native NFT, the order a round-29 report
+// flagged as a risk ("deletes the mapping, then burns; if the burn fails the
+// mapping is already lost, so the residue is undiscoverable").
 //
-// The order is forced, not a choice. x/collection.RemoveNFT refuses to burn an
-// NFT that IsConvertedNFT reports as bound to a contract token
-// (ErrNFTBoundToContract), and the production checker answers that question
-// from THIS module's own pair index. Burning first would therefore fail on
-// every single refund -- after the ERC721 had already been returned to the
-// user -- so the module account would keep the native NFT forever and the
-// packet could never converge. Deleting the binding is what makes the burn
-// legal.
+// The order is forced: x/collection.RemoveNFT refuses to burn an NFT that
+// IsConvertedNFT reports as bound to a contract token (ErrNFTBoundToContract),
+// and the production checker answers that question from this module's pair
+// index. Burning first would fail on every refund, after the ERC721 had already
+// been returned to the user, leaving the module account holding the native NFT
+// forever. Deleting the binding is what makes the burn legal.
 //
-// The test wires the checker the way the app does, which is the part the other
-// refund tests cannot see (their collection keeper has no checker, so a
-// burn-first implementation would still pass them). Here it turns the healthy
-// path into nft_burn_failed plus a surviving NFT.
+// Wiring the checker is what the other refund tests cannot see (their
+// collection keeper has no checker, so a burn-first implementation would still
+// pass them); here it turns the healthy path into nft_burn_failed plus a
+// surviving NFT.
 func TestRefundBurnRequiresThePairMappingsGone(t *testing.T) {
 	k, ctx, owner := setupConvertKeeper(t)
 	setupRefundableToken(t, k, ctx, owner, "kitty", "nft1", "1")

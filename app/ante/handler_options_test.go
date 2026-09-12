@@ -26,11 +26,11 @@ func (stubKVStoreService) OpenKVStore(_ context.Context) corestore.KVStore {
 	return nil
 }
 
-// TestSetUpContextPrecedesWasmCountTX pins the dfe8cee (round 18) G-5 fix:
-// SetUpContextDecorator MUST come before CountTXDecorator (and any other
-// wasm KV-writing decorator), so the tx gas meter, not the infinite
-// BaseApp preset meter, accounts for CountTX's KV writes. A regression
-// here would let a malicious tx inflate the count without paying gas.
+// TestSetUpContextPrecedesWasmCountTX pins the fix from dfe8cee: SetUpContext
+// MUST come before CountTX (and any other wasm KV-writing decorator), so the tx
+// gas meter, not BaseApp's infinite preset meter, accounts for CountTX's KV
+// writes. A regression here would let a malicious tx inflate the count without
+// paying gas.
 func TestSetUpContextPrecedesWasmCountTX(t *testing.T) {
 	opts := HandlerOptions{
 		TXCounterStoreService: stubKVStoreService{},
@@ -134,10 +134,9 @@ func TestWasmDecoratorsOmittedWhenKeepersNil(t *testing.T) {
 }
 
 // TestGasRegisterDecoratorRequiresWasmKeeper is the negative-control
-// counterpart to TestWasmDecoratorsOmittedWhenKeepersNil: WasmNodeConfig
-// is set but WasmKeeper is nil, so GasRegisterDecorator must NOT appear.
-// End-to-end integration tests in app_test.go exercise the real
-// (non-nil) WasmKeeper branch.
+// counterpart to TestWasmDecoratorsOmittedWhenKeepersNil: WasmNodeConfig is set
+// but WasmKeeper is nil, so GasRegisterDecorator must NOT appear. The non-nil
+// branch has no unit assertion here; it is exercised only end-to-end (tests/e2e).
 func TestGasRegisterDecoratorRequiresWasmKeeper(t *testing.T) {
 	decorators := cosmosAnteDecorators(
 		HandlerOptions{WasmNodeConfig: &wasmtypes.NodeConfig{}},
@@ -156,11 +155,9 @@ func TestGasRegisterDecoratorRequiresWasmKeeper(t *testing.T) {
 //
 // It compares reflect.Type values rather than type-name strings on purpose. The
 // wasmd keeper package is imported as `wasmkeeper` but declares `package
-// keeper`, so fmt.Sprintf("%T", d) prints "*keeper.GasRegisterDecorator" and
-// any literal built from the import alias can never match - the assertion this
-// helper replaces had exactly that shape and could not fail. Names also collide
-// across packages: cosmos-sdk's, ibc-go's and cosmos/evm's ante packages all
-// print as "ante" or "cosmos".
+// keeper`, so fmt.Sprintf("%T", d) prints "*keeper.GasRegisterDecorator" and any
+// literal built from the import alias can never match - the assertion this
+// helper replaces had exactly that shape and could not fail.
 //
 // A typed nil works for pointer decorators: reflect.TypeOf recovers the pointer
 // type without allocating.
@@ -175,18 +172,16 @@ func decoratorIndex(chain []sdk.AnteDecorator, prototype any) int {
 }
 
 // TestAnteDecoratorOrdering pins the two orderings in cosmosAnteDecorators
-// whose inversion breaks behaviour silently. Both are stated as comments in
-// handler_options.go and neither is observable from a type-level assert, so
-// without this test a plausible-looking reorder would only show up in
-// production as "the wasm simulation ignores its gas cap" or "signature
-// verification became free".
+// whose inversion breaks behaviour silently: without this test a plausible
+// reorder would surface only in production as "the wasm simulation ignores its
+// gas cap" or "signature verification became free".
 //
-// The rest of the chain is deliberately not pinned. Most pairs only decide
-// which error surfaces first, including the one flagged in review as an
-// adjacency constraint (RejectMessagesDecorator next to the extension-option
-// checker): those two have never been adjacent - the authz limiter and the
-// simulation-gas decorator sit between them - and swapping any of the three
-// leaves the same tx either accepted or rejected, just reported differently.
+// The rest of the chain is deliberately not pinned. Most pairs only decide which
+// error surfaces first, and swapping them leaves the same tx accepted or
+// rejected, just reported differently. That includes the RejectMessagesDecorator
+// / extension-option adjacency flagged in review: they are not adjacent (the
+// authz limiter and the simulation-gas decorator sit between them), and swapping
+// any of the three changes only which error surfaces.
 func TestAnteDecoratorOrdering(t *testing.T) {
 	sigVerify := ante.NewSigVerificationDecorator(nil, nil)
 	decorators := cosmosAnteDecorators(

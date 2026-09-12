@@ -46,15 +46,14 @@ func (i GenesisExportIssue) String() string {
 // the error message. Every issue is still counted.
 const MaxReportedExportIssues = 20
 
-// GenesisExportError is the fail-closed error raised by ExportGenesis when the
-// live store holds state the genesis file cannot represent.
+// GenesisExportError reports state that a genesis file cannot represent. The
+// error-returning accessors (ExportNFTUIDPairs, ExportRefundReceivers) return it
+// through issuesToError when the live store is damaged.
 //
 // The Cosmos SDK module interface (AppModule.ExportGenesis(ctx, cdc)
-// json.RawMessage) has no error channel, so an export cannot hand a structured
-// error back to the CLI. Panicking with this value is therefore the only
-// mechanism that makes the CLI fail (non-zero exit) AND prints the full,
-// actionable list of damaged keys — which is strictly better than both the old
-// bare panic (no diagnosis) and a silent skip (data loss).
+// json.RawMessage) has no error channel, so the module-level ExportGenesis
+// cannot surface it and degrades-and-reports instead; Error() is what spells
+// out the actionable list of damaged keys, capped at MaxReportedExportIssues.
 type GenesisExportError struct {
 	Module string
 	Issues []GenesisExportIssue
@@ -80,15 +79,13 @@ func (e *GenesisExportError) Error() string {
 	return b.String()
 }
 
-// issuesToError converts a non-empty issue list into a plain error, for the
-// legacy (error-returning) accessors.
+// issuesToError converts a non-empty issue list into an error.
 func issuesToError(module string, issues []GenesisExportIssue) error {
 	return &GenesisExportError{Module: module, Issues: issues}
 }
 
-// MergeExportIssues flattens the per-store issue lists into a single list, so
-// every caller reports them in the same order instead of repeating (and
-// eventually drifting on) the append sequence.
+// MergeExportIssues flattens the per-store issue lists into one list so every
+// caller reports them in the same order instead of re-implementing the append.
 func MergeExportIssues(groups ...[]GenesisExportIssue) []GenesisExportIssue {
 	total := 0
 	for _, g := range groups {
