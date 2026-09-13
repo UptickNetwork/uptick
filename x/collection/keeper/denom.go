@@ -38,11 +38,14 @@ func (k Keeper) SaveDenom(ctx sdk.Context, id,
 	// Oversized schema/data are bounded separately: the schema is embedded in
 	// the first ERC721 deployment calldata, so an unbounded schema can
 	// permanently DoS conversion; data is arbitrary metadata.
-	if len(schema) > types.MaxDenomSchemaLen {
-		return sdkerrors.Wrapf(types.ErrInvalidDenom, "schema too long: %d > %d", len(schema), types.MaxDenomSchemaLen)
-	}
-	if len(data) > types.MaxDenomDataLen {
-		return sdkerrors.Wrapf(types.ErrInvalidDenom, "data too long: %d > %d", len(data), types.MaxDenomDataLen)
+	//
+	// The predicate lives in x/collection/types because ValidateGenesis and
+	// ClassBuilder.Build must apply the *identical* bound, and this keeper
+	// package cannot be reached from types/. v0.4.1 shipped the bound here only,
+	// which is exactly what made the validate/import sides disagree (an
+	// oversized ICS-721 classData passed validation and panicked InitGenesis).
+	if err := types.ValidateDenomMetadataBounds(schema, data); err != nil {
+		return err
 	}
 
 	denomMetadata := &types.DenomMetadata{

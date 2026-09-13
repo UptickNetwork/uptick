@@ -179,12 +179,37 @@ var (
 		// still needs the "nft" account for IBC escrow. Deleting it triggers
 		// "panic: the nft module account has not been set" in TestInitCmd
 		// (regression discovered during 第19轮 dfe8cee 副作用审查).
-		cosmosnft.ModuleName:           nil,
-		nfttypes.ModuleName:            nil, // x/collection
-		wasmtypes.ModuleName:           {authtypes.Burner},
-		icatypes.ModuleName:            nil,
-		feemarkettypes.ModuleName:      nil,
-		ibcnfttransfertypes.ModuleName: {authtypes.Minter, authtypes.Burner},
+		cosmosnft.ModuleName:      nil,
+		nfttypes.ModuleName:       nil, // x/collection
+		wasmtypes.ModuleName:      {authtypes.Burner},
+		icatypes.ModuleName:       nil,
+		feemarkettypes.ModuleName: nil,
+		// ibcnfttransfertypes.ModuleName: the ICS-721 module moves NFTs, never
+		// coins, so it has no reason to hold bank mint/burn rights. Audit F-004.
+		//
+		// Nothing uses them. Repo-wide, MintCoins/BurnCoins appear only in
+		// testutil/signer.go -- twice, both with minttypes.ModuleName -- and the
+		// fork behind this module (UptickNetwork/nft-transfer v1.3.0-ibc-v10) has
+		// no bank keeper at all: its Keeper holds storeKey, cdc, authority,
+		// ics4Wrapper, channelKeeper, nftKeeper and authKeeper, and its non-test
+		// source contains zero MintCoins/BurnCoins calls. ICS-721 escrow is
+		// types.GetEscrowAddress(port, channel) -- an ADR-028 hash of the channel
+		// identifiers that never consults this map.
+		//
+		// nil rather than deleting the entry: BlockedAddrs() and
+		// ModuleAccountAddrs() derive addresses from this map's KEYS, so dropping
+		// the key would stop the module address being blocked and make
+		// GetModuleAddress return nil -- the exact shape that forced a previous
+		// round to restore cosmosnft.ModuleName (see the comment above). nil keeps
+		// that address derived, resolvable and blocked while granting nothing.
+		//
+		// Scope: this governs accounts created from here on. An account already in
+		// auth state keeps whatever permissions it was written with, because they
+		// live on the ModuleAccount object and x/auth consults permAddrs only to
+		// create a missing one (x/auth/keeper/keeper.go:285-306). That residue is
+		// unreachable for want of a caller, so it is reported rather than migrated
+		// -- see deliverables/gstack/fix-app-moduleacct-2026-09-13.md.
+		ibcnfttransfertypes.ModuleName: nil,
 	}
 
 	// module accounts that are allowed to receive tokens

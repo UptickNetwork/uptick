@@ -95,6 +95,62 @@ func ValidateDenomID(denomID string) error {
 	return ValidateKeywords(denomID)
 }
 
+// ValidateDenomMetadataBounds is the single implementation of the denom
+// schema/data size bound. It is called from the three sides that must agree on
+// exactly the same predicate:
+//
+//   - keeper.SaveDenom (the write path, x/collection/keeper/denom.go),
+//   - ValidateGenesis (the validate / import path),
+//   - ClassBuilder.Build (the ICS-721 receive path, which writes the class
+//     straight through the underlying nft keeper and so never reaches
+//     SaveDenom at all).
+//
+// The three used to disagree. v0.4.1 added the bound to SaveDenom only, so an
+// oversized ICS-721 classData could be stored on chain, exported verbatim,
+// accepted by `uptickd validate-genesis`, and then panic InitGenesis on the
+// node that tried to start from that same export. Keeping the predicate in one
+// function is what makes that asymmetry unrepeatable: do not inline the
+// comparisons at a call site, and do not give a call site a laxer bound. A
+// reverse-pin test asserts that no other file in this package, and not
+// keeper/denom.go, carries the literal comparisons.
+//
+// The error strings are byte-for-byte the ones SaveDenom used before the
+// extraction, so operator-visible messages and CLI output do not change.
+func ValidateDenomMetadataBounds(schema, data string) error {
+	if len(schema) > MaxDenomSchemaLen {
+		return sdkerrors.Wrapf(ErrInvalidDenom, "schema too long: %d > %d", len(schema), MaxDenomSchemaLen)
+	}
+	if len(data) > MaxDenomDataLen {
+		return sdkerrors.Wrapf(ErrInvalidDenom, "data too long: %d > %d", len(data), MaxDenomDataLen)
+	}
+	return nil
+}
+
+// ClampDenomMetadataBounds truncates schema/data to the bounds enforced by
+// ValidateDenomMetadataBounds, reporting whether anything was cut.
+//
+// It is the companion of the predicate, for the one caller that must make an
+// already-stored value legal rather than reject it: the genesis export. A
+// genesis whose ValidateGenesis rejects is a genesis no node can start from, so
+// when a class was written outside SaveDenom (an ICS-721 voucher class, before
+// the receive path was bounded) the export truncates to the same bound the
+// validate/import side will enforce, instead of emitting a record that fails
+// validation.
+//
+// It lives here, next to the predicate, so neither the bound nor the comparison
+// is spelled a second time anywhere else in the module -- the export path, the
+// write path and the validate path all read them from this file.
+func ClampDenomMetadataBounds(schema, data string) (clampedSchema, clampedData string, changed bool) {
+	clampedSchema, clampedData = schema, data
+	if len(clampedSchema) > MaxDenomSchemaLen {
+		clampedSchema, changed = clampedSchema[:MaxDenomSchemaLen], true
+	}
+	if len(clampedData) > MaxDenomDataLen {
+		clampedData, changed = clampedData[:MaxDenomDataLen], true
+	}
+	return clampedSchema, clampedData, changed
+}
+
 // validateIBCClassID accepts ICS-721 voucher class ids of the form ibc/{hash}.
 // User issuance still goes through ValidateIssueDenomID, which rejects this prefix.
 func validateIBCClassID(denomID string) error {

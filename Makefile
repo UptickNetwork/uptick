@@ -1,17 +1,28 @@
 #!/usr/bin/make -f
 
-BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
 COMMIT := $(shell git log -1 --format='%H')
-VERSION := v0.4.1
 
-
-# don't override user values
-ifeq (,$(VERSION))
-  VERSION := $(shell git describe --exact-match 2>/dev/null)
-  # if VERSION is empty, then populate it with branch's name and raw commit hash
-  ifeq (,$(VERSION))
-    VERSION := $(BRANCH)-$(COMMIT)
-  endif
+# VERSION is injected by -ldflags below as the app version: into the SDK's
+# version package (what `uptickd version` prints) and into this repo's own
+# version package. It must never claim a release that this commit is not.
+#
+# It used to be a hardcoded `v0.4.1`. That value is non-empty, so the `git
+# describe` fallback underneath it was dead code: a binary built from an
+# arbitrary commit and one built from the v0.4.1 tag both reported v0.4.1, and
+# only the injected commit hash told them apart. Defaulting to what git says
+# about the current commit fixes that, and releases are unaffected because the
+# exact version is still passed in explicitly by .build.sh (command line) and
+# goreleaser ({{.Version}} templates), both of which take precedence.
+#
+# `--dirty` appends -dirty for uncommitted *tracked* changes (untracked files do
+# not set it); `--always` keeps it working in the tag-less shallow checkout CI
+# uses, where it degrades to the abbreviated commit instead of erroring.
+GIT_VERSION := $(shell git describe --tags --dirty --always 2>/dev/null)
+VERSION ?= $(GIT_VERSION)
+ifeq (,$(strip $(VERSION)))
+  # No git at all (a source tarball, or an explicit empty VERSION): say so
+  # instead of inventing a version.
+  VERSION := dev
 endif
 
 PACKAGES_NOSIMULATION=$(shell go list ./... | grep -v '/simulation')
@@ -137,6 +148,7 @@ build-linux:
 	GOOS=linux GOARCH=amd64 LEDGER_ENABLED=true $(MAKE) build
 
 $(BUILD_TARGETS): go.sum $(BUILDDIR)/
+	@echo "--> building $(VERSION) ($(COMMIT))"
 	go $@ $(BUILD_FLAGS) $(BUILD_ARGS) ./...
 
 $(BUILDDIR)/:

@@ -71,6 +71,19 @@ const (
 	// GenesisState and is recomputed on import, so the mismatch would quietly
 	// vanish. Reported so it cannot vanish unobserved.
 	ExportIssueSupplyMismatch ExportIssueKind = "supply_mismatch"
+	// ExportIssueClassMetadataTooLarge means the class' schema and/or data blob
+	// exceeds the denom metadata bounds that ValidateGenesis enforces, so the
+	// export cannot carry it verbatim: an exported record that validate rejects
+	// is a genesis no node can start from. The export truncates the offending
+	// field to the bound (the prefix is kept) and reports the original and the
+	// emitted byte counts here, so the loss is loud in
+	// <home>/export-issues.json instead of silent.
+	//
+	// A class can only reach this state by a write path that bypasses
+	// SaveDenom -- in practice an ICS-721 voucher class written before the
+	// receive-side bound existed (see ClassBuilder.Build). The bound is applied
+	// on receive now, so this kind should only ever fire on pre-existing state.
+	ExportIssueClassMetadataTooLarge ExportIssueKind = "class_metadata_too_large"
 )
 
 // ExportIssue is one recoverable problem encountered during genesis export. It
@@ -140,6 +153,13 @@ func (k Keeper) GetCollectionsWithReport(ctx sdk.Context) ([]types.Collection, [
 			issues = append(issues, *issue)
 		}
 
+		// Make the metadata legal before it leaves: a genesis ValidateGenesis
+		// rejects is a genesis no node can start from. Truncating keeps the
+		// export importable while the issue records the lost bytes.
+		if issue := k.classMetadataBoundsIssue(denom); issue != nil {
+			issues = append(issues, *issue)
+		}
+
 		// The supply check rides along with the NFT walk that is already
 		// happening: len(nfts) is the independent count, the class' stored
 		// counter is the other side of the comparison.
@@ -174,6 +194,39 @@ func (k Keeper) classMetadataIssue(class *nft.Class) *ExportIssue {
 		}
 	}
 	return nil
+}
+
+// classMetadataBoundsIssue reports a class whose schema/data exceeds the denom
+// metadata bounds, truncating the offending field(s) in place to the bound so
+// the exported value is one ValidateGenesis (and therefore InitGenesis)
+// accepts. Returns nil for a class that is already within bounds.
+//
+// Both the bound and the comparison come from types.ClampDenomMetadataBounds,
+// which is the same file that holds the predicate keeper.SaveDenom and
+// ValidateGenesis apply. Re-deriving the limit here is what would let the
+// export drift from `uptickd validate-genesis` again.
+//
+// Truncating keeps the prefix rather than clearing the field: the prefix is
+// what a consumer can still act on, and the Detail records both byte counts so
+// the loss is auditable rather than silent.
+func (k Keeper) classMetadataBoundsIssue(denom *types.Denom) *ExportIssue {
+	origSchema, origData := denom.Schema, denom.Data
+	clampedSchema, clampedData, changed := types.ClampDenomMetadataBounds(origSchema, origData)
+	if !changed {
+		return nil
+	}
+
+	denom.Schema, denom.Data = clampedSchema, clampedData
+
+	return &ExportIssue{
+		ClassID: denom.Id,
+		Kind:    ExportIssueClassMetadataTooLarge,
+		Detail: fmt.Sprintf(
+			"denom metadata exceeds the genesis bounds and was truncated to keep the export importable: "+
+				"schema %d -> %d bytes, data %d -> %d bytes",
+			len(origSchema), len(clampedSchema), len(origData), len(clampedData),
+		),
+	}
 }
 
 // supplyIssue reports a class whose stored total-supply counter disagrees with

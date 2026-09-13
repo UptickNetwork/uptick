@@ -18,14 +18,53 @@ if [[ ! -f "$BASELINE_FILE" ]]; then
   exit 2
 fi
 
+# G-02: the scanner is pinned, not floating. `@latest` resolved to a different
+# binary on different days (v1.8.0 as of 2026-09-13), so "no new vulnerabilities"
+# was a statement about an unknown tool. The pin below must stay in lockstep with
+# .github/workflows/security.yml (GOVULNCHECK_VERSION), which installs the binary
+# this script then picks up from $PATH: the assertion further down runs against
+# whatever is on $PATH in BOTH places, so if one copy is bumped alone the other
+# fails loudly instead of quietly scanning with a different scanner.
+#
+# v1.7.0 is the newest x/vuln that go.mod's toolchain (go 1.25.13) can build;
+# v1.8.0 requires `go >= 1.26.0`. Bump this only together with the toolchain.
+PINNED_GOVULNCHECK_VERSION="v1.7.0"
+
 if ! command -v govulncheck >/dev/null 2>&1; then
-  echo "govulncheck not found, installing..."
-  go install golang.org/x/vuln/cmd/govulncheck@latest
-  export PATH="$HOME/go/bin:$PATH"
+  echo "govulncheck not found, installing ${PINNED_GOVULNCHECK_VERSION}..."
+  go install "golang.org/x/vuln/cmd/govulncheck@${PINNED_GOVULNCHECK_VERSION}"
+  # `go install` writes into $(go env GOBIN), or GOPATH/bin when GOBIN is unset
+  # (this used to hardcode $HOME/go/bin, which is wrong whenever GOBIN is set).
+  install_bin="$(go env GOBIN)"
+  [[ -n "$install_bin" ]] || install_bin="$(go env GOPATH)/bin"
+  export PATH="$install_bin:$PATH"
+fi
+
+if ! command -v govulncheck >/dev/null 2>&1; then
+  echo "FAIL: govulncheck is still not on PATH after installing ${PINNED_GOVULNCHECK_VERSION}." >&2
+  exit 2
 fi
 
 LOG="$(mktemp)"
 trap 'rm -f "$LOG"' EXIT
+
+# Record which scanner produced the verdict below, and refuse to continue with a
+# different one. The `Scanner:` line is read from the binary's own build info
+# (x/vuln internal/scan/run.go, scannerVersion), so a look-alike placed earlier
+# on $PATH cannot satisfy it. The `Go:` line next to it is the ambient `go` from
+# $PATH and is printed for traceability only, never asserted on.
+version_out="$(govulncheck -version 2>&1 || true)"
+echo "$version_out"
+installed_version="$(printf '%s\n' "$version_out" | sed -n 's/^Scanner: govulncheck@//p' | tr -d '\r')"
+if [[ "$installed_version" != "$PINNED_GOVULNCHECK_VERSION" ]]; then
+  echo "FAIL: govulncheck reports '${installed_version:-<unparseable>}', expected '${PINNED_GOVULNCHECK_VERSION}'." >&2
+  echo "Refusing to scan: the verdict would describe a scanner this gate does not pin, so" >&2
+  echo "'no new vulnerabilities' would not be a statement about a fixed tool." >&2
+  echo "Fix by installing the pin:  go install golang.org/x/vuln/cmd/govulncheck@${PINNED_GOVULNCHECK_VERSION}" >&2
+  echo "If the pin is genuinely moving, change it here AND GOVULNCHECK_VERSION in" >&2
+  echo ".github/workflows/security.yml in the same commit." >&2
+  exit 2
+fi
 
 # govulncheck exits 3 for findings and other non-zero codes for build/network
 # errors; capture the rc instead of letting set -e abort, for the checks below.

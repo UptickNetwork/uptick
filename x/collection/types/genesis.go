@@ -56,6 +56,18 @@ func ValidateGenesis(data GenesisState) error {
 			}
 		}
 
+		// keeper.SaveDenom applies the schema/data size bound on the import
+		// path, so validate must apply the identical predicate: a genesis
+		// validation waves through is one InitGenesis panics on. Do NOT
+		// re-derive the bound here -- ValidateDenomID above is shared the same
+		// way, and re-implementing rather than sharing it is what let v0.4.1
+		// ship an asymmetric validate/import pair (an oversized ICS-721
+		// classData was accepted by `uptickd validate-genesis` and then
+		// panicked the node restoring from that export).
+		if err := ValidateDenomMetadataBounds(c.Denom.Schema, c.Denom.Data); err != nil {
+			return err
+		}
+
 		seenTokenIDs := make(map[string]struct{}, len(c.NFTs))
 		for _, nft := range c.NFTs {
 			if nft.GetOwner().Empty() {

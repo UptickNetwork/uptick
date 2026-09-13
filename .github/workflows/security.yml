@@ -3,6 +3,11 @@ name: Security
 # NOT listed in scripts/vuln-baseline.txt (known no-fix-available advisories).
 # When an upstream fix becomes available, remove the ID from the baseline and
 # upgrade the dependency — this workflow will then enforce the upgrade.
+#
+# G-02: the scanner version and the GOTOOLCHAIN it runs on are pinned at the job
+# level, so the same commit is always scanned by the same tool. The pin is
+# duplicated in scripts/govulncheck-baseline.sh on purpose — both sides assert
+# the version of the binary they run, so bumping only one fails the job.
 on:
   pull_request:
   push:
@@ -22,6 +27,23 @@ jobs:
     name: govulncheck (baseline filtered)
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # G-02: the verdict this job produces must be reproducible from one commit
+    # to the next, so both the scanner and the toolchain it runs on are pinned
+    # here instead of being resolved at run time.
+    env:
+      # `local` forbids Go from downloading another toolchain mid-run. This is a
+      # deliberate behaviour change: with the previous implicit default (`auto`),
+      # installing a floating scanner version silently fetched and switched to a
+      # NEWER toolchain (go1.26.x) than the 1.25.13 that go.mod and setup-go
+      # install, so the scan ran on a compiler this repo never declares.
+      #
+      # `local` is only safe when the pinned scanner can be built by the declared
+      # toolchain, which is exactly what GOVULNCHECK_VERSION buys us: x/vuln
+      # v1.7.0 requires `go >= 1.25.0` (OK against go.mod's 1.25.13), whereas the
+      # currently-latest v1.8.0 requires `go >= 1.26.0` and would fail here.
+      # Move the two together if the toolchain is ever bumped.
+      GOTOOLCHAIN: local
+      GOVULNCHECK_VERSION: v1.7.0
     steps:
       # Audit O-05: pinned to immutable commits (see ci.yml for the policy).
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -31,7 +53,39 @@ jobs:
           go-version-file: "go.mod"
 
       - name: Install govulncheck
-        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+        run: |
+          set -euo pipefail
+          # Prove the toolchain policy actually reached this step. Without this
+          # check a runner that pre-sets GOTOOLCHAIN would fall back to
+          # downloading a toolchain and the scan below would no longer be the
+          # one this commit pinned.
+          echo "GOTOOLCHAIN=$GOTOOLCHAIN"
+          if [[ "$GOTOOLCHAIN" != "local" ]]; then
+            echo "FAIL: expected GOTOOLCHAIN=local for a reproducible scan, got '$GOTOOLCHAIN'." >&2
+            exit 1
+          fi
+          go install golang.org/x/vuln/cmd/govulncheck@"$GOVULNCHECK_VERSION"
+
+      # G-02: `@latest` meant the same commit could be scanned by a different
+      # scanner version on a different day, so "no new vulnerabilities" was not
+      # a statement about a fixed tool. Print the version of every run for the
+      # log, and fail when the installed binary is not the pinned one -- that is
+      # what catches the pin drifting apart from the copy in
+      # scripts/govulncheck-baseline.sh (run by the next step).
+      #
+      # Parsing target is upstream-defined: the `Scanner:` line comes from the
+      # binary's own build info (x/vuln internal/scan/run.go, scannerVersion),
+      # not from PATH, so it cannot be satisfied by a look-alike on $PATH.
+      - name: Verify govulncheck version
+        run: |
+          set -euo pipefail
+          version_out="$(govulncheck -version 2>&1)"
+          echo "$version_out"
+          actual="$(printf '%s\n' "$version_out" | sed -n 's/^Scanner: govulncheck@//p' | tr -d '\r')"
+          if [[ "$actual" != "$GOVULNCHECK_VERSION" ]]; then
+            echo "FAIL: installed govulncheck reports '${actual:-<unparseable>}', expected '$GOVULNCHECK_VERSION'." >&2
+            exit 1
+          fi
 
       - name: Run govulncheck with baseline
         run: bash scripts/govulncheck-baseline.sh

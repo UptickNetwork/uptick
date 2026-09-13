@@ -140,6 +140,15 @@ func NewRootCmd() *cobra.Command {
 		ac.appExport,
 		addModuleInitFlags,
 	)
+	// The export command must carry the degraded-export reporting step. Without
+	// it, an export whose diagnostics report could not be written is again
+	// indistinguishable from a clean one for every consumer that does not read
+	// the node log -- the very defect this step exists to close. Failing fast
+	// at construction time is the same treatment the two panics below give to
+	// the other construction-time invariants.
+	if !wrapExportCommand(rootCmd) {
+		panic("uptickd: the SDK export command was not found; the degraded-export exit code cannot be installed")
+	}
 
 	// add keybase, auxiliary RPC, query, and tx child commands
 	rootCmd.AddCommand(
@@ -341,6 +350,65 @@ func (a appCreator) appExport(
 	}
 
 	return uptickApp.ExportAppStateAndValidators(forZeroHeight, jailAllowedAddrs, modulesToExport)
+}
+
+// wrapExportCommand makes a degraded export visible to the operator and to a
+// pipeline, once the genesis has already been written to stdout (or to
+// --output-document).
+//
+// The export command itself must never fail because of the diagnostics sidecar
+// (a full disk must not block disaster recovery -- see the invariant in
+// app/export.go and app/export_diagnostics.go), so returning an error from here
+// is not an option: that would make a perfectly usable genesis look like a
+// failed export and could make a caller throw it away. The process exit code is
+// therefore the only channel left, and it stays meaningful:
+//
+//	0  the export succeeded and, if it degraded, the degradations are on disk
+//	3  the export succeeded but the degradations could NOT be recorded durably
+//	   (app.ExportDiagnosticsDegradedExitCode)
+//	1  the export itself failed (cobra's own error path)
+//
+// On top of the code, a degraded export always prints a standing one-line
+// marker on stderr, so a human sees it even without inspecting the exit code.
+//
+// The command is located by name and its RunE is composed, rather than
+// reconstructed, so the SDK keeps owning the export logic. It reports whether
+// the command was found, so the caller can refuse to start a CLI whose export
+// silently lost the reporting step.
+func wrapExportCommand(rootCmd *cobra.Command) bool {
+	exportCmd, _, err := rootCmd.Find([]string{"export"})
+	if err != nil || exportCmd == nil || exportCmd.Name() != "export" || exportCmd.RunE == nil {
+		return false
+	}
+	exportCmd.RunE = composeExportRunE(exportCmd.RunE)
+	return true
+}
+
+// composeExportRunE appends the diagnostics report step to the SDK's export
+// RunE. It is separate from wrapExportCommand so the composition can be
+// exercised without a real node home and a real database.
+func composeExportRunE(inner func(*cobra.Command, []string) error) func(*cobra.Command, []string) error {
+	return func(cmd *cobra.Command, args []string) error {
+		if err := inner(cmd, args); err != nil {
+			return err
+		}
+		return finishExport(cmd.ErrOrStderr(), app.LastExportDiagnosticsStatus())
+	}
+}
+
+// finishExport prints the standing marker of a degraded export and, when the
+// degradations could not be recorded durably, terminates the process with the
+// degraded exit code. The genesis has already been emitted at this point, so
+// exiting directly -- rather than returning an error -- is what keeps the
+// output usable while still letting a pipeline notice.
+func finishExport(stderr io.Writer, status app.ExportDiagnosticsStatus) error {
+	if msg := status.CLIMessage(); msg != "" {
+		fmt.Fprintln(stderr, msg)
+	}
+	if code := status.CLIExitCode(); code != 0 {
+		os.Exit(code)
+	}
+	return nil
 }
 
 // initTendermintConfig helps to override default Tendermint Config values.

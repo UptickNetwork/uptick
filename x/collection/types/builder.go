@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 
+	sdkerrors "cosmossdk.io/errors"
 	"cosmossdk.io/x/nft"
 	"github.com/cosmos/cosmos-sdk/codec"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
@@ -147,12 +148,22 @@ func (cb ClassBuilder) Build(classID, classURI, classData string) (nft.Class, er
 
 	dataMap := make(map[string]interface{})
 	if err := json.Unmarshal(classDataBz, &dataMap); err != nil {
+		// The classData is not JSON, so it becomes the metadata blob verbatim.
+		// Bound it *before* it is written: this is the ICS-721 receive path,
+		// and an unbounded blob here is exactly how a counterparty chain could
+		// store a class that this chain's own export then emitted, validate
+		// accepted, and InitGenesis panicked on. See
+		// ValidateDenomMetadataBounds for why the check is shared, not inlined.
+		rawData := string(classDataBz)
+		if err := ValidateDenomMetadataBounds(schema, rawData); err != nil {
+			return nft.Class{}, err
+		}
 		anyVal, err := codectypes.NewAnyWithValue(&DenomMetadata{
 			Creator:          creator,
 			Schema:           schema,
 			MintRestricted:   mintRestricted,
 			UpdateRestricted: updateRestricted,
-			Data:             string(classDataBz),
+			Data:             rawData,
 		})
 		if err != nil {
 			return nft.Class{}, err
@@ -258,6 +269,14 @@ func (cb ClassBuilder) Build(classID, classURI, classData string) (nft.Class, er
 		data = string(dataBz)
 	}
 
+	// The JSON branch can carry an oversized schema (and an oversized leftover
+	// data map). Same shared predicate as the non-JSON branch above and as
+	// keeper.SaveDenom: this is the only place a class derived from an ICS-721
+	// packet is allowed to reach the store.
+	if err := ValidateDenomMetadataBounds(schema, data); err != nil {
+		return nft.Class{}, err
+	}
+
 	anyVal, err := codectypes.NewAnyWithValue(&DenomMetadata{
 		Creator:          creator,
 		Schema:           schema,
@@ -278,6 +297,54 @@ func (cb ClassBuilder) Build(classID, classURI, classData string) (nft.Class, er
 		UriHash:     uriHash,
 		Data:        anyVal,
 	}, nil
+}
+
+// MaxTokenDataLen bounds the token metadata blob that an ICS-721 packet may
+// carry into NFTMetadata.Data through TokenBuilder.Build.
+//
+// It exists because that field had no bound at all. TokenBuilder.Build is the
+// single entry point through which a counterparty chain's tokenData becomes a
+// stored token: x/internft reaches it from Mint (the ICS-721 receive path,
+// x/internft/keeper.go:94) and from Transfer (:119). An unbounded blob there is
+// counterparty-controlled state on this chain.
+//
+// The magnitude mirrors MaxDenomDataLen (validation.go) -- same kind of
+// arbitrary metadata blob, same order of magnitude the module already accepts --
+// but it is deliberately a separate constant. The token blob and the denom blob
+// are different fields on different records, and one shared name would imply a
+// coupling that does not exist. It is also why this constant lives here and not
+// in validation.go: see the "one side only" note below.
+//
+// This bound has exactly ONE side, and must stay that way. Unlike the denom
+// bound, no genesis path runs through Build:
+//
+//   - export reads the stored NFTMetadata.Data verbatim (keeper.GetNFTs) and
+//     never calls Build;
+//   - import writes it verbatim (InitGenesis -> SaveCollection -> SaveNFT) and
+//     never calls Build;
+//   - ValidateGenesis checks a token's owner, id and URI, but not its Data.
+//
+// Gating Build therefore cannot make an export emit something ValidateGenesis
+// rejects, and a token already stored above the bound -- written before this
+// gate existed, or through the MsgMintNFT / MsgEditNFT path -- still
+// round-trips losslessly. Do NOT add this predicate to ValidateGenesis: that
+// would reject pre-existing state the export is obliged to emit, which is the
+// F-001 asymmetry with the signs reversed (validate stricter than import, and
+// an operator unable to validate the chain's own backup).
+const MaxTokenDataLen = 65536
+
+// ValidateTokenMetadataBounds is the single implementation of the token
+// metadata size bound. TokenBuilder.Build is its only caller -- see
+// MaxTokenDataLen for why there is no genesis-side twin to keep in step.
+//
+// Both of Build's exits call this instead of re-deriving the comparison, so the
+// non-JSON and JSON branches cannot drift from each other. The error wording
+// parallels ValidateDenomMetadataBounds on the class side.
+func ValidateTokenMetadataBounds(data string) error {
+	if len(data) > MaxTokenDataLen {
+		return sdkerrors.Wrapf(ErrInvalidNFT, "data too long: %d > %d", len(data), MaxTokenDataLen)
+	}
+	return nil
 }
 
 func NewTokenBuilder(cdc codec.Codec) TokenBuilder {
@@ -347,8 +414,16 @@ func (tb TokenBuilder) Build(classId, tokenId, tokenURI, tokenData string) (nft.
 
 	dataMap := make(map[string]interface{})
 	if err := json.Unmarshal(tokenDataBz, &dataMap); err != nil {
+		// This branch stores the packet's raw decoded bytes as the metadata
+		// blob, so it is the one place a counterparty chain picks the exact
+		// bytes this chain will persist. Bound it *before* it is written; see
+		// MaxTokenDataLen for why the gate lives on the receive path only.
+		rawData := string(tokenDataBz)
+		if err := ValidateTokenMetadataBounds(rawData); err != nil {
+			return nft.NFT{}, err
+		}
 		metadata, err := codectypes.NewAnyWithValue(&NFTMetadata{
-			Data: string(tokenDataBz),
+			Data: rawData,
 		})
 		if err != nil {
 			return nft.NFT{}, err
@@ -391,6 +466,14 @@ func (tb TokenBuilder) Build(classId, tokenId, tokenURI, tokenData string) (nft.
 			return nft.NFT{}, err
 		}
 		data = string(dataBz)
+	}
+
+	// The JSON branch carries the bound too, and it is not covered by the
+	// check above: Build keeps every key it does not recognise and re-marshals
+	// the leftovers into NFTMetadata.Data, so what reaches the store is this
+	// re-encoded blob rather than the packet's raw bytes.
+	if err := ValidateTokenMetadataBounds(data); err != nil {
+		return nft.NFT{}, err
 	}
 
 	metadata, err := codectypes.NewAnyWithValue(&NFTMetadata{

@@ -38,28 +38,6 @@ func (app *Uptick) ExportAppStateAndValidators(
 		return servertypes.ExportedApp{}, err
 	}
 
-	// A module export never fails on damaged state: it degrades, logs, and
-	// still returns its genesis (decision 第 22 轮: one export policy for the
-	// whole repository). Persist that degradation list next to the node home so
-	// it outlives the process -- otherwise the only trace would be a log line,
-	// and an operator restoring from a partially degraded backup would have no
-	// way to know what was missing.
-	if diags := app.collectExportDiagnostics(ctx); len(diags) > 0 {
-		if path, writeErr := app.writeExportDiagnosticsReport(height, diags); writeErr != nil {
-			// Never fail the export over the sidecar: the degradations are
-			// already logged by each module, and the genesis itself is valid.
-			ctx.Logger().Error("failed to write the export diagnostics report", "err", writeErr)
-		} else {
-			ctx.Logger().Error(
-				"genesis export was degraded; the full list of affected records was written to the diagnostics report",
-				"path", path,
-				"affected_records", len(diags),
-			)
-		}
-	} else {
-		app.removeStaleExportDiagnosticsReport()
-	}
-
 	appState, err := json.MarshalIndent(genState, "", "  ")
 	if err != nil {
 		return servertypes.ExportedApp{}, err
@@ -69,6 +47,23 @@ func (app *Uptick) ExportAppStateAndValidators(
 	if err != nil {
 		return servertypes.ExportedApp{}, err
 	}
+
+	// A module export never fails on damaged state: it degrades, logs, and
+	// still returns its genesis (decision 第 22 轮: one export policy for the
+	// whole repository). Persist that degradation list next to the node home so
+	// it outlives the process -- otherwise the only trace would be a log line,
+	// and an operator restoring from a partially degraded backup would have no
+	// way to know what was missing.
+	//
+	// It is committed HERE, after every step that can still fail, and not
+	// before: the sidecar is the record of an export, so publishing it before
+	// the export exists let a report outlive a failed export (a genesis that
+	// was never written) and describe it as the most recent one. Everything
+	// above this line is either read-only or has already returned; from here on
+	// the export cannot fail any more, so the report and the genesis are
+	// published together. Never fail the export over the sidecar: a full disk
+	// must not block disaster recovery, and the genesis above is already valid.
+	app.finalizeExportDiagnostics(ctx, height, app.collectExportDiagnostics(ctx))
 
 	return servertypes.ExportedApp{
 		AppState:        appState,
