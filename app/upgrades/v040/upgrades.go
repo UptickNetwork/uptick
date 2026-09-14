@@ -94,7 +94,13 @@ var legacyIBCTransferProvenancePrefix = []byte{0x04}
 //     longer wired; IBC coin->ERC20 conversion now goes through cosmos/evm's
 //     ERC20 IBC middleware + ibc_callbacks.go.
 //   - Params migrated from x/params subspace to authority-based.
-//     EnableEVMHook is dropped (cosmos/evm uses PermissionlessRegistration).
+//     The legacy EnableEVMHook param has NO cosmos/evm counterpart and is
+//     dropped: in the self-developed module it gated the ERC20->Coin hook
+//     conversion only (v0.3.3 x/erc20/keeper/evm_hooks.go), NOT who may
+//     register a token pair. PermissionlessRegistration is a different
+//     concept (who may submit MsgRegisterERC20). Do not treat one as the
+//     successor of the other — see migrateErc20Params for the reasoning
+//     behind the value written there.
 //   - Existing OWNER_MODULE pairs are deleted (STRv2 addressing differs).
 //   - Existing OWNER_EXTERNAL pairs keep their legacy "erc20/0x…" denom and
 //     remain functional; only NEW registrations use the "erc20:0x…" scheme.
@@ -688,14 +694,37 @@ func repairEvmDenomMetadata(ctx sdk.Context, box upgrades.Toolbox, evmDenom stri
 //
 // Uptick now uses cosmos/evm's x/erc20 (not the self-developed module), so this
 // migration initializes the cosmos/evm erc20 keeper's params in the new
-// authority-based store. The legacy EnableEVMHook param is intentionally
-// dropped; cosmos/evm's default params (EnableErc20 + PermissionlessRegistration)
-// are used instead.
+// authority-based store.
+//
+// EnableErc20 carries the legacy value over. PermissionlessRegistration is NOT
+// left at cosmos/evm's default (true) — it is forced to false on purpose; see
+// the inline note at the assignment for the full set of consequences.
 func migrateErc20Params(ctx sdk.Context, box upgrades.Toolbox, logger log.Logger) error {
 	logger.Info("migrating erc20 params to authority-based system")
 
 	erc20Keeper := box.Erc20Keeper
 	params := erc20types.DefaultParams()
+	// Intentionally forced OFF — not a leftover. cosmos/evm's default is true.
+	//
+	// It covers two paths here: MsgRegisterERC20 (false => only gov may register
+	// an already-deployed ERC20 contract) and, through this repo's
+	// app/keepers/erc20_ibc_gate.go, the inbound ICS-20 auto-registration that
+	// upstream leaves ungated.
+	//
+	// Before flipping it to true, note:
+	//   - This is the ONLY route to an ERC20 form for an ibc/<hash> denom:
+	//     there is no MsgRegisterCoin upstream, and MsgRegisterERC20 needs a
+	//     deployed contract address, which a derived precompile does not have.
+	//     With it off, neither users nor governance can register one.
+	//   - On an UPGRADED chain pre-existing ibc/ vouchers stay plain bank
+	//     vouchers and are unusable from the EVM side (local upgrade chain:
+	//     4 ibc/ denoms, token_pairs = 0). A freshly initialized chain takes
+	//     the default true and auto-registers on receive.
+	//   - Turning it on re-opens unbounded state growth: the callback runs with
+	//     a zeroed KV gas config (ibc_callbacks.go), so any counterparty chain
+	//     can make this chain write a token pair at no relayer cost.
+	//
+	// Evidence: deliverables/gstack/qa-ibc-crosschain-v041-2026-09-13.md app. A
 	params.PermissionlessRegistration = false
 	params.EnableErc20 = getLegacyBoolParam(
 		ctx,

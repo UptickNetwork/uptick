@@ -105,6 +105,9 @@ func NewRootCmd() *cobra.Command {
 			if err := server.InterceptConfigsPreRunHandler(cmd, customAppTemplate, customAppConfig, customTMConfig); err != nil {
 				return err
 			}
+			if err := keepExportStdoutClean(cmd); err != nil {
+				return err
+			}
 			if err := applyEVMChainID(cmd); err != nil {
 				return err
 			}
@@ -382,6 +385,42 @@ func wrapExportCommand(rootCmd *cobra.Command) bool {
 	}
 	exportCmd.RunE = composeExportRunE(exportCmd.RunE)
 	return true
+}
+
+// keepExportStdoutClean moves the server logger of the export command to
+// stderr.
+//
+// The SDK builds the server logger against `cmd.OutOrStdout()`
+// (server/util.go InterceptConfigsPreRunHandler -> CreateSDKLogger), so the
+// two startup log lines ("evm chain id", "cosmos pool max tx is non-positive")
+// went to stdout, right ahead of the genesis document. The documented backup
+// path is `uptickd export > genesis.json`, and the result failed its own
+// validate-genesis with `invalid character '\x1b'` -- the ANSI bytes of the
+// log lines (finding F-1).
+//
+// The genesis itself MUST keep flowing through cmd.OutOrStdout()
+// (server/export.go copies it there), so the writer on the command is left
+// alone and only the server context's logger is rebuilt against stderr, with
+// the same level / format / color options the SDK would have used. The app
+// inherits its logger from the server context (server/export.go passes
+// serverCtx.Logger to the app creator), so this one swap covers every log
+// line an export can produce.
+func keepExportStdoutClean(cmd *cobra.Command) error {
+	if cmd.Name() != "export" {
+		return nil
+	}
+	serverCtx := server.GetServerContextFromCmd(cmd)
+	if serverCtx == nil {
+		return nil
+	}
+	logger, err := server.CreateSDKLogger(serverCtx, cmd.ErrOrStderr())
+	if err != nil {
+		return fmt.Errorf("cannot redirect the export logger to stderr: %w", err)
+	}
+	// Same decoration the SDK applies to its own logger; without the module
+	// key the "module=server" lines would vanish instead of moving to stderr.
+	serverCtx.Logger = logger.With(log.ModuleKey, "server")
+	return nil
 }
 
 // composeExportRunE appends the diagnostics report step to the SDK's export

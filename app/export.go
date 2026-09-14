@@ -38,6 +38,16 @@ func (app *Uptick) ExportAppStateAndValidators(
 		return servertypes.ExportedApp{}, err
 	}
 
+	// Finding F-2: IBC voucher denom metadata written by ibc-go v10's migration
+	// fails bank's own Metadata.Validate(), so the exported genesis could never
+	// pass the chain's own validate-genesis. Normalise it here -- before the
+	// app state is encoded and while an error can still abort the export --
+	// and let the sidecar record every rewrite. See export_bank_metadata.go.
+	bankDiags, err := normalizeExportedBankDenomMetadata(app.AppCodec(), genState)
+	if err != nil {
+		return servertypes.ExportedApp{}, err
+	}
+
 	appState, err := json.MarshalIndent(genState, "", "  ")
 	if err != nil {
 		return servertypes.ExportedApp{}, err
@@ -63,7 +73,7 @@ func (app *Uptick) ExportAppStateAndValidators(
 	// the export cannot fail any more, so the report and the genesis are
 	// published together. Never fail the export over the sidecar: a full disk
 	// must not block disaster recovery, and the genesis above is already valid.
-	app.finalizeExportDiagnostics(ctx, height, app.collectExportDiagnostics(ctx))
+	app.finalizeExportDiagnostics(ctx, height, append(app.collectExportDiagnostics(ctx), bankDiags...))
 
 	return servertypes.ExportedApp{
 		AppState:        appState,

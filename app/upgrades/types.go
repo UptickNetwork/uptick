@@ -83,11 +83,14 @@ func (r *UpgradeRouter) UpgradeInfo(planName string) Upgrade {
 // guard unreachable on any manager containing one, silently disabling
 // idempotency protection for every handler that relies on it.
 //
-// PRECONDITION: only sound for an upgrade that bumps at least one module's
-// ConsensusVersion or adds/removes modules. One that changes no consensus version
-// leaves a chain from the previous release already satisfying "all stored versions
-// == current", so the guard would wrongly report "applied" on the first legitimate
-// run (this bit v0.4.1 -- rely on the migrations being idempotent instead).
+// PRECONDITION: only sound for an upgrade that makes vm disagree with the
+// current versions on its first run -- i.e. it bumps some managed module's
+// ConsensusVersion, or adds a module that reports one. Dropping a module does
+// NOT qualify, and neither does adding one without a ConsensusVersion: both are
+// skipped by the loop below, so if nothing else moved, the guard reports
+// "applied" on the first legitimate run and skips every migration (this bit
+// v0.4.1, which changes no consensus version -- rely on the migrations being
+// idempotent instead).
 func (b Toolbox) UpgradeAlreadyApplied(vm module.VersionMap) bool {
 	if len(vm) == 0 {
 		return false

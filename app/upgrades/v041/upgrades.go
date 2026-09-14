@@ -33,11 +33,21 @@ func upgradeHandlerConstructor(
 	return func(ctx context.Context, _ upgradetypes.Plan, vm module.VersionMap) (module.VersionMap, error) {
 		sdkCtx := sdk.UnwrapSDKContext(ctx)
 
-		// No UpgradeAlreadyApplied guard (unlike v040): v0.4.1 bumps no module
-		// ConsensusVersion, so a chain from v0.4.0 already matches the current
-		// version map and the guard would skip these repairs on their first and
-		// only legitimate run. Each repair is idempotent on its own -- see the
-		// per-repair comments below -- so a replayed plan is harmless without it.
+		// Deliberately no UpgradeAlreadyApplied guard: v0.4.1 bumps no module
+		// ConsensusVersion, so a chain from v0.4.0 hands this handler a version
+		// map equal to the current one, and the guard would report "applied" on
+		// the first (and only legitimate) run -- skipping every repair below.
+		// It is unusable here, not omitted by oversight: see the PRECONDITION
+		// note on Toolbox.UpgradeAlreadyApplied (app/upgrades/types.go).
+		//
+		// Do not read the absence as precedent. v0.4.0's handler has no guard
+		// either, but that one is an unfixed defect rather than a constraint:
+		// its legacy-pair deletion is not idempotent, so a replayed plan
+		// deletes pairs registered after the upgrade. Reproducer:
+		// app/upgrades/v040/erc20_legacy_replay_test.go.
+		//
+		// Each repair below is idempotent on its own -- see the per-repair
+		// comments -- so a replayed plan is harmless without the guard.
 
 		sdkCtx.Logger().Info(
 			"executing upgrade plan",
