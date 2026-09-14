@@ -108,7 +108,8 @@
 #   * no `git ... || true`: a git failure is fatal, never "nothing to check"
 #
 # Exit codes: 0 = pinned and every frontier pin write is labelled; 1 = drift, or
-# a frontier pin write is not a `fix(v040):` commit; 2 = could not check.
+# a frontier pin write is not a `fix(v040):` commit; 2 = could not check
+# (including running outside a git working copy).
 set -euo pipefail
 
 # V040_FREEZE_ANCHOR is the v0.4.1 release commit's parent, so it is reachable
@@ -117,6 +118,19 @@ V040_FREEZE_ANCHOR="5e8000f7594524c1321a0fbd1b6708e574267647"
 FROZEN_PATH="app/upgrades/v040/"
 MANIFEST="scripts/v040-frozen.sha256"
 ZERO_SHA="0000000000000000000000000000000000000000"
+
+# Refuse to run outside a git working copy. Part A lists the frozen files with
+# `git ls-files` inside a process substitution, whose failure `set -e` cannot
+# see: in a tarball unpack (no .git) that yields an empty file list, every
+# manifest line is then reported as deleted, and the gate exits 1 with a bogus
+# "content or file set changed" verdict that sends the operator chasing a
+# non-existent tampering. Distinguish "environment unsupported" (exit 2, below)
+# from "content drifted" (exit 1).
+if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  echo "error: v040-freeze requires a git working copy: the script lists frozen files with 'git ls-files' and hashes them with 'git hash-object'." >&2
+  echo "       A source tarball unpack (no .git directory) is not supported; run this from a git clone/checkout." >&2
+  exit 2
+fi
 
 # write_manifest regenerates MANIFEST from the WORKING TREE; used by the
 # `v040-frozen-manifest` target so the remediation flow is a single command.

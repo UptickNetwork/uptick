@@ -91,6 +91,12 @@ func (r *UpgradeRouter) UpgradeInfo(planName string) Upgrade {
 // "applied" on the first legitimate run and skips every migration (this bit
 // v0.4.1, which changes no consensus version -- rely on the migrations being
 // idempotent instead).
+//
+// There are currently NO production callers: v0.4.0 and v0.4.1 both rely on
+// per-migration idempotency instead (v0.4.0's missing guard is a known, fenced
+// defect -- see app/upgrades/v040/erc20_legacy_replay_test.go). The function is
+// kept, covered by its own unit tests, as the guard for future upgrades that
+// do bump a managed module's ConsensusVersion.
 func (b Toolbox) UpgradeAlreadyApplied(vm module.VersionMap) bool {
 	if len(vm) == 0 {
 		return false
