@@ -35,6 +35,13 @@ Ref: https://keepachangelog.com/en/1.0.0/
 
 # Changelog
 
+## Unreleased
+
+### Bug Fixes
+
+* (rpc) Restore the geth tracer engines in `app/app.go` (`eth/tracers/js`, `eth/tracers/native`). The v0.4.x tree imports neither package, so their `init()` never runs and `tracers.DefaultDirectory` stays empty: every `debug_traceCall` / `debug_traceTransaction` that names a tracer panics the node with `invalid memory address or nil pointer dereference`, including the inline JS tracer our bundler sends for ERC-7562 validation (`eth/tracers/dir.go` falls through to the nil `jsEval`). Both the v0.4.0 and the v0.4.1 release binaries are affected (`strings <bin> | grep -c RegisterJSEval` → 0; the pre-upgrade binary on the same host → 1). `app/tracer_directory_test.go` pins both imports, and `eth/tracers/js` pulls in `dop251/goja`, hence the new `go.mod`/`go.sum` entries.
+  Not state machine breaking: neither package's `init()` writes state, gas or consensus data — it only registers lookups in an RPC-level directory, so mixed-version validators produce the same `AppState` for the same genesisState and txList.
+
 ## v0.4.1 - 2026-09-07
 
 > v0.4.0 was never released standalone; this release ships the whole v0.4.0

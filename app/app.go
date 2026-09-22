@@ -16,6 +16,23 @@ import (
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	corevm "github.com/ethereum/go-ethereum/core/vm"
 
+	// Blank imports for their init() side effects: each package registers its
+	// tracers into tracers.DefaultDirectory -- js via RegisterJSEval (the engine
+	// an inline `tracer` string needs) and native via Register (callTracer,
+	// flatCallTracer, prestateTracer, 4byteTracer, muxTracer, noopTracer,
+	// erc7562Tracer).
+	//
+	// Both are load-bearing and nothing else pulls them in: cosmos/evm only
+	// calls tracers.DefaultDirectory.New (x/vm/keeper/grpc_query.go), and in
+	// go-ethereum v1.16.2-cosmos-1 the two packages are referenced only from
+	// test files. Dropping either one still compiles, then panics the node with
+	// "invalid memory address or nil pointer dereference" on the first trace
+	// RPC, because directory.New falls through to the nil jsEval
+	// (eth/tracers/dir.go) for an unregistered name.
+	// app/tracer_directory_test.go fails if either import goes away.
+	_ "github.com/ethereum/go-ethereum/eth/tracers/js"
+	_ "github.com/ethereum/go-ethereum/eth/tracers/native"
+
 	"cosmossdk.io/client/v2/autocli"
 	"cosmossdk.io/core/appmodule"
 	evidencetypes "cosmossdk.io/x/evidence/types"
