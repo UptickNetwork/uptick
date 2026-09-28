@@ -15,7 +15,7 @@ import (
 // NOTHING CALLS THIS AT RUNTIME. It satisfies module.HasInvariants
 // (x/collection/module/module.go), but the only thing that would invoke it --
 // module.Manager.RegisterInvariants -- is a deliberate no-op in cosmos-sdk
-// v0.53.6 (types/module/module.go:454-457). app/app.go's call therefore
+// v0.53.8 (types/module/module.go:454-457). app/app.go's call therefore
 // registers zero routes and every crisis entry point asserts an empty set;
 // app/app.go lists the sites.
 //

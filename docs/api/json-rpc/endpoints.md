@@ -175,8 +175,16 @@ Get the web3 client version.
 #### Result
 
 ```json
- {"jsonrpc":"2.0","id":1,"result":"Uptick/0.1.3+/linux/go1.25.8"}
+ {"jsonrpc":"2.0","id":1,"result":"Version v0.4.1 (3f6344c0e6a1a5b0e6f0d1c9f2b7a4e8d3c5b1a9)\nCompiled at 2026-09-22T09:00:00Z using Go go1.25.13 (amd64)"}
 ```
+
+The string identifies the running binary: version, git commit and build time, then
+the Go toolchain it was compiled with. It is produced by `version.Version()`
+(`version/version.go`), which delegates to the cosmos/evm renderer this endpoint is
+built on; the three values are injected by the build (Makefile `ldflags`,
+`.goreleaser.yml`). A binary built without that injection reports `dev` in place of
+the version, its VCS revision in place of the commit, and `unknown` in place of the
+build time -- so a node can never be mistaken for a release build.
 
 #### Client Examples
 

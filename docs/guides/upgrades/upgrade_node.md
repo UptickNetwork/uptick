@@ -78,6 +78,12 @@ The on-chain upgrade name is `v0.4.1` (e.g. `uptickd tx gov submit-proposal soft
 
 ### Operator checklist
 
+- **Clock sync**: from CometBFT v0.38.22 the node rejects any block whose header time is at or past its own clock
+  plus `consensus.block_time_tolerance` (`1m0s` by default, applied even when the key is absent from
+  `config.toml`, and rejected by validation if written as `0`). Block time tracks the network's median clock, so a
+  host running more than 60s slow rejects every block and stalls at one height while its log still looks healthy.
+  Run `make check-clock-skew` on each node before the upgrade height: it exits 1 when the clock is behind by at
+  least the tolerance, and 2 when it could not measure anything — which is not a pass.
 - **Export rehearsal**: the v0.4.x `erc721`/`cw721` genesis export fails loudly on inconsistent
   per-token bindings, orphaned refund records or corrupt token pairs instead of silently dropping
   them. Before the upgrade, run `uptickd export` against a state snapshot and confirm it succeeds;

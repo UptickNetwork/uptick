@@ -30,7 +30,7 @@ import (
 // false here: the collection module already reports ConsensusVersion 2 and
 // registers its 1->2 migration at v0.3.3, so every v0.3.3 chain has
 // "collection" == 2 in its x/upgrade version map, and RunMigrations skips a
-// module when fromVersion == toVersion (cosmos-sdk@v0.53.6/types/module/
+// module when fromVersion == toVersion (cosmos-sdk@v0.53.8/types/module/
 // configurator.go:126) -- the v0.4.0 upgrade never runs the 1->2 migration, so a
 // handler step would be dead weight.
 //

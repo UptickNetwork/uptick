@@ -4,6 +4,14 @@ BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
 COMMIT := $(shell git log -1 --format='%H')
 VERSION := v0.4.1
 
+# Build timestamp, published to clients through the JSON-RPC `web3_clientVersion`
+# endpoint (see version/version.go). A reproducible build can pin it with the
+# SOURCE_DATE_EPOCH convention; otherwise it is the wall clock. Both forms are
+# formatted identically, so the string a client sees does not depend on how the
+# binary was built. BSD date spells the reference time `-r`, GNU date `-d @`.
+SOURCE_DATE_EPOCH ?=
+BUILD_DATE := $(shell if [ -n "$(SOURCE_DATE_EPOCH)" ]; then date -u -r "$(SOURCE_DATE_EPOCH)" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d "@$(SOURCE_DATE_EPOCH)" +%Y-%m-%dT%H:%M:%SZ; else date -u +%Y-%m-%dT%H:%M:%SZ; fi)
+
 
 # don't override user values
 ifeq (,$(VERSION))
@@ -83,6 +91,14 @@ build_tags_comma_sep := $(subst $(whitespace),$(comma),$(build_tags))
 
 # process linker flags
 
+# The uptick/version symbols are not decoration: the JSON-RPC endpoint
+# `web3_clientVersion` renders the cosmos/evm version package, and
+# uptick/version.Sync() publishes these three values to it at startup. Without
+# the injection the endpoint reports "Version dev ()" with no commit and no build
+# date, and two binaries built from different commits become indistinguishable to
+# a client. The cosmos-evm symbols are deliberately NOT injected here: one
+# injected package plus the bridge keeps three symbols from being spread over
+# every build configuration.
 ldflags = -X github.com/cosmos/cosmos-sdk/version.Name=uptick \
           -X github.com/cosmos/cosmos-sdk/version.AppName=$(UPTICK_BINARY) \
           -X github.com/cosmos/cosmos-sdk/version.Version=$(VERSION) \
@@ -90,6 +106,7 @@ ldflags = -X github.com/cosmos/cosmos-sdk/version.Name=uptick \
           -X "github.com/cosmos/cosmos-sdk/version.BuildTags=$(build_tags_comma_sep)" \
           -X github.com/UptickNetwork/uptick/version.AppVersion=$(VERSION) \
           -X github.com/UptickNetwork/uptick/version.GitCommit=$(COMMIT) \
+          -X github.com/UptickNetwork/uptick/version.BuildDate=$(BUILD_DATE) \
           -X github.com/cometbft/cometbft/version.TMCoreSemVer=$(TMVERSION)
 
 # DB backend selection
@@ -387,6 +404,19 @@ test-all: test-unit test-race
 # Remove IDs from the baseline once upstream publishes a fixed version.
 vulncheck:
 	@bash scripts/govulncheck-baseline.sh
+
+# cometbft >= v0.38.22 rejects any block whose header time is at/after the local
+# wall clock plus `consensus.block_time_tolerance` (default 1m0s, applied even
+# when the key is absent from config.toml -- and 0s is rejected by ValidateBasic,
+# so it is not a way to disable the check). A host whose clock runs slow therefore
+# rejects every block and stalls at one height. Run this on each node before an
+# upgrade: exit 1 = behind by at least the tolerance, exit 2 = could not measure,
+# which is not a pass. See scripts/check-clock-skew.sh for the full rationale.
+CLOCK_SKEW_HOME ?= $(HOME)/.uptickd
+check-clock-skew:
+	@bash scripts/check-clock-skew.sh --home $(CLOCK_SKEW_HOME)
+.PHONY: check-clock-skew
+
 PACKAGES_UNIT=$(shell go list ./...)
 TEST_PACKAGES=./...
 TEST_TARGETS := test-unit test-unit-cover test-race

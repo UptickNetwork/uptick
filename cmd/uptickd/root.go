@@ -15,6 +15,7 @@ import (
 	"github.com/UptickNetwork/uptick/app/params"
 	cmdcfg "github.com/UptickNetwork/uptick/cmd/config"
 	upticktypes "github.com/UptickNetwork/uptick/types"
+	uptickversion "github.com/UptickNetwork/uptick/version"
 	tmcfg "github.com/cometbft/cometbft/config"
 	tmcli "github.com/cometbft/cometbft/libs/cli"
 	dbm "github.com/cosmos/cosmos-db"
@@ -54,6 +55,17 @@ const (
 // NewRootCmd creates a new root command for uptickd. It is called once in the
 // main function.
 func NewRootCmd() *cobra.Command {
+
+	// Publish the build metadata to the package the JSON-RPC endpoint
+	// `web3_clientVersion` renders (cosmos/evm's version package, which no build
+	// in this repository injects into). Without this call a node answers
+	// "Version dev ()" with no commit and no build time, and two binaries built
+	// from different commits are indistinguishable to a client. The package's
+	// init() does the same thing, but init() only runs while the package is
+	// linked -- this call is what keeps the bridge from vanishing with an import
+	// someone tidies away, which is why it is asserted in
+	// root_version_wiring_test.go.
+	uptickversion.Sync()
 
 	initAppOptions := viper.New()
 	tempDir := tempDir()

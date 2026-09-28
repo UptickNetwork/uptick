@@ -18,7 +18,7 @@ func (r *recordingRegistry) RegisterRoute(moduleName, route string, _ sdk.Invari
 // TestModuleManagerRegistersNoInvariants is a REVERSE PIN, not a description of
 // desirable behaviour.
 //
-// It pins what this repository currently depends on: cosmos-sdk v0.53.6 ships
+// It pins what this repository currently depends on: cosmos-sdk v0.53.8 ships
 // module.Manager.RegisterInvariants as a deliberate no-op
 // (types/module/module.go:454-457), so app.CrisisKeeper ends up with an empty
 // route set even though app/app.go calls it on a manager that holds dozens of

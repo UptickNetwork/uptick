@@ -169,9 +169,22 @@ func TestEVMJSONRPCSmoke(t *testing.T) {
 	require.NoError(t, json.Unmarshal(jsonRPC(t, "net_version"), &netVersion))
 	require.Equal(t, strconv.FormatUint(e2eEVMChainID, 10), netVersion)
 
+	// The cosmos/evm `web3` namespace renders its own version package, which no
+	// build in this repository injects into, so this endpoint used to answer
+	// "Version dev ()\nCompiled at  using Go ..." no matter which binary was
+	// deployed -- no version, no commit, no build date, and therefore no way to
+	// tell a running node apart from any other build over JSON-RPC. A commit in
+	// the string is the cheapest proof that the build metadata reached the
+	// endpoint: it is present both for a release build (ldflags) and for a plain
+	// `go build` (Go's VCS stamp), and absent in exactly the pre-fix state.
 	var clientVersion string
 	require.NoError(t, json.Unmarshal(jsonRPC(t, "web3_clientVersion"), &clientVersion))
-	require.NotEmpty(t, clientVersion)
+	require.Regexp(t, `[0-9a-f]{40}`, clientVersion,
+		"web3_clientVersion must carry the git commit, otherwise two nodes built "+
+			"from different commits are indistinguishable to a client")
+	require.NotContains(t, clientVersion, "Compiled at  using",
+		"web3_clientVersion must carry a build date, not the empty field a "+
+			"non-injected build used to report")
 
 	var syncing bool
 	require.NoError(t, json.Unmarshal(jsonRPC(t, "eth_syncing"), &syncing))

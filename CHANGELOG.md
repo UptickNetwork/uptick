@@ -37,10 +37,63 @@ Ref: https://keepachangelog.com/en/1.0.0/
 
 ## Unreleased
 
+### State Machine Breaking
+
+* (deps) Cosmos SDK v0.53.6 → **v0.53.8** and CometBFT v0.38.21 → **v0.38.25**, in one coordinated step. Upstream
+  marks v0.53.8 a security release that has to be coordinated with the chain, and the backports genuinely move
+  consensus, so the binary must not be rolled out node-by-node against a running chain. Everything below arrives
+  with the version bump alone — no migration, no store change, no module consensus version bump:
+
+  * `x/distribution` reward and commission withdrawals resolve a destination instead of letting the bank module
+    fail. On a user transaction — `x/staking` now marks the context with `WithStrictWithdraw` in `Delegate`,
+    `BeginRedelegate`, `Undelegate` and `CancelUnbondingDelegation` — a withdraw address in the bank module's
+    blocked set is rejected with `ErrUnauthorized`, so a delegation can now fail where the withdrawal used to fall
+    through. On non-transaction paths (`AfterValidatorRemoved`, `BeforeDelegationSharesModified`) the same address
+    falls back to the owner and then to the community pool, emitting `withdraw_addr_redirected` with the new
+    `original_withdraw_address` attribute, so indexers must expect both the event and the rerouting. That fallback
+    also removes a halt: those hooks run from `BeginBlocker`/`EndBlocker`, where returning the bank error stops the
+    chain.
+  * `x/distribution` reads historical rewards strictly: `calculateDelegationRewardsBetween` now errors on a missing
+    `ValidatorHistoricalRewards` entry, where the old read handed `nil` bytes to `Unmarshal` — no error, zero value.
+    A withdrawal that used to silently credit nothing now fails, and so does `CalculateDelegationRewards` on the
+    query path.
+  * `x/gov` `EndBlocker`: an inactive or active proposal that fails to decode used to `return nil` out of the whole
+    loop, leaving its queue key in place and skipping every proposal behind it on every block. It now fails that one
+    proposal, removes its queue key, deletes it and continues.
+  * `x/staking` `getBeginInfo` returns `completeNow = true` when the source validator is already gone instead of
+    erroring, so a redelegation whose source was removed by `Unbond` consuming its last shares can complete.
+  * `x/auth` and `crypto` add checks that reject what used to panic or slip through: `SetPubKeyDecorator` rejects a
+    signer-info / public-key count mismatch, nested multisig flattening is bounded at depth 2 and breadth 32,
+    multisig bit-array and signature indexing is bounds-checked (previously an index panic on attacker-controlled
+    sizes), `crypto/keys/secp256k1.PubKey.UnmarshalAmino` rejects a leading byte outside `0x02`/`0x03`, and
+    `CompactBitArray.GetIndex`/`SetIndex` are bounded by `Elems`. Well-formed transactions produce the same
+    `AppState`; malformed ones no longer reach the compiler's luck.
+
+  CometBFT v0.38.25 moves no protocol version: `P2PProtocol = 8` and `BlockProtocol = 11` are identical to v0.38.21
+  and no wire `proto` type changed, so peer traffic stays compatible and a node can be upgraded without a
+  coordinated halt *on that side*. Two node-local defaults do change and neither is a consensus rule:
+  `consensus.block_time_tolerance` (new in v0.38.22, default `1m0s`, applied even when the key is absent from
+  `config.toml`, and rejected by `ValidateBasic` if written as `0`) rejects any block whose header time is at or
+  past the local clock plus the tolerance — see `make check-clock-skew` — and `double_sign_check_height = 1` now
+  checks the previous block, which an off-by-one had stopped it from ever doing (#5668).
+
+### Features
+
+* (tooling) `make check-clock-skew` (`scripts/check-clock-skew.sh`): preflight a node's clock against the
+  `consensus.block_time_tolerance` cometbft enforces from v0.38.22. Block time tracks the network's median clock,
+  so the host that trips the check is the slow one: at the `1m0s` default, a node more than 60s behind rejects
+  every block and stalls at one height. The script reports the effective tolerance (a commented-out key is
+  reported as absent, not as "set"), measures the offset against independent HTTPS `Date` headers, exits 1 when the
+  clock is behind by at least the tolerance, and exits 2 when nothing could be measured: an unverifiable clock is
+  never reported as a pass.
+
 ### Bug Fixes
 
 * (rpc) Restore the geth tracer engines in `app/app.go` (`eth/tracers/js`, `eth/tracers/native`). The v0.4.x tree imports neither package, so their `init()` never runs and `tracers.DefaultDirectory` stays empty: every `debug_traceCall` / `debug_traceTransaction` that names a tracer panics the node with `invalid memory address or nil pointer dereference`, including the inline JS tracer our bundler sends for ERC-7562 validation (`eth/tracers/dir.go` falls through to the nil `jsEval`). Both the v0.4.0 and the v0.4.1 release binaries are affected (`strings <bin> | grep -c RegisterJSEval` → 0; the pre-upgrade binary on the same host → 1). `app/tracer_directory_test.go` pins both imports, and `eth/tracers/js` pulls in `dop251/goja`, hence the new `go.mod`/`go.sum` entries.
   Not state machine breaking: neither package's `init()` writes state, gas or consensus data — it only registers lookups in an RPC-level directory, so mixed-version validators produce the same `AppState` for the same genesisState and txList.
+
+* (rpc) Report the build's version, commit and build time from `web3_clientVersion`. The endpoint is served by the cosmos/evm `web3` namespace, which formats `github.com/cosmos/evm/version` — a package no build in this repository injected into (the Makefile, `.goreleaser.yml` and the rbuilder image all injected only the SDK's package), so every node answered `"Version dev ()\nCompiled at  using Go ..."`: no version number, no commit, no build time, and therefore no way for a client to tell two nodes built from different commits apart. `version/version.go` now bridges the injected metadata into that package (`Sync`, run from the package `init()` and again from `NewRootCmd`), the build injects `BuildDate` for the first time, and a binary built outside the release pipeline reports its VCS revision in place of the commit. `version/version_test.go` asserts the string the endpoint's own service method returns, `cmd/uptickd/root_version_wiring_test.go` pins the CLI bridge, and `tests/e2e/rpc_smoke_test.go` now fails a node whose `web3_clientVersion` carries neither a commit nor a build date.
+  Not state machine breaking: the string is RPC/CLI metadata, and nothing it reads is consensus state.
 
 ## v0.4.1 - 2026-09-07
 

@@ -1,5 +1,15 @@
 version: 2
 
+# The uptick/version symbols below are what the JSON-RPC endpoint
+# `web3_clientVersion` reports: the endpoint renders the cosmos/evm version
+# package, and uptick/version.Sync() publishes these values to it at startup
+# (version/version.go). Dropping the BuildDate injection is not fatal -- the
+# bridge then reports "unknown" -- but dropping AppVersion/GitCommit puts every
+# released binary back to "Version dev ()", indistinguishable from any other
+# build, so the release workflow's own gate lives in
+# tests/e2e/rpc_smoke_test.go. cosmos/evm's own symbols are deliberately not
+# injected: one injected package plus the bridge, not three symbols per build
+# target.
 builds:
   - id: "uptickd-darwin"
     main: ./cmd/uptickd
@@ -15,7 +25,7 @@ builds:
     flags:
         - -tags=cgo,ledger
     ldflags:
-      - -s -w -X github.com/cosmos/cosmos-sdk/version.Name=uptick -X github.com/cosmos/cosmos-sdk/version.AppName=uptickd -X github.com/cosmos/cosmos-sdk/version.Version={{.Version}} -X github.com/cosmos/cosmos-sdk/version.Commit={{.Commit}} -X github.com/UptickNetwork/uptick/version.AppVersion={{.Version}} -X github.com/UptickNetwork/uptick/version.GitCommit={{.Commit}}
+      - -s -w -X github.com/cosmos/cosmos-sdk/version.Name=uptick -X github.com/cosmos/cosmos-sdk/version.AppName=uptickd -X github.com/cosmos/cosmos-sdk/version.Version={{.Version}} -X github.com/cosmos/cosmos-sdk/version.Commit={{.Commit}} -X github.com/UptickNetwork/uptick/version.AppVersion={{.Version}} -X github.com/UptickNetwork/uptick/version.GitCommit={{.Commit}} -X github.com/UptickNetwork/uptick/version.BuildDate={{ .Date }}
   - id: "uptickd-darwin-arm64"
     main: ./cmd/uptickd
     binary: bin/uptickd
@@ -30,7 +40,7 @@ builds:
     flags:
       - -tags=cgo,ledger
     ldflags:
-      - -s -w -X github.com/cosmos/cosmos-sdk/version.Name=uptick -X github.com/cosmos/cosmos-sdk/version.AppName=uptickd -X github.com/cosmos/cosmos-sdk/version.Version={{.Version}} -X github.com/cosmos/cosmos-sdk/version.Commit={{.Commit}} -X github.com/UptickNetwork/uptick/version.AppVersion={{.Version}} -X github.com/UptickNetwork/uptick/version.GitCommit={{.Commit}}
+      - -s -w -X github.com/cosmos/cosmos-sdk/version.Name=uptick -X github.com/cosmos/cosmos-sdk/version.AppName=uptickd -X github.com/cosmos/cosmos-sdk/version.Version={{.Version}} -X github.com/cosmos/cosmos-sdk/version.Commit={{.Commit}} -X github.com/UptickNetwork/uptick/version.AppVersion={{.Version}} -X github.com/UptickNetwork/uptick/version.GitCommit={{.Commit}} -X github.com/UptickNetwork/uptick/version.BuildDate={{ .Date }}
   - id: "uptickd-linux"
     main: ./cmd/uptickd
     binary: bin/uptickd
@@ -45,7 +55,7 @@ builds:
     flags:
       - -tags=cgo,ledger
     ldflags:
-      - -s -w -X github.com/cosmos/cosmos-sdk/version.Name=uptick -X github.com/cosmos/cosmos-sdk/version.AppName=uptickd -X github.com/cosmos/cosmos-sdk/version.Version={{.Version}} -X github.com/cosmos/cosmos-sdk/version.Commit={{.Commit}} -X github.com/UptickNetwork/uptick/version.AppVersion={{.Version}} -X github.com/UptickNetwork/uptick/version.GitCommit={{.Commit}}
+      - -s -w -X github.com/cosmos/cosmos-sdk/version.Name=uptick -X github.com/cosmos/cosmos-sdk/version.AppName=uptickd -X github.com/cosmos/cosmos-sdk/version.Version={{.Version}} -X github.com/cosmos/cosmos-sdk/version.Commit={{.Commit}} -X github.com/UptickNetwork/uptick/version.AppVersion={{.Version}} -X github.com/UptickNetwork/uptick/version.GitCommit={{.Commit}} -X github.com/UptickNetwork/uptick/version.BuildDate={{ .Date }}
   - id: "uptickd-linux-arm64"
     main: ./cmd/uptickd
     binary: bin/uptickd
@@ -60,7 +70,7 @@ builds:
     flags:
       - -tags=cgo,ledger
     ldflags:
-      - -s -w -X github.com/cosmos/cosmos-sdk/version.Name=uptick -X github.com/cosmos/cosmos-sdk/version.AppName=uptickd -X github.com/cosmos/cosmos-sdk/version.Version={{.Version}} -X github.com/cosmos/cosmos-sdk/version.Commit={{.Commit}} -X github.com/UptickNetwork/uptick/version.AppVersion={{.Version}} -X github.com/UptickNetwork/uptick/version.GitCommit={{.Commit}}
+      - -s -w -X github.com/cosmos/cosmos-sdk/version.Name=uptick -X github.com/cosmos/cosmos-sdk/version.AppName=uptickd -X github.com/cosmos/cosmos-sdk/version.Version={{.Version}} -X github.com/cosmos/cosmos-sdk/version.Commit={{.Commit}} -X github.com/UptickNetwork/uptick/version.AppVersion={{.Version}} -X github.com/UptickNetwork/uptick/version.GitCommit={{.Commit}} -X github.com/UptickNetwork/uptick/version.BuildDate={{ .Date }}
 archives:
 - name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
   ids:

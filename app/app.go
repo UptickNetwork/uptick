@@ -619,7 +619,7 @@ func NewUptick(
 	// Create and set the configurator
 	app.configurator = module.NewConfigurator(app.codec, app.MsgServiceRouter(), app.GRPCQueryRouter())
 
-	// Registers NOTHING. cosmos-sdk v0.53.6 implements
+	// Registers NOTHING. cosmos-sdk v0.53.8 implements
 	// module.Manager.RegisterInvariants as a deliberate no-op
 	// (types/module/module.go:454-457), so crisis' route set stays empty and
 	// the three places that assert invariants assert an empty set:

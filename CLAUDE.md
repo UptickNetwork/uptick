@@ -5,8 +5,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project Overview
 
 Uptick Network is a Cosmos SDK-based blockchain network designed for NFTs and RWAs (Real World Assets). It integrates:
-- **Cosmos SDK v0.53.6** - Core blockchain framework
-- **CometBFT v0.38.21** - Consensus engine (formerly Tendermint)
+- **Cosmos SDK v0.53.8** - Core blockchain framework
+- **CometBFT v0.38.25** - Consensus engine (formerly Tendermint)
 - **ibc-go v10.5.0** - Inter-Blockchain Communication protocol
 - **cosmos/evm v0.6.2** - Official EVM integration for Ethereum compatibility
 - **wasmd v0.61.14 / wasmvm v3** - WebAssembly smart contracts
