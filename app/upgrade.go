@@ -13,13 +13,20 @@ import (
 	v033 "github.com/UptickNetwork/uptick/app/upgrades/v033"
 	v040 "github.com/UptickNetwork/uptick/app/upgrades/v040"
 	v041 "github.com/UptickNetwork/uptick/app/upgrades/v041"
+	v050 "github.com/UptickNetwork/uptick/app/upgrades/v050"
 )
 
+// router holds every upgrade plan this binary can execute.
+//
+// v050 is the plan mainnet follows from v0.3.3 in ONE hop: it replays the
+// v0.4.0 change set and then the v0.4.1 repairs. See its package doc for why the
+// starting state -- not a flag -- decides which stage runs.
 var (
 	router = upgrades.NewUpgradeRouter().
 		Register(v033.Upgrade).
 		Register(v040.Upgrade).
-		Register(v041.Upgrade)
+		Register(v041.Upgrade).
+		Register(v050.Upgrade)
 )
 
 // RegisterUpgradePlans register a handler of upgrade plan

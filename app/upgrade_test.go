@@ -86,3 +86,22 @@ func TestUpgradeRouter_Registration(t *testing.T) {
 		router.Register(upgrades.Upgrade{UpgradeName: "v0.4.1"})
 	}, "re-registering an upgrade name must be loud, not a silent overwrite")
 }
+
+// The app's own router must carry every plan a released binary is expected to
+// execute, v0.5.0 included. A missing entry is not a missing migration: the
+// upgrade module refuses to run a plan whose handler is not registered, and
+// without the entry setupUpgradeStoreLoaders never learns the store change
+// either.
+func TestAppRouterRegistration(t *testing.T) {
+	t.Parallel()
+
+	for _, name := range []string{"v0.3.3", "v0.4.0", "v0.4.1", "v0.5.0"} {
+		require.Equal(t, name, router.UpgradeInfo(name).UpgradeName,
+			"the app router must register %s", name)
+	}
+
+	// The capability-store deletion travels with the plan name: a mainnet node
+	// follows "v0.5.0" and consults nothing else, so a v0.5.0 entry without the
+	// deletion would boot the node with the legacy store still mounted.
+	require.Equal(t, []string{"capability"}, router.UpgradeInfo("v0.5.0").StoreUpgrades.Deleted)
+}

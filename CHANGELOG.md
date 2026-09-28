@@ -39,6 +39,16 @@ Ref: https://keepachangelog.com/en/1.0.0/
 
 ### State Machine Breaking
 
+* (upgrade) New `v0.5.0` plan: the one-hop upgrade mainnet follows from v0.3.3. It runs the whole v0.4.0
+  change set and then the v0.4.1 repairs inside ONE governance plan, where the testnet executed those as two
+  plans (`v0.4.0` first, then `v0.4.1`). The handler probes its starting state from state rather than from a
+  flag — the cosmos/evm `EvmCoinInfo` record (EVM store prefix 0x05), which the v0.4.0 handler writes and the
+  legacy ethermint layout cannot — so one binary still serves a chain already on v0.4.x, where the v0.4.0 set
+  must NOT be replayed: its legacy-pair deletion removes by `ContractOwner == OWNER_MODULE` and would take the
+  live STRv2 pairs with it. A marker in the x/upgrade store makes a re-proposed or crash-restarted plan return
+  early. The plan repeats the `capability` store deletion, because the store loader is keyed on the plan name.
+  The governance proposal must carry the name `v0.5.0` verbatim; see `app/upgrades/v050`.
+
 * (deps) Cosmos SDK v0.53.6 → **v0.53.8** and CometBFT v0.38.21 → **v0.38.25**, in one coordinated step. Upstream
   marks v0.53.8 a security release that has to be coordinated with the chain, and the backports genuinely move
   consensus, so the binary must not be rolled out node-by-node against a running chain. Everything below arrives
