@@ -49,6 +49,26 @@ Ref: https://keepachangelog.com/en/1.0.0/
   early. The plan repeats the `capability` store deletion, because the store loader is keyed on the plan name.
   The governance proposal must carry the name `v0.5.0` verbatim; see `app/upgrades/v050`.
 
+* (erc20) IBC vouchers get their ERC20 representation repaired, on both starting states. Two migrations run
+  inside the `v0.5.0` handler, after the replayed change sets and before the replay marker:
+
+  * `decimals()` no longer reports 0 for IBC-derived ERC20. ibc-go writes a voucher's bank metadata with the
+    full denom path in `Display` and a single unit carrying the SOURCE denom at exponent 0, while cosmos/evm's
+    precompile matches the last segment of `Display` against the units — so it found exponent 0, and every
+    wallet, explorer and DEX front-end read a balance as 10^18 times its value. The migration rewrites each
+    voucher's metadata into the shape that satisfies both the precompile's rule and `x/bank`'s
+    `Metadata.Validate` (which the on-chain shape had never passed, and which the export path had to work
+    around). Source denoms whose exponent cannot be derived (`u…` → 6, `a…` → 18) are skipped and logged
+    instead of guessed.
+  * Existing vouchers gain the token pair they could never acquire. The v0.4.0 handler deletes the legacy
+    OWNER_MODULE pairs and the inbound auto-registration is gated off (deliberately, to bound state growth), so
+    no voucher that arrived earlier can reach the EVM. The backfill registers a derived (module-owned, no
+    contract deployed) pair for every `ibc/` voucher that holds a supply and has none yet.
+
+  Scope is state-derived rather than a compiled-in whitelist: one binary serves mainnet and testnet, whose
+  voucher sets do not overlap. It cannot fail the upgrade — a voucher that cannot be repaired is logged and
+  skipped, with counts in the summary line. See `app/upgrades/v050/migrate.go`.
+
 * (deps) Cosmos SDK v0.53.6 → **v0.53.8** and CometBFT v0.38.21 → **v0.38.25**, in one coordinated step. Upstream
   marks v0.53.8 a security release that has to be coordinated with the chain, and the backports genuinely move
   consensus, so the binary must not be rolled out node-by-node against a running chain. Everything below arrives

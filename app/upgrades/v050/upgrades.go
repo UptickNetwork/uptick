@@ -152,7 +152,18 @@ func upgradeHandlerConstructor(
 			return nil, err
 		}
 
-		// v0.5.0's own migrations belong here, before the marker is written.
+		// v0.5.0's own migrations, in the order they have to run: the metadata
+		// shape first, so a holder querying decimals() in the same block already
+		// reads the repaired exponent, then the token pairs that expose the
+		// voucher to the EVM at all.
+		//
+		// Both run on BOTH starting states, unlike the v0.4.0 change set above.
+		// They are not repair-the-migration work: a testnet already on v0.4.x has
+		// exactly the same IBC vouchers with decimals() == 0 and no token pair,
+		// because ibc-go writes that metadata shape whoever receives the packet
+		// and the inbound auto-registration is gated off. See migrate.go.
+		normalizeIBCVoucherERC20Decimals(sdkCtx, box.BankKeeper, logger)
+		backfillIBCVoucherTokenPairs(sdkCtx, box.BankKeeper, box.Erc20Keeper, logger)
 
 		marker.Set(migrationsAppliedKey, []byte{0x01})
 		logger.Info("v0.5.0 migration set complete", "upgrade", upgradeName)

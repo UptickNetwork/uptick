@@ -4,6 +4,9 @@ import (
 	"testing"
 
 	upgradetypes "cosmossdk.io/x/upgrade/types"
+	sdk "github.com/cosmos/cosmos-sdk/types"
+	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
+	erc20types "github.com/cosmos/evm/x/erc20/types"
 	evmtypes "github.com/cosmos/evm/x/vm/types"
 	"github.com/stretchr/testify/require"
 
@@ -67,4 +70,91 @@ func TestV050UpgradeHandlerOnUpgradedState(t *testing.T) {
 	vm, err = handler(ctx, v050Plan(), app.mm.GetVersionMap())
 	require.NoError(t, err)
 	require.NotEmpty(t, vm)
+}
+
+// handlerVoucherDenom is a voucher unique to this test. The hash only has to be
+// the 64-character hex string ibc-go derives, since the ERC20 address is hashed
+// out of it.
+const (
+	handlerVoucherDenom  = "ibc/C0FFEE0000000000000000000000000000000000000000000000000000000000"
+	handlerVoucherSource = "auoc"
+	handlerVoucherPath   = "transfer/channel-7/auoc"
+)
+
+// TestV050UpgradeHandlerBackfillsIBCVoucherDecimalsAndPairs runs the real handler
+// against a real voucher on the real application, which is the only place the
+// migrations' wiring to the bank and erc20 keepers is proven.
+//
+// The two assertions are the two halves of the v0.5.0 repair: the metadata comes
+// back in the shape that makes decimals() report 18 instead of 0, and the denom
+// gains a token pair it could never have acquired while the inbound gate is
+// closed. The v050 package's own tests pin the rewrite rules; this one pins that
+// the handler actually calls them, on the same starting state a testnet node is
+// in.
+func TestV050UpgradeHandlerBackfillsIBCVoucherDecimalsAndPairs(t *testing.T) {
+	app, ctx := sharedTestApp(t)
+	restoreSharedState(t, app)
+
+	// Seed the voucher the way ibc-go does: supply in the bank, and metadata
+	// whose Display is the full denom path with a single unit at exponent 0.
+	//
+	// The supply is created through the EVM module account -- the one account
+	// this app grants both Minter and Burner -- so the fixture can be undone with
+	// BurnCoins, which is what removes the denom from the supply table again.
+	coins := sdk.NewCoins(sdk.NewInt64Coin(handlerVoucherDenom, 1_000_000))
+	require.NoError(t, app.BankKeeper.MintCoins(ctx, evmtypes.ModuleName, coins))
+	app.BankKeeper.SetDenomMetaData(ctx, banktypes.Metadata{
+		Description: "IBC token from " + handlerVoucherPath,
+		DenomUnits:  []*banktypes.DenomUnit{{Denom: handlerVoucherSource, Exponent: 0}},
+		Base:        handlerVoucherDenom,
+		Display:     handlerVoucherPath,
+		Name:        handlerVoucherPath + " IBC token",
+		Symbol:      "AUOC",
+	})
+
+	upgradeStore := ctx.KVStore(app.GetKey(upgradetypes.StoreKey))
+	require.False(t, upgradeStore.Has([]byte(migrationsAppliedProbeKey)),
+		"the replay marker must not exist before the handler runs")
+	require.False(t, app.Erc20Keeper.IsDenomRegistered(ctx, handlerVoucherDenom),
+		"the fixture must start without a pair, otherwise the backfill proves nothing")
+
+	// The shared app is a process-wide singleton: undo the seeded supply, the
+	// pair and the marker so no other test inherits this fixture.
+	t.Cleanup(func() {
+		if pair, found := app.Erc20Keeper.GetTokenPair(ctx, app.Erc20Keeper.GetTokenPairID(ctx, handlerVoucherDenom)); found {
+			app.Erc20Keeper.DeleteTokenPair(ctx, pair)
+			app.Erc20Keeper.DeleteDynamicPrecompile(ctx, pair.GetERC20Contract())
+			require.NoError(t, app.Erc20Keeper.UnRegisterERC20CodeHash(ctx, pair.GetERC20Contract()))
+		}
+		require.NoError(t, app.BankKeeper.BurnCoins(ctx, evmtypes.ModuleName, coins))
+		upgradeStore.Delete([]byte(migrationsAppliedProbeKey))
+	})
+
+	handler := v050.Upgrade.UpgradeHandlerConstructor(app.mm, app.configurator, app.toolbox())
+	_, err := handler(ctx, v050Plan(), app.mm.GetVersionMap())
+	require.NoError(t, err)
+
+	// A-01: the metadata is in shape C and is legal bank state at last.
+	metadata, found := app.BankKeeper.GetDenomMetaData(ctx, handlerVoucherDenom)
+	require.True(t, found)
+	require.Equal(t, handlerVoucherSource, metadata.Display,
+		"Display must be the source denom so the precompile's last-segment rule finds the exponent unit")
+	require.Equal(t, []*banktypes.DenomUnit{
+		{Denom: handlerVoucherDenom, Exponent: 0},
+		{Denom: handlerVoucherSource, Exponent: 18},
+	}, metadata.DenomUnits, "auoc is atto-prefixed, so decimals() must come back as 18")
+	require.NoError(t, metadata.Validate(),
+		"the on-chain metadata must stop being the illegal shape the export side had to work around")
+
+	// A-02: the voucher has an EVM representation, backed by a dynamic precompile
+	// rather than by a deployed contract.
+	require.True(t, app.Erc20Keeper.IsDenomRegistered(ctx, handlerVoucherDenom),
+		"the backfill must register a pair for the seeded voucher")
+	pair, found := app.Erc20Keeper.GetTokenPair(ctx, app.Erc20Keeper.GetTokenPairID(ctx, handlerVoucherDenom))
+	require.True(t, found)
+	require.Equal(t, erc20types.OWNER_MODULE, pair.ContractOwner,
+		"the pair must be module-owned: the address is hashed out of the voucher, nothing is deployed")
+	require.True(t, pair.Enabled)
+	require.True(t, app.Erc20Keeper.IsDynamicPrecompileAvailable(ctx, pair.GetERC20Contract()),
+		"the derived address must be an active dynamic precompile, otherwise calls to it fail")
 }
