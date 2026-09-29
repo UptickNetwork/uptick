@@ -215,6 +215,13 @@ func upgradeHandlerConstructor(
 		normalizeIBCVoucherERC20Decimals(sdkCtx, box.BankKeeper, logger)
 		backfillIBCVoucherTokenPairs(sdkCtx, box.BankKeeper, box.Erc20Keeper, logger)
 
+		// Settle the legacy ibc/ ERC721 voucher pairs (R1-C): burn the wrapped /
+		// orphan ERC721 halves, hand escrowed vouchers back, and drop the
+		// bindings that would otherwise lock the vouchers behind the ICS-721 burn
+		// guard. Fail-safe per binding — ambiguous states are kept and left to the
+		// terminal un-wrap (A3) — so it never aborts the upgrade.
+		settleIBCVoucherPairs(sdkCtx, box.Erc721Keeper)
+
 		marker.Set(migrationsAppliedKey, []byte{0x01})
 		logger.Info("v0.5.0 migration set complete", "upgrade", upgradeName)
 		return vm, nil

@@ -18,6 +18,22 @@ import (
 // holders.
 const ibcVoucherPrefix = "ibc/"
 
+// ibcVoucherPairSettler is the slice of the erc721 keeper the R1-C voucher-pair
+// settlement needs. The concrete keeper reports its own counts; the interface
+// exists only so the helper below stays unit testable without an app.
+type ibcVoucherPairSettler interface {
+	SettleIBCVoucherPairs(ctx sdk.Context) (settled, staleCleared, kept, pairsDeleted int)
+}
+
+// settleIBCVoucherPairs runs the R1-C legacy voucher-pair settlement (see
+// x/erc721/keeper/voucher_settlement.go). The keeper method is fail-safe — it
+// never returns an error, because an ambiguous per-token state is kept and left
+// to the terminal un-wrap (A3) — and it self-reports its counts, so there is no
+// separate summary line here.
+func settleIBCVoucherPairs(ctx sdk.Context, erc721 ibcVoucherPairSettler) {
+	erc721.SettleIBCVoucherPairs(ctx)
+}
+
 // ibcVoucherBankStore is the slice of the bank keeper the v0.5.0 migrations
 // need. It is an interface so the migrations stay unit testable: a Toolbox
 // embeds the concrete keepers.AppKeepers, so the handler itself can only be run
