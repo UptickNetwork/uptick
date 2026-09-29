@@ -28,6 +28,34 @@
 // Keeping the handler correct from both starting states is what lets a later
 // release register v0.4.1 back and reuse this code unchanged.
 //
+// # What v0.5.1 reuses from here
+//
+// v0.5.1 has to carry three migrations forward rather than call this handler,
+// because on the testnet this plan never runs:
+//
+//   - enablePermissionlessRegistration,
+//   - normalizeIBCVoucherERC20Decimals,
+//   - backfillIBCVoucherTokenPairs.
+//
+// Testnet stops on v0.4.1 and upgrades straight to v0.5.1, so for it these three
+// are the only route to a switch that is on, metadata whose decimals() reads 18
+// instead of 0, and token pairs for the vouchers it already holds. Mainnet, past
+// v0.5.0, runs the same three a second time and has to be unaffected by it.
+//
+// Two consequences, both load-bearing for that release:
+//
+//   - The three are idempotent on their own, which is why they can be re-applied
+//     without this plan's replay marker. The marker is keyed to
+//     migrationsAppliedKey below, which is v0.5.0's name, so it is not something
+//     v0.5.1 inherits. The property is pinned by
+//     TestV050TailMigrationsAreSafeToReapplyWithoutTheMarker in
+//     app/upgrade_v050_handler_test.go, which deletes the marker and applies the
+//     handler twice.
+//   - The v0.4.0 stage must NOT be carried forward with them. Both chains have
+//     the EvmCoinInfo record by then, so the probe above would never select it
+//     anyway; a v0.5.1 handler should refuse a legacy starting state loudly
+//     instead of running the repairs and the tail against it.
+//
 // The starting state is therefore probed from state, never configured: a
 // validator running the wrong branch would have to be wrong about its own store
 // contents, not about an operator flag.

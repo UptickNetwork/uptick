@@ -58,7 +58,14 @@ Ref: https://keepachangelog.com/en/1.0.0/
   cannot run until the `v0.4.0` change set has. Leaving both unregistered is what makes such a plan
   halt at the upgrade height instead of executing it. The cost is explicit: this binary **cannot run
   on a chain stopped at `v0.4.1`** — that is the testnet, which aborts on every start — so do not
-  deploy it there, and a later release registers `v0.4.1` back for that.
+  deploy it there. Testnet stays on `v0.4.1` for this release and the next release is where the two
+  chains converge: `v0.5.1` has to register `v0.4.1` (testnet's last completed) **and** `v0.5.0`
+  (mainnet's last completed once this plan runs), and it carries the three erc20 migrations below
+  forward, because testnet never runs the `v0.5.0` plan at all.
+
+  A node running this binary before the `v0.5.0` height does not merely wait: x/upgrade refuses to
+  start a binary that already carries a pending plan's handler (`BINARY UPDATED BEFORE TRIGGER`), so
+  the swap happens at the height — stage the binary, let the old one reach the height.
 
 * (erc20) IBC vouchers get their ERC20 representation repaired, on both starting states. Two migrations run
   inside the `v0.5.0` handler, after the replayed change sets and before the replay marker:

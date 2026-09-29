@@ -21,6 +21,26 @@ catch up, and not participate. Do not point a testnet node at this binary and do
 anyone joining the testnet. A later release registers `v0.4.1` back.
 :::
 
+### Which chain moves in which release
+
+| | current | this release | next release |
+|---|---|---|---|
+| mainnet `uptick_117-1` | `v0.3.3` | → `v0.5.0` (one plan, one hop) | → `v0.5.1` |
+| testnet `origin_1170-3` | `v0.4.1` | **stays on `v0.4.1`** | → `v0.5.1` |
+
+The two chains converge on `v0.5.1`, not here. Testnet keeps running its `v0.4.1` binary until then.
+
+That is a mechanical requirement on the next release, not a preference. x/upgrade's startup
+self-check (see *Swapping the binary* below) demands that a binary carry a handler for the last
+completed upgrade of every chain it runs on. Once mainnet has executed `v0.5.0`, **`v0.5.0` becomes
+mainnet's last completed upgrade**, so the `v0.5.1` binary has to register both `v0.4.1` (testnet) and
+`v0.5.0` (mainnet). Getting only one of them right breaks one of the two chains on startup.
+
+`v0.5.1` must also carry this release's erc20 migrations forward: testnet never runs the `v0.5.0`
+plan, so the three steps that repair IBC vouchers — the `permissionless_registration` switch, the
+`decimals()` metadata rewrite, the token-pair backfill — are the only way those reach it. They are
+idempotent, which is what lets `v0.5.1` re-apply them to mainnet as well.
+
 `v0.5.0` is the **one-hop** upgrade from `v0.3.3`: a single governance plan named `v0.5.0` runs the whole `v0.4.0` change set and then the `v0.4.1` repairs, replacing the two-plan sequence the testnet executed. The handler decides which stage to run from the node's **starting state**, not from a flag: it probes for the cosmos/evm `EvmCoinInfo` record (EVM store prefix `0x05`), which the `v0.4.0` handler writes and the legacy ethermint layout cannot, and skips the `v0.4.0` set when that record is present — the set's legacy-pair deletion is destructive to replay.
 
 `v0.5.0` also carries two erc20 migrations that repair IBC vouchers, and turns `permissionless_registration` on:
@@ -30,7 +50,7 @@ anyone joining the testnet. A later release registers `v0.4.1` back.
 - `permissionless_registration` is flipped to `true` on both starting states.
 
 ::: warning
-`v0.5.0` is **state machine breaking and not reversible**: it deletes the `capability` store and moves the EVM `ChainConfig` to time-based activation, exactly as `v0.4.0` did. Every validator must run the new binary **before** the upgrade height.
+`v0.5.0` is **state machine breaking and not reversible**: it deletes the `capability` store and moves the EVM `ChainConfig` to time-based activation, exactly as `v0.4.0` did. Every validator must **have the new binary staged** before the upgrade height — but must not be **running** it there. See the next section; starting it early halts the node.
 :::
 
 The on-chain upgrade name must be `v0.5.0` **verbatim** — the store loader, including the `capability` store deletion, is keyed on the plan name and nothing else:
@@ -45,6 +65,39 @@ When using Cosmovisor, place the new binary under:
 mkdir -p $DAEMON_HOME/cosmovisor/upgrades/v0.5.0/bin
 cp $(which uptickd) $DAEMON_HOME/cosmovisor/upgrades/v0.5.0/bin/
 ```
+
+### Swapping the binary: at the height, never before
+
+x/upgrade does **not** let the new binary run ahead of the plan. On every block where a plan is
+pending but not yet due, its `PreBlocker` refuses to start a binary whose handler list already
+contains that plan's name:
+
+```
+BINARY UPDATED BEFORE TRIGGER! UPGRADE "v0.5.0" - in binary but not executed on chain. Downgrade your binary
+```
+
+So once the `v0.5.0` proposal has passed, a node started with the `v0.5.0` binary **halts** until the
+upgrade height arrives, and the recovery is to put the old binary back. What this means in practice:
+
+- **Cosmovisor**: stage the binary under `upgrades/v0.5.0/bin` and change nothing else. Cosmovisor
+  runs the current binary, sees `UPGRADE "v0.5.0" NEEDED at height …`, and switches at the height —
+  which is the only moment a switch is legal. This is the recommended path.
+- **Manual**: run the old binary until it halts at the upgrade height with `UPGRADE NEEDED`, then
+  replace the binary and restart. Do not replace it earlier, even though the file is already on disk.
+- A plan whose name the running binary does **not** know is harmless: that is the normal state of
+  every node between proposal and height, and the chain keeps producing blocks.
+
+The same rule applies to the next release, and it is why the testnet's plan must be proposed while
+testnet is still running its `v0.4.1` binary.
+
+### What the node must have before the height
+
+- The old binary has to reach the upgrade height once, because that is when it writes
+  `data/upgrade-info.json`, which the new binary reads to install the store loader. Cosmovisor
+  handles this; a manual operator should let the node halt rather than trying to pre-empt it.
+- Run `make check-clock-skew` on each node. A host more than 60s behind the network's median clock
+  rejects every block from CometBFT v0.38.22 onward.
+- Update the release's version in your deployment tooling **at** the height, not before.
 
 ## Upgrading to v0.4.0
 

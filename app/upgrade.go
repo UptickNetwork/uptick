@@ -28,7 +28,25 @@ import (
 // the v0.4.0 change set and then the v0.4.1 repairs itself (see v050's package
 // doc for why the starting state, not a flag, decides which stage runs).
 //
-// v0.4.0 and v0.4.1 are absent on purpose, and the absence is the guard:
+// # The roll-out, release by release
+//
+//	release   registers                serves
+//	v0.5.0    v0.3.3, v0.5.0           mainnet (v0.3.3 -> v0.5.0); testnet NOT served
+//	v0.5.1    + v0.4.1, + v0.5.1       both: mainnet (v0.5.0 -> v0.5.1) and
+//	                                   testnet (v0.4.1 -> v0.5.1)
+//
+// Testnet stays on v0.4.1 through this release and follows a plan named v0.5.1
+// later, so it is absent from the table above on purpose. That v0.5.1 row is not
+// a preference: the same self-check forces it. Once mainnet has run its v0.5.0
+// plan, v0.5.0 is mainnet's LAST COMPLETED name and every mainnet node aborts on
+// start unless the running binary has a handler for it; testnet's last completed
+// name stays v0.4.1 until its own plan executes, so v0.5.1 owes a handler for
+// both names. v0.5.1 also carries the v0.5.0 handler's tail migrations forward,
+// because testnet never runs that plan and would otherwise keep an erc20 switch
+// that is off, voucher metadata that reports decimals() == 0 and voucher pairs
+// that were never backfilled.
+//
+// v0.4.0 and v0.4.1 are absent HERE on purpose, and the absence is the guard:
 //
 //   - x/upgrade keeps a name schedulable until it has a done record, and mainnet
 //     has none for either. Registering v0.4.0 would leave it reachable by
@@ -49,10 +67,10 @@ import (
 // Neither removal touches the upgrade path: v050 builds both of its stages from
 // the v040 and v041 packages directly, never by looking them up here.
 //
-// The cost, deliberate: this binary must NOT be handed to a node stopped on
-// v0.4.1 (the testnet's last completed plan) -- it aborts on every start with
+// The cost, deliberate and temporary: this binary must NOT be handed to a node
+// stopped on v0.4.1 -- that is the testnet, and it aborts on every start with
 // "upgrade handler is missing for v0.4.1 upgrade plan". v0.5.1 registers v0.4.1
-// back for that.
+// back, which is a line in that release's table and not a change to this one.
 var (
 	router = upgrades.NewUpgradeRouter().
 		Register(v033.Upgrade).
