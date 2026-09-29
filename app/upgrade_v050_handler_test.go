@@ -165,14 +165,20 @@ func TestV050UpgradeHandlerBackfillsIBCVoucherDecimalsAndPairs(t *testing.T) {
 }
 
 // TestV050UpgradeHandlerEnablesPermissionlessRegistration pins the x/erc20
-// parameter the release ships, on the starting state a testnet node is in.
+// parameter the release ships, on the state v0.4.0 leaves behind.
 //
 // Why it has to run here and not merely in the v050 unit tests: the value comes
-// from the real keeper's params store, and the only way a chain already on
-// v0.4.x can reach it is this handler's own step -- v0.4.0's migrateErc20Params
+// from the real keeper's params store, and the only in-tree way a chain already
+// on v0.4.x reaches it is this handler's own step -- v0.4.0's migrateErc20Params
 // wrote the switch off and will never run again on that chain. The fixture is
-// therefore the recorded state of such a chain, not a fresh app, whose genesis
-// would default the parameter on and prove nothing.
+// therefore that recorded state, not a fresh app, whose genesis would default the
+// parameter on and prove nothing.
+//
+// The fixture is the v0.4.0 output, not a claim about what a live v0.4.x chain
+// holds: gov can rewrite the parameter at any height via MsgUpdateParams, and
+// testnet already has (proposal 16, executed 2026-09-17 at height 14974481), so
+// there this step takes its already-on early return and writes nothing. That path
+// is covered by TestEnablePermissionlessRegistrationIsIdempotent.
 func TestV050UpgradeHandlerEnablesPermissionlessRegistration(t *testing.T) {
 	app, ctx := sharedTestApp(t)
 	restoreSharedState(t, app)

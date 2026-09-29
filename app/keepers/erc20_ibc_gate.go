@@ -141,6 +141,16 @@ func (g ERC20IBCGate) permissionlessRegistrationEnabled(ctx sdk.Context) bool {
 //
 // The only way it can be wrong is by answering false when the callback would in fact
 // register, which leaks the gate rather than breaking a legitimate path.
+//
+// Answering true when the callback would have returned early anyway is allowed, and
+// does happen: the predicate deliberately does not replicate the callback's other
+// early returns, so a `factory/` denom, a module-account recipient and the staking
+// denom all answer true. The acknowledgement is identical either way, so nothing
+// behaves differently -- but the suppressed event and log line are emitted for those
+// packets too, and an operator counting them is counting packets that were never
+// going to register. TestGateCreatesNoPairForAnyShapeWhileTheSwitchIsOff pins both
+// halves: no pair for any shape, and identical acknowledgements for the shapes the
+// callback would have ignored.
 func wouldAutoRegisterTokenPair(
 	ctx sdk.Context,
 	keeper *cosmoserc20keeper.Keeper,

@@ -54,9 +54,17 @@ type erc20ParamsStore interface {
 // chain already past v0.4.0 never re-runs that migration. Changing the value in
 // v0.4.0 would therefore move mainnet and leave testnet -- the chain that did
 // execute it -- on the old setting forever. A step in this handler is the only
-// place that reaches both starting states. It has to run AFTER the legacy stage
-// above, because that stage writes the whole Params struct and would overwrite
-// this field.
+// in-tree place that reaches both starting states. It has to run AFTER the legacy
+// stage above, because that stage writes the whole Params struct and would
+// overwrite this field.
+//
+// "In-tree" is the operative word: this is not the only way the parameter can
+// move. MsgUpdateParams is authority-gated (keeper/msg_server.go:161-172) and the
+// authority is the gov module account, so a passed proposal rewrites it at any
+// height. Testnet did exactly that -- proposal 16, "ERC20 Param Change: Enable
+// Permissionless Registration", executed 2026-09-17 at height 14974481 -- so a
+// chain can hold either value with no migration having run. Read the value; do
+// not infer it from the release notes.
 //
 // # What turning it on changes
 //

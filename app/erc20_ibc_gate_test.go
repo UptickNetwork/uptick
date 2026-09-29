@@ -14,6 +14,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	transfertypes "github.com/cosmos/ibc-go/v10/modules/apps/transfer/types"
 	channeltypes "github.com/cosmos/ibc-go/v10/modules/core/04-channel/types"
+	"github.com/cosmos/ibc-go/v10/modules/core/exported"
 
 	evmibc "github.com/cosmos/evm/ibc"
 	cosmoserc20types "github.com/cosmos/evm/x/erc20/types"
@@ -239,11 +240,25 @@ func TestERC20IBCMiddlewareIsWiredToTheGate(t *testing.T) {
 func inboundPacket(t *testing.T, rawDenom string) (channeltypes.Packet, string) {
 	t.Helper()
 
-	receiver := sdk.AccAddress(bytes.Repeat([]byte{0x7a}, 20)).String()
+	return inboundPacketTo(t, rawDenom, "")
+}
+
+// inboundPacketTo is inboundPacket with the local recipient overridden. An empty
+// receiver means the ordinary account inboundPacket uses; the override exists
+// because the callback treats a module-account recipient differently -- it
+// returns before the registration branch -- and that is a distinct packet shape
+// the gate has to be checked against.
+func inboundPacketTo(t *testing.T, rawDenom, receiver string) (channeltypes.Packet, string) {
+	t.Helper()
+
+	sender := sdk.AccAddress(bytes.Repeat([]byte{0x7a}, 20)).String()
+	if receiver == "" {
+		receiver = sender
+	}
 	data := transfertypes.FungibleTokenPacketData{
 		Denom:    rawDenom,
 		Amount:   "1000",
-		Sender:   receiver,
+		Sender:   sender,
 		Receiver: receiver,
 	}
 	packet := channeltypes.Packet{
@@ -298,4 +313,113 @@ func stripLineComments(src string) string {
 		}
 	}
 	return strings.Join(lines, "\n")
+}
+
+// TestGateCreatesNoPairForAnyShapeWhileTheSwitchIsOff is the drift canary for the
+// gate's predicate.
+//
+// wouldAutoRegisterTokenPair reimplements the condition under which upstream's
+// OnRecvPacket creates a pair instead of sharing it. An upstream release that
+// widens that branch -- a new denom prefix, an early return dropped -- leaves the
+// gate answering false and delegating, so the callback creates a pair with the
+// switch off. The delegation test above cannot see that: it only exercises packets
+// the predicate already classifies as "will not register", so a shape upstream
+// newly registers is delegated on both sides and compares equal.
+//
+// The property asserted here is the gate's whole job: with the switch off, no
+// packet shape may bring a token pair into existence. Each shape is first run with
+// the switch ON as a positive control, because "no pair" is trivially true for a
+// shape the callback never registers anyway.
+func TestGateCreatesNoPairForAnyShapeWhileTheSwitchIsOff(t *testing.T) {
+	app, baseCtx := sharedTestApp(t)
+
+	// The callback returns before the registration branch when the recipient is a
+	// module account, which makes that recipient a packet shape of its own.
+	moduleReceiver := app.AccountKeeper.GetModuleAccount(baseCtx, cosmoserc20types.ModuleName).
+		GetAddress().String()
+
+	// Likewise for the staking denom, which the callback excludes explicitly.
+	bondDenom, err := app.StakingKeeper.BondDenom(baseCtx)
+	require.NoError(t, err)
+
+	shapes := []struct {
+		name string
+		// rawDenom is the denom path the counterparty puts in the packet.
+		rawDenom string
+		// receiver overrides the local recipient; empty means an ordinary account.
+		receiver string
+		// registers is what the switch-ON run must do: whether this shape is one
+		// the callback's registration branch reaches at all.
+		registers bool
+	}{
+		{"unseen voucher", "transfer/channel-0/uatom", "", true},
+		{"unseen voucher, second denom", "transfer/channel-0/uosmo", "", true},
+		{"token factory denom", "factory/osmo1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqnrql8a/utkn", "", false},
+		{"module account recipient", "transfer/channel-0/uion", moduleReceiver, false},
+		{"staking denom", transfertypes.PortID + "/" + inboundChannel + "/" + bondDenom, "", false},
+	}
+
+	for _, tc := range shapes {
+		t.Run(tc.name, func(t *testing.T) {
+			// run delivers this shape in the given switch state and reports what
+			// the callback did with it. The acknowledgement is kept as the
+			// interface both callers return, so the gate and the keeper stay
+			// comparable without a type assertion.
+			run := func(t *testing.T, permissionless, viaGate bool) (exported.Acknowledgement, string, bool) {
+				t.Helper()
+
+				ctx, _ := baseCtx.CacheContext()
+				ctx = ctx.WithGasMeter(storetypes.NewInfiniteGasMeter())
+				require.NoError(t, app.Erc20Keeper.SetParams(
+					ctx, cosmoserc20types.NewParams(true, permissionless)))
+
+				packet, denom := inboundPacketTo(t, tc.rawDenom, tc.receiver)
+				var ack exported.Acknowledgement = channeltypes.NewResultAcknowledgement([]byte{1})
+				if viaGate {
+					ack = uptickkeepers.NewERC20IBCGate(&app.Erc20Keeper).OnRecvPacket(ctx, packet, ack)
+				} else {
+					ack = app.Erc20Keeper.OnRecvPacket(ctx, packet, ack)
+				}
+
+				return ack, denom, app.Erc20Keeper.IsDenomRegistered(ctx, denom)
+			}
+
+			// Positive control: does this shape reach the registration branch at
+			// all? Without it the suppression assertion below could be satisfied
+			// by a shape the callback ignores for an unrelated reason.
+			onAck, onDenom, onRegistered := run(t, true, false)
+			require.True(t, onAck.Success(), "the credit itself must survive the callback")
+			require.Equal(t, tc.registers, onRegistered,
+				"the shape of %s changed upstream, so this case no longer exercises what it claims to; "+
+					"re-derive the gate's predicate against ibc_callbacks.go before trusting the assertion below",
+				onDenom)
+
+			offAck, _, offRegistered := run(t, false, true)
+			require.True(t, offAck.Success(), "gating registration must not fail the transfer")
+
+			if !tc.registers {
+				// Nothing here for the gate to suppress. It suppresses these
+				// anyway -- the predicate keys on the received denom alone, so a
+				// factory/ denom, a module-account recipient and the staking denom
+				// all get the suppressed event -- but the acknowledgement must not
+				// move, and no pair may appear.
+				require.Equal(t, onAck.Acknowledgement(), offAck.Acknowledgement(),
+					"the acknowledgement must be identical whether or not the gate suppressed")
+				require.False(t, offRegistered)
+				return
+			}
+
+			// The bare keeper ignores the switch on this path, which is the whole
+			// reason the gate exists. Assert it still does: if it ever stops, the
+			// suppression assertion below would pass for want of a callback that
+			// registers, and the canary would be dead.
+			_, bareDenom, bareRegistered := run(t, false, false)
+			require.True(t, bareRegistered,
+				"the bare keeper no longer registers %s with the switch off, so the gate "+
+					"assertion below cannot distinguish suppression from a no-op", bareDenom)
+
+			require.False(t, offRegistered,
+				"with PermissionlessRegistration off no shape may bring a token pair into existence")
+		})
+	}
 }

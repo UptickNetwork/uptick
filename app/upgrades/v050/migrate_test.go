@@ -348,11 +348,18 @@ func TestBackfillContinuesPastAFailingDenom(t *testing.T) {
 }
 
 // TestEnablePermissionlessRegistrationFlipsTheShippedStartingState is the case
-// this migration exists for: the state a v0.4.x chain actually carries.
+// this migration exists for: the state v0.4.0 leaves behind.
 //
 // v0.4.0's migrateErc20Params writes {EnableErc20: true, PermissionlessRegistration:
-// false} and an already-upgraded chain never runs it again, so nothing but this
-// step can move the parameter. The fixture is that recorded pair of values.
+// false} and an already-upgraded chain never runs it again, so no other in-tree
+// step reaches that state. The fixture is that recorded pair of values.
+//
+// The fixture is the v0.4.0 output, which is not what a live v0.4.x chain
+// necessarily holds: gov can rewrite the parameter at any height through
+// MsgUpdateParams, and testnet did (proposal 16, executed 2026-09-17 at height
+// 14974481), so testnet already reads true and this step is a no-op there. That
+// is the already-on path pinned by
+// TestEnablePermissionlessRegistrationIsIdempotent, not a gap here.
 func TestEnablePermissionlessRegistrationFlipsTheShippedStartingState(t *testing.T) {
 	t.Parallel()
 
