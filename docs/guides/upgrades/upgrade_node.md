@@ -99,6 +99,43 @@ testnet is still running its `v0.4.1` binary.
   rejects every block from CometBFT v0.38.22 onward.
 - Update the release's version in your deployment tooling **at** the height, not before.
 
+### Legacy IBC-ERC20 after the upgrade
+
+Mainnet's four pre-upgrade IBC-ERC20 assets are **deprecated**. They are not migrated, not converted,
+and not kept convertible: the chains they represent are gone or going (IRIS halted, the Cosmos Hub
+channel closed, Noble retiring USDC), so there is nothing left to be compatible with.
+
+The handler deletes their token pairs (`app/upgrades/v040`: every pair whose `contract_owner` is
+`OWNER_MODULE`). What that does and does not change — read off mainnet on 2026-09-29:
+
+| | legacy contract | voucher (`ibc/…`) |
+|---|---|---|
+| still on chain | yes — deployed, 13,187 B of code | yes — bank supply untouched |
+| readable | yes — `eth_call` for `name`/`symbol`/`decimals`/`totalSupply`/`balanceOf` | yes — bank queries, plus a new derived pair |
+| convertible to/from Cosmos coins | **no** — `MsgConvertERC20` fails with `token pair not found` | **no** — an STRv2 pair is `OWNER_MODULE`, which `MsgConvertCoin` refuses |
+| ERC20 → ERC20 transfers | still work (it is an ordinary contract) | n/a |
+
+The legacy contracts stay *readable* because they were never in cosmos/evm's precompile registries —
+measured: the native and dynamic prefixes are empty for all four addresses. Calls to them are
+therefore ordinary EVM execution against the deployed bytecode. Had they been registered as
+precompiles, every call would fail instead, because the pair the precompile resolves is gone.
+
+Two things to know and deliberately not act on in this release:
+
+- **The escrowed coins are stranded.** Mainnet's `x/erc20` module account holds **16,638,820,054**
+  units of these four vouchers — equal to the legacy ERC20 `totalSupply` unit for unit; those
+  balances were the ERC20s' backing. With the pairs deleted, nothing on this chain can move them, and
+  this release does not burn them. Closing that loop changes the bank supply table and is a separate,
+  governance-visible decision.
+- **Anyone can re-register a legacy contract.** `permissionless_registration` is on in this release,
+  so `MsgRegisterERC20` against one of the old addresses creates a *new* `erc20:0x…` denom owned by
+  `OWNER_EXTERNAL`. Deprecation here means "not carried forward by us", not "blocked on chain".
+
+The *voucher* is not deprecated: it receives a new derived token pair in the same upgrade, so
+bank-side `ibc/…` balances keep an EVM representation through the erc20 precompile. Those vouchers
+are also the only part of this that still has users — a float of about 101,468,219 units sits in
+non-module accounts, whereas the module account's 16,638,820,054 are unreachable either way.
+
 ## Upgrading to v0.4.0
 
 *Historical. No chain upgrades through this plan name any more: the testnet already ran `v0.4.0` and `v0.4.1`, and mainnet reaches the same state in one hop via `v0.5.0`, which replays this change set internally. What follows documents what `v0.5.0` replays, and remains the reference for the state a `v0.4.x` chain is in.*

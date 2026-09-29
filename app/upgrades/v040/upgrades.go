@@ -760,9 +760,42 @@ func migrateErc20Params(ctx sdk.Context, box upgrades.Toolbox, logger log.Logger
 //     byERC20 + byDenom maps (DeleteTokenPair)
 //   - Preserves OWNER_EXTERNAL pairs (external ERC20 → Cosmos coin mappings)
 //
-// Deleted pairs are logged (denom + erc20 address) for auditability. The
-// Cosmos-native coin itself is NOT removed from the bank module — only the
+// The Cosmos-native coin itself is NOT removed from the bank module — only the
 // ERC20↔coin mapping is dropped.
+//
+// # The state this leaves behind, on purpose
+//
+// This function touches the erc20 store and nothing else: no bank write, no EVM
+// call, no burn. That is a decision, not an oversight, and its consequences are
+// the point of the change. Each one below was verified against mainnet's live
+// state before the v0.5.0 upgrade (evidence and numbers in
+// docs/guides/upgrades/upgrade_node.md, "Legacy IBC-ERC20 after v0.5.0"):
+//
+//   - The old ERC20 contract stays deployed on the EVM. It is absent from the
+//     native/dynamic precompile registries (measured: both key prefixes empty
+//     for all four mainnet addresses), so calls to it are ordinary EVM
+//     execution and name/symbol/decimals/totalSupply/balanceOf remain readable.
+//     The asset is deprecated, not erased — which is what lets it still be
+//     queried after the upgrade.
+//   - Its Cosmos bridge is gone: MsgConvertERC20 on that address now fails with
+//     ErrTokenPairNotFound, because MintingEnabled resolves the pair through the
+//     byERC20 map this function clears.
+//   - Idempotence is still absent here (see v041's note): replaying this
+//     deletion on post-upgrade state removes the STRv2 pairs registered since.
+//     v0.5.0 protects itself with a replay marker instead, which is why this
+//     function does not carry one.
+//   - Any coins the erc20 module account holds in escrow stay exactly where they
+//     are. On mainnet those balances equal the old ERC20 totalSupply to the unit
+//     (16,638,820,054 across four vouchers): they are the backing of the now
+//     deprecated ERC20, and once the pair is gone nothing on this chain can move
+//     them. Closing that loop is a separate, supply-changing decision and is
+//     deliberately not taken here.
+//   - Allowances recorded for the deleted contract go away with it
+//     (DeleteTokenPair → deleteAllowances).
+//
+// The deletion is irreversible, so it is logged one line per asset at Info: an
+// operator reading the upgrade log at the default level has to be able to name
+// the assets that were cut off. The summary line alone only carries counts.
 func deleteLegacyOwnerModulePairs(ctx sdk.Context, box upgrades.Toolbox, logger log.Logger) error {
 	logger.Info("deleting legacy OWNER_MODULE token pairs")
 
@@ -771,7 +804,6 @@ func deleteLegacyOwnerModulePairs(ctx sdk.Context, box upgrades.Toolbox, logger 
 
 	var deletedCount int
 	var preservedCount int
-	var details []string
 
 	for _, pair := range allPairs {
 		if pair.ContractOwner != erc20types.OWNER_MODULE {
@@ -784,9 +816,10 @@ func deleteLegacyOwnerModulePairs(ctx sdk.Context, box upgrades.Toolbox, logger 
 		erc20Keeper.DeleteTokenPair(ctx, pair)
 		deletedCount++
 
-		details = append(details,
-			fmt.Sprintf("  - denom=%s erc20=%s",
-				pair.Denom, pair.Erc20Address),
+		logger.Info(
+			"deleted legacy OWNER_MODULE token pair",
+			"denom", pair.Denom,
+			"erc20", pair.Erc20Address,
 		)
 	}
 
@@ -796,10 +829,6 @@ func deleteLegacyOwnerModulePairs(ctx sdk.Context, box upgrades.Toolbox, logger 
 		"deleted_owner_module", deletedCount,
 		"preserved_external", preservedCount,
 	)
-
-	for _, d := range details {
-		logger.Debug(d)
-	}
 
 	return nil
 }

@@ -88,6 +88,19 @@ Ref: https://keepachangelog.com/en/1.0.0/
   code covers both starting states. It cannot fail the upgrade — a voucher that cannot be repaired
   is logged and skipped, with counts in the summary line. See `app/upgrades/v050/migrate.go`.
 
+* (erc20) Mainnet's pre-upgrade IBC-ERC20 assets are **deprecated, not migrated**. The replayed
+  change set deletes every `OWNER_MODULE` token pair, which cuts the old contracts off the Cosmos
+  bridge (`MsgConvertERC20` now fails with `token pair not found`) while leaving them deployed and
+  readable over `eth_call`: they were never in cosmos/evm's precompile registries, so calls to them
+  are ordinary EVM execution. Their counterparty chains are gone or going (IRIS halted, the Cosmos
+  Hub channel closed, Noble retiring USDC), so no compatibility path is provided and none is
+  warranted. Two consequences ship unchanged and are recorded rather than fixed: the `x/erc20`
+  module account still holds **16,638,820,054** units of those four vouchers — equal to the legacy
+  ERC20 `totalSupply` unit for unit, and unreachable once the pairs are deleted — and because
+  `permissionless_registration` is on in this release, anyone can re-register a legacy contract as a
+  new `OWNER_EXTERNAL` denom. The *vouchers* are not deprecated: the backfill above gives them
+  derived pairs. See `docs/guides/upgrades/upgrade_node.md`, "Legacy IBC-ERC20 after the upgrade".
+
 * (erc20) `permissionless_registration` ships **on**: the `v0.5.0` handler flips it to true on both starting
   states. v0.4.0's `migrateErc20Params` forces the parameter off on purpose, but the two networks diverge if
   the change lives there — mainnet has still to run that migration, and testnet, which already did, never will
