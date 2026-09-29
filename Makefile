@@ -713,18 +713,22 @@ localnet-show-logstream:
 ###############################################################################
 
 PACKAGE_NAME:=github.com/UptickNetwork/uptick
-GOLANG_CROSS_VERSION  = v1.25.8
+# Releases run in CI (release.yml), whose goreleaser image is pinned by digest
+# and runs without --privileged or a docker.sock mount. Keep these local targets
+# aligned with that hardened path: a mutable tag image given --privileged plus a
+# docker.sock mount and the release token (.release-env) is a supply-chain
+# escalation vector. Prefer `make release-dry-run` for local smoke; run the real
+# release through CI.
+GOLANG_CROSS_VERSION  = v1.25.13
 GOLANG_CROSS_IMAGE    = ghcr.io/goreleaser/goreleaser-cross
 GOPATH ?= '$(HOME)/go'
 release-dry-run:
 	docker run \
 		--rm \
-		--privileged \
 		-e CGO_ENABLED=1 \
 		-e GOMODCACHE=/go/pkg/mod \
 		-e GOPROXY="`go env GOPROXY`" \
 		-e GOSUMDB="`go env GOSUMDB`" \
-		-v /var/run/docker.sock:/var/run/docker.sock \
 		-v `pwd`:/go/src/$(PACKAGE_NAME) \
 		-v ${GOPATH}/pkg:/go/pkg \
 		-w /go/src/$(PACKAGE_NAME) \
@@ -738,13 +742,11 @@ release:
 	fi
 	docker run \
 		--rm \
-		--privileged \
 		-e CGO_ENABLED=1 \
 		-e GOMODCACHE=/go/pkg/mod \
 		-e GOPROXY="`go env GOPROXY`" \
 		-e GOSUMDB="`go env GOSUMDB`" \
 		--env-file .release-env \
-		-v /var/run/docker.sock:/var/run/docker.sock \
 		-v `pwd`:/go/src/$(PACKAGE_NAME) \
 		-w /go/src/$(PACKAGE_NAME) \
 		${GOLANG_CROSS_IMAGE}:${GOLANG_CROSS_VERSION} \

@@ -305,6 +305,14 @@ func initAppConfig() (string, interface{}) {
 		cfg.StateSync.SnapshotInterval = 1500
 		cfg.StateSync.SnapshotKeepRecent = 2
 		cfg.IAVLDisableFastNode = false
+		// Close the default exposure surface (round 43): cosmos/evm ships
+		// allow-insecure-unlock=true and the SDK leaves gRPC/gRPC-web on while
+		// REST and JSON-RPC are off. Force them off so `uptickd init` emits a
+		// template that is closed by default; operators can opt back in when
+		// they need a namespace or listener.
+		cfg.JSONRPC.AllowInsecureUnlock = false
+		cfg.GRPC.Enable = false
+		cfg.GRPCWeb.Enable = false
 		return customAppTemplate, cfg
 	}
 	return customAppTemplate, customAppConfig

@@ -38,7 +38,20 @@ golangci-lint
 keyring_test_cosmos
 ./**/node_modules
 ./**/dist
+
+# Secrets and machine-local configuration. Mirrors .dockerignore: a release
+# token or an exported validator key must never enter the repository, and a
+# single `git add -A`/`git add .` must not be able to commit them. Keeping the
+# list ahead of the accident is cheaper than a credential rotation.
+.env
+.env.*
+*.env
+.release-env
 secret.yml
+secrets.yml
+*.pem
+*.key
+
 artifacts/*
 github.com/
 # vue/
