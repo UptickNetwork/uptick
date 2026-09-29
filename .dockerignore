@@ -3,3 +3,25 @@ localnet-setup
 
 # build
 build
+
+# Secrets and machine-local configuration. These are not tracked today, which is
+# exactly why they belong here: `docker build` sends the whole working tree, so an
+# operator's local .env or an exported validator key would be baked into a layer of
+# the published image before anyone noticed. Keeping the list ahead of the accident
+# is cheaper than a credential rotation.
+.env
+.env.*
+*.env
+.release-env
+secret.yml
+secrets.yml
+*.pem
+*.key
+
+# Local agent/audit workspace: holds operator notes with hostnames and addresses.
+.workbuddy
+
+# NOTE: `.git` is deliberately NOT ignored. Makefile:4 and :45 stamp
+# version.Commit from `git log -1`, which reaches the binary via ldflags; with the
+# git directory outside the build context the stamp silently resolves to empty and
+# the published image reports no commit at all.

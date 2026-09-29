@@ -10,7 +10,36 @@ With every new software release, we strongly recommend validators to perform a s
 
 You can upgrade your node by 1) upgrading your software version and 2) upgrading your node to that version. In this guide, you can find out how to automatically upgrade your node with Cosmovisor or perform the update manually.
 
+## Upgrading to v0.5.0
+
+`v0.5.0` is the **one-hop** upgrade from `v0.3.3`: a single governance plan named `v0.5.0` runs the whole `v0.4.0` change set and then the `v0.4.1` repairs, replacing the two-plan sequence the testnet executed. The handler decides which stage to run from the node's **starting state**, not from a flag: it probes for the cosmos/evm `EvmCoinInfo` record (EVM store prefix `0x05`), which the `v0.4.0` handler writes and the legacy ethermint layout cannot, and skips the `v0.4.0` set when that record is present — the set's legacy-pair deletion is destructive to replay.
+
+`v0.5.0` also carries two erc20 migrations that repair IBC vouchers, and turns `permissionless_registration` on:
+
+- `decimals()` on IBC-derived ERC20 is rewritten so wallets, explorers and DEX front-ends stop reading balances 10^18 times too large. Source denoms whose exponent cannot be derived (`u…` → 6, `a…` → 18) are skipped and logged, not guessed.
+- Every `ibc/` voucher that holds a supply and has no token pair yet gets a derived pair backfilled.
+- `permissionless_registration` is flipped to `true` on both starting states.
+
+::: warning
+`v0.5.0` is **state machine breaking and not reversible**: it deletes the `capability` store and moves the EVM `ChainConfig` to time-based activation, exactly as `v0.4.0` did. Every validator must run the new binary **before** the upgrade height.
+:::
+
+The on-chain upgrade name must be `v0.5.0` **verbatim** — the store loader, including the `capability` store deletion, is keyed on the plan name and nothing else:
+
+```bash
+uptickd tx gov submit-proposal software-upgrade v0.5.0 ...
+```
+
+When using Cosmovisor, place the new binary under:
+
+```bash
+mkdir -p $DAEMON_HOME/cosmovisor/upgrades/v0.5.0/bin
+cp $(which uptickd) $DAEMON_HOME/cosmovisor/upgrades/v0.5.0/bin/
+```
+
 ## Upgrading to v0.4.0
+
+*Historical. No chain upgrades through this plan name any more: the testnet already ran `v0.4.0` and `v0.4.1`, and mainnet reaches the same state in one hop via `v0.5.0`, which replays this change set internally. What follows documents what `v0.5.0` replays, and remains the reference for the state a `v0.4.x` chain is in.*
 
 The `v0.4.0` upgrade is a **state machine breaking** upgrade that replaces the core stack:
 
@@ -52,20 +81,16 @@ idempotent and safe to re-apply:
   `ExtensionOptionsWeb3Tx` type-URL mapping) and the EIP-2 low-s signature check live in the
   binary's codec and ante handler.
 
-### Two-step upgrade from v0.3.x (mandatory)
+### The two-step path from v0.3.x (superseded)
 
-A chain on v0.3.x **cannot jump straight to a `v0.4.1` plan**: the one-shot migrations that make
+A chain on v0.3.x **cannot** jump straight to a `v0.4.1` plan: the one-shot migrations that make
 v0.3.x state readable by the cosmos/evm stack — legacy `EthAccount` → `BaseAccount` rewriting,
 legacy `ethsecp256k1` pubkey `Any` migration, `capability` store deletion, EVM `ChainConfig`
 Block→Time migration, legacy erc20/params cleanup — only exist in the `v0.4.0` handler.
 
-Upgrade in two sequential governance steps:
-
-1. Submit and execute the **`v0.4.0`** software-upgrade plan first.
-2. After the chain restarts on v0.4.0 state, submit and execute the **`v0.4.1`** plan.
-
-Both names are registered in the same binary, and `x/upgrade` allows only one pending plan at a
-time, so the two plans must be proposed and executed in order.
+That is exactly why the one-hop `v0.5.0` plan runs the `v0.4.0` change set itself and then the
+`v0.4.1` repairs, instead of asking governance to sequence two plans. Submit `v0.5.0`; do **not**
+propose `v0.4.0` or `v0.4.1` on a chain that has not already run them, in any order.
 
 When using Cosmovisor, place the new binary under:
 

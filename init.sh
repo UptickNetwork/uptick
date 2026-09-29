@@ -55,7 +55,7 @@ else
     sed -i 's/create_empty_blocks = true/create_empty_blocks = false/g' $HOME/.uptickd/config/config.toml
 fi
 
-if [[ $1 == "pending" ]]; then
+if [[ "${1:-}" == "pending" ]]; then
     if [[ "$OSTYPE" == "darwin"* ]]; then
         sed -i '' 's/create_empty_blocks_interval = "0s"/create_empty_blocks_interval = "30s"/g' $HOME/.uptickd/config/config.toml
         sed -i '' 's/timeout_propose = "3s"/timeout_propose = "30s"/g' $HOME/.uptickd/config/config.toml
@@ -98,9 +98,13 @@ uptickd collect-gentxs
 # Run this to ensure everything worked and that the genesis file is setup correctly
 uptickd validate-genesis
 
-if [[ $1 == "pending" ]]; then
+if [[ "${1:-}" == "pending" ]]; then
     echo "pending mode is on, please wait for the first block committed."
 fi
 
 # Start the node (remove the --pruning=nothing flag if historical queries are not needed)
-uptickd start --pruning=nothing $TRACE --log_level $LOGLEVEL --minimum-gas-prices=0auptick --json-rpc.api eth,txpool,personal,net,debug,web3
+# JSON-RPC namespaces are pinned to cosmos/evm's own default ({"eth","net","web3"}).
+# Do not add "personal" (exposes account unlock over RPC) or "debug" (returns full
+# goroutine stacks) just because this is a local chain -- operators copy this file.
+# For local tracing, add them explicitly on the command line, never here.
+uptickd start --pruning=nothing $TRACE --log_level $LOGLEVEL --minimum-gas-prices=0auptick --json-rpc.api eth,net,web3

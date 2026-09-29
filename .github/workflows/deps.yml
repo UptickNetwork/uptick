@@ -20,8 +20,16 @@ jobs:
         with:
           go-version: "1.25.13"
 
+      # Pinned, not `@latest`, for the same reason security.yml is: this job runs
+      # the identical scripts/govulncheck-baseline.sh, which asserts the scanner
+      # version it finds on $PATH against PINNED_GOVULNCHECK_VERSION (v1.7.0) and
+      # exits 2 on any mismatch. With `@latest` resolving to v1.8.0 that assertion
+      # failed every single run, so the weekly job was red by construction -- the
+      # same "always red is the same as absent" failure mode the step below warns
+      # about. Keep all three in lockstep: this line, GOVULNCHECK_VERSION in
+      # security.yml, and PINNED_GOVULNCHECK_VERSION in the script.
       - name: Install govulncheck
-        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
 
       - name: Run govulncheck
         # Must go through the baseline script, not a bare `govulncheck ./...`.
