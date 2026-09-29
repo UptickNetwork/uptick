@@ -11,21 +11,46 @@ import (
 	// v030-v032 were removed: they were build-ignored historical upgrades with
 	// SDK 0.50 API incompatibilities and stale ethermint fork fields.
 	v033 "github.com/UptickNetwork/uptick/app/upgrades/v033"
-	v040 "github.com/UptickNetwork/uptick/app/upgrades/v040"
-	v041 "github.com/UptickNetwork/uptick/app/upgrades/v041"
+	// v040 and v041 are deliberately not imported here. Their packages still
+	// build into the binary -- v050 calls their handler constructors directly --
+	// but neither name is registered as a plan this binary will execute. See the
+	// note on `router` below: the absence is the guard.
 	v050 "github.com/UptickNetwork/uptick/app/upgrades/v050"
 )
 
-// router holds every upgrade plan this binary can execute.
+// router holds exactly the upgrade plans this binary is meant to serve.
 //
-// v050 is the plan mainnet follows from v0.3.3 in ONE hop: it replays the
-// v0.4.0 change set and then the v0.4.1 repairs. See its package doc for why the
-// starting state -- not a flag -- decides which stage runs.
+// The table is scoped per release AND per chain. x/upgrade's startup self-check
+// (abci.go:38-62) requires the name of the last completed upgrade to have a
+// handler, so the table must contain the plan name of EVERY chain this binary is
+// pointed at -- and it should contain nothing else. Mainnet is the only chain
+// v0.5.0 serves: it is stopped on v0.3.3 and upgrades to v0.5.0, which replays
+// the v0.4.0 change set and then the v0.4.1 repairs itself (see v050's package
+// doc for why the starting state, not a flag, decides which stage runs).
+//
+// v0.4.0 and v0.4.1 are absent on purpose, and the absence is the guard:
+//
+//   - x/upgrade keeps a name schedulable until it has a done record, and mainnet
+//     has none for either. Registering v0.4.0 would leave it reachable by
+//     governance, and its legacy-pair deletion is not idempotent -- a replayed
+//     plan deletes the pairs registered after the upgrade. Registering v0.4.1
+//     would leave reachable a handler that reads cosmos/evm EVM params out of a
+//     legacy ethermint store, which cannot work on a v0.3.3 chain at all.
+//   - With neither name registered, such a plan cannot reach ApplyUpgrade: the
+//     module fails the upgrade height with "UPGRADE NEEDED" and halts, and an
+//     operator clears it with --unsafe-skip-upgrades. A halt is recoverable; a
+//     replayed deletion is not.
+//
+// Neither removal touches the upgrade path: v050 builds both of its stages from
+// the v040 and v041 packages directly, never by looking them up here.
+//
+// The cost, deliberate: this binary must NOT be handed to a node stopped on
+// v0.4.1 (the testnet's last completed plan) -- it aborts on every start with
+// "upgrade handler is missing for v0.4.1 upgrade plan". v0.5.1 registers v0.4.1
+// back for that.
 var (
 	router = upgrades.NewUpgradeRouter().
 		Register(v033.Upgrade).
-		Register(v040.Upgrade).
-		Register(v041.Upgrade).
 		Register(v050.Upgrade)
 )
 
