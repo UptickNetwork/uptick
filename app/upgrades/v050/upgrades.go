@@ -11,15 +11,22 @@
 // restating their migrations, so the v0.4.x code that already passed review is
 // what runs on mainnet.
 //
-// # One binary, two starting states
+// # One handler, two starting states
 //
-// The same v0.5.0 binary also has to keep serving a chain that is already on
-// v0.4.x (testnet), where the v0.4.0 set HAS run and must not run again. A
-// second run is not merely wasteful: deleteLegacyOwnerModulePairs selects token
-// pairs by ContractOwner == OWNER_MODULE alone, and cosmos/evm's IBC
-// auto-registration creates pairs with that same owner, so a replay deletes the
-// STRv2 pairs real users hold (the defect pinned by
-// app/upgrades/v040/erc20_legacy_replay_test.go).
+// The probe exists because the v0.4.0 change set must not run twice. A second
+// run is not merely wasteful: deleteLegacyOwnerModulePairs selects token pairs
+// by ContractOwner == OWNER_MODULE alone, and cosmos/evm's IBC auto-registration
+// creates pairs with that same owner, so a replay deletes the STRv2 pairs real
+// users hold (the defect pinned by
+// app/upgrades/v040/erc20_legacy_replay_test.go). A chain already on v0.4.x has
+// to reach the repairs without passing through the v0.4.0 set again.
+//
+// This is a property of the HANDLER, not a statement about what the v0.5.0
+// BINARY serves. The v0.4.0 and v0.4.1 plan names are deliberately not
+// registered in this release (see the note on `router` in app/upgrade.go), so
+// this binary cannot run on a chain stopped at v0.4.1 -- the testnet -- at all.
+// Keeping the handler correct from both starting states is what lets a later
+// release register v0.4.1 back and reuse this code unchanged.
 //
 // The starting state is therefore probed from state, never configured: a
 // validator running the wrong branch would have to be wrong about its own store

@@ -102,17 +102,30 @@ func TestAppRouterRegistration(t *testing.T) {
 			"the app router must register %s", name)
 	}
 
-	// Absent: this is the fence, not an oversight. v0.4.0 and v0.4.1 are both
-	// still schedulable on mainnet (neither has a done record there) and neither
-	// handler is safe against v0.3.3 state -- v0.4.0's legacy-pair deletion is
-	// not idempotent, and v0.4.1 reads cosmos/evm EVM params out of a legacy
-	// ethermint store. Unregistered, such a plan halts at the upgrade height
+	// Absent: this is the fence, not an oversight. Nothing on mainnet ever writes
+	// a done record for either name -- the one-hop upgrade records only "v0.5.0"
+	// -- so both stay schedulable by governance forever, and neither is safe to
+	// run:
+	//
+	//   - v0.4.0's legacy-pair deletion is not idempotent, and it selects pairs
+	//     by ContractOwner == OWNER_MODULE alone, which is what cosmos/evm's IBC
+	//     auto-registration produces. Running it on a chain that is already on
+	//     v0.5.0 state -- which has no v0.4.0 done record to stop a re-proposal --
+	//     deletes the STRv2 pairs registered since the upgrade.
+	//   - v0.4.1 cannot run until the v0.4.0 change set has: its first repair
+	//     reads the ICA controller params (v041/upgrades.go:68, before the module
+	//     manager runs), and ibc-go v10's controller keeper panics rather than
+	//     defaulting when the module store has no "params" key
+	//     (27-interchain-accounts/controller/keeper/keeper.go:307-315) -- the
+	//     state of a chain that never ran that set.
+	//
+	// Unregistered, such a plan fails the upgrade height with "UPGRADE NEEDED"
 	// instead of reaching ApplyUpgrade. Registering either one again is not a
 	// fix; it re-opens the hole.
 	for _, name := range []string{"v0.4.0", "v0.4.1"} {
 		require.Empty(t, router.UpgradeInfo(name).UpgradeName,
-			"%s must not be registered: it is schedulable on mainnet and its handler is "+
-				"destructive (v0.4.0) or unrunnable (v0.4.1) on a v0.3.3 chain", name)
+			"%s must not be registered: it stays schedulable on mainnet forever and is "+
+				"not safe to run there", name)
 	}
 
 	require.Len(t, router.Routers(), 2,

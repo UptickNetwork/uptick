@@ -12,7 +12,15 @@ You specify the network you want to join by setting the **genesis file** and **s
 
 | Network Chain ID | Description                       | Site                                                                     | Version                                               |
 |------------------|-----------------------------------|--------------------------------------------------------------------------|-------------------------------------------------------|
-| `origin_1170-3`   | Uptick Testnet | [origin_1170-3 testnet](https://github.com/UptickNetwork/uptick-testnet/tree/main/origin_1170-3) | [`v0.4.0`](https://github.com/UptickNetwork/uptick/releases) |
+| `origin_1170-3`   | Uptick Testnet | [origin_1170-3 testnet](https://github.com/UptickNetwork/uptick-testnet/tree/main/origin_1170-3) | `v0.4.1` |
+
+:::danger
+The testnet's last completed upgrade is `v0.4.1`, so a node joining it needs a binary that registers
+that plan name. **Do not run the latest release on the testnet**: `v0.5.0` deliberately does not
+register `v0.4.1`, and a node without a handler for the chain's last completed upgrade aborts on
+every start with `upgrade handler is missing for v0.4.1 upgrade plan`. Take the binary from the
+`v0.4.1` release rather than from the top of the releases page.
+:::
 
 ## Install `uptickd`
 

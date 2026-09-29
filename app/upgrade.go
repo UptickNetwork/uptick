@@ -34,8 +34,13 @@ import (
 //     has none for either. Registering v0.4.0 would leave it reachable by
 //     governance, and its legacy-pair deletion is not idempotent -- a replayed
 //     plan deletes the pairs registered after the upgrade. Registering v0.4.1
-//     would leave reachable a handler that reads cosmos/evm EVM params out of a
-//     legacy ethermint store, which cannot work on a v0.3.3 chain at all.
+//     would leave reachable a handler that cannot run on a v0.3.3 chain at all:
+//     its first repair reads the ICA controller params (v041/upgrades.go:68, and
+//     before the module manager gets to run), and ibc-go v10's controller keeper
+//     PANICS rather than defaulting when the module store has no "params" key
+//     (27-interchain-accounts/controller/keeper/keeper.go:307-315). That is the
+//     state a chain which never ran the v0.4.0 change set is in, those params
+//     having lived in the legacy x/params subspace.
 //   - With neither name registered, such a plan cannot reach ApplyUpgrade: the
 //     module fails the upgrade height with "UPGRADE NEEDED" and halts, and an
 //     operator clears it with --unsafe-skip-upgrades. A halt is recoverable; a

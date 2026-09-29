@@ -46,8 +46,19 @@ Ref: https://keepachangelog.com/en/1.0.0/
   legacy ethermint layout cannot — so one binary still serves a chain already on v0.4.x, where the v0.4.0 set
   must NOT be replayed: its legacy-pair deletion removes by `ContractOwner == OWNER_MODULE` and would take the
   live STRv2 pairs with it. A marker in the x/upgrade store makes a re-proposed or crash-restarted plan return
-  early. The plan repeats the `capability` store deletion, because the store loader is keyed on the plan name.
+  early.   The plan repeats the `capability` store deletion, because the store loader is keyed on the plan name.
   The governance proposal must carry the name `v0.5.0` verbatim; see `app/upgrades/v050`.
+
+  This release's plan table is scoped to mainnet. It registers `v0.3.3` (the chain's last completed
+  upgrade, which the module's startup self-check requires a handler for) and `v0.5.0`, and deliberately
+  does **not** register `v0.4.0` or `v0.4.1`. Nothing on mainnet ever writes a done record for either
+  name — the one-hop upgrade records only `v0.5.0` — so both stay schedulable by governance forever,
+  and neither is safe to run: `v0.4.0`'s legacy-pair deletion is not idempotent, so against a chain
+  already on v0.5.0 state a re-proposal deletes the pairs registered since the upgrade; and `v0.4.1`
+  cannot run until the `v0.4.0` change set has. Leaving both unregistered is what makes such a plan
+  halt at the upgrade height instead of executing it. The cost is explicit: this binary **cannot run
+  on a chain stopped at `v0.4.1`** — that is the testnet, which aborts on every start — so do not
+  deploy it there, and a later release registers `v0.4.1` back for that.
 
 * (erc20) IBC vouchers get their ERC20 representation repaired, on both starting states. Two migrations run
   inside the `v0.5.0` handler, after the replayed change sets and before the replay marker:
@@ -65,9 +76,10 @@ Ref: https://keepachangelog.com/en/1.0.0/
     no voucher that arrived earlier can reach the EVM. The backfill registers a derived (module-owned, no
     contract deployed) pair for every `ibc/` voucher that holds a supply and has none yet.
 
-  Scope is state-derived rather than a compiled-in whitelist: one binary serves mainnet and testnet, whose
-  voucher sets do not overlap. It cannot fail the upgrade — a voucher that cannot be repaired is logged and
-  skipped, with counts in the summary line. See `app/upgrades/v050/migrate.go`.
+  Scope is state-derived rather than a compiled-in whitelist: the migration keys off the vouchers
+  actually present in the store, and the two chains' voucher sets do not overlap, so one piece of
+  code covers both starting states. It cannot fail the upgrade — a voucher that cannot be repaired
+  is logged and skipped, with counts in the summary line. See `app/upgrades/v050/migrate.go`.
 
 * (erc20) `permissionless_registration` ships **on**: the `v0.5.0` handler flips it to true on both starting
   states. v0.4.0's `migrateErc20Params` forces the parameter off on purpose, but the two networks diverge if
@@ -140,9 +152,11 @@ Ref: https://keepachangelog.com/en/1.0.0/
 
 > v0.4.0 was never released standalone; this release ships the whole v0.4.0
 > change set (Cosmos SDK v0.53.6 / CometBFT v0.38.21 / ibc-go v10.5.0 /
-> cosmos-evm v0.6.2 / wasmd v0.61.14) plus the v0.4.1 fixes below. The binary
-> registers both the `v0.4.0` and `v0.4.1` handlers, but a v0.3.x chain must
-> still execute two governance plans IN ORDER (first `v0.4.0`, then `v0.4.1`).
+> cosmos-evm v0.6.2 / wasmd v0.61.14) plus the v0.4.1 fixes below. **This**
+> binary registered both the `v0.4.0` and `v0.4.1` handlers, and a v0.3.x chain
+> had to execute two governance plans IN ORDER (first `v0.4.0`, then `v0.4.1`).
+> The later v0.5.0 release folds that pair into a single plan and drops both
+> names from its own table — do not read this paragraph as describing it.
 > See docs/guides/upgrades/upgrade_node.md.
 
 ### State Machine Breaking

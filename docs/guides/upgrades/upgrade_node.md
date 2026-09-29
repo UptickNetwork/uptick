@@ -12,6 +12,15 @@ You can upgrade your node by 1) upgrading your software version and 2) upgrading
 
 ## Upgrading to v0.5.0
 
+::: danger
+**This release is scoped to mainnet.** The `v0.4.0` and `v0.4.1` plan names are deliberately *not*
+registered in the `v0.5.0` binary, so it **cannot be used on the testnet (`origin_1170-3`)**. That
+chain's last completed upgrade is `v0.4.1`, and a node whose binary has no handler for it aborts on
+**every** start with `upgrade handler is missing for v0.4.1 upgrade plan` — it will not sync, not
+catch up, and not participate. Do not point a testnet node at this binary and do not hand it to
+anyone joining the testnet. A later release registers `v0.4.1` back.
+:::
+
 `v0.5.0` is the **one-hop** upgrade from `v0.3.3`: a single governance plan named `v0.5.0` runs the whole `v0.4.0` change set and then the `v0.4.1` repairs, replacing the two-plan sequence the testnet executed. The handler decides which stage to run from the node's **starting state**, not from a flag: it probes for the cosmos/evm `EvmCoinInfo` record (EVM store prefix `0x05`), which the `v0.4.0` handler writes and the legacy ethermint layout cannot, and skips the `v0.4.0` set when that record is present — the set's legacy-pair deletion is destructive to replay.
 
 `v0.5.0` also carries two erc20 migrations that repair IBC vouchers, and turns `permissionless_registration` on:
@@ -62,9 +71,11 @@ mkdir -p $DAEMON_HOME/cosmovisor/upgrades/v0.4.0/bin
 cp $(which uptickd) $DAEMON_HOME/cosmovisor/upgrades/v0.4.0/bin/
 ```
 
-The on-chain upgrade name is `v0.4.0` (e.g. `uptickd tx gov submit-proposal software-upgrade v0.4.0 ...`).
+The on-chain upgrade name was `v0.4.0` (e.g. `uptickd tx gov submit-proposal software-upgrade v0.4.0 ...`). **It is no longer registered**: proposing `v0.4.0` against the current binary halts the upgrade height with `UPGRADE NEEDED` instead of running it. The `v0.5.0` plan replays this change set.
 
 ## Upgrading to v0.4.1
+
+*Historical. No chain upgrades through this plan name any more. The testnet ran `v0.4.0` then `v0.4.1` and is now stopped on `v0.4.1`; mainnet reaches the same state in one hop via `v0.5.0`. The `v0.4.1` plan is not registered in the current binary — see the warning on the `v0.5.0` section above. What follows documents the repairs `v0.5.0` replays.*
 
 The `v0.4.1` upgrade is **state-machine compatible with v0.4.0**: it bumps no module
 consensus version and performs no store deletion. The one-shot repairs the handler runs are
@@ -99,7 +110,7 @@ mkdir -p $DAEMON_HOME/cosmovisor/upgrades/v0.4.1/bin
 cp $(which uptickd) $DAEMON_HOME/cosmovisor/upgrades/v0.4.1/bin/
 ```
 
-The on-chain upgrade name is `v0.4.1` (e.g. `uptickd tx gov submit-proposal software-upgrade v0.4.1 ...`).
+The on-chain upgrade name was `v0.4.1` (e.g. `uptickd tx gov submit-proposal software-upgrade v0.4.1 ...`). **It is no longer registered**: proposing `v0.4.1` against the current binary halts the upgrade height with `UPGRADE NEEDED` instead of running it.
 
 ### Operator checklist
 
