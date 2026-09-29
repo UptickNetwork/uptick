@@ -1,27 +1,27 @@
 package keeper
 
 import (
-	"context"
-
 	cw721keep "github.com/UptickNetwork/uptick/x/cw721/keeper"
-	cw721types "github.com/UptickNetwork/uptick/x/cw721/types"
 	erc721keeper "github.com/UptickNetwork/uptick/x/erc721/keeper"
-	erc721types "github.com/UptickNetwork/uptick/x/erc721/types"
 	ibcnfttransferkeeper "github.com/bianjieai/nft-transfer/keeper"
 	nfttransfertypes "github.com/bianjieai/nft-transfer/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	channeltypes "github.com/cosmos/ibc-go/v10/modules/core/04-channel/types"
 )
 
-// ERC721Converter is the x/erc721 surface used by inbound convert and outbound refunds.
+// ERC721Converter is the x/erc721 surface used by outbound refunds.
+//
+// NOTE (R1-C): the inbound ConvertNFT path was removed — convert memos are now
+// settled natively, so no token pair is written and the burn guard never locks
+// a bridged voucher out of its origin chain. Only the refund side remains.
 type ERC721Converter interface {
-	ConvertNFT(ctx context.Context, msg *erc721types.MsgConvertNFT) (*erc721types.MsgConvertNFTResponse, error)
 	RefundPacketToken(ctx sdk.Context, data nfttransfertypes.NonFungibleTokenPacketData) error
 }
 
-// CW721Converter is the x/cw721 surface used by inbound convert and outbound refunds.
+// CW721Converter is the x/cw721 surface used by outbound refunds.
+//
+// NOTE (R1-C): same as ERC721Converter — inbound ConvertNFT was removed.
 type CW721Converter interface {
-	ConvertNFT(ctx context.Context, msg *cw721types.MsgConvertNFT) (*cw721types.MsgConvertNFTResponse, error)
 	RefundPacketToken(ctx sdk.Context, data nfttransfertypes.NonFungibleTokenPacketData) error
 }
 

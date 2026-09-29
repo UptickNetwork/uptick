@@ -1,7 +1,6 @@
 package evmibc
 
 import (
-	"context"
 	"fmt"
 	"testing"
 
@@ -64,11 +63,12 @@ func (m *recordingIBCModule) OnChanCloseConfirm(sdk.Context, string, string) err
 
 func (m *recordingIBCModule) OnRecvPacket(ctx sdk.Context, _ string, packet channeltypes.Packet, _ sdk.AccAddress) exported.Acknowledgement {
 	m.recvs = append(m.recvs, packet)
-	if m.storeKey != nil {
-		ctx.KVStore(m.storeKey).Set([]byte("recv"), []byte("1"))
-	}
 	if !m.recvOK {
 		return channeltypes.NewErrorAcknowledgement(fmt.Errorf("nft-transfer recv failed"))
+	}
+	// Mimic nft-transfer: the mint is only committed on a successful receive.
+	if m.storeKey != nil {
+		ctx.KVStore(m.storeKey).Set([]byte("recv"), []byte("1"))
 	}
 	return channeltypes.NewResultAcknowledgement([]byte{byte(1)})
 }
@@ -84,18 +84,8 @@ func (m *recordingIBCModule) OnTimeoutPacket(sdk.Context, string, channeltypes.P
 }
 
 type fakeERC721 struct {
-	convertErr error
-	refundErr  error
-	converts   []erc721types.MsgConvertNFT
-	refunds    []nfttransfertypes.NonFungibleTokenPacketData
-}
-
-func (f *fakeERC721) ConvertNFT(_ context.Context, msg *erc721types.MsgConvertNFT) (*erc721types.MsgConvertNFTResponse, error) {
-	f.converts = append(f.converts, *msg)
-	if f.convertErr != nil {
-		return nil, f.convertErr
-	}
-	return &erc721types.MsgConvertNFTResponse{}, nil
+	refundErr error
+	refunds   []nfttransfertypes.NonFungibleTokenPacketData
 }
 
 func (f *fakeERC721) RefundPacketToken(_ sdk.Context, data nfttransfertypes.NonFungibleTokenPacketData) error {
@@ -104,18 +94,8 @@ func (f *fakeERC721) RefundPacketToken(_ sdk.Context, data nfttransfertypes.NonF
 }
 
 type fakeCW721 struct {
-	convertErr error
-	refundErr  error
-	converts   []cw721types.MsgConvertNFT
-	refunds    []nfttransfertypes.NonFungibleTokenPacketData
-}
-
-func (f *fakeCW721) ConvertNFT(_ context.Context, msg *cw721types.MsgConvertNFT) (*cw721types.MsgConvertNFTResponse, error) {
-	f.converts = append(f.converts, *msg)
-	if f.convertErr != nil {
-		return nil, f.convertErr
-	}
-	return &cw721types.MsgConvertNFTResponse{}, nil
+	refundErr error
+	refunds   []nfttransfertypes.NonFungibleTokenPacketData
 }
 
 func (f *fakeCW721) RefundPacketToken(_ sdk.Context, data nfttransfertypes.NonFungibleTokenPacketData) error {
@@ -202,62 +182,58 @@ func decodePacketData(t *testing.T, packet channeltypes.Packet) nfttransfertypes
 	return data
 }
 
-func TestKeeperOnRecvPacket_UnknownConvertType(t *testing.T) {
-	key := storetypes.NewKVStoreKey("convert-e2e")
-	tkey := storetypes.NewTransientStoreKey("convert-e2e-transient")
-	ctx := testutil.DefaultContext(key, tkey)
-	k := evmibckeeper.NewKeeper(&fakeICS721{})
-
-	ack := k.OnRecvPacket(ctx, inboundPacket(testHexReceiver, ""), testHexReceiver, 99)
-	require.False(t, ack.Success(), "unknown convertType must fail closed without committing")
+func requireConvertSkipEvent(t *testing.T, ctx sdk.Context, convertTo, classID string) {
+	t.Helper()
+	found := false
+	for _, ev := range ctx.EventManager().Events() {
+		if ev.Type != "ibc_nft_convert" {
+			continue
+		}
+		attrs := make(map[string]string, len(ev.Attributes))
+		for _, a := range ev.Attributes {
+			attrs[a.Key] = a.Value
+		}
+		require.Equal(t, "3", attrs["status"])
+		require.Equal(t, "R1C", attrs["policy"])
+		require.Equal(t, convertTo, attrs["convert_to"])
+		require.Equal(t, classID, attrs["class_id"])
+		found = true
+	}
+	require.True(t, found, "expected ibc_nft_convert skip event (status=3, policy=R1C)")
 }
 
-func TestConvertRecv_ERC721Success(t *testing.T) {
-	ctx, key, app, erc, _, _, im := newConvertHarness(t, true)
+func TestConvertRecv_SkippedNative_ERC721(t *testing.T) {
+	ctx, key, app, _, _, _, im := newConvertHarness(t, true)
 
 	ack := im.OnRecvPacket(ctx, "", inboundPacket(testHexReceiver, `{"convert_to":"erc721"}`), nil)
 	require.True(t, ack.Success())
-	require.True(t, ctx.KVStore(key).Has([]byte("recv")), "nft-transfer mint must commit on convert success")
+	require.True(t, ctx.KVStore(key).Has([]byte("recv")), "nft-transfer mint must commit")
 	require.Len(t, app.recvs, 1)
-	require.Equal(t, erc721types.AccModuleAddress.String(), decodePacketData(t, app.recvs[0]).Receiver)
-	require.Len(t, erc.converts, 1)
-	require.Equal(t, testHexReceiver, erc.converts[0].EvmReceiver)
-	require.Equal(t, erc721types.AccModuleAddress.String(), erc.converts[0].CosmosSender)
-	require.Equal(t, []string{testTokenID}, erc.converts[0].CosmosTokenIds)
+	// R1-C: the voucher is settled natively — the receiver is NOT redirected to
+	// the module account, so no pair is written and the burn guard never locks
+	// the voucher out of its origin chain.
+	require.Equal(t, testHexReceiver, decodePacketData(t, app.recvs[0]).Receiver)
+	requireConvertSkipEvent(t, ctx, "erc721", testClassID)
 }
 
-func TestConvertRecv_CW721Success(t *testing.T) {
+func TestConvertRecv_SkippedNative_CW721(t *testing.T) {
 	receiver := sdk.AccAddress([]byte("cw721-receiver-addr01")).String()
-	ctx, key, app, _, cw, _, im := newConvertHarness(t, true)
+	ctx, key, app, _, _, _, im := newConvertHarness(t, true)
 
 	ack := im.OnRecvPacket(ctx, "", inboundPacket(receiver, `{"convert_to":"cw721"}`), nil)
 	require.True(t, ack.Success())
 	require.True(t, ctx.KVStore(key).Has([]byte("recv")))
 	require.Len(t, app.recvs, 1)
-	require.Equal(t, cw721types.AccModuleAddress.String(), decodePacketData(t, app.recvs[0]).Receiver)
-	require.Len(t, cw.converts, 1)
-	require.Equal(t, receiver, cw.converts[0].Receiver)
-	require.Equal(t, cw721types.AccModuleAddress.String(), cw.converts[0].Sender)
+	require.Equal(t, receiver, decodePacketData(t, app.recvs[0]).Receiver)
+	requireConvertSkipEvent(t, ctx, "cw721", testClassID)
 }
 
-func TestConvertRecv_FailClosedOnConvertError(t *testing.T) {
-	ctx, key, app, erc, _, _, im := newConvertHarness(t, true)
-	erc.convertErr = fmt.Errorf("pair missing")
-
-	ack := im.OnRecvPacket(ctx, "", inboundPacket(testHexReceiver, `{"convert_to":"erc721"}`), nil)
-	require.False(t, ack.Success())
-	require.False(t, ctx.KVStore(key).Has([]byte("recv")), "convert failure must roll back nft-transfer mint")
-	require.Len(t, erc.converts, 1)
-	require.Len(t, app.recvs, 1)
-}
-
-func TestConvertRecv_FailClosedOnUnderlyingRecvError(t *testing.T) {
-	ctx, key, app, erc, _, _, im := newConvertHarness(t, false)
+func TestConvertRecv_SkippedNative_UnderlyingRecvError(t *testing.T) {
+	ctx, key, app, _, _, _, im := newConvertHarness(t, false)
 
 	ack := im.OnRecvPacket(ctx, "", inboundPacket(testHexReceiver, `{"convert_to":"erc721"}`), nil)
 	require.False(t, ack.Success())
 	require.False(t, ctx.KVStore(key).Has([]byte("recv")))
-	require.Empty(t, erc.converts, "convert must not run when nft-transfer recv fails")
 	require.Len(t, app.recvs, 1)
 }
 

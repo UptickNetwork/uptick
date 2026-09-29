@@ -2,6 +2,7 @@ package evmibc
 
 import (
 	"encoding/json"
+	"strconv"
 	"strings"
 
 	sdkerrors "cosmossdk.io/errors"
@@ -11,11 +12,8 @@ import (
 	channeltypes "github.com/cosmos/ibc-go/v10/modules/core/04-channel/types"
 	porttypes "github.com/cosmos/ibc-go/v10/modules/core/05-port/types"
 	"github.com/cosmos/ibc-go/v10/modules/core/exported"
-	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/UptickNetwork/uptick/ibc"
-	cw721Types "github.com/UptickNetwork/uptick/x/cw721/types"
-	erc721Types "github.com/UptickNetwork/uptick/x/erc721/types"
 	"github.com/UptickNetwork/uptick/x/evmibc/keeper"
 	evmibctypes "github.com/UptickNetwork/uptick/x/evmibc/types"
 
@@ -83,71 +81,33 @@ func (im IBCMiddleware) OnRecvPacket(
 	}
 
 	switch strings.ToLower(packageMemo.ConvertTo) {
-	case convertERC721:
-		newPackage, dstReceiver := PackageToModuleAccount(packet, erc721Types.AccModuleAddress)
-		if !common.IsHexAddress(dstReceiver) || common.HexToAddress(dstReceiver) == (common.Address{}) {
-			ackResult = channeltypes.NewErrorAcknowledgement(
-				sdkerrors.Wrap(errortypes.ErrInvalidType, "receiver address format error"),
-			)
-			return ackResult
-		}
-		return im.recvAndConvert(ctx, channelVersion, newPackage, relayer, dstReceiver, 0)
-
-	case convertCW721:
-		newPackage, dstReceiver := PackageToModuleAccount(packet, cw721Types.AccModuleAddress)
-		if _, err := sdk.AccAddressFromBech32(dstReceiver); err != nil {
-			ackResult = channeltypes.NewErrorAcknowledgement(
-				sdkerrors.Wrap(errortypes.ErrInvalidType, "receiver address format error"),
-			)
-			return ackResult
-		}
-		return im.recvAndConvert(ctx, channelVersion, newPackage, relayer, dstReceiver, 1)
+	case convertERC721, convertCW721:
+		// R1-C: convert-memo packets are no longer converted. The voucher is
+		// settled natively by the ICS-721 path — minted straight to the original
+		// receiver — so no token pair is written and the burn guard never locks
+		// the voucher out of its origin chain (R1). Emit an observable "skipped"
+		// event so a deliberate policy skip is distinguishable from a packet
+		// that never carried a convert memo.
+		im.keeper.Logger(ctx).Info(
+			"convert memo skipped: voucher settled natively (R1-C)",
+			"convert_to", packageMemo.ConvertTo,
+			"class_id", data.ClassId,
+			"sequence", packet.Sequence,
+		)
+		ctx.EventManager().EmitEvent(
+			sdk.NewEvent(
+				"ibc_nft_convert",
+				sdk.NewAttribute("status", "3"), // SKIPPED
+				sdk.NewAttribute("policy", "R1C"),
+				sdk.NewAttribute("convert_to", packageMemo.ConvertTo),
+				sdk.NewAttribute("class_id", data.ClassId),
+				sdk.NewAttribute("sequence", strconv.FormatUint(packet.Sequence, 10)),
+			),
+		)
+		return im.Module.OnRecvPacket(ctx, channelVersion, packet, relayer)
 	}
 	return im.Module.OnRecvPacket(ctx, channelVersion, packet, relayer)
 
-}
-
-// recvAndConvert runs nft-transfer mint and ERC721/CW721 conversion on one
-// cache context. write() is called only if both succeed, so a convert failure
-// rolls back the voucher mint instead of leaving it on the module account
-// while returning an error ACK (which would also refund on the source chain).
-func (im IBCMiddleware) recvAndConvert(
-	ctx sdk.Context,
-	channelVersion string,
-	packet channeltypes.Packet,
-	relayer sdk.AccAddress,
-	dstReceiver string,
-	convertType uint,
-) exported.Acknowledgement {
-	cctx, write := ctx.CacheContext()
-	ack := im.Module.OnRecvPacket(cctx, channelVersion, packet, relayer)
-	if !ack.Success() {
-		return ack
-	}
-	convertAck := im.keeper.OnRecvPacket(cctx, packet, dstReceiver, convertType)
-	if !convertAck.Success() {
-		return convertAck
-	}
-	write()
-	return convertAck
-}
-
-func PackageToModuleAccount(packet channeltypes.Packet, moduleAddr sdk.AccAddress) (channeltypes.Packet, string) {
-	// Rewrites the packet receiver to the conversion module account
-	// and returns the original destination receiver for later conversion.
-	var data types.NonFungibleTokenPacketData
-	if err := types.ModuleCdc.UnmarshalJSON(packet.GetData(), &data); err != nil {
-		return channeltypes.Packet{}, ""
-	}
-	dstReceiver := data.Receiver
-	data.Receiver = moduleAddr.String()
-	dataBz, err := types.ModuleCdc.MarshalJSON(&data)
-	if err != nil {
-		return channeltypes.Packet{}, ""
-	}
-	packet.Data = dataBz
-
-	return packet, dstReceiver
 }
 
 // OnAcknowledgementPacket implements the IBCModule interface

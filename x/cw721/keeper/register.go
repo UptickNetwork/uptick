@@ -6,12 +6,28 @@ import (
 	sdkerrors "cosmossdk.io/errors"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
 
 	"github.com/UptickNetwork/uptick/x/cw721/types"
 )
 
 // RegisterNFT deploys an cw721 contract and creates the token pair for the existing cosmos coin
 func (k Keeper) RegisterNFT(ctx sdk.Context, msg *types.MsgConvertNFT) (*types.TokenPair, error) {
+
+	// R1-C: IBC voucher classes are settled natively by the ICS-721 escrow/burn
+	// path and must never be bound to a CW721 contract. Binding one wrote a
+	// token pair whose presence the burn guard (x/internft IsConvertedNFT) later
+	// refused to release, permanently locking the voucher out of its origin
+	// chain (R1). This gate closes both the convert-memo path and a user's
+	// manual MsgConvertNFT. cw721 has no legacy ibc-class pairs (0 on both
+	// chains), so this is forward-only protection.
+	if strings.HasPrefix(msg.ClassId, "ibc/") {
+		return nil, sdkerrors.Wrapf(
+			errortypes.ErrInvalidRequest,
+			"ibc voucher class %s is settled natively and cannot be bound to a cw721 contract (R1-C)",
+			msg.ClassId,
+		)
+	}
 
 	// Canonicalize the contract address before any key is derived from it so
 	// case aliases of the same bech32 address cannot create duplicate pairs.

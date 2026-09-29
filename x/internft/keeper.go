@@ -181,10 +181,13 @@ func (ik InterNftKeeper) GetNFT(ctx sdk.Context, classID, tokenID string) (nfttr
 // (nft-transfer keeper/relay.go:238-248), and the class a conversion produces
 // is always "uptick-<contract>" (x/erc721 and x/cw721 both pin it in
 // Register*), which never carries a "<port>/<channel>/" prefix -- so the
-// outbound transfer of a converted NFT always escrows. A genuine voucher
-// being returned to its origin chain also arrives here with no pair recorded
-// (pairs are only ever written for "uptick-<contract>" classes), so it is
-// released by the same check.
+// outbound transfer of a converted NFT always escrows. A genuine voucher being
+// returned to its origin chain also arrives here with no pair recorded, so it
+// is released by the same check. (R1-C: ibc voucher classes are barred from
+// pair registration, and legacy ibc-class pairs are settled at the v0.5.0
+// upgrade height; the earlier claim that "pairs are only ever written for
+// uptick-<contract> classes" was false and is what let a convert-memo voucher
+// pair lock its NFT out of the origin chain.)
 //
 // The absence check is a plain HasNFT read on purpose. An earlier version
 // wrapped it in a blanket recover(), which swallowed every panic — including

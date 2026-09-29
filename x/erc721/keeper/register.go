@@ -6,6 +6,7 @@ import (
 
 	sdkerrors "cosmossdk.io/errors"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/UptickNetwork/uptick/x/erc721/types"
@@ -13,6 +14,20 @@ import (
 
 // RegisterNFT deploys an erc721 contract and creates the token pair for the existing cosmos coin
 func (k Keeper) RegisterNFT(ctx sdk.Context, msg *types.MsgConvertNFT) (*types.TokenPair, error) {
+
+	// R1-C: IBC voucher classes are settled natively by the ICS-721 escrow/burn
+	// path and must never be bound to an ERC721 contract. Binding one wrote a
+	// token pair whose presence the burn guard (x/internft IsConvertedNFT) later
+	// refused to release, permanently locking the voucher out of its origin
+	// chain (R1). This gate closes both the convert-memo path and a user's
+	// manual MsgConvertNFT.
+	if strings.HasPrefix(msg.ClassId, "ibc/") {
+		return nil, sdkerrors.Wrapf(
+			errortypes.ErrInvalidRequest,
+			"ibc voucher class %s is settled natively and cannot be bound to an erc721 contract (R1-C)",
+			msg.ClassId,
+		)
+	}
 
 	// Check if class is already registered
 	if k.IsClassRegistered(ctx, msg.ClassId) {

@@ -1,7 +1,6 @@
 package keeper
 
 import (
-	"context"
 	"testing"
 
 	sdkerrors "cosmossdk.io/errors"
@@ -11,7 +10,6 @@ import (
 	channeltypes "github.com/cosmos/ibc-go/v10/modules/core/04-channel/types"
 	"github.com/stretchr/testify/require"
 
-	cw721types "github.com/UptickNetwork/uptick/x/cw721/types"
 	erc721types "github.com/UptickNetwork/uptick/x/erc721/types"
 	evmibctypes "github.com/UptickNetwork/uptick/x/evmibc/types"
 )
@@ -43,10 +41,6 @@ type mockERC721 struct {
 	refundErr error
 }
 
-func (m *mockERC721) ConvertNFT(context.Context, *erc721types.MsgConvertNFT) (*erc721types.MsgConvertNFTResponse, error) {
-	return &erc721types.MsgConvertNFTResponse{}, nil
-}
-
 func (m *mockERC721) RefundPacketToken(sdk.Context, nfttransfertypes.NonFungibleTokenPacketData) error {
 	*m.order = append(*m.order, "erc:refund")
 	return m.refundErr
@@ -55,10 +49,6 @@ func (m *mockERC721) RefundPacketToken(sdk.Context, nfttransfertypes.NonFungible
 type mockCW721 struct {
 	order     *[]string
 	refundErr error
-}
-
-func (m *mockCW721) ConvertNFT(context.Context, *cw721types.MsgConvertNFT) (*cw721types.MsgConvertNFTResponse, error) {
-	return &cw721types.MsgConvertNFTResponse{}, nil
 }
 
 func (m *mockCW721) RefundPacketToken(sdk.Context, nfttransfertypes.NonFungibleTokenPacketData) error {

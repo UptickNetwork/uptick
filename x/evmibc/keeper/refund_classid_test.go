@@ -1,7 +1,6 @@
 package keeper
 
 import (
-	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -50,10 +49,6 @@ type captureERC721 struct {
 	classIDs *[]string
 }
 
-func (m *captureERC721) ConvertNFT(context.Context, *erc721types.MsgConvertNFT) (*erc721types.MsgConvertNFTResponse, error) {
-	return &erc721types.MsgConvertNFTResponse{}, nil
-}
-
 func (m *captureERC721) RefundPacketToken(_ sdk.Context, data nfttransfertypes.NonFungibleTokenPacketData) error {
 	*m.classIDs = append(*m.classIDs, data.ClassId)
 	return nil
@@ -62,10 +57,6 @@ func (m *captureERC721) RefundPacketToken(_ sdk.Context, data nfttransfertypes.N
 // captureCW721 mirrors captureERC721 for the CW721 reverse-conversion refund.
 type captureCW721 struct {
 	classIDs *[]string
-}
-
-func (m *captureCW721) ConvertNFT(context.Context, *cw721types.MsgConvertNFT) (*cw721types.MsgConvertNFTResponse, error) {
-	return &cw721types.MsgConvertNFTResponse{}, nil
 }
 
 func (m *captureCW721) RefundPacketToken(_ sdk.Context, data nfttransfertypes.NonFungibleTokenPacketData) error {
