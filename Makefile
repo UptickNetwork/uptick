@@ -392,6 +392,17 @@ check-doc-make-targets:
 	@./scripts/check-doc-make-targets.sh
 .PHONY: check-doc-make-targets
 
+# Denoms are looked up by byte-exact string equality (bank's SupplyKey, the
+# erc20 denom index, the IBC denom map) and the three shapes this chain stores
+# each get their case from a different upstream component: ibc/<UPPER-hex> from
+# cmtbytes.HexBytes.String(), erc20:<EIP-55> from go-ethereum's Address.String(),
+# natives from genesis. Folding case on the way in normalises nothing -- it turns
+# a hit into a silent miss -- and sdk.ValidateDenom stays quiet because its regex
+# accepts A-Za-z. See scripts/check-denom-format.sh.
+check-denom-format:
+	@./scripts/check-denom-format.sh
+.PHONY: check-denom-format
+
 ###############################################################################
 ###                           Tests & Simulation                            ###
 ###############################################################################

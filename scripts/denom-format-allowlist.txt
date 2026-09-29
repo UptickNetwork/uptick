@@ -1,0 +1,18 @@
+# Exemptions for scripts/check-denom-format.sh.
+#
+# One entry per line, either a whole path or a single path:line. '#' starts a
+# comment. Every entry needs a reason: the point of the file is to leave an
+# audit trail for each place the rule does not apply, so the next reader can
+# judge it instead of guessing. An entry that matches nothing is reported.
+
+# Builds the bank metadata Symbol field out of the configured DISPLAY denom.
+# Symbol is human-facing metadata, not a key anything is looked up by, so
+# upper-casing it cannot desynchronise a lookup. The denom actually used as a
+# key on the lines above is `evmDenom`, which is untouched.
+app/app.go:1122
+
+# genDenomID invents a RANDOM collection denom id for the simulator and
+# lower-cases it so the generated string satisfies the id regex. The variable it
+# returns is the same one issued and later queried, so no stored key is folded;
+# this is generation, not normalisation of an existing denom.
+x/collection/simulation/operations.go:523
