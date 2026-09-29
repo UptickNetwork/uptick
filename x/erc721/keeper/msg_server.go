@@ -89,7 +89,14 @@ func (k Keeper) TransferERC721(
 	// Record against ConvertERC721 results, not the original msg. CosmosTokenIds
 	// on the request is often empty; refund lookup uses the packet cosmos ids
 	// and the mapped EVM token id, plus a lowercased contract address.
-	k.SetEvmRefundReceiver(ctx, resMsg.EvmContractAddress, resMsg.CosmosTokenIds, resMsg.EvmTokenIds, sender.Hex())
+	//
+	// R1-C: a voucher-class un-wrap is terminal — the ERC721 half is burned and
+	// the binding deleted, so there is no ERC721 left to refund on a later IBC
+	// timeout/error. Recording a refund receiver here would leave a stale key;
+	// skip it. Non-voucher classes keep the original refund-record behavior.
+	if !strings.HasPrefix(resMsg.ClassId, "ibc/") {
+		k.SetEvmRefundReceiver(ctx, resMsg.EvmContractAddress, resMsg.CosmosTokenIds, resMsg.EvmTokenIds, sender.Hex())
+	}
 
 	return &types.MsgTransferERC721Response{}, nil
 
@@ -526,6 +533,14 @@ func (k Keeper) convertEvm2Cosmos(
 	erc721 := contracts.ERC721UpticksContract.ABI
 	contract := pair.GetERC721Contract()
 
+	// R1-C: a voucher-class pair (ClassId prefixed "ibc/") is terminal — its
+	// ERC721 half is burned instead of escrowed back to the module, and its
+	// binding is deleted rather than rewritten. This closes the historical
+	// R1 lockout where the ICS-721 burn guard (IsConvertedNFT = binding exists)
+	// refused to burn a voucher on its way back to the origin chain. uptick-
+	// and externally-registered classes keep the original escrow semantics.
+	isVoucherPair := strings.HasPrefix(pair.ClassId, "ibc/")
+
 	for i, tokenId := range msg.EvmTokenIds {
 
 		bigTokenId, err := parseERC721TokenID(tokenId)
@@ -550,12 +565,26 @@ func (k Keeper) convertEvm2Cosmos(
 			return nil, sdkerrors.Wrapf(errortypes.ErrUnauthorized, "%s is not the owner of erc721 token %s", sender, tokenId)
 		}
 
-		_, err = k.CallEVM(
-			ctx, erc721, sender, contract, true,
-			"safeTransferFrom", sender, types.ModuleAddress, bigTokenId,
-		)
-		if err != nil {
-			return nil, sdkerrors.Wrapf(types.ErrEVMCall, "failed to safeTransferFrom erc721 token %s: %v", tokenId, err)
+		if isVoucherPair {
+			// Terminal un-wrap: burn the ERC721 half (ERC721Burnable.burn,
+			// authorized because sender == owner) so there is no contract half
+			// left to escrow or refund. The native voucher is then handed to the
+			// receiver below and the binding is dropped after the loop.
+			_, err = k.CallEVM(
+				ctx, erc721, sender, contract, true,
+				"burn", bigTokenId,
+			)
+			if err != nil {
+				return nil, sdkerrors.Wrapf(types.ErrEVMCall, "failed to burn erc721 token %s: %v", tokenId, err)
+			}
+		} else {
+			_, err = k.CallEVM(
+				ctx, erc721, sender, contract, true,
+				"safeTransferFrom", sender, types.ModuleAddress, bigTokenId,
+			)
+			if err != nil {
+				return nil, sdkerrors.Wrapf(types.ErrEVMCall, "failed to safeTransferFrom erc721 token %s: %v", tokenId, err)
+			}
 		}
 
 		nftId := string(k.GetNFTPairByContractTokenID(ctx, msg.EvmContractAddress, tokenId))
@@ -612,6 +641,18 @@ func (k Keeper) convertEvm2Cosmos(
 
 	// save nft pair
 	for i, tokenId := range msg.EvmTokenIds {
+		if isVoucherPair {
+			// R1-C terminal un-wrap: drop the bidirectional binding and the IBC
+			// refund receiver record. After this the native voucher is owned by
+			// the user with no pair mapping, so a later nft-transfer back to the
+			// origin chain takes the Burn branch and passes the burn guard.
+			// There is no refund semantics left (the ERC721 half is burned), so
+			// the refund record must go too.
+			k.DeleteNFTPairByTokenID(ctx, msg.EvmContractAddress, tokenId)
+			k.DeleteNFTPairByNFTID(ctx, msg.ClassId, msg.CosmosTokenIds[i])
+			k.DeleteEvmAddressByContractTokenId(ctx, msg.EvmContractAddress, tokenId)
+			continue
+		}
 		if err := k.SetNFTPairs(ctx, msg.EvmContractAddress, tokenId, msg.ClassId, msg.CosmosTokenIds[i]); err != nil {
 			return nil, err
 		}
