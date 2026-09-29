@@ -37,6 +37,77 @@ type ibcVoucherTokenPairStore interface {
 	RegisterERC20Extension(ctx sdk.Context, denom string) (*erc20types.TokenPair, error)
 }
 
+// erc20ParamsStore is the slice of the erc20 keeper the parameter migration
+// needs. It is the concrete keeper verbatim, because both methods already exist
+// with these signatures.
+type erc20ParamsStore interface {
+	GetParams(ctx sdk.Context) erc20types.Params
+	SetParams(ctx sdk.Context, params erc20types.Params) error
+}
+
+// enablePermissionlessRegistration turns x/erc20's PermissionlessRegistration
+// parameter on, on both starting states.
+//
+// # Why the flip has to live here
+//
+// v0.4.0's migrateErc20Params forces the parameter OFF, deliberately, and a
+// chain already past v0.4.0 never re-runs that migration. Changing the value in
+// v0.4.0 would therefore move mainnet and leave testnet -- the chain that did
+// execute it -- on the old setting forever. A step in this handler is the only
+// place that reaches both starting states. It has to run AFTER the legacy stage
+// above, because that stage writes the whole Params struct and would overwrite
+// this field.
+//
+// # What turning it on changes
+//
+//   - The inbound ICS-20 callback registers a token pair (and a dynamic
+//     precompile account) for any previously unseen `ibc/` denom. That branch
+//     does not read the parameter upstream; this repo gates it separately, and
+//     with the parameter on the gate (app/keepers/erc20_ibc_gate.go) reports
+//     "enabled" and delegates, so the upstream behavior applies again. The
+//     callback runs with a zeroed KV gas config (ibc_callbacks.go:53-56), so a
+//     counterparty chain can make this chain write a pair at no relayer cost.
+//     This is the state growth the original OFF value was bounding.
+//   - MsgRegisterERC20 becomes permissionless: any account can map an already
+//     deployed ERC20 contract to a new `erc20:0x…` denom (msg_server.go:181-185).
+//
+// # What it does not do
+//
+// It is not a retroactive repair. Upstream registers on a *new inbound packet*,
+// so every voucher that arrived while the switch was off stays pairless until
+// backfillIBCVoucherTokenPairs gives it one: the two migrations are
+// complementary, and the backfill is not made redundant by this one.
+//
+// A read-modify-write: EnableErc20 carries the value v0.4.0 migrated from the
+// legacy subspace (and any field a future cosmos/evm adds to Params) instead of
+// being rebuilt from DefaultParams, which would silently force EnableErc20 on
+// even if the legacy chain had it off -- and EnableErc20 is what makes coin
+// conversion possible at all (keeper/mint.go:23). Idempotent: an already-on
+// parameter performs no write, so a crash-restart leaves state byte-identical.
+func enablePermissionlessRegistration(
+	ctx sdk.Context,
+	store erc20ParamsStore,
+	logger log.Logger,
+) error {
+	params := store.GetParams(ctx)
+	if params.PermissionlessRegistration {
+		logger.Info("permissionless erc20 registration already enabled")
+		return nil
+	}
+
+	params.PermissionlessRegistration = true
+	if err := store.SetParams(ctx, params); err != nil {
+		return fmt.Errorf("set erc20 params: %w", err)
+	}
+
+	logger.Info(
+		"permissionless erc20 registration enabled",
+		"upgrade", upgradeName,
+		"EnableErc20", params.EnableErc20,
+	)
+	return nil
+}
+
 // ibcVoucherDenoms returns the ibc/-prefixed denominations that hold a supply,
 // sorted so the migration's writes happen in a deterministic order.
 //

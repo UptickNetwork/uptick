@@ -158,3 +158,40 @@ func TestV050UpgradeHandlerBackfillsIBCVoucherDecimalsAndPairs(t *testing.T) {
 	require.True(t, app.Erc20Keeper.IsDynamicPrecompileAvailable(ctx, pair.GetERC20Contract()),
 		"the derived address must be an active dynamic precompile, otherwise calls to it fail")
 }
+
+// TestV050UpgradeHandlerEnablesPermissionlessRegistration pins the x/erc20
+// parameter the release ships, on the starting state a testnet node is in.
+//
+// Why it has to run here and not merely in the v050 unit tests: the value comes
+// from the real keeper's params store, and the only way a chain already on
+// v0.4.x can reach it is this handler's own step -- v0.4.0's migrateErc20Params
+// wrote the switch off and will never run again on that chain. The fixture is
+// therefore the recorded state of such a chain, not a fresh app, whose genesis
+// would default the parameter on and prove nothing.
+func TestV050UpgradeHandlerEnablesPermissionlessRegistration(t *testing.T) {
+	app, ctx := sharedTestApp(t)
+	restoreSharedState(t, app)
+
+	// restoreSharedState covers the EVM, ICA and feemarket params, not erc20's,
+	// so this test has to undo its own fixture: the app is a process-wide
+	// singleton and the parameter would otherwise leak into every test after it.
+	previous := app.Erc20Keeper.GetParams(ctx)
+	t.Cleanup(func() { require.NoError(t, app.Erc20Keeper.SetParams(ctx, previous)) })
+
+	require.NoError(t, app.Erc20Keeper.SetParams(ctx, erc20types.NewParams(true, false)))
+	require.False(t, app.Erc20Keeper.GetParams(ctx).PermissionlessRegistration,
+		"the fixture must start with the switch off, which is exactly the state the migration exists for")
+
+	upgradeStore := ctx.KVStore(app.GetKey(upgradetypes.StoreKey))
+	t.Cleanup(func() { upgradeStore.Delete([]byte(migrationsAppliedProbeKey)) })
+
+	handler := v050.Upgrade.UpgradeHandlerConstructor(app.mm, app.configurator, app.toolbox())
+	_, err := handler(ctx, v050Plan(), app.mm.GetVersionMap())
+	require.NoError(t, err)
+
+	got := app.Erc20Keeper.GetParams(ctx)
+	require.True(t, got.PermissionlessRegistration,
+		"v0.5.0 must ship the switch ON, and on this starting state nothing else can turn it on")
+	require.True(t, got.EnableErc20,
+		"the flip is a read-modify-write; a rebuild from DefaultParams would hide a legacy chain that had conversion off")
+}

@@ -69,6 +69,17 @@ Ref: https://keepachangelog.com/en/1.0.0/
   voucher sets do not overlap. It cannot fail the upgrade — a voucher that cannot be repaired is logged and
   skipped, with counts in the summary line. See `app/upgrades/v050/migrate.go`.
 
+* (erc20) `permissionless_registration` ships **on**: the `v0.5.0` handler flips it to true on both starting
+  states. v0.4.0's `migrateErc20Params` forces the parameter off on purpose, but the two networks diverge if
+  the change lives there — mainnet has still to run that migration, and testnet, which already did, never will
+  again — so only a step inside this plan reaches both. The flip is a read-modify-write, so the `EnableErc20`
+  value migrated from the legacy `x/params` subspace is carried through rather than rebuilt from
+  `DefaultParams`. The consequences are the reason the parameter was off, and they are accepted: the inbound
+  ICS-20 callback auto-registers an unseen `ibc/` denom again (the `ERC20IBCGate` reports enabled and
+  delegates, and that branch runs with a zeroed KV gas config, so a counterparty chain can make this chain
+  write a pair at no relayer cost) and `MsgRegisterERC20` becomes permissionless. It is not a retroactive
+  repair: upstream registers on a NEW inbound packet, so existing vouchers still need the backfill above.
+
 * (deps) Cosmos SDK v0.53.6 → **v0.53.8** and CometBFT v0.38.21 → **v0.38.25**, in one coordinated step. Upstream
   marks v0.53.8 a security release that has to be coordinated with the chain, and the backports genuinely move
   consensus, so the binary must not be rolled out node-by-node against a running chain. Everything below arrives

@@ -96,6 +96,29 @@ func (f *fakeVoucherPairs) RegisterERC20Extension(_ sdk.Context, denom string) (
 	return &erc20types.TokenPair{Denom: denom, Erc20Address: "0x" + strings.Repeat("ab", 20)}, nil
 }
 
+// fakeERC20Params is the slice of the erc20 keeper the parameter migration uses.
+//
+// It counts writes rather than only holding the final value: the property worth
+// pinning is that the already-on path performs NO write, because a crash-restart
+// is a real replay of this handler and a gratuitous write would make the state
+// it leaves behind depend on how many times the upgrade ran.
+type fakeERC20Params struct {
+	params   erc20types.Params
+	setCalls int
+	setErr   error
+}
+
+func (f *fakeERC20Params) GetParams(_ sdk.Context) erc20types.Params { return f.params }
+
+func (f *fakeERC20Params) SetParams(_ sdk.Context, params erc20types.Params) error {
+	if f.setErr != nil {
+		return f.setErr
+	}
+	f.params = params
+	f.setCalls++
+	return nil
+}
+
 // recordingLogger keeps every log line as text. The metadata rewrite discards the
 // old DenomUnits, so the log line is the only place they survive -- asserting the
 // audit trail needs a logger that remembers, not a nop one.
@@ -322,4 +345,80 @@ func TestBackfillContinuesPastAFailingDenom(t *testing.T) {
 	require.Contains(t, logger.text(), "failed to backfill ibc voucher token pair")
 	require.Contains(t, logger.text(), "registered=1")
 	require.Contains(t, logger.text(), "failed=1")
+}
+
+// TestEnablePermissionlessRegistrationFlipsTheShippedStartingState is the case
+// this migration exists for: the state a v0.4.x chain actually carries.
+//
+// v0.4.0's migrateErc20Params writes {EnableErc20: true, PermissionlessRegistration:
+// false} and an already-upgraded chain never runs it again, so nothing but this
+// step can move the parameter. The fixture is that recorded pair of values.
+func TestEnablePermissionlessRegistrationFlipsTheShippedStartingState(t *testing.T) {
+	t.Parallel()
+
+	store := &fakeERC20Params{params: erc20types.NewParams(true, false)}
+	logger := &recordingLogger{}
+
+	require.NoError(t, enablePermissionlessRegistration(sdk.Context{}, store, logger))
+
+	require.True(t, store.params.PermissionlessRegistration,
+		"the shipped value is ON: the inbound ICS-20 auto-registration is upstream behavior, deliberately adopted")
+	require.True(t, store.params.EnableErc20,
+		"EnableErc20 is what makes conversion possible at all; the flip must carry it through untouched")
+	require.Equal(t, 1, store.setCalls)
+	require.Contains(t, logger.text(), "permissionless erc20 registration enabled")
+}
+
+// TestEnablePermissionlessRegistrationKeepsEnableErc20Off pins the
+// read-modify-write. Rebuilding the struct (erc20types.NewParams(true, true))
+// passes the test above and every other test in this repo, because the one field
+// that matters there is on -- and it would silently switch EnableErc20 on for a
+// legacy chain that had it off. v0.4.0 migrated that value from the x/params
+// subspace precisely so it would survive; this migration must not undo it.
+func TestEnablePermissionlessRegistrationKeepsEnableErc20Off(t *testing.T) {
+	t.Parallel()
+
+	store := &fakeERC20Params{params: erc20types.NewParams(false, false)}
+
+	require.NoError(t, enablePermissionlessRegistration(sdk.Context{}, store, &recordingLogger{}))
+
+	require.False(t, store.params.EnableErc20,
+		"a legacy chain with conversion switched off must stay switched off; only the registration flag is ours to set")
+	require.True(t, store.params.PermissionlessRegistration)
+}
+
+// TestEnablePermissionlessRegistrationIsIdempotent: the marker in the x/upgrade
+// store makes a replayed v0.5.0 plan return before this point, but a run that
+// crashed mid-sequence re-executes everything, and the parameter has to be the
+// one piece of that which is already in its final state. A write here would also
+// move a height-less replay out of byte-equality with the first run.
+func TestEnablePermissionlessRegistrationIsIdempotent(t *testing.T) {
+	t.Parallel()
+
+	store := &fakeERC20Params{params: erc20types.NewParams(true, true)}
+
+	require.NoError(t, enablePermissionlessRegistration(sdk.Context{}, store, &recordingLogger{}))
+
+	require.Equal(t, 0, store.setCalls, "an already-on parameter must produce no state change")
+	require.True(t, store.params.PermissionlessRegistration)
+}
+
+// TestEnablePermissionlessRegistrationPropagatesSetParamsError: a failing write
+// has to abort the upgrade rather than let the rest of the migration set run and
+// leave the parameter at its old value silently. The real keeper only fails on
+// invalid params, so the failure is injected.
+func TestEnablePermissionlessRegistrationPropagatesSetParamsError(t *testing.T) {
+	t.Parallel()
+
+	store := &fakeERC20Params{
+		params: erc20types.NewParams(true, false),
+		setErr: fmt.Errorf("erc20 params are invalid"),
+	}
+
+	err := enablePermissionlessRegistration(sdk.Context{}, store, &recordingLogger{})
+
+	require.ErrorContains(t, err, "set erc20 params")
+	require.ErrorContains(t, err, "erc20 params are invalid")
+	require.False(t, store.params.PermissionlessRegistration,
+		"a failed write must not leave the in-memory copy looking migrated")
 }

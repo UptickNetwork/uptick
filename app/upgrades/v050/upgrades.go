@@ -47,6 +47,15 @@
 // The v0.4.1 repairs need no probe: each is idempotent on its own (see their doc
 // comments), so they run on both paths and are harmless when repeated.
 //
+// # The registration switch
+//
+// The plan also flips x/erc20's PermissionlessRegistration to true. That is the
+// one v0.5.0 step that overrides a v0.4.0 decision instead of replaying it:
+// migrateErc20Params forces the parameter off, and a chain already on v0.4.x
+// never re-runs that migration, so only a step here reaches both starting
+// states. See enablePermissionlessRegistration for what the flag changes and
+// why the backfill is still required.
+//
 // # Replay guard
 //
 // The v0.4.0 stage is not replay-safe, and x/upgrade does not prevent a replay:
@@ -152,16 +161,22 @@ func upgradeHandlerConstructor(
 			return nil, err
 		}
 
-		// v0.5.0's own migrations, in the order they have to run: the metadata
-		// shape first, so a holder querying decimals() in the same block already
-		// reads the repaired exponent, then the token pairs that expose the
-		// voucher to the EVM at all.
+		// v0.5.0's own migrations, in the order they have to run: the
+		// registration switch first, then the metadata shape, so a holder
+		// querying decimals() in the same block already reads the repaired
+		// exponent, then the token pairs that expose the voucher to the EVM at
+		// all.
 		//
-		// Both run on BOTH starting states, unlike the v0.4.0 change set above.
-		// They are not repair-the-migration work: a testnet already on v0.4.x has
-		// exactly the same IBC vouchers with decimals() == 0 and no token pair,
-		// because ibc-go writes that metadata shape whoever receives the packet
-		// and the inbound auto-registration is gated off. See migrate.go.
+		// All three run on BOTH starting states, unlike the v0.4.0 change set
+		// above. The repairs are not repair-the-migration work: a testnet
+		// already on v0.4.x has exactly the same IBC vouchers with decimals()
+		// == 0 and no token pair, because ibc-go writes that metadata shape
+		// whoever receives the packet and the inbound auto-registration is
+		// gated off -- which is also why the switch has to be set here rather
+		// than in v0.4.0. See migrate.go.
+		if err := enablePermissionlessRegistration(sdkCtx, box.Erc20Keeper, logger); err != nil {
+			return nil, fmt.Errorf("enable permissionless erc20 registration: %w", err)
+		}
 		normalizeIBCVoucherERC20Decimals(sdkCtx, box.BankKeeper, logger)
 		backfillIBCVoucherTokenPairs(sdkCtx, box.BankKeeper, box.Erc20Keeper, logger)
 
