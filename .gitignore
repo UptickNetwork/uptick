@@ -104,3 +104,8 @@ contracts/@openzeppelin/*
 .vscode/
 md/
 reviewDoc/
+
+# Local delivery documents (public notices, testnet operator guides) kept out
+# of the repository; they were accidentally committed in 5159563 and are now
+# untracked on disk.
+deliverables/
