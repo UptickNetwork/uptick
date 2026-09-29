@@ -94,12 +94,15 @@ Ref: https://keepachangelog.com/en/1.0.0/
   readable over `eth_call`: they were never in cosmos/evm's precompile registries, so calls to them
   are ordinary EVM execution. Their counterparty chains are gone or going (IRIS halted, the Cosmos
   Hub channel closed, Noble retiring USDC), so no compatibility path is provided and none is
-  warranted. Two consequences ship unchanged and are recorded rather than fixed: the `x/erc20`
-  module account still holds **16,638,820,054** units of those four vouchers — equal to the legacy
-  ERC20 `totalSupply` unit for unit, and unreachable once the pairs are deleted — and because
-  `permissionless_registration` is on in this release, anyone can re-register a legacy contract as a
-  new `OWNER_EXTERNAL` denom. The *vouchers* are not deprecated: the backfill above gives them
-  derived pairs. See `docs/guides/upgrades/upgrade_node.md`, "Legacy IBC-ERC20 after the upgrade".
+  warranted. Two consequences ship unchanged on purpose. The `x/erc20` module account still holds
+  **16,638,820,054** units of those four vouchers — equal to the legacy ERC20 `totalSupply` unit for
+  unit, and unreachable once the pairs are deleted. That escrow is left in place **by decision, not by
+  omission**: burning it would return nothing to any holder and would only erase the backing, and the
+  deletion is now tested against a BankKeeper that fails by name if it is ever reached for. Also
+  unchanged: `permissionless_registration` is on in this release, so anyone can re-register a legacy
+  contract as a new `OWNER_EXTERNAL` denom — deprecation here means "not carried forward by us", not
+  "blocked on chain". The *vouchers* are not deprecated: the backfill above gives them derived pairs.
+  See `docs/guides/upgrades/upgrade_node.md`, "Legacy IBC-ERC20 after the upgrade".
 
 * (erc20) `permissionless_registration` ships **on**: the `v0.5.0` handler flips it to true on both starting
   states. v0.4.0's `migrateErc20Params` forces the parameter off on purpose, but the two networks diverge if

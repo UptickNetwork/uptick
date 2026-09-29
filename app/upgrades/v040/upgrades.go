@@ -777,19 +777,39 @@ func migrateErc20Params(ctx sdk.Context, box upgrades.Toolbox, logger log.Logger
 //     execution and name/symbol/decimals/totalSupply/balanceOf remain readable.
 //     The asset is deprecated, not erased — which is what lets it still be
 //     queried after the upgrade.
+//
 //   - Its Cosmos bridge is gone: MsgConvertERC20 on that address now fails with
 //     ErrTokenPairNotFound, because MintingEnabled resolves the pair through the
 //     byERC20 map this function clears.
+//
 //   - Idempotence is still absent here (see v041's note): replaying this
 //     deletion on post-upgrade state removes the STRv2 pairs registered since.
 //     v0.5.0 protects itself with a replay marker instead, which is why this
 //     function does not carry one.
+//
 //   - Any coins the erc20 module account holds in escrow stay exactly where they
 //     are. On mainnet those balances equal the old ERC20 totalSupply to the unit
 //     (16,638,820,054 across four vouchers): they are the backing of the now
 //     deprecated ERC20, and once the pair is gone nothing on this chain can move
-//     them. Closing that loop is a separate, supply-changing decision and is
-//     deliberately not taken here.
+//     them.
+//
+//     DECIDED, not deferred (2026-09-29): the escrow is left in place. The
+//     counterparty chains are gone or going, so the coins are redeemable by no
+//     route and burning them would return nothing to anyone — it would only
+//     delete the backing, and with it the ability to state that the backing
+//     exists. Because the decision is invisible in the diff (a migration that
+//     ignores an escrow looks exactly like one that forgot about it),
+//     erc20_legacy_pairs_test.go pins it: the deletion runs against a BankKeeper
+//     whose every method panics, so a future edit that burns, moves or merely
+//     reads the escrow fails there by name.
+//
+//     To revisit, all of these have to change on purpose: that panicking
+//     BankKeeper test, a RunMigrations step that does the burn, and the bank
+//     call-site count in app/module_account_perms_test.go (2 -> 3). The first
+//     two are gated by design; the burner permission is already in place
+//     (mainnet's erc20 module account has it, and app/app.go declares it), so
+//     permission is not the obstacle.
+//
 //   - Allowances recorded for the deleted contract go away with it
 //     (DeleteTokenPair → deleteAllowances).
 //

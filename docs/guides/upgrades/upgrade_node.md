@@ -122,11 +122,15 @@ precompiles, every call would fail instead, because the pair the precompile reso
 
 Two things to know and deliberately not act on in this release:
 
-- **The escrowed coins are stranded.** Mainnet's `x/erc20` module account holds **16,638,820,054**
-  units of these four vouchers — equal to the legacy ERC20 `totalSupply` unit for unit; those
-  balances were the ERC20s' backing. With the pairs deleted, nothing on this chain can move them, and
-  this release does not burn them. Closing that loop changes the bank supply table and is a separate,
-  governance-visible decision.
+- **The escrowed coins are stranded, and they stay there by decision.** Mainnet's `x/erc20` module
+  account holds **16,638,820,054** units of these four vouchers — equal to the legacy ERC20
+  `totalSupply` unit for unit; those balances were the ERC20s' backing. With the pairs deleted,
+  nothing on this chain can move them: `x/bank` has no message that moves a module account's balance,
+  and the only pair that could release the escrow is the one this upgrade deletes. Burning them was
+  considered and rejected — the counterparty chains are gone, so a burn would return nothing to any
+  holder and would only erase the backing. This is a decision, not an oversight: it is pinned by
+  `app/upgrades/v040/erc20_legacy_pairs_test.go`, which fails by name if the deletion ever reaches
+  for the bank, and the note on `deleteLegacyOwnerModulePairs` lists what revisiting it would require.
 - **Anyone can re-register a legacy contract.** `permissionless_registration` is on in this release,
   so `MsgRegisterERC20` against one of the old addresses creates a *new* `erc20:0x…` denom owned by
   `OWNER_EXTERNAL`. Deprecation here means "not carried forward by us", not "blocked on chain".
@@ -135,6 +139,22 @@ The *voucher* is not deprecated: it receives a new derived token pair in the sam
 bank-side `ibc/…` balances keep an EVM representation through the erc20 precompile. Those vouchers
 are also the only part of this that still has users — a float of about 101,468,219 units sits in
 non-module accounts, whereas the module account's 16,638,820,054 are unreachable either way.
+
+::: tip The two representations do not report the same totalSupply()
+Neither number is wrong, and they are not interchangeable:
+
+| | legacy contract `0x80b5…` | derived voucher address |
+|---|---|---|
+| where `totalSupply()` comes from | the contract's own storage | the bank module's supply for `ibc/…` |
+| IRIS ch-0 | 305,830,933 | 307,307,053 |
+| USDC ch-3 | 557,191,595 | 657,183,593 |
+
+The contract reports how many ERC20 exist; the voucher reports how many coins exist. The difference is
+the coin float that was never converted — about 101,468,219 units across all four. Before treating
+either figure as circulating supply, subtract the stranded escrow: on the *voucher*, read
+`balanceOf(0x47eeB2eAC350e1923b8cbdfa4396A077B36e62a0)` — that is the `x/erc20` module account's EVM
+address, and every unit it reports there is permanently unreachable.
+:::
 
 ## Upgrading to v0.4.0
 

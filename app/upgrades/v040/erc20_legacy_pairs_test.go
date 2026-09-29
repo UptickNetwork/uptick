@@ -18,6 +18,7 @@ import (
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
+	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
@@ -160,6 +161,18 @@ var externalPairs = []legacyPairFixture{
 
 func newErc20TestKeeper(t *testing.T) (erc20keeper.Keeper, sdk.Context, *storetypes.KVStoreKey) {
 	t.Helper()
+	return newErc20TestKeeperWithBank(t, nil)
+}
+
+// newErc20TestKeeperWithBank is the same keeper with a BankKeeper of the
+// caller's choosing. The pair-deletion path never calls it — which is exactly
+// the property TestLegacyPairDeletionNeverReachesTheBank asserts, by handing it
+// a BankKeeper that panics on every method.
+//
+// erc20keeper.NewKeeper only stores the BankKeeper; it never calls a method on
+// it during construction, so a panicking stub is safe to pass.
+func newErc20TestKeeperWithBank(t *testing.T, bk erc20types.BankKeeper) (erc20keeper.Keeper, sdk.Context, *storetypes.KVStoreKey) {
+	t.Helper()
 
 	reg := codectypes.NewInterfaceRegistry()
 	erc20types.RegisterInterfaces(reg)
@@ -178,12 +191,86 @@ func newErc20TestKeeper(t *testing.T) (erc20keeper.Keeper, sdk.Context, *storety
 		cdc,
 		authtypes.NewModuleAddress(govtypes.ModuleName),
 		stubAccountKeeper{},
-		nil, // BankKeeper: unused by the pair-deletion path
+		bk,  // BankKeeper: unused by the pair-deletion path
 		nil, // EVMKeeper:  unused
 		stubStakingKeeper{},
 		nil, // *transferkeeper.Keeper: unused
 	)
 	return k, ctx, key
+}
+
+// ---------------------------------------------------------------------------
+// G1, as code: the escrowed coins stay in place.
+//
+// G1 asked what to do with the 16,638,820,054 units mainnet's erc20 module
+// account holds in escrow — the backing of the four deprecated IBC-ERC20
+// assets. Decided 2026-09-29: leave them in place. The counterparty chains are
+// gone or going (IRIS halted, the Cosmos Hub channel closed, Noble retiring
+// USDC), so the coins are redeemable by no route; burning them would return
+// nothing to anyone and would only erase the backing.
+//
+// That decision is invisible in the diff — a migration that ignores an escrow
+// looks exactly like one that forgot about it — so
+// TestLegacyPairDeletionNeverReachesTheBank asserts it. The deletion can reach
+// the bank by two different routes, and neither is left open:
+//
+//   - through the erc20 Keeper it holds, where bankKeeper is an interface: the
+//     keeper is built with panicBankKeeper below, whose every method panics
+//     with bankTouchPanic;
+//   - through box.BankKeeper, the Toolbox's own field, which the other v040
+//     migrations use. Its type is the concrete bankkeeper.Keeper, so a stub
+//     cannot be substituted; in the test it is the zero value, and the test
+//     turns whatever panic a nil call raises into a failure that names the
+//     decision.
+//
+// Naming it matters: a bare nil dereference reads like a broken test, not like
+// a violated decision. The unguarded tests in this file produce exactly that
+// when the deletion is made to touch the bank, which is why this one does not
+// rely on it.
+// ---------------------------------------------------------------------------
+
+const bankTouchPanic = "the legacy pair deletion must not touch the bank: " +
+	"the escrowed coins stay in place by decision (G1, 2026-09-29); " +
+	"see deleteLegacyOwnerModulePairs for what revisiting that requires"
+
+// panicBankKeeper covers the route through the erc20 Keeper. It is unambiguous
+// for every method, including the ones this path would be most tempted to use
+// (BurnCoins, SendCoinsFromModuleToAccount, GetSupply).
+type panicBankKeeper struct{}
+
+var _ erc20types.BankKeeper = panicBankKeeper{}
+
+func (panicBankKeeper) SendCoins(context.Context, sdk.AccAddress, sdk.AccAddress, sdk.Coins) error {
+	panic(bankTouchPanic)
+}
+func (panicBankKeeper) GetBalance(context.Context, sdk.AccAddress, string) sdk.Coin {
+	panic(bankTouchPanic)
+}
+func (panicBankKeeper) BlockedAddr(sdk.AccAddress) bool { panic(bankTouchPanic) }
+func (panicBankKeeper) IsSendEnabledCoin(context.Context, sdk.Coin) bool {
+	panic(bankTouchPanic)
+}
+func (panicBankKeeper) MintCoins(context.Context, string, sdk.Coins) error { panic(bankTouchPanic) }
+func (panicBankKeeper) BurnCoins(context.Context, string, sdk.Coins) error { panic(bankTouchPanic) }
+func (panicBankKeeper) SendCoinsFromModuleToAccount(context.Context, string, sdk.AccAddress, sdk.Coins) error {
+	panic(bankTouchPanic)
+}
+func (panicBankKeeper) SendCoinsFromAccountToModule(context.Context, sdk.AccAddress, string, sdk.Coins) error {
+	panic(bankTouchPanic)
+}
+func (panicBankKeeper) IterateAccountBalances(context.Context, sdk.AccAddress, func(sdk.Coin) bool) {
+	panic(bankTouchPanic)
+}
+func (panicBankKeeper) IterateTotalSupply(context.Context, func(sdk.Coin) bool) {
+	panic(bankTouchPanic)
+}
+func (panicBankKeeper) GetSupply(context.Context, string) sdk.Coin { panic(bankTouchPanic) }
+func (panicBankKeeper) GetDenomMetaData(context.Context, string) (banktypes.Metadata, bool) {
+	panic(bankTouchPanic)
+}
+func (panicBankKeeper) SetDenomMetaData(context.Context, banktypes.Metadata) { panic(bankTouchPanic) }
+func (panicBankKeeper) SpendableCoin(context.Context, sdk.AccAddress, string) sdk.Coin {
+	panic(bankTouchPanic)
 }
 
 // seedLegacyPair writes a pair the way the legacy module left it in the store:
@@ -334,6 +421,54 @@ func TestDeleteLegacyOwnerModulePairsOnEmptyStore(t *testing.T) {
 	box.Erc20Keeper = k
 	require.NoError(t, deleteLegacyOwnerModulePairs(ctx, box, log.NewNopLogger()))
 	require.Empty(t, k.GetTokenPairs(ctx))
+}
+
+// TestLegacyPairDeletionNeverReachesTheBank pins the G1 decision in executable
+// form: mainnet's 16,638,820,054 units of escrowed coins stay where they are,
+// so the deletion has to run to completion without touching the bank module at
+// all — no burn, no move, not even a read.
+//
+// It seeds the four real mainnet pairs, so the loop body a future burn would be
+// added to actually executes, and runs the migration with both bank routes
+// closed off. Passing means no bank method was called by either.
+//
+// The seed is asserted before the migration runs, for the same reason the other
+// tests here do it: on an empty store this test would pass while proving
+// nothing about the loop body.
+func TestLegacyPairDeletionNeverReachesTheBank(t *testing.T) {
+	k, ctx, key := newErc20TestKeeperWithBank(t, panicBankKeeper{})
+
+	for i, f := range mainnetLegacyPairs {
+		stored, err := hex.DecodeString(mainnetStoredPairHex[i])
+		require.NoError(t, err)
+
+		var pair erc20types.TokenPair
+		require.NoError(t, codec.NewProtoCodec(codectypes.NewInterfaceRegistry()).Unmarshal(stored, &pair))
+
+		store := ctx.KVStore(key)
+		prefix.NewStore(store, erc20types.KeyPrefixTokenPair).Set(pair.GetID(), stored)
+		prefix.NewStore(store, erc20types.KeyPrefixTokenPairByDenom).Set([]byte(f.denom), pair.GetID())
+		prefix.NewStore(store, erc20types.KeyPrefixTokenPairByERC20).Set(common.HexToAddress(f.erc20).Bytes(), pair.GetID())
+	}
+	require.Len(t, k.GetTokenPairs(ctx), len(mainnetLegacyPairs),
+		"the seed has to land, otherwise the loop body this test guards never runs")
+
+	// box.BankKeeper is the concrete bankkeeper.Keeper and cannot be stubbed, so
+	// it stays the zero value; the panic a call through it raises is converted
+	// into a failure that names the decision instead of a bare nil dereference.
+	box := upgrades.Toolbox{}
+	box.Erc20Keeper = k
+
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Fatalf("deleteLegacyOwnerModulePairs reached for the bank: %v\n%s", r, bankTouchPanic)
+			}
+		}()
+		require.NoError(t, deleteLegacyOwnerModulePairs(ctx, box, log.NewNopLogger()))
+	}()
+
+	require.Empty(t, k.GetTokenPairs(ctx), "the deletion itself still has to happen")
 }
 
 // ---------------------------------------------------------------------------
@@ -584,3 +719,22 @@ func TestDeprecatedLegacyERC20LosesItsCosmosBridgeButStaysQueryable(t *testing.T
 //     TestMainnetStoredTokenPairsDecodeAndSelectForDeletion fails with
 //     "the deletion selects on contract_owner". This is the mutation that shows
 //     the byte-level pinning is load-bearing rather than decorative.
+//
+//  3. make the deletion reach for the escrow -- insert one bank call into the
+//     loop body, right after each DeleteTokenPair:
+//
+//       python3 - <<'PY'
+//       p = "app/upgrades/v040/upgrades.go"
+//       s = open(p).read()
+//       anchor = "\n\t\terc20Keeper.DeleteTokenPair(ctx, pair)\n"
+//       assert s.count(anchor) == 1, "anchor moved; the recipe needs updating"
+//       open(p, "w").write(s.replace(anchor,
+//           anchor + "\t\t_ = box.BankKeeper.BurnCoins(ctx, erc20types.ModuleName, nil)\n"))
+//       PY
+//       go test -count=1 ./app/upgrades/v040/ -run TestLegacyPairDeletionNeverReachesTheBank
+//
+//     The test fails with "reached for the bank" followed by bankTouchPanic.
+//     This is the recipe that shows the G1 decision ("the escrow stays") is
+//     enforced rather than merely documented -- and note that it needs a bank
+//     call to be added on purpose: no edit that leaves the loop alone can trip
+//     it.
