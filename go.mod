@@ -215,7 +215,7 @@ require (
 require (
 	cloud.google.com/go v0.123.0 // indirect
 	cloud.google.com/go/iam v1.5.3 // indirect
-	cloud.google.com/go/storage v1.61.3 // indirect; indirectx
+	cloud.google.com/go/storage v1.61.3 // indirect
 	filippo.io/edwards25519 v1.1.1 // indirect
 	github.com/99designs/keyring v1.2.2 // indirect
 	github.com/VictoriaMetrics/fastcache v1.12.2 // indirect

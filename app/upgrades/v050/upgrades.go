@@ -115,7 +115,9 @@ package v050
 import (
 	"context"
 	"fmt"
+	"strings"
 
+	"cosmossdk.io/log"
 	storetypes "cosmossdk.io/store/types"
 	upgradetypes "cosmossdk.io/x/upgrade/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -139,6 +141,17 @@ const upgradeName = "v0.5.0"
 // error leaves no marker and re-executes the whole sequence -- which is safe,
 // because a failed handler aborts the block and its writes are never committed.
 var migrationsAppliedKey = []byte("v0.5.0/migrations-applied")
+
+// backfillFailuresKey records, in the same x/upgrade store as the replay marker,
+// the ibc/ voucher denoms whose token-pair backfill failed during this upgrade.
+//
+// It exists because the handler writes migrationsAppliedKey unconditionally: a
+// denom that fails backfill is skipped (deliberately -- see
+// backfillIBCVoucherTokenPairs) but would then be skipped by every replay too, so
+// the only remaining trace would be one log line. Storing the denom list keeps the
+// failure enumerable on chain and gives a v0.5.x tail migration a retry path via
+// RetryIBCVoucherBackfill. Newline-joined; absent means nothing is outstanding.
+var backfillFailuresKey = []byte("v0.5.0/backfill-failures")
 
 // Upgrade implements the v0.5.0 upgrade plan.
 //
@@ -166,7 +179,7 @@ func upgradeHandlerConstructor(
 		sdkCtx := sdk.UnwrapSDKContext(ctx)
 		logger := sdkCtx.Logger()
 
-		marker, err := replayMarker(sdkCtx, box)
+		marker, err := upgradeStore(sdkCtx, box)
 		if err != nil {
 			return nil, err
 		}
@@ -213,7 +226,8 @@ func upgradeHandlerConstructor(
 			return nil, fmt.Errorf("enable permissionless erc20 registration: %w", err)
 		}
 		normalizeIBCVoucherERC20Decimals(sdkCtx, box.BankKeeper, logger)
-		backfillIBCVoucherTokenPairs(sdkCtx, box.BankKeeper, box.Erc20Keeper, logger)
+		failedDenoms := backfillIBCVoucherTokenPairs(sdkCtx, box.BankKeeper, box.Erc20Keeper, logger)
+		recordBackfillFailures(sdkCtx, box, failedDenoms, logger)
 
 		// Settle the legacy ibc/ ERC721 voucher pairs (R1-C): burn the wrapped /
 		// orphan ERC721 halves, hand escrowed vouchers back, and drop the
@@ -279,17 +293,69 @@ func runMigrationSet(
 	return vm, nil
 }
 
-// replayMarker returns the x/upgrade store, where the replay marker lives.
+// upgradeStore returns the x/upgrade store, where this handler keeps its own
+// bookkeeping: the replay marker and the backfill-failure record.
 //
 // A missing store key is unreachable while x/upgrade is wired into the app, but
 // it must fail the upgrade rather than silently skip the guard: without the
 // marker the plan would run its non-idempotent stage again on a replay.
-func replayMarker(ctx sdk.Context, box upgrades.Toolbox) (storetypes.KVStore, error) {
+func upgradeStore(ctx sdk.Context, box upgrades.Toolbox) (storetypes.KVStore, error) {
 	storeKey := box.GetKVStoreKey(upgradetypes.StoreKey)
 	if storeKey == nil {
 		return nil, fmt.Errorf("x/upgrade store key is not registered; cannot guard the v0.4.0 stage against a replay")
 	}
 	return ctx.KVStore(storeKey), nil
+}
+
+// recordBackfillFailures persists the denoms the token-pair backfill could not
+// register and emits them as an event.
+//
+// It is what keeps the handler's deliberate "never halt mainnet over one
+// unreachable voucher" choice from also meaning "never retry". The completion
+// marker is written unconditionally, so a replay will not revisit these denoms;
+// without a durable record the failure would survive only as a log line, with no
+// on-chain trace to enumerate or retry from. An empty list clears the record,
+// because the backfill is idempotent and a later run can legitimately succeed
+// where an earlier one failed.
+func recordBackfillFailures(ctx sdk.Context, box upgrades.Toolbox, failed []string, logger log.Logger) {
+	store, err := upgradeStore(ctx, box)
+	if err != nil {
+		logger.Error("cannot persist ibc voucher backfill failures; a failed denom would have no on-chain retry record", "err", err)
+		return
+	}
+
+	if len(failed) == 0 {
+		store.Delete(backfillFailuresKey)
+		return
+	}
+
+	store.Set(backfillFailuresKey, []byte(strings.Join(failed, "\n")))
+	ctx.EventManager().EmitEvent(sdk.NewEvent(
+		"ibc_voucher_backfill_failures",
+		sdk.NewAttribute("count", fmt.Sprintf("%d", len(failed))),
+		sdk.NewAttribute("denoms", strings.Join(failed, ",")),
+	))
+	logger.Error(
+		"ibc voucher token pair backfill left denoms without a pair; retry via RetryIBCVoucherBackfill",
+		"count", len(failed),
+		"denoms", strings.Join(failed, ","),
+	)
+}
+
+// ReadBackfillFailures returns the denoms recorded at backfillFailuresKey, or nil
+// when nothing is outstanding. A v0.5.x tail migration reads this to retry only
+// the denoms that actually failed (see RetryIBCVoucherBackfill) instead of
+// rescanning every voucher on the chain.
+func ReadBackfillFailures(ctx sdk.Context, box upgrades.Toolbox) ([]string, error) {
+	store, err := upgradeStore(ctx, box)
+	if err != nil {
+		return nil, err
+	}
+	raw := store.Get(backfillFailuresKey)
+	if len(raw) == 0 {
+		return nil, nil
+	}
+	return strings.Split(string(raw), "\n"), nil
 }
 
 // startingState names the probed starting state for the operator log, so an

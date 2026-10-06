@@ -189,3 +189,19 @@ func TestRunMigrationSetNamesTheFailingStage(t *testing.T) {
 	require.ErrorIs(t, err, repairsErr)
 	require.Contains(t, err.Error(), "v0.4.1 repairs")
 }
+
+// TestBackfillFailuresKeyIsOutsideTheUpgradeStoreKeySpace keeps the failure
+// record in the same safe key space as the replay marker, and distinct from it:
+// sharing x/upgrade's own low-byte keys, or the marker's key, would let one
+// record silently overwrite or corrupt the other.
+func TestBackfillFailuresKeyIsOutsideTheUpgradeStoreKeySpace(t *testing.T) {
+	t.Parallel()
+
+	require.NotEmpty(t, backfillFailuresKey)
+	require.NotEqual(t, byte('u'), backfillFailuresKey[0],
+		"the failure record must not sit under x/upgrade's upgradedIBCState prefix")
+	require.Greater(t, backfillFailuresKey[0], byte(0x0f),
+		"the failure record must not share x/upgrade's low-byte key space")
+	require.NotEqual(t, string(migrationsAppliedKey), string(backfillFailuresKey),
+		"the failure record must not overwrite the replay marker")
+}

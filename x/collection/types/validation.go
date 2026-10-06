@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"unicode/utf8"
 
 	sdkerrors "cosmossdk.io/errors"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -140,15 +141,49 @@ func ValidateDenomMetadataBounds(schema, data string) error {
 // It lives here, next to the predicate, so neither the bound nor the comparison
 // is spelled a second time anywhere else in the module -- the export path, the
 // write path and the validate path all read them from this file.
+//
+// The cut is made on a UTF-8 rune boundary, never on a raw byte offset. Go
+// strings are byte sequences, so `s[:max]` can slice a multi-byte rune in half;
+// a JSON encoder then rewrites each dangling byte as U+FFFD (three bytes), and
+// the value that was just clamped to the bound lands *above* it again after the
+// export -> unmarshal round trip -- so the genesis still fails ValidateGenesis.
+// Backing the cut off to the previous rune start keeps `len <= max` stable
+// across a JSON round trip. See TestClampDenomMetadataBoundsStaysWithinBound.
 func ClampDenomMetadataBounds(schema, data string) (clampedSchema, clampedData string, changed bool) {
-	clampedSchema, clampedData = schema, data
-	if len(clampedSchema) > MaxDenomSchemaLen {
-		clampedSchema, changed = clampedSchema[:MaxDenomSchemaLen], true
+	clampedSchema, schemaChanged := clampToValidUTF8Bound(schema, MaxDenomSchemaLen)
+	clampedData, dataChanged := clampToValidUTF8Bound(data, MaxDenomDataLen)
+	return clampedSchema, clampedData, schemaChanged || dataChanged
+}
+
+// clampToValidUTF8Bound returns s made to satisfy both `len(out) <= max` and
+// `utf8.ValidString(out)`, reporting whether it had to change s.
+//
+// A value that is already within the bound and already valid UTF-8 is returned
+// untouched. Otherwise the byte budget is walked back to the start of the rune
+// that straddles it (so no rune is split), and -- defensively, for a stored
+// value that carries invalid bytes anywhere, not only at the cut -- the result
+// is passed through strings.ToValidUTF8 with an empty replacement, which drops
+// invalid bytes instead of expanding them to U+FFFD. Both steps only ever shrink
+// the value, so the bound cannot be re-exceeded.
+func clampToValidUTF8Bound(s string, max int) (string, bool) {
+	if len(s) <= max && utf8.ValidString(s) {
+		return s, false
 	}
-	if len(clampedData) > MaxDenomDataLen {
-		clampedData, changed = clampedData[:MaxDenomDataLen], true
+
+	cut := max
+	if cut > len(s) {
+		cut = len(s)
 	}
-	return clampedSchema, clampedData, changed
+	// walk back off any continuation byte so the cut sits on a rune start
+	for cut > 0 && cut < len(s) && !utf8.RuneStart(s[cut]) {
+		cut--
+	}
+
+	out := s[:cut]
+	if !utf8.ValidString(out) {
+		out = strings.ToValidUTF8(out, "")
+	}
+	return out, true
 }
 
 // validateIBCClassID accepts ICS-721 voucher class ids of the form ibc/{hash}.
@@ -292,6 +327,30 @@ func Modify(origin, target string) string {
 	}
 }
 
+// IsIBCDenom reports whether denomID is an ICS-721 voucher class, i.e. carries
+// the lowercase "ibc/" prefix.
+//
+// This is the SINGLE definition of "is a voucher class" on the chain. Three
+// decisions read it, and each one assumes the other two see the same set:
+//
+//   - x/erc721 / x/cw721 RegisterNFT refuse to bind a voucher class to a
+//     contract (binding one wrote a token pair the burn guard then refused to
+//     release, permanently locking the voucher out of its origin chain, R1);
+//   - x/erc721 convertEvm2Cosmos chooses terminal-burn over escrow semantics for
+//     a voucher pair;
+//   - the v0.5.0 voucher-pair settlement selects which pairs it reconciles.
+//
+// Keeping it in one place is what makes those three unable to drift: before this
+// they were three independent strings.HasPrefix(x, "ibc/") literals, so changing
+// one prefix test (e.g. to case-insensitive) would silently split the set and
+// turn a valid registration or a terminal burn into an escrowed one.
+//
+// It is case-SENSITIVE on purpose. Real voucher classes are derived by ibc-go as
+// "ibc/" + the uppercase hex of the denom hash (Denom.Hash() rendered via
+// cmtbytes.HexBytes.String()), so the prefix is always lowercase; a class written
+// "IBC/..." is an ordinary user class and must stay registrable. A case-folded
+// predicate would also disagree with the store, which only ever holds the
+// literal class id.
 func IsIBCDenom(denomID string) bool {
 	return strings.HasPrefix(denomID, "ibc/")
 }

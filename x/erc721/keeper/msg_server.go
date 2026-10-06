@@ -539,7 +539,11 @@ func (k Keeper) convertEvm2Cosmos(
 	// R1 lockout where the ICS-721 burn guard (IsConvertedNFT = binding exists)
 	// refused to burn a voucher on its way back to the origin chain. uptick-
 	// and externally-registered classes keep the original escrow semantics.
-	isVoucherPair := strings.HasPrefix(pair.ClassId, "ibc/")
+	//
+	// The predicate is shared with the RegisterNFT gate and with the v0.5.0
+	// settlement (x/collection/types.IsIBCDenom), so the three cannot disagree
+	// about which pairs take the terminal branch.
+	isVoucherPair := nftTypes.IsIBCDenom(pair.ClassId)
 
 	for i, tokenId := range msg.EvmTokenIds {
 
@@ -647,10 +651,10 @@ func (k Keeper) convertEvm2Cosmos(
 			// the user with no pair mapping, so a later nft-transfer back to the
 			// origin chain takes the Burn branch and passes the burn guard.
 			// There is no refund semantics left (the ERC721 half is burned), so
-			// the refund record must go too.
-			k.DeleteNFTPairByTokenID(ctx, msg.EvmContractAddress, tokenId)
-			k.DeleteNFTPairByNFTID(ctx, msg.ClassId, msg.CosmosTokenIds[i])
-			k.DeleteEvmAddressByContractTokenId(ctx, msg.EvmContractAddress, tokenId)
+			// the refund record must go too -- both spellings of it, which is why
+			// this goes through the same helper the settlement uses rather than
+			// deleting only the EVM token id (the divergence L-4 removed).
+			k.deleteVoucherBindingKeys(ctx, msg.EvmContractAddress, tokenId, msg.ClassId, msg.CosmosTokenIds[i])
 			continue
 		}
 		if err := k.SetNFTPairs(ctx, msg.EvmContractAddress, tokenId, msg.ClassId, msg.CosmosTokenIds[i]); err != nil {

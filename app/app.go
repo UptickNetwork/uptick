@@ -224,8 +224,10 @@ var (
 		// auth state keeps whatever permissions it was written with, because they
 		// live on the ModuleAccount object and x/auth consults permAddrs only to
 		// create a missing one (x/auth/keeper/keeper.go:285-306). That residue is
-		// unreachable for want of a caller, so it is reported rather than migrated
-		// -- see deliverables/gstack/fix-app-moduleacct-2026-09-13.md.
+		// unreachable for want of a caller, so it is reported rather than migrated.
+		// (The evidence for this was in a deliverables/gstack note that is no
+		// longer tracked; the argument above is self-contained and is what the
+		// decision rests on.)
 		ibcnfttransfertypes.ModuleName: nil,
 	}
 

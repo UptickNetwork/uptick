@@ -186,6 +186,69 @@ func TestSettleIBCVoucherPairs_Matrix(t *testing.T) {
 	require.Equal(t, owner.String(), gotKept.GetOwner().String())
 }
 
+// Regression (M-01): an ownerOf query FAILURE must be kept. The error domain of
+// QueryERC721TokenOwner also covers EVM infrastructure failures, a nil response
+// and an ABI unpack error, none of which mean "the token does not exist". Before
+// the fix the settlement mapped every error to ercIsNone and, whenever the
+// native side was gone, took the stale branch — deleting the binding and
+// purging the pair of an ERC721 that may still have been live.
+func TestSettleIBCVoucherPairs_QueryFailureIsKept(t *testing.T) {
+	k, ctx, _ := setupConvertKeeper(t)
+
+	const (
+		errClass = "ibc/DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD"
+		errCtr   = "0xdddddddddddddddddddddddddddddddddddddddd"
+		nftID    = "nftZ"
+		tokenID  = "1"
+	)
+
+	// Native side absent, so a mis-classified error lands in the stale branch.
+	contract := registerSettlementPair(t, k, ctx, errClass, nftID, errCtr, tokenID, nil)
+
+	k.evmKeeper = &settlementEVMKeeper{
+		fakeEVMKeeper: &fakeEVMKeeper{accounts: map[common.Address]*statedb.Account{
+			contract: {CodeHash: []byte{1}},
+		}},
+		ownerOfRet: map[common.Address][]byte{},
+		ownerOfErr: map[common.Address]error{contract: evmtypes.ErrVMExecution},
+	}
+
+	settled, staleCleared, kept, pairsDeleted := k.SettleIBCVoucherPairs(ctx)
+	require.Equal(t, 0, settled)
+	require.Equal(t, 0, staleCleared, "a query failure must not be read as 'native+erc both gone'")
+	require.Equal(t, 1, kept, "a query failure must be kept, not classified as absent")
+	require.Equal(t, 0, pairsDeleted, "the pair must survive so A3 / a retry can still find it")
+	require.NotEmpty(t, k.GetNFTPairByClassNFTID(ctx, errClass, nftID), "binding must survive")
+}
+
+// Regression (M-01): a malformed contract field must not be silently read as the
+// zero address (common.HexToAddress maps unparseable strings there) and then
+// drive an ownership classification.
+func TestSettleIBCVoucherPairs_MalformedContractIsKept(t *testing.T) {
+	k, ctx, _ := setupConvertKeeper(t)
+
+	const (
+		badClass = "ibc/EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE"
+		badCtr   = "not-an-address"
+		nftID    = "nftY"
+		tokenID  = "1"
+	)
+
+	registerSettlementPair(t, k, ctx, badClass, nftID, badCtr, tokenID, nil)
+
+	k.evmKeeper = &settlementEVMKeeper{
+		fakeEVMKeeper: &fakeEVMKeeper{accounts: map[common.Address]*statedb.Account{}},
+		ownerOfRet:    map[common.Address][]byte{},
+		ownerOfErr:    map[common.Address]error{},
+	}
+
+	_, staleCleared, kept, pairsDeleted := k.SettleIBCVoucherPairs(ctx)
+	require.Equal(t, 0, staleCleared)
+	require.Equal(t, 1, kept, "a malformed contract address must not be classified")
+	require.Equal(t, 0, pairsDeleted)
+	require.NotEmpty(t, k.GetNFTPairByClassNFTID(ctx, badClass, nftID))
+}
+
 // T4 idempotency: a second run over fully-settled state reports all zeros.
 func TestSettleIBCVoucherPairs_Idempotent(t *testing.T) {
 	k, ctx, owner := setupConvertKeeper(t)

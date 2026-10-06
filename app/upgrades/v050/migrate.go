@@ -11,6 +11,8 @@ import (
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	evmibc "github.com/cosmos/evm/ibc"
 	erc20types "github.com/cosmos/evm/x/erc20/types"
+
+	"github.com/UptickNetwork/uptick/app/upgrades"
 )
 
 // ibcVoucherPrefix marks the bank denominations that are ICS-20 vouchers: an
@@ -246,6 +248,16 @@ func normalizeIBCVoucherERC20Decimals(ctx sdk.Context, bank ibcVoucherBankStore,
 // normalizedIBCVoucherMetadata returns the shape-C rewrite of a voucher's
 // metadata, or the reason it cannot be repaired. It never mutates its input.
 func normalizedIBCVoucherMetadata(metadata banktypes.Metadata) (banktypes.Metadata, string, bool) {
+	if upgrades.HasNilDenomUnit(metadata.DenomUnits) {
+		// A nil unit means the stored record is structurally corrupt. Refuse to
+		// rewrite it: the shape-C rewrite reuses nothing but Base/Display here, so
+		// the exponent would have to be guessed, and a wrong exponent silently
+		// rescales a real asset. Skip it with a reason and leave it for an
+		// operator. (x/bank's own Validate would panic on this record, so every
+		// walk below must stay nil-safe too.)
+		return metadata, "metadata carries a nil denom unit", false
+	}
+
 	if metadata.Display == metadata.Base {
 		// The source denom is not recoverable, and deriving one from the hash
 		// tail would invent an asset name.
@@ -289,8 +301,15 @@ func normalizedIBCVoucherMetadata(metadata banktypes.Metadata) (banktypes.Metada
 // nonZeroUnitExponent returns the exponent the metadata already records for
 // denom, if it is non-zero. Shape A carries the source denom with exponent 0,
 // which is the value being repaired, so zero is not a usable answer here.
+//
+// Nil elements are skipped rather than dereferenced: proto repeated message
+// fields can carry them, and this migration's job is to survive inconsistent
+// historical state, not to panic on it.
 func nonZeroUnitExponent(units []*banktypes.DenomUnit, denom string) (uint32, bool) {
 	for _, unit := range units {
+		if unit == nil {
+			continue
+		}
 		if unit.Denom == denom && unit.Exponent > 0 {
 			return unit.Exponent, true
 		}
@@ -299,22 +318,49 @@ func nonZeroUnitExponent(units []*banktypes.DenomUnit, denom string) (uint32, bo
 }
 
 // sameDenomUnits reports whether two unit lists are equal in order and content.
+// A nil element compares as such (never dereferenced), so a corrupt list is
+// reported as changed rather than crashing the caller.
 func sameDenomUnits(a, b []*banktypes.DenomUnit) bool {
 	if len(a) != len(b) {
 		return false
 	}
 	for i := range a {
-		if a[i].Denom != b[i].Denom || a[i].Exponent != b[i].Exponent {
+		if (a[i] == nil) != (b[i] == nil) {
+			return false
+		}
+		if denomUnitDenom(a[i]) != denomUnitDenom(b[i]) || denomUnitExponent(a[i]) != denomUnitExponent(b[i]) {
 			return false
 		}
 	}
 	return true
 }
 
-// formatDenomUnits renders a unit list for the audit log.
+// denomUnitDenom / denomUnitExponent read a possibly-nil denom unit. They exist
+// because x/bank's Metadata.Validate dereferences every unit unconditionally, so
+// any path that walks a stored Metadata must tolerate nil first.
+func denomUnitDenom(u *banktypes.DenomUnit) string {
+	if u == nil {
+		return ""
+	}
+	return u.Denom
+}
+
+func denomUnitExponent(u *banktypes.DenomUnit) uint32 {
+	if u == nil {
+		return 0
+	}
+	return u.Exponent
+}
+
+// formatDenomUnits renders a unit list for the audit log, marking nil elements
+// instead of dereferencing them.
 func formatDenomUnits(units []*banktypes.DenomUnit) string {
 	parts := make([]string, 0, len(units))
 	for _, unit := range units {
+		if unit == nil {
+			parts = append(parts, "<nil>")
+			continue
+		}
 		parts = append(parts, fmt.Sprintf("%s:%d", unit.Denom, unit.Exponent))
 	}
 	return strings.Join(parts, ",")
@@ -345,13 +391,20 @@ func formatDenomUnits(units []*banktypes.DenomUnit) string {
 // upgrade height over one unreachable voucher would be far worse than leaving
 // that voucher without an EVM representation. The summary line carries the
 // counts so a systemic failure is visible in the upgrade log.
+//
+// Not aborting must not mean "unrecoverable", though. The handler writes its
+// completion marker unconditionally, so a denom that fails here would never be
+// retried by a replay. The failed denoms are therefore RETURNED, and the caller
+// persists them (see recordBackfillFailures / RetryIBCVoucherBackfill) so the
+// failure is enumerable on chain and has a retry path, rather than surviving only
+// as a log line an operator may never read.
 func backfillIBCVoucherTokenPairs(
 	ctx sdk.Context,
 	bank ibcVoucherBankStore,
 	pairs ibcVoucherTokenPairStore,
 	logger log.Logger,
-) {
-	var registered, skipped, failed int
+) (failed []string) {
+	var registered, skipped int
 
 	for _, denom := range ibcVoucherDenoms(ctx, bank) {
 		if pairs.IsDenomRegistered(ctx, denom) {
@@ -361,7 +414,7 @@ func backfillIBCVoucherTokenPairs(
 
 		pair, err := pairs.RegisterERC20Extension(ctx, denom)
 		if err != nil {
-			failed++
+			failed = append(failed, denom)
 			logger.Error("failed to backfill ibc voucher token pair", "denom", denom, "err", err)
 			continue
 		}
@@ -374,6 +427,41 @@ func backfillIBCVoucherTokenPairs(
 		"ibc voucher token pair backfill complete",
 		"registered", registered,
 		"already_registered", skipped,
-		"failed", failed,
+		"failed", len(failed),
 	)
+	return failed
+}
+
+// RetryIBCVoucherBackfill re-runs the token-pair backfill for exactly the denoms
+// a previous run recorded as failed, returning the count it registered and the
+// denoms that are still unmatched.
+//
+// It is the recovery path for the per-denom skip above: the v0.5.0 handler writes
+// its completion marker unconditionally, so without an explicit retry a voucher
+// whose registration failed once would keep no EVM representation forever. A
+// v0.5.x tail migration (or an authority-gated tool) calls this with the denoms
+// stored at backfillFailuresKey; it is idempotent -- a denom that has since
+// acquired a pair is skipped -- so it is safe to call repeatedly.
+func RetryIBCVoucherBackfill(
+	ctx sdk.Context,
+	pairs ibcVoucherTokenPairStore,
+	denoms []string,
+	logger log.Logger,
+) (registered int, stillFailed []string) {
+	for _, denom := range denoms {
+		if pairs.IsDenomRegistered(ctx, denom) {
+			continue
+		}
+
+		pair, err := pairs.RegisterERC20Extension(ctx, denom)
+		if err != nil {
+			stillFailed = append(stillFailed, denom)
+			logger.Error("retry: failed to backfill ibc voucher token pair", "denom", denom, "err", err)
+			continue
+		}
+
+		registered++
+		logger.Info("retry: backfilled ibc voucher token pair", "denom", denom, "erc20", pair.Erc20Address)
+	}
+	return registered, stillFailed
 }

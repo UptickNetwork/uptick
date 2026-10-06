@@ -208,3 +208,42 @@ func f2FindMetadata(t *testing.T, metas []banktypes.Metadata, base string) (bank
 	}
 	return banktypes.Metadata{}, false
 }
+
+// Regression (L-01): a bank metadata record carrying a nil *DenomUnit must not
+// make the export panic. x/bank's Metadata.Validate dereferences every unit
+// without a nil check, so the normaliser has to reject such a record before it
+// reaches Validate -- otherwise an export over corrupt historical state takes the
+// node down instead of degrading and reporting.
+//
+// The section is written by hand rather than through the proto codec: a nil
+// repeated element is exactly the shape the codec does not round-trip faithfully,
+// i.e. it can only arrive from an already-corrupt store.
+func TestNormalizeDropsMetadataWithNilDenomUnit(t *testing.T) {
+	cdc := f2Codec()
+
+	raw := json.RawMessage(`{"denom_metadata":[{"description":"d","base":"` + f2FixtureBase +
+		`","display":"` + f2FixtureBase + `","name":"n","symbol":"S","denom_units":[null]}]}`)
+	genState := map[string]json.RawMessage{banktypes.ModuleName: raw}
+
+	// Reverse control: without the guard it is x/bank's own Validate that panics
+	// on the nil unit, which is what makes the guard load-bearing rather than
+	// defensive decoration. If a future SDK adds the nil check, this assertion
+	// fails and tells us the guard has become redundant (not wrong).
+	require.Panics(t, func() {
+		_ = banktypes.Metadata{
+			Base: f2FixtureBase, Display: f2FixtureBase, Name: "n", Symbol: "S",
+			DenomUnits: []*banktypes.DenomUnit{nil},
+		}.Validate()
+	}, "the guard exists because bank's Validate dereferences a nil unit")
+
+	diags, err := normalizeExportedBankDenomMetadata(cdc, genState)
+	require.NoError(t, err)
+	require.Len(t, diags, 1)
+	require.Equal(t, exportIssueDenomMetadataDropped, diags[0].Kind)
+	require.Equal(t, f2FixtureBase, diags[0].Key)
+	require.Contains(t, diags[0].Detail, "nil denom unit")
+
+	var bankGen banktypes.GenesisState
+	require.NoError(t, cdc.UnmarshalJSON(genState[banktypes.ModuleName], &bankGen))
+	require.Empty(t, bankGen.DenomMetadata, "the corrupt entry must be dropped from the export")
+}

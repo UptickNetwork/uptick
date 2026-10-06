@@ -86,6 +86,14 @@ func TestConvertERC721_VoucherPairTerminalUnwrap(t *testing.T) {
 	)
 	contract := registerVoucherPair(t, k, ctx, owner, voucherClass, nftID, voucherContract, evmTokenID)
 
+	// Seed the IBC refund-receiver record exactly the way SetEvmRefundReceiver
+	// writes it: under BOTH the cosmos token id and the EVM token id. The terminal
+	// un-wrap must clear both (L-4); deleting only the EVM spelling left an orphan
+	// record behind.
+	k.SetEvmRefundReceiver(ctx, voucherContract, []string{nftID}, []string{evmTokenID}, common.BytesToAddress(owner.Bytes()).Hex())
+	require.NotEmpty(t, k.GetEvmAddressByContractTokenId(ctx, voucherContract, nftID))
+	require.NotEmpty(t, k.GetEvmAddressByContractTokenId(ctx, voucherContract, evmTokenID))
+
 	rec := &recordingEVMKeeper{
 		fakeEVMKeeper: &fakeEVMKeeper{
 			accounts: map[common.Address]*statedb.Account{
@@ -121,6 +129,12 @@ func TestConvertERC721_VoucherPairTerminalUnwrap(t *testing.T) {
 	// The bidirectional binding is deleted, not rewritten.
 	require.Empty(t, k.GetNFTPairByContractTokenID(ctx, voucherContract, evmTokenID), "forward binding must be deleted")
 	require.Empty(t, k.GetNFTPairByClassNFTID(ctx, voucherClass, nftID), "reverse binding must be deleted")
+
+	// L-4: BOTH spellings of the refund record are gone, not just the EVM one.
+	require.Empty(t, k.GetEvmAddressByContractTokenId(ctx, voucherContract, evmTokenID),
+		"the EVM-id refund record must be cleared")
+	require.Empty(t, k.GetEvmAddressByContractTokenId(ctx, voucherContract, nftID),
+		"the cosmos-id refund record must be cleared too")
 
 	// The native voucher is owned by the receiver.
 	got, err := k.nftKeeper.GetNFT(ctx, voucherClass, nftID)
@@ -176,4 +190,35 @@ func TestConvertERC721_UptickPairStillEscrows(t *testing.T) {
 	// The binding is rewritten (still present), not deleted.
 	require.NotEmpty(t, k.GetNFTPairByContractTokenID(ctx, contract, evmTokenID))
 	require.NotEmpty(t, k.GetNFTPairByClassNFTID(ctx, classID, nftID))
+}
+
+// L-4 regression: the shared key-set helper clears every binding key, including
+// BOTH spellings of the refund-receiver record. It is the single definition the
+// terminal un-wrap and the upgrade settlement both use, so this is the test that
+// keeps them from clearing different key sets again.
+func TestDeleteVoucherBindingKeysClearsBothRefundSpellings(t *testing.T) {
+	k, ctx, _ := setupConvertKeeper(t)
+
+	const (
+		classID  = "ibc/FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
+		nftID    = "n1"
+		contract = "0x2222222222222222222222222222222222222222"
+		tokenID  = "7"
+	)
+
+	require.NoError(t, k.SetNFTPairs(ctx, contract, tokenID, classID, nftID))
+	k.SetEvmRefundReceiver(ctx, contract, []string{nftID}, []string{tokenID},
+		"0x3333333333333333333333333333333333333333")
+
+	require.NotEmpty(t, k.GetNFTPairByClassNFTID(ctx, classID, nftID))
+	require.NotEmpty(t, k.GetNFTPairByContractTokenID(ctx, contract, tokenID))
+	require.NotEmpty(t, k.GetEvmAddressByContractTokenId(ctx, contract, tokenID))
+	require.NotEmpty(t, k.GetEvmAddressByContractTokenId(ctx, contract, nftID))
+
+	k.deleteVoucherBindingKeys(ctx, contract, tokenID, classID, nftID)
+
+	require.Empty(t, k.GetNFTPairByClassNFTID(ctx, classID, nftID), "reverse binding")
+	require.Empty(t, k.GetNFTPairByContractTokenID(ctx, contract, tokenID), "forward binding")
+	require.Empty(t, k.GetEvmAddressByContractTokenId(ctx, contract, tokenID), "refund record under the EVM token id")
+	require.Empty(t, k.GetEvmAddressByContractTokenId(ctx, contract, nftID), "refund record under the cosmos token id")
 }

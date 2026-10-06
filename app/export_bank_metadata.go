@@ -6,6 +6,8 @@ import (
 
 	"github.com/cosmos/cosmos-sdk/codec"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
+
+	"github.com/UptickNetwork/uptick/app/upgrades"
 )
 
 // Finding F-2. ibc-go v10.5.0's denom-trace migration writes IBC voucher
@@ -78,6 +80,22 @@ func normalizeExportedBankDenomMetadata(
 	)
 	out := make([]banktypes.Metadata, 0, len(bankGen.DenomMetadata))
 	for _, md := range bankGen.DenomMetadata {
+		if upgrades.HasNilDenomUnit(md.DenomUnits) {
+			// x/bank's Metadata.Validate dereferences every unit without a nil
+			// check, so a stored nil element panics before any repair can run.
+			// Such a record is unrepairable by construction, so drop it and record
+			// why -- the same policy as an entry that still fails validation after
+			// the rewrite below.
+			changed = true
+			diags = append(diags, ExportDiagnostic{
+				Module: banktypes.ModuleName,
+				Kind:   exportIssueDenomMetadataDropped,
+				Key:    md.Base,
+				Detail: "dropped denom metadata carrying a nil denom unit: x/bank's own Validate panics on it, so it can be neither exported nor repaired",
+			})
+			continue
+		}
+
 		if md.Validate() == nil {
 			out = append(out, md)
 			continue
@@ -125,7 +143,10 @@ func normalizeExportedBankDenomMetadata(
 }
 
 func firstUnitDenom(md banktypes.Metadata) string {
-	if len(md.DenomUnits) > 0 {
+	// A nil first unit must not be dereferenced: this helper is called from the
+	// diagnostic that reports records bank rejects, i.e. records that may well
+	// carry a nil unit.
+	if len(md.DenomUnits) > 0 && md.DenomUnits[0] != nil {
 		return md.DenomUnits[0].Denom
 	}
 	return ""

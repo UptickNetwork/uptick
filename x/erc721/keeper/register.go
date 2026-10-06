@@ -9,6 +9,7 @@ import (
 	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/ethereum/go-ethereum/common"
 
+	nftTypes "github.com/UptickNetwork/uptick/x/collection/types"
 	"github.com/UptickNetwork/uptick/x/erc721/types"
 )
 
@@ -21,7 +22,11 @@ func (k Keeper) RegisterNFT(ctx sdk.Context, msg *types.MsgConvertNFT) (*types.T
 	// refused to release, permanently locking the voucher out of its origin
 	// chain (R1). This gate closes both the convert-memo path and a user's
 	// manual MsgConvertNFT.
-	if strings.HasPrefix(msg.ClassId, "ibc/") {
+	//
+	// The predicate is shared with convertEvm2Cosmos' terminal-burn branch and
+	// with the v0.5.0 settlement, so the three cannot disagree about what a
+	// voucher class is (x/collection/types.IsIBCDenom).
+	if nftTypes.IsIBCDenom(msg.ClassId) {
 		return nil, sdkerrors.Wrapf(
 			errortypes.ErrInvalidRequest,
 			"ibc voucher class %s is settled natively and cannot be bound to an erc721 contract (R1-C)",

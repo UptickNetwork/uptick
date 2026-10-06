@@ -11,6 +11,8 @@ import (
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	erc20types "github.com/cosmos/evm/x/erc20/types"
 	"github.com/stretchr/testify/require"
+
+	"github.com/UptickNetwork/uptick/app/upgrades"
 )
 
 const (
@@ -428,4 +430,95 @@ func TestEnablePermissionlessRegistrationPropagatesSetParamsError(t *testing.T) 
 	require.ErrorContains(t, err, "erc20 params are invalid")
 	require.False(t, store.params.PermissionlessRegistration,
 		"a failed write must not leave the in-memory copy looking migrated")
+}
+
+// TestBackfillReportsFailuresForRetry pins the recoverability half of L-02: a
+// denom this run could not register must be RETURNED, not merely logged. The
+// handler writes its completion marker unconditionally, so a failure that existed
+// only as a log line would never be retried and would leave that voucher without
+// an EVM representation for good.
+func TestBackfillReportsFailuresForRetry(t *testing.T) {
+	t.Parallel()
+
+	bank := newFakeVoucherBank(
+		sdk.NewInt64Coin(microVoucherDenom, 5),
+		sdk.NewInt64Coin(voucherDenom, 1),
+	)
+	pairs := newFakeVoucherPairs()
+	pairs.failOn[microVoucherDenom] = fmt.Errorf("token already exists for token 0xdead")
+
+	failed := backfillIBCVoucherTokenPairs(sdk.Context{}, bank, pairs, &recordingLogger{})
+	require.Equal(t, []string{microVoucherDenom}, failed,
+		"the failed denom must be reported so the caller can persist it")
+	require.Equal(t, []string{voucherDenom}, pairs.order)
+}
+
+// TestRetryIBCVoucherBackfillRecoversOnlyRecordedDenoms pins the retry entry
+// point a v0.5.x tail migration uses with the recorded failure list: it retries
+// exactly those denoms, is idempotent, and reports what still fails.
+func TestRetryIBCVoucherBackfillRecoversOnlyRecordedDenoms(t *testing.T) {
+	t.Parallel()
+
+	pairs := newFakeVoucherPairs()
+	pairs.failOn[voucherDenom] = fmt.Errorf("hand-deployed contract on the derived address")
+	logger := &recordingLogger{}
+
+	registered, still := RetryIBCVoucherBackfill(
+		sdk.Context{}, pairs, []string{voucherDenom, microVoucherDenom}, logger)
+
+	require.Equal(t, 1, registered, "the recorded denom that can now be registered is")
+	require.Equal(t, []string{voucherDenom}, still, "the still-failing denom is reported back")
+	require.Equal(t, []string{microVoucherDenom}, pairs.order)
+	require.Contains(t, logger.text(), "retry: backfilled ibc voucher token pair")
+
+	// Idempotent: a denom that already has a pair is skipped, and clearing the
+	// blocker lets a later run finish the job.
+	require.Equal(t, 1, len(pairs.order))
+	pairs.failOn = map[string]error{}
+	registered, still = RetryIBCVoucherBackfill(sdk.Context{}, pairs, still, logger)
+	require.Equal(t, 1, registered)
+	require.Empty(t, still)
+}
+
+// TestNilDenomUnitIsSkippedNotDereferenced pins L-01: a stored metadata record
+// carrying a nil *DenomUnit (proto repeated messages can hold one) must not make
+// the upgrade walkers or the migration panic -- x/bank's own Metadata.Validate
+// dereferences every unit, so every path that touches a stored record has to be
+// nil-safe ahead of it.
+func TestNilDenomUnitIsSkippedNotDereferenced(t *testing.T) {
+	t.Parallel()
+
+	metadata := ibcGoVoucherMetadata(voucherDenom, voucherPath, voucherSource)
+	metadata.DenomUnits = []*banktypes.DenomUnit{nil, {Denom: voucherSource, Exponent: 6}}
+
+	require.True(t, upgrades.HasNilDenomUnit(metadata.DenomUnits))
+	require.NotPanics(t, func() { _ = formatDenomUnits(metadata.DenomUnits) })
+	require.NotPanics(t, func() { _, _ = nonZeroUnitExponent(metadata.DenomUnits, voucherSource) })
+	require.NotPanics(t, func() { _ = sameDenomUnits(metadata.DenomUnits, metadata.DenomUnits) })
+
+	// The migration skips the record: its unit list cannot be read, so the
+	// exponent would have to be guessed, and a wrong exponent rescales an asset.
+	updated, reason, ok := normalizedIBCVoucherMetadata(metadata)
+	require.False(t, ok)
+	require.Contains(t, reason, "nil denom unit")
+	require.Equal(t, metadata.DenomUnits, updated.DenomUnits, "the record must be returned untouched")
+}
+
+// TestNormalizeIBCVoucherDecimalsLeavesNilUnitRecordAlone is the end-to-end
+// counterpart: the migration that walks every voucher must neither panic nor
+// rewrite a record it cannot read.
+func TestNormalizeIBCVoucherDecimalsLeavesNilUnitRecordAlone(t *testing.T) {
+	t.Parallel()
+
+	bank := newFakeVoucherBank(sdk.NewInt64Coin(voucherDenom, 1))
+	metadata := ibcGoVoucherMetadata(voucherDenom, voucherPath, voucherSource)
+	metadata.DenomUnits = []*banktypes.DenomUnit{nil}
+	bank.metadata[voucherDenom] = metadata
+	logger := &recordingLogger{}
+
+	require.NotPanics(t, func() {
+		normalizeIBCVoucherERC20Decimals(sdk.Context{}, bank, logger)
+	})
+	require.Empty(t, bank.writes, "a corrupt record must not be rewritten")
+	require.Contains(t, logger.text(), "nil denom unit")
 }

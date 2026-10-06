@@ -409,6 +409,28 @@ func (k Keeper) DeleteEvmAddressByContractTokenId(ctx sdk.Context, evmContractAd
 	store.Delete([]byte(contractAndTokenId))
 }
 
+// deleteVoucherBindingKeys removes every store key that binds a native NFT
+// (classID, nftID) to an ERC721 token (contract, tokenID):
+//
+//   - both directions of the per-token pair index, and
+//   - both spellings of the IBC refund-receiver record, because
+//     SetEvmRefundReceiver writes that record under the cosmos token id AND the
+//     EVM token id (it loops over cosmosTokenIds and evmTokenIds).
+//
+// It exists because two callers must clear the SAME key set: the terminal
+// un-wrap of a voucher pair (convertEvm2Cosmos, R1-C A3) and the v0.5.0 voucher
+// settlement. A3 previously deleted only the EVM spelling, leaving an orphan
+// refund record behind -- harmless while the voucher's ERC721 half is burned and
+// refund semantics are gone, but real drift, and the kind that becomes a live gap
+// the moment a reader starts trusting that record's absence. One function makes
+// the two callers unable to diverge again.
+func (k Keeper) deleteVoucherBindingKeys(ctx sdk.Context, contract, tokenID, classID, nftID string) {
+	k.DeleteNFTPairByTokenID(ctx, contract, tokenID)
+	k.DeleteNFTPairByNFTID(ctx, classID, nftID)
+	k.DeleteEvmAddressByContractTokenId(ctx, contract, tokenID)
+	k.DeleteEvmAddressByContractTokenId(ctx, contract, nftID)
+}
+
 // SetEvmRefundReceiver records the original ERC721 owner for IBC timeout/error
 // refunds. Keys use a lowercased contract address plus both cosmos and EVM
 // token ids so lookup matches packet TokenIds and the NFT-UID mapping.

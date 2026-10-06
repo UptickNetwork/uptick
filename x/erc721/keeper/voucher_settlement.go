@@ -2,7 +2,6 @@ package keeper
 
 import (
 	"math/big"
-	"strings"
 
 	"cosmossdk.io/store/prefix"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -79,7 +78,7 @@ func (k Keeper) SettleIBCVoucherPairs(ctx sdk.Context) (settled, staleCleared, k
 	iter.Close()
 
 	for _, pair := range k.GetTokenPairs(ctx) {
-		if !strings.HasPrefix(pair.ClassId, "ibc/") {
+		if !nftTypes.IsIBCDenom(pair.ClassId) {
 			continue
 		}
 
@@ -140,25 +139,47 @@ func (k Keeper) settleVoucherBinding(ctx sdk.Context, pair types.TokenPair, b vo
 		return keptOutcome
 	}
 
-	contract := common.HexToAddress(b.contract)
-	ercOwner, err := k.QueryERC721TokenOwner(ctx, contract, bigTokenID)
-	ercIsModule := false
-	ercIsNone := false
-	ercIsUser := false
-	if err != nil {
-		// ownerOf reverted — the ERC721 half no longer exists. This is the
-		// normal "already burned" case, not an ambiguous one.
-		ercIsNone = true
-	} else if ercOwner == (common.Address{}) {
-		ercIsNone = true
-	} else if ercOwner == types.ModuleAddress {
-		ercIsModule = true
-	} else if acc := k.evmKeeper.GetAccountWithoutBalance(ctx, ercOwner); acc != nil && acc.HasCodeHash() {
-		// The ERC721 is held by a contract, not a user — burning it would
-		// destroy a third party's asset. Leave it for manual handling.
-		logger.Warn("ibc voucher pair settlement: erc721 held by a contract, kept", "class", b.classID, "nft", b.nftID, "holder", ercOwner)
+	// A reverse-index value can carry a contract field that is not a well-formed
+	// address. common.HexToAddress silently maps anything it cannot parse to the
+	// zero address, which would then masquerade as "an ERC721 held by nobody",
+	// so reject the shape before it can reach any ownership comparison.
+	if !common.IsHexAddress(b.contract) {
+		logger.Warn("ibc voucher pair settlement: malformed contract address, kept",
+			"class", b.classID, "nft", b.nftID, "contract", b.contract)
 		return keptOutcome
-	} else {
+	}
+	contract := common.HexToAddress(b.contract)
+
+	ercOwner, err := k.QueryERC721TokenOwner(ctx, contract, bigTokenID)
+	if err != nil {
+		// The error domain here is NOT "the token does not exist". CallEVMWithData
+		// also surfaces EVM infrastructure failures (an ApplyMessage error, a nil
+		// response, res.Failed()) and the caller adds ErrABIUnpack, and none of
+		// those can be told apart from a nonexistent-token revert by the error
+		// value alone. Classifying them as "absent" deletes the binding — and,
+		// when it is the last one, the pair — of an ERC721 that may still be
+		// live, which is the very asset this function documents it must never
+		// destroy on a guess. Keep it: A3 and a later run remain the recovery
+		// paths.
+		logger.Warn("ibc voucher pair settlement: ownerOf query failed, kept",
+			"class", b.classID, "nft", b.nftID, "contract", b.contract, "err", err)
+		return keptOutcome
+	}
+
+	// Only a SUCCESSFUL query that returned the zero address is positive
+	// evidence the ERC721 half is gone. A conforming ERC721 reverts for a
+	// nonexistent token, so this is the permissive-contract case — still a
+	// deterministic on-chain answer, unlike an error.
+	ercIsNone := ercOwner == (common.Address{})
+	ercIsModule := !ercIsNone && ercOwner == types.ModuleAddress
+	ercIsUser := false
+	if !ercIsNone && !ercIsModule {
+		if acc := k.evmKeeper.GetAccountWithoutBalance(ctx, ercOwner); acc != nil && acc.HasCodeHash() {
+			// The ERC721 is held by a contract, not a user — burning it would
+			// destroy a third party's asset. Leave it for manual handling.
+			logger.Warn("ibc voucher pair settlement: erc721 held by a contract, kept", "class", b.classID, "nft", b.nftID, "holder", ercOwner)
+			return keptOutcome
+		}
 		ercIsUser = true
 	}
 
@@ -251,11 +272,9 @@ func (k Keeper) settleOrphan(ctx sdk.Context, pair types.TokenPair, b voucherBin
 }
 
 // deleteBinding removes the bidirectional per-token binding and the IBC refund
-// receiver record (if any). It mirrors the terminal-un-wrap deletion in
-// convertEvm2Cosmos (R1-C A3).
+// receiver record (if any). It delegates to deleteVoucherBindingKeys, the single
+// key-set definition shared with the terminal-un-wrap path (convertEvm2Cosmos,
+// R1-C A3), so the two can never clear different keys.
 func (k Keeper) deleteBinding(ctx sdk.Context, b voucherBinding) {
-	k.DeleteNFTPairByTokenID(ctx, b.contract, b.tokenID)
-	k.DeleteNFTPairByNFTID(ctx, b.classID, b.nftID)
-	k.DeleteEvmAddressByContractTokenId(ctx, b.contract, b.tokenID)
-	k.DeleteEvmAddressByContractTokenId(ctx, b.contract, b.nftID)
+	k.deleteVoucherBindingKeys(ctx, b.contract, b.tokenID, b.classID, b.nftID)
 }

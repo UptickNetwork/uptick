@@ -8,6 +8,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
 
+	nftTypes "github.com/UptickNetwork/uptick/x/collection/types"
 	"github.com/UptickNetwork/uptick/x/cw721/types"
 )
 
@@ -21,7 +22,11 @@ func (k Keeper) RegisterNFT(ctx sdk.Context, msg *types.MsgConvertNFT) (*types.T
 	// chain (R1). This gate closes both the convert-memo path and a user's
 	// manual MsgConvertNFT. cw721 has no legacy ibc-class pairs (0 on both
 	// chains), so this is forward-only protection.
-	if strings.HasPrefix(msg.ClassId, "ibc/") {
+	//
+	// The predicate is shared with x/erc721 and with the v0.5.0 settlement
+	// (x/collection/types.IsIBCDenom), so the modules cannot disagree about what
+	// a voucher class is.
+	if nftTypes.IsIBCDenom(msg.ClassId) {
 		return nil, sdkerrors.Wrapf(
 			errortypes.ErrInvalidRequest,
 			"ibc voucher class %s is settled natively and cannot be bound to a cw721 contract (R1-C)",

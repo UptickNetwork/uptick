@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"cosmossdk.io/x/nft"
 	"github.com/cosmos/cosmos-sdk/codec"
@@ -217,5 +218,91 @@ func TestBuildRejectsOversizedClassMetadata(t *testing.T) {
 		// even call Build for it, and Build must not invent a rejection either.
 		_, err := cb.Build("someclass", "ipfs://class", Base64.EncodeToString(nil))
 		require.NoError(t, err)
+	})
+}
+
+// TestClampDenomMetadataBoundsStaysWithinBound pins the M-02 fix: the export
+// clamp must cut on a UTF-8 rune boundary, never on a raw byte offset.
+//
+// Go strings are byte sequences, so a byte-wise `s[:max]` can slice a multi-byte
+// rune in half; a JSON encoder then rewrites each dangling byte as U+FFFD (three
+// bytes), and the value that was just clamped to the bound lands back ABOVE it
+// after the export -> unmarshal round trip -- so the genesis the clamp exists to
+// keep importable still fails ValidateGenesis. The property is asserted through
+// the app proto codec (the encoder genesis actually uses), not just by inspecting
+// the clamped bytes.
+func TestClampDenomMetadataBoundsStaysWithinBound(t *testing.T) {
+	cdc := codec.NewProtoCodec(codectypes.NewInterfaceRegistry())
+
+	runes := []struct {
+		name string
+		r    string
+	}{
+		{"1-byte", "a"},
+		{"2-byte", "\u00e9"},
+		{"3-byte", "\u4e2d"},
+		{"4-byte", "\U0001F600"},
+	}
+
+	for _, tc := range runes {
+		t.Run(tc.name, func(t *testing.T) {
+			// Vary how far the oversized tail pokes past the bound, so the byte
+			// cut lands at every position inside the final rune.
+			for off := 1; off <= len(tc.r); off++ {
+				src := strings.Repeat("x", MaxDenomSchemaLen-len(tc.r)+off) + tc.r
+				require.Greater(t, len(src), MaxDenomSchemaLen, "fixture must exceed the bound")
+
+				clamped, _, changed := ClampDenomMetadataBounds(src, "")
+				require.True(t, changed)
+				require.LessOrEqual(t, len(clamped), MaxDenomSchemaLen)
+				require.True(t, utf8.ValidString(clamped), "clamped value must be valid UTF-8")
+
+				// The real path: genesis is JSON-marshalled and read back.
+				denom := &Denom{Id: "abc", Schema: clamped}
+				bz, err := cdc.MarshalJSON(denom)
+				require.NoError(t, err)
+				var out Denom
+				require.NoError(t, cdc.UnmarshalJSON(bz, &out))
+
+				require.LessOrEqual(t, len(out.Schema), MaxDenomSchemaLen,
+					"schema grew past the bound across a JSON round trip")
+				require.NoError(t, ValidateDenomMetadataBounds(out.Schema, out.Data),
+					"the clamped value must still validate after a JSON round trip")
+			}
+		})
+	}
+
+	t.Run("data field", func(t *testing.T) {
+		src := strings.Repeat("x", MaxDenomDataLen-2) + "\u4e2d"
+		clampedData, _, changed := ClampDenomMetadataBounds("", src)
+		require.True(t, changed)
+		require.LessOrEqual(t, len(clampedData), MaxDenomDataLen)
+		require.True(t, utf8.ValidString(clampedData))
+
+		denom := &Denom{Id: "abc", Data: clampedData}
+		bz, err := cdc.MarshalJSON(denom)
+		require.NoError(t, err)
+		var out Denom
+		require.NoError(t, cdc.UnmarshalJSON(bz, &out))
+		require.NoError(t, ValidateDenomMetadataBounds(out.Schema, out.Data))
+	})
+
+	t.Run("in-bounds valid value is untouched", func(t *testing.T) {
+		schema := strings.Repeat("y", MaxDenomSchemaLen)
+		data := strings.Repeat("z", MaxDenomDataLen)
+		gotSchema, gotData, changed := ClampDenomMetadataBounds(schema, data)
+		require.False(t, changed)
+		require.Equal(t, schema, gotSchema)
+		require.Equal(t, data, gotData)
+	})
+
+	t.Run("in-bounds but invalid UTF-8 is sanitized", func(t *testing.T) {
+		// A stored value carrying a stray invalid byte must not survive to the
+		// JSON encoder, where it would expand into U+FFFD.
+		schema := "abc\xffdef"
+		gotSchema, _, changed := ClampDenomMetadataBounds(schema, "")
+		require.True(t, changed)
+		require.True(t, utf8.ValidString(gotSchema))
+		require.LessOrEqual(t, len(gotSchema), MaxDenomSchemaLen)
 	})
 }

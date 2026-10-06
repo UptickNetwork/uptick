@@ -205,3 +205,25 @@ func TestEditNFTDataRemoveFieldSemantics(t *testing.T) {
 	// Empty keeps the origin.
 	require.Equal(t, `{"old":true}`, Modify(`{"old":true}`, ""))
 }
+
+// TestIsIBCDenomIsTheSingleCaseSensitiveVoucherPredicate pins L-5. The gate
+// (x/erc721 / x/cw721 RegisterNFT), the terminal-un-wrap branch
+// (convertEvm2Cosmos) and the v0.5.0 voucher settlement all read this one
+// predicate, so its exact semantics are load-bearing: a case-folded variant would
+// silently split the set those three assume is identical.
+//
+// The case-sensitivity is deliberate. Real voucher classes are ibc-go's
+// "ibc/" + uppercase hex of the denom hash, so the prefix is always lowercase,
+// while "IBC/<hex>" is an ordinary user class that must stay registrable.
+func TestIsIBCDenomIsTheSingleCaseSensitiveVoucherPredicate(t *testing.T) {
+	require.True(t, IsIBCDenom("ibc/"+strings.Repeat("A", 64)))
+	require.True(t, IsIBCDenom("ibc/anything"))
+	require.True(t, IsIBCDenom("ibc/"))
+
+	require.False(t, IsIBCDenom("IBC/"+strings.Repeat("A", 64)),
+		"an uppercase prefix is a user class, not a voucher")
+	require.False(t, IsIBCDenom("Ibc/x"))
+	require.False(t, IsIBCDenom("uptick-abc"))
+	require.False(t, IsIBCDenom("ibcx"))
+	require.False(t, IsIBCDenom(""))
+}
