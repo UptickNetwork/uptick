@@ -9,7 +9,7 @@
 # Symbol is human-facing metadata, not a key anything is looked up by, so
 # upper-casing it cannot desynchronise a lookup. The denom actually used as a
 # key on the lines above is `evmDenom`, which is untouched.
-app/app.go:1122
+app/app.go:1124
 
 # genDenomID invents a RANDOM collection denom id for the simulator and
 # lower-cases it so the generated string satisfies the id regex. The variable it
