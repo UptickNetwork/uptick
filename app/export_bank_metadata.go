@@ -7,7 +7,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/codec"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 
-	"github.com/UptickNetwork/uptick/app/upgrades"
+	"github.com/UptickNetwork/uptick/ibc"
 )
 
 // Finding F-2. ibc-go v10.5.0's denom-trace migration writes IBC voucher
@@ -80,7 +80,7 @@ func normalizeExportedBankDenomMetadata(
 	)
 	out := make([]banktypes.Metadata, 0, len(bankGen.DenomMetadata))
 	for _, md := range bankGen.DenomMetadata {
-		if upgrades.HasNilDenomUnit(md.DenomUnits) {
+		if ibc.HasNilDenomUnit(md.DenomUnits) {
 			// x/bank's Metadata.Validate dereferences every unit without a nil
 			// check, so a stored nil element panics before any repair can run.
 			// Such a record is unrepairable by construction, so drop it and record

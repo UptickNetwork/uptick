@@ -504,9 +504,14 @@ func New(
 	// Params.PermissionlessRegistration. Upstream never reads that parameter on
 	// this path, so without the gate the switch is bypassed by anyone who can
 	// get an unseen denom delivered. See erc20_ibc_gate.go.
+	//
+	// The bank keeper goes to the gate for the other half of the same branch:
+	// the decimals the dynamic precompile will report come from the voucher's
+	// bank metadata, and ibc-go's shape reports 0. Repairing it there is what
+	// keeps a newly registered voucher equal to one the v0.5.0 handler repaired.
 	transferIBCModule := transfer.NewIBCModule(appKeepers.IBCTransferKeeper)
 	transferStack := cosmoserc20.NewIBCMiddleware(
-		NewERC20IBCGate(&appKeepers.Erc20Keeper),
+		NewERC20IBCGate(&appKeepers.Erc20Keeper, appKeepers.BankKeeper),
 		transferIBCModule,
 	)
 

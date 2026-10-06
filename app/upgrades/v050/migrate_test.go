@@ -12,7 +12,7 @@ import (
 	erc20types "github.com/cosmos/evm/x/erc20/types"
 	"github.com/stretchr/testify/require"
 
-	"github.com/UptickNetwork/uptick/app/upgrades"
+	"github.com/UptickNetwork/uptick/ibc"
 )
 
 const (
@@ -491,14 +491,14 @@ func TestNilDenomUnitIsSkippedNotDereferenced(t *testing.T) {
 	metadata := ibcGoVoucherMetadata(voucherDenom, voucherPath, voucherSource)
 	metadata.DenomUnits = []*banktypes.DenomUnit{nil, {Denom: voucherSource, Exponent: 6}}
 
-	require.True(t, upgrades.HasNilDenomUnit(metadata.DenomUnits))
-	require.NotPanics(t, func() { _ = formatDenomUnits(metadata.DenomUnits) })
-	require.NotPanics(t, func() { _, _ = nonZeroUnitExponent(metadata.DenomUnits, voucherSource) })
-	require.NotPanics(t, func() { _ = sameDenomUnits(metadata.DenomUnits, metadata.DenomUnits) })
+	require.True(t, ibc.HasNilDenomUnit(metadata.DenomUnits))
+	require.NotPanics(t, func() { _ = ibc.FormatDenomUnits(metadata.DenomUnits) })
+	require.NotPanics(t, func() { _, _ = ibc.NonZeroUnitExponent(metadata.DenomUnits, voucherSource) })
+	require.NotPanics(t, func() { _ = ibc.SameDenomUnits(metadata.DenomUnits, metadata.DenomUnits) })
 
 	// The migration skips the record: its unit list cannot be read, so the
 	// exponent would have to be guessed, and a wrong exponent rescales an asset.
-	updated, reason, ok := normalizedIBCVoucherMetadata(metadata)
+	updated, reason, ok := ibc.NormalizeVoucherMetadata(metadata)
 	require.False(t, ok)
 	require.Contains(t, reason, "nil denom unit")
 	require.Equal(t, metadata.DenomUnits, updated.DenomUnits, "the record must be returned untouched")

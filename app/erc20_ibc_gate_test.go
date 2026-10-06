@@ -12,6 +12,7 @@ import (
 	storetypes "cosmossdk.io/store/types"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	transfertypes "github.com/cosmos/ibc-go/v10/modules/apps/transfer/types"
 	channeltypes "github.com/cosmos/ibc-go/v10/modules/core/04-channel/types"
 	"github.com/cosmos/ibc-go/v10/modules/core/exported"
@@ -56,7 +57,7 @@ func TestInboundAutoRegistrationRunsUnderDefaultParams(t *testing.T) {
 	require.True(t, app.Erc20Keeper.GetParams(ctx).PermissionlessRegistration,
 		"DefaultParams enables permissionless registration; this test pins the baseline the gate must preserve")
 
-	gate := uptickkeepers.NewERC20IBCGate(&app.Erc20Keeper)
+	gate := uptickkeepers.NewERC20IBCGate(&app.Erc20Keeper, app.BankKeeper)
 	packet, recvDenom := inboundPacket(t, "transfer/channel-0/uatom")
 	require.True(t, strings.HasPrefix(recvDenom, "ibc/"),
 		"an unseen foreign denom credits as an ibc/<hash> voucher, which is the input the registration branch keys off")
@@ -80,7 +81,7 @@ func TestInboundAutoRegistrationHonoursPermissionlessRegistration(t *testing.T) 
 	require.NoError(t, app.Erc20Keeper.SetParams(ctx, cosmoserc20types.NewParams(true, false)))
 	require.False(t, app.Erc20Keeper.GetParams(ctx).PermissionlessRegistration)
 
-	gate := uptickkeepers.NewERC20IBCGate(&app.Erc20Keeper)
+	gate := uptickkeepers.NewERC20IBCGate(&app.Erc20Keeper, app.BankKeeper)
 	packet, recvDenom := inboundPacket(t, "transfer/channel-0/uosmo")
 
 	ack := channeltypes.NewResultAcknowledgement([]byte{1})
@@ -101,6 +102,103 @@ func TestInboundAutoRegistrationHonoursPermissionlessRegistration(t *testing.T) 
 	}
 	require.True(t, suppressed,
 		"a suppressed registration has to be observable, otherwise it is indistinguishable from a packet that never matched")
+}
+
+// TestInboundRegistrationNormalizesTheVoucherDecimals covers the decimals half of
+// the same registration branch.
+//
+// The dynamic precompile the callback creates reports decimals() out of the
+// voucher's bank metadata (precompiles/erc20/query.go:115-128), and the shape
+// ibc-go writes makes that read land on the source denom's exponent-0 unit. A
+// voucher therefore reports 0 while one the v0.5.0 handler repaired reports the
+// source denom's own exponent - one chain, two answers, decided by whether the pair
+// predates the upgrade.
+//
+// The pre-upgrade shape is seeded rather than produced: the only thing that writes
+// it is a real inbound transfer through the transfer module, and the assertion that
+// matters is what the gate leaves behind.
+func TestInboundRegistrationNormalizesTheVoucherDecimals(t *testing.T) {
+	app, baseCtx := sharedTestApp(t)
+
+	ctx, _ := baseCtx.CacheContext()
+	ctx = ctx.WithGasMeter(storetypes.NewInfiniteGasMeter())
+
+	packet, recvDenom := inboundPacket(t, "transfer/channel-0/uatom")
+	require.True(t, strings.HasPrefix(recvDenom, "ibc/"),
+		"an unseen foreign denom credits as an ibc/<hash> voucher, which is the input the registration branch keys off")
+
+	// Exactly what ibc-go v10.5.0 writes when the voucher first arrives: the full
+	// denom path in Display and a single unit carrying the SOURCE denom at exponent 0.
+	app.BankKeeper.SetDenomMetaData(ctx, banktypes.Metadata{
+		Description: "IBC token from transfer/channel-0/uatom",
+		DenomUnits:  []*banktypes.DenomUnit{{Denom: "uatom", Exponent: 0}},
+		Base:        recvDenom,
+		Display:     "transfer/channel-0/uatom",
+		Name:        "transfer/channel-0/uatom IBC token",
+		Symbol:      "UATOM",
+	})
+
+	ibcGoShape, found := app.BankKeeper.GetDenomMetaData(ctx, recvDenom)
+	require.True(t, found)
+	require.Error(t, ibcGoShape.Validate(),
+		"the fixture must reproduce the illegal on-chain shape, otherwise it proves nothing")
+
+	ack := channeltypes.NewResultAcknowledgement([]byte{1})
+	out := uptickkeepers.NewERC20IBCGate(&app.Erc20Keeper, app.BankKeeper).OnRecvPacket(ctx, packet, ack)
+
+	require.True(t, out.Success(), "the ICS-20 credit must survive the callback")
+	require.True(t, app.Erc20Keeper.IsDenomRegistered(ctx, recvDenom),
+		"this test is about the registration branch, so that branch has to have run")
+
+	got, found := app.BankKeeper.GetDenomMetaData(ctx, recvDenom)
+	require.True(t, found, "the repair must rewrite the record, not drop it")
+	require.NoError(t, got.Validate(),
+		"the repaired metadata must be legal bank state, not merely readable by the precompile")
+	require.Equal(t, "uatom", got.Display,
+		"Display must become the source denom, so the precompile's last-segment rule lands on the exponent unit")
+	require.Equal(t, []*banktypes.DenomUnit{
+		{Denom: recvDenom, Exponent: 0},
+		{Denom: "uatom", Exponent: 6},
+	}, got.DenomUnits, "uatom is micro-prefixed, so the unit must carry exponent 6")
+	require.Equal(t, "UATOM", got.Symbol,
+		"Name/Symbol/Description are not part of the defect and must survive")
+}
+
+// TestInboundRegistrationLeavesEstablishedVoucherMetadataAlone pins the scope of the
+// repair. A voucher that already has a pair is not registering, so the callback takes
+// its conversion branch and the gate has no business rewriting that denomination's
+// metadata - flipping decimals() under a live integrator is exactly the surprise the
+// upgrade repair is meant to remove, not to reintroduce on every packet.
+func TestInboundRegistrationLeavesEstablishedVoucherMetadataAlone(t *testing.T) {
+	app, baseCtx := sharedTestApp(t)
+
+	ctx, _ := baseCtx.CacheContext()
+	ctx = ctx.WithGasMeter(storetypes.NewInfiniteGasMeter())
+
+	packet, recvDenom := inboundPacket(t, "transfer/channel-0/uosmo")
+	require.True(t, strings.HasPrefix(recvDenom, "ibc/"))
+
+	_, err := app.Erc20Keeper.RegisterERC20Extension(ctx, recvDenom)
+	require.NoError(t, err, "the fixture needs an established pair, which is what makes this packet a non-registration")
+
+	app.BankKeeper.SetDenomMetaData(ctx, banktypes.Metadata{
+		Description: "IBC token from transfer/channel-0/uosmo",
+		DenomUnits:  []*banktypes.DenomUnit{{Denom: "uosmo", Exponent: 0}},
+		Base:        recvDenom,
+		Display:     "transfer/channel-0/uosmo",
+		Name:        "transfer/channel-0/uosmo IBC token",
+		Symbol:      "UOSMO",
+	})
+	before, found := app.BankKeeper.GetDenomMetaData(ctx, recvDenom)
+	require.True(t, found)
+
+	ack := channeltypes.NewResultAcknowledgement([]byte{1})
+	uptickkeepers.NewERC20IBCGate(&app.Erc20Keeper, app.BankKeeper).OnRecvPacket(ctx, packet, ack)
+
+	after, found := app.BankKeeper.GetDenomMetaData(ctx, recvDenom)
+	require.True(t, found)
+	require.Equal(t, before, after,
+		"a packet that does not register must leave the voucher metadata byte-identical")
 }
 
 // TestERC20IBCGateDelegatesEverythingButRegistration pins the scope of the gate.
@@ -185,7 +283,7 @@ func TestERC20IBCGateDelegatesEverythingButRegistration(t *testing.T) {
 			keeperCtx = keeperCtx.WithGasMeter(storetypes.NewInfiniteGasMeter())
 
 			ack := channeltypes.NewResultAcknowledgement([]byte{1})
-			viaGate := uptickkeepers.NewERC20IBCGate(&app.Erc20Keeper).OnRecvPacket(gateCtx, packet, ack)
+			viaGate := uptickkeepers.NewERC20IBCGate(&app.Erc20Keeper, app.BankKeeper).OnRecvPacket(gateCtx, packet, ack)
 			viaKeeper := app.Erc20Keeper.OnRecvPacket(keeperCtx, packet, ack)
 
 			require.Equal(t, tc.keeperSucceeds, viaKeeper.Success(),
@@ -376,7 +474,7 @@ func TestGateCreatesNoPairForAnyShapeWhileTheSwitchIsOff(t *testing.T) {
 				packet, denom := inboundPacketTo(t, tc.rawDenom, tc.receiver)
 				var ack exported.Acknowledgement = channeltypes.NewResultAcknowledgement([]byte{1})
 				if viaGate {
-					ack = uptickkeepers.NewERC20IBCGate(&app.Erc20Keeper).OnRecvPacket(ctx, packet, ack)
+					ack = uptickkeepers.NewERC20IBCGate(&app.Erc20Keeper, app.BankKeeper).OnRecvPacket(ctx, packet, ack)
 				} else {
 					ack = app.Erc20Keeper.OnRecvPacket(ctx, packet, ack)
 				}

@@ -13,6 +13,8 @@ import (
 	evmibc "github.com/cosmos/evm/ibc"
 	cosmoserc20keeper "github.com/cosmos/evm/x/erc20/keeper"
 	cosmoserc20types "github.com/cosmos/evm/x/erc20/types"
+
+	uptickibc "github.com/UptickNetwork/uptick/ibc"
 )
 
 // EventTypeAutoRegistrationSuppressed is the observable counterpart of the gate
@@ -47,20 +49,45 @@ const EventTypeAutoRegistrationSuppressed = "erc20_auto_registration_suppressed"
 // inbound packet for an unknown denom is still received and credited; it just stays a
 // bank voucher instead of silently becoming an ERC20. Turning the switch back on
 // restores the old behavior, and no state written by the gate needs undoing.
+//
+// Decimals. The gate also repairs the bank metadata that the registration branch is
+// about to freeze into a dynamic precompile, for the same denom set the suppression
+// guards. The precompile reads decimals() out of that metadata
+// (precompiles/erc20/query.go:115-128), and ibc-go writes the shape whose last-segment
+// match lands on the source denom's exponent-0 unit - so decimals() returns 0 for every
+// voucher the callback registers. That is the same defect the v0.5.0 handler repairs
+// for the vouchers that already existed, and it is repaired through the same
+// implementation (ibc.NormalizeVoucherDecimals) so decimals() stops depending on
+// whether a pair predates the upgrade. It runs only when the callback will in fact
+// register, and it is idempotent, so a re-delivered packet costs reads.
+//
+// The repair is not a widening of the gate: it writes no token pair, and it is scoped
+// to the one denomination the packet carries. It does add a store write per newly
+// registered voucher - the same one the callback is about to make unbounded.
 type ERC20IBCGate struct {
-	keeper *cosmoserc20keeper.Keeper
+	keeper     *cosmoserc20keeper.Keeper
+	bankKeeper uptickibc.VoucherBankStore
 }
 
 var _ cosmoserc20types.Erc20Keeper = ERC20IBCGate{}
 
 // NewERC20IBCGate wraps the ERC20 keeper, which must be non-nil: a nil keeper
-// would make every callback a no-op and silently disable auto registration.
-func NewERC20IBCGate(keeper *cosmoserc20keeper.Keeper) ERC20IBCGate {
+// would make every callback a no-op and silently disable auto registration. The
+// bank keeper is required for the metadata repair and must be non-nil for the same
+// reason - a nil one would leave every newly registered voucher at decimals()==0
+// while looking like it works.
+func NewERC20IBCGate(
+	keeper *cosmoserc20keeper.Keeper,
+	bankKeeper uptickibc.VoucherBankStore,
+) ERC20IBCGate {
 	if keeper == nil {
 		panic("erc20 ibc gate: keeper cannot be nil")
 	}
+	if bankKeeper == nil {
+		panic("erc20 ibc gate: bank keeper cannot be nil")
+	}
 
-	return ERC20IBCGate{keeper: keeper}
+	return ERC20IBCGate{keeper: keeper, bankKeeper: bankKeeper}
 }
 
 // Logger delegates so log output keeps the keeper's logger.
@@ -90,16 +117,23 @@ func (g ERC20IBCGate) OnTimeoutPacket(
 // OnRecvPacket returns the ICS-20 acknowledgement untouched when permissionless
 // registration is off and the callback's only remaining effect would be to create a
 // token pair; otherwise it delegates. The switch is read first on purpose: under the
-// default params it is true, so the common path costs one extra store read and
-// nothing else.
+// default params it is true, and the common path then costs one extra store read plus
+// the registration predicate the metadata repair needs, and nothing else.
+//
+// The predicate is what makes the repair safe to run on every inbound packet: only a
+// packet the callback is about to register for has metadata worth rewriting, and the
+// rewrite is idempotent, so an established denom is a pair lookup plus nothing.
 func (g ERC20IBCGate) OnRecvPacket(
 	ctx sdk.Context,
 	packet channeltypes.Packet,
 	ack exported.Acknowledgement,
 ) exported.Acknowledgement {
-	if !ack.Success() ||
-		g.permissionlessRegistrationEnabled(ctx) ||
-		!wouldAutoRegisterTokenPair(ctx, g.keeper, packet) {
+	if ack.Success() && g.permissionlessRegistrationEnabled(ctx) {
+		g.normalizeVoucherDecimals(ctx, packet)
+		return g.keeper.OnRecvPacket(ctx, packet, ack)
+	}
+
+	if !ack.Success() || !wouldAutoRegisterTokenPair(ctx, g.keeper, packet) {
 		return g.keeper.OnRecvPacket(ctx, packet, ack)
 	}
 
@@ -122,6 +156,48 @@ func (g ERC20IBCGate) OnRecvPacket(
 	)
 
 	return ack
+}
+
+// normalizeVoucherDecimals rewrites the inbound voucher's bank metadata into the shape
+// that makes the dynamic precompile report the source denom's own exponent, when - and
+// only when - the callback is about to register this denomination.
+//
+// The guard is the gate's own predicate rather than a second copy of it, so the two
+// cannot drift apart about which packets reach the registration branch.
+//
+// Not failing the packet is deliberate. A record that cannot be repaired is skipped by
+// NormalizeVoucherDecimals with a reason, and leaving that pair at decimals()==0 is the
+// status quo the v0.5.0 handler already accepts for unreadable vouchers; rejecting the
+// acknowledgement over a cosmetic field would instead strand a real transfer.
+func (g ERC20IBCGate) normalizeVoucherDecimals(ctx sdk.Context, packet channeltypes.Packet) {
+	if !wouldAutoRegisterTokenPair(ctx, g.keeper, packet) {
+		return
+	}
+
+	denom, ok := receivedDenom(packet)
+	if !ok {
+		return
+	}
+
+	result := uptickibc.NormalizeVoucherDecimals(ctx, g.bankKeeper, denom)
+	switch result.Outcome {
+	case uptickibc.NormalizationApplied:
+		g.keeper.Logger(ctx).Info(
+			"normalized inbound ibc voucher erc20 decimals",
+			"denom", denom,
+			"decimals", result.Decimals,
+			"source_port", packet.SourcePort,
+			"source_channel", packet.SourceChannel,
+		)
+	case uptickibc.NormalizationSkipped:
+		// The denom keeps decimals()==0 rather than getting a guessed exponent; the
+		// reason has to reach the log, because nothing else about the transfer differs.
+		g.keeper.Logger(ctx).Info(
+			"skipping inbound ibc voucher metadata",
+			"denom", denom,
+			"reason", result.Reason,
+		)
+	}
 }
 
 func (g ERC20IBCGate) permissionlessRegistrationEnabled(ctx sdk.Context) bool {

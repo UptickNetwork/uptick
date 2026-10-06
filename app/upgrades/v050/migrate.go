@@ -9,16 +9,16 @@ import (
 	"cosmossdk.io/log"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
-	evmibc "github.com/cosmos/evm/ibc"
 	erc20types "github.com/cosmos/evm/x/erc20/types"
 
-	"github.com/UptickNetwork/uptick/app/upgrades"
+	"github.com/UptickNetwork/uptick/ibc"
 )
 
 // ibcVoucherPrefix marks the bank denominations that are ICS-20 vouchers: an
 // ERC20 representation of them is what these migrations hand back to their
-// holders.
-const ibcVoucherPrefix = "ibc/"
+// holders. The definition is shared with the repair itself, which refuses any
+// denom outside it.
+const ibcVoucherPrefix = ibc.VoucherPrefix
 
 // ibcVoucherPairSettler is the slice of the erc721 keeper the R1-C voucher-pair
 // settlement needs. The concrete keeper reports its own counts; the interface
@@ -162,47 +162,23 @@ func ibcVoucherDenoms(ctx sdk.Context, bank ibcVoucherBankStore) []string {
 }
 
 // normalizeIBCVoucherERC20Decimals rewrites the bank metadata of every IBC
-// voucher into the only shape that satisfies both of the constraints it lives
-// under, so that cosmos/evm's ERC20 precompile reports the right decimals.
+// voucher the chain already holds into the shape that makes cosmos/evm's ERC20
+// precompile report the right decimals.
 //
-// # What is wrong without it
+// The rewrite itself -- what the defect is, the shape that fixes it, and why an
+// unreadable record is skipped rather than guessed -- lives in
+// ibc.NormalizeVoucherDecimals, because the inbound auto-registration path
+// (app/keepers/erc20_ibc_gate.go) keeps minting NEW vouchers in ibc-go's shape
+// after this handler has run. A repair confined to this file would leave
+// decimals() depending on whether a pair predates the upgrade; one shared
+// implementation is what stops the two populations from diverging.
 //
-// ibc-go writes a voucher's metadata as:
-//
-//	Base       = "ibc/3D02…"              (the voucher hash)
-//	Display    = "transfer/channel-1/auoc" (the full denom path)
-//	DenomUnits = [{Denom: "auoc", Exponent: 0}]
-//
-// cosmos/evm's precompile (precompiles/erc20/query.go:89-127) reads decimals
-// differently for these: with a "ibc/" base it matches the LAST SEGMENT of
-// Display against DenomUnits. That segment is "auoc", it matches the only unit,
-// and that unit's exponent is 0 -- so decimals() returns 0. Wallets, explorers
-// and DEX front-ends then read a 1 auoc balance as 10^18.
-//
-// THE SHAPE THAT WORKS ("shape C" in the test-side analysis)
-//
-//	Display    = "auoc"                    (the source denom, no path)
-//	DenomUnits = [{Base, 0}, {"auoc", 18}]
-//
-// which satisfies:
-//
-//   - x/bank's Metadata.Validate (first unit is the base with exponent 0, units
-//     sorted ascending, Display present among them), so the metadata stops
-//     being illegal state and the export-side workaround stops masking it; and
-//   - the precompile's rule above, whose last-segment match now lands on the
-//     unit carrying the real exponent.
-//
-// There is no other runtime entry point: SDK v0.53 has no MsgSetDenomMetadata,
-// only the keeper method used here. That is why this repair has to ride an
-// upgrade.
-//
-// Exponent is taken from an existing non-zero unit for the source denom when
-// there is one, and derived from the source denom's prefix otherwise (u… -> 6,
-// a… -> 18). A source denom that matches neither is skipped with a log line
-// rather than guessed: a wrong exponent is worse than the status quo, because
-// it silently rescales a real asset.
-//
-// Idempotent: a voucher already in shape C produces no write.
+// What stays here is the pass over pre-upgrade state: which denominations are in
+// scope (supply-bearing ibc/ vouchers, sorted so the writes are deterministic),
+// the audit trail, and the counters a validator reads in the upgrade log. There
+// is no other runtime entry point for the vouchers that already exist -- SDK
+// v0.53 has no MsgSetDenomMetadata, only the keeper method the shared rewrite
+// uses -- which is why they have to be repaired from an upgrade at all.
 //
 // It cannot fail, and returns nothing on purpose: every unusable voucher is
 // skipped individually (SetDenomMetaData itself has no error return), and halting
@@ -211,6 +187,10 @@ func normalizeIBCVoucherERC20Decimals(ctx sdk.Context, bank ibcVoucherBankStore,
 	var normalized, skipped int
 
 	for _, denom := range ibcVoucherDenoms(ctx, bank) {
+		// Read before the repair so the unit list it discards stays readable in
+		// the log of the block that dropped it; the shared rewrite re-reads.
+		// One extra store read per voucher, at upgrade height, for an audit
+		// trail that cannot be reconstructed afterwards.
 		metadata, found := bank.GetDenomMetaData(ctx, denom)
 		if !found {
 			// No metadata: the precompile falls back to deriving from the source
@@ -218,152 +198,24 @@ func normalizeIBCVoucherERC20Decimals(ctx sdk.Context, bank ibcVoucherBankStore,
 			continue
 		}
 
-		updated, reason, ok := normalizedIBCVoucherMetadata(metadata)
-		if !ok {
+		result := ibc.NormalizeVoucherDecimals(ctx, bank, denom)
+		switch result.Outcome {
+		case ibc.NormalizationSkipped:
 			skipped++
-			logger.Info("skipping ibc voucher metadata", "denom", denom, "reason", reason)
-			continue
+			logger.Info("skipping ibc voucher metadata", "denom", denom, "reason", result.Reason)
+		case ibc.NormalizationApplied:
+			normalized++
+			logger.Info(
+				"normalized ibc voucher erc20 decimals",
+				"denom", denom,
+				"decimals", result.Decimals,
+				"old_display", metadata.Display,
+				"old_units", ibc.FormatDenomUnits(metadata.DenomUnits),
+			)
 		}
-		if updated.Display == metadata.Display && sameDenomUnits(updated.DenomUnits, metadata.DenomUnits) {
-			continue
-		}
-
-		bank.SetDenomMetaData(ctx, updated)
-		normalized++
-		// The old units are dropped, so they have to be readable in the log of
-		// the block that did it.
-		logger.Info(
-			"normalized ibc voucher erc20 decimals",
-			"denom", denom,
-			"display", updated.Display,
-			"decimals", updated.DenomUnits[len(updated.DenomUnits)-1].Exponent,
-			"old_display", metadata.Display,
-			"old_units", formatDenomUnits(metadata.DenomUnits),
-		)
 	}
 
 	logger.Info("ibc voucher erc20 decimals normalized", "normalized", normalized, "skipped", skipped)
-}
-
-// normalizedIBCVoucherMetadata returns the shape-C rewrite of a voucher's
-// metadata, or the reason it cannot be repaired. It never mutates its input.
-func normalizedIBCVoucherMetadata(metadata banktypes.Metadata) (banktypes.Metadata, string, bool) {
-	if upgrades.HasNilDenomUnit(metadata.DenomUnits) {
-		// A nil unit means the stored record is structurally corrupt. Refuse to
-		// rewrite it: the shape-C rewrite reuses nothing but Base/Display here, so
-		// the exponent would have to be guessed, and a wrong exponent silently
-		// rescales a real asset. Skip it with a reason and leave it for an
-		// operator. (x/bank's own Validate would panic on this record, so every
-		// walk below must stay nil-safe too.)
-		return metadata, "metadata carries a nil denom unit", false
-	}
-
-	if metadata.Display == metadata.Base {
-		// The source denom is not recoverable, and deriving one from the hash
-		// tail would invent an asset name.
-		return metadata, "display is the voucher hash, source denom unknown", false
-	}
-
-	sourceDenom := metadata.Display
-	if i := strings.LastIndex(sourceDenom, "/"); i >= 0 {
-		sourceDenom = sourceDenom[i+1:]
-	}
-	if sourceDenom == "" || sourceDenom == metadata.Base {
-		return metadata, "display carries no usable source denom", false
-	}
-
-	decimals, ok := nonZeroUnitExponent(metadata.DenomUnits, sourceDenom)
-	if !ok {
-		derived, err := evmibc.DeriveDecimalsFromDenom(sourceDenom)
-		if err != nil {
-			return metadata, fmt.Sprintf("cannot derive decimals for source denom %q: %v", sourceDenom, err), false
-		}
-		decimals = uint32(derived)
-	}
-
-	updated := metadata
-	updated.Display = sourceDenom
-	updated.DenomUnits = []*banktypes.DenomUnit{
-		{Denom: metadata.Base, Exponent: 0},
-		{Denom: sourceDenom, Exponent: decimals},
-	}
-
-	// Refuse to write metadata the bank module itself would reject: once such a
-	// record is on chain, the export-side normalization rewrites Display to the
-	// base denom and decimals() goes from 0 to a revert -- worse than the
-	// starting point.
-	if err := updated.Validate(); err != nil {
-		return metadata, fmt.Sprintf("repaired metadata is invalid: %v", err), false
-	}
-	return updated, "", true
-}
-
-// nonZeroUnitExponent returns the exponent the metadata already records for
-// denom, if it is non-zero. Shape A carries the source denom with exponent 0,
-// which is the value being repaired, so zero is not a usable answer here.
-//
-// Nil elements are skipped rather than dereferenced: proto repeated message
-// fields can carry them, and this migration's job is to survive inconsistent
-// historical state, not to panic on it.
-func nonZeroUnitExponent(units []*banktypes.DenomUnit, denom string) (uint32, bool) {
-	for _, unit := range units {
-		if unit == nil {
-			continue
-		}
-		if unit.Denom == denom && unit.Exponent > 0 {
-			return unit.Exponent, true
-		}
-	}
-	return 0, false
-}
-
-// sameDenomUnits reports whether two unit lists are equal in order and content.
-// A nil element compares as such (never dereferenced), so a corrupt list is
-// reported as changed rather than crashing the caller.
-func sameDenomUnits(a, b []*banktypes.DenomUnit) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if (a[i] == nil) != (b[i] == nil) {
-			return false
-		}
-		if denomUnitDenom(a[i]) != denomUnitDenom(b[i]) || denomUnitExponent(a[i]) != denomUnitExponent(b[i]) {
-			return false
-		}
-	}
-	return true
-}
-
-// denomUnitDenom / denomUnitExponent read a possibly-nil denom unit. They exist
-// because x/bank's Metadata.Validate dereferences every unit unconditionally, so
-// any path that walks a stored Metadata must tolerate nil first.
-func denomUnitDenom(u *banktypes.DenomUnit) string {
-	if u == nil {
-		return ""
-	}
-	return u.Denom
-}
-
-func denomUnitExponent(u *banktypes.DenomUnit) uint32 {
-	if u == nil {
-		return 0
-	}
-	return u.Exponent
-}
-
-// formatDenomUnits renders a unit list for the audit log, marking nil elements
-// instead of dereferencing them.
-func formatDenomUnits(units []*banktypes.DenomUnit) string {
-	parts := make([]string, 0, len(units))
-	for _, unit := range units {
-		if unit == nil {
-			parts = append(parts, "<nil>")
-			continue
-		}
-		parts = append(parts, fmt.Sprintf("%s:%d", unit.Denom, unit.Exponent))
-	}
-	return strings.Join(parts, ",")
 }
 
 // backfillIBCVoucherTokenPairs gives every IBC voucher already on the chain the
