@@ -52,6 +52,59 @@ const (
 	EnvPrefix = "UPTICK"
 )
 
+// flagsShieldedFromConfig lists the flags that must never be seeded from the
+// node's config.toml / app.toml, because the value belongs to the command that
+// declares them and not to the node they happen to run against.
+//
+// The leak is in the SDK's pre-run hook (cosmos-sdk v0.53
+// server/util.go:86-94, bindFlags). Viper holds config.toml and app.toml in one
+// *flat* namespace keyed by name, and bindFlags copies it into every flag the
+// user left alone:
+//
+//	if !f.Changed && v.IsSet(f.Name) {
+//		cmd.Flags().Set(f.Name, fmt.Sprintf("%v", v.Get(f.Name)))
+//	}
+//
+// For the flags `start` and `prune` declare, that is the whole point: they are
+// the config file's own surface. For a flag of a *module* subcommand it is a
+// bug -- the name collision is arbitrary and the module, not the node, owns the
+// value. Measured on the v0.5.0 testnet:
+//
+//	uptickd tx interchain-accounts controller register <conn> --generate-only
+//	  -> Msg.version = "0.38.19"    (config.toml's top-level CometBFT build marker)
+//	  -> channel open init callback failed:
+//	     cannot unmarshal ICS-27 interchain accounts metadata
+//
+// i.e. the registration fails on a value the caller never typed, and the error
+// names ICA rather than the flag, so it reads as "ICA is broken".
+//
+// Marking the flag as changed is the signal bindFlags honours, and it is
+// deliberately conditional: a value the user *did* pass survives untouched
+// (`--version foo` stays "foo"), and so does the flag's own default.
+//
+// TestModuleFlagsDoNotInheritNodeConfig keeps this list honest: it fails on a
+// collision that is neither declared by a server command nor listed here, and
+// on an entry here that no longer collides with anything.
+var flagsShieldedFromConfig = []string{
+	// ibc-go's ICA controller `register --version` vs. CometBFT's top-level
+	// `version = "0.38.x"` build marker in config.toml.
+	"version",
+}
+
+// shieldFlagsFromConfig marks this command's config-colliding flags as already
+// set, so that server.InterceptConfigsPreRunHandler leaves them at the value
+// the user gave (or at their own default) instead of overwriting them with the
+// node's configuration. Call it immediately before that hook.
+func shieldFlagsFromConfig(cmd *cobra.Command) {
+	for _, name := range flagsShieldedFromConfig {
+		f := cmd.Flags().Lookup(name)
+		if f == nil || f.Changed {
+			continue
+		}
+		f.Changed = true
+	}
+}
+
 // NewRootCmd creates a new root command for uptickd. It is called once in the
 // main function.
 func NewRootCmd() *cobra.Command {
@@ -113,6 +166,11 @@ func NewRootCmd() *cobra.Command {
 
 			customAppTemplate, customAppConfig := initAppConfig()
 			customTMConfig := initTendermintConfig()
+
+			// Must run before the hook below: it is what stops the node's
+			// configuration from being copied into a module flag of the same
+			// name (see flagsShieldedFromConfig).
+			shieldFlagsFromConfig(cmd)
 
 			if err := server.InterceptConfigsPreRunHandler(cmd, customAppTemplate, customAppConfig, customTMConfig); err != nil {
 				return err
