@@ -214,6 +214,27 @@ All PRs require two Reviews before merge. When reviewing PRs, please use the fol
 2. Run `make test` to ensure that all tests pass.
 3. Squash merge pull request.
 
+### <span id="frozen_v040">Frozen upgrade handler (`app/upgrades/v040/`)</span>
+
+`app/upgrades/v040/` runs exactly once, on live state, during a chain halt, so it
+is byte-pinned to the build validators signed off on. `make check-v040-frozen`
+enforces the pin against `scripts/v040-frozen.sha256`.
+
+**Any commit that touches a file under `app/upgrades/v040/` must refresh the
+manifest in the same commit**, and the commit subject must start with `fix(v040):`:
+
+```sh
+make v040-frozen-manifest
+git add app/upgrades/v040/... scripts/v040-frozen.sha256
+git commit -m 'fix(v040): <what changed and why>'
+```
+
+The gate has two parts. Part A compares the working tree's blobs against the
+manifest, so a content-only change leaves it red. Part B requires the surviving
+(frontier) pin write to be labelled `fix(v040):`. Because a later `fix(v040):`
+re-pin supersedes an earlier one, a re-pin is the sanctioned remedy for drift that
+has already landed -- the gate is not red-forever.
+
 ### <span id="release_procedure">Release Procedure</span>
 
 1. Start on `development`.

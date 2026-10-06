@@ -724,7 +724,10 @@ func migrateErc20Params(ctx sdk.Context, box upgrades.Toolbox, logger log.Logger
 	//     a zeroed KV gas config (ibc_callbacks.go), so any counterparty chain
 	//     can make this chain write a token pair at no relayer cost.
 	//
-	// Evidence: deliverables/gstack/qa-ibc-crosschain-v041-2026-09-13.md app. A
+	// (The cross-chain evidence behind this decision was recorded in a
+	// deliverables/ note that the repo no longer tracks; the two measurements it
+	// rested on are stated inline above -- the local upgrade chain held 4 ibc/
+	// denoms with token_pairs = 0.)
 	params.PermissionlessRegistration = false
 	params.EnableErc20 = getLegacyBoolParam(
 		ctx,
