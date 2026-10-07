@@ -43,6 +43,20 @@ func RegisterCompatInterfaces(registry codectypes.InterfaceRegistry) error {
 		&legacy.UpdateTokenPairERC20Proposal{},
 	)
 
+	// The auto-generated CLI is a protobuf-v2 reader: it resolves `Any` payloads
+	// through github.com/cosmos/gogoproto/proto.MergedRegistry, not through this
+	// interface registry. The legacy proposal types are only registered with
+	// gogoproto, so without the v2 file descriptor the whole `query gov
+	// proposals` response fails with "can't resolve type URL
+	// /uptick.erc20.v1.RegisterCoinProposal: proto: not found".
+	//
+	// Registering here (rather than relying solely on the legacy package's
+	// init) turns a future breakage into a boot error: the package records the
+	// init result, and this call re-reports it.
+	if err := legacy.RegisterLegacyERC20ProtoDescriptor(); err != nil {
+		return err
+	}
+
 	// Legacy Keplr type URLs -> complete cosmos/evm types.
 	if err := registerCustomTypeURL(registry, (*cryptotypes.PubKey)(nil), "/ethermint.crypto.v1.ethsecp256k1.PubKey", &ethsecp256k1.PubKey{}); err != nil {
 		return err
