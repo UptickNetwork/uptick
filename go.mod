@@ -57,7 +57,7 @@ require (
 	cosmossdk.io/store v1.1.2
 	cosmossdk.io/x/evidence v0.2.0
 	cosmossdk.io/x/feegrant v0.2.0
-	cosmossdk.io/x/tx v0.14.0
+	cosmossdk.io/x/tx v1.1.0
 	cosmossdk.io/x/upgrade v0.2.0
 	github.com/cosmos/gogoproto v1.7.2
 	github.com/gogo/protobuf v1.3.2 // indirect
