@@ -25,7 +25,7 @@ require (
 	github.com/improbable-eng/grpc-web v0.15.0 // indirect
 	github.com/linxGnu/grocksdb v1.9.2 // indirect
 	github.com/pkg/errors v0.9.1
-	github.com/rakyll/statik v0.1.7
+	github.com/rakyll/statik v0.1.8
 	github.com/rs/cors v1.11.1 // indirect
 	github.com/spf13/cast v1.10.0
 	github.com/spf13/cobra v1.10.2
