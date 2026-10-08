@@ -43,7 +43,7 @@ As the usage of the blockchain grows, the server requirements may increase as we
 Your `uptickvalconspub` can be used to create a new validator by staking tokens. You can find your validator pubkey by running:
 
 ```bash
-uptickd tendermint show-validator
+uptickd comet show-validator
 ```
 
 To create your validator, just use the following command:
@@ -51,7 +51,7 @@ To create your validator, just use the following command:
 ```bash
 uptickd tx staking create-validator \
   --amount=1000000auptick \
-  --pubkey=$(uptickd tendermint show-validator) \
+  --pubkey=$(uptickd comet show-validator) \
   --moniker="choose a moniker" \
   --chain-id=<chain_id> \
   --commission-rate="0.10" \
@@ -81,7 +81,7 @@ you have some stake at genesis, create one (or multiple) transactions to bond th
 Your `uptickvalconspub` can be used to create a new validator by staking tokens. You can find your validator pubkey by running:
 
 ```bash
-uptickd tendermint show-validator
+uptickd comet show-validator
 ```
 
 Next, craft your `uptickd gentx` command.
@@ -166,7 +166,7 @@ uptickd tx slashing unjail \
 Your validator is active if the following command returns anything:
 
 ```bash
-uptickd query tendermint-validator-set | grep "$(uptickd tendermint show-address)"
+uptickd query cometbft validator-set | grep "$(uptickd comet show-address)"
 ```
 
 You should now see your validator in one of Uptick explorers. You are looking for the `bech32` encoded `address` in the `~/.uptickd/config/priv_validator.json` file.

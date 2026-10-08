@@ -20,7 +20,7 @@ structure and treat it as a unique Cosmos SDK message type. An Ethereum transact
 transaction information is contained in this message. This includes the signature, gas, payload,
 amount, etc.
 
-Being that Uptick implements the Tendermint ABCI application interface, as transactions are
+Being that Uptick implements the CometBFT ABCI application interface, as transactions are
 consumed, they are passed through a series of handlers. Once such handler, the `AnteHandler`, is
 responsible for performing preliminary message execution business logic such as fee payment,
 signature verification, etc. This is particular to Cosmos SDK routed transactions. Ethereum routed

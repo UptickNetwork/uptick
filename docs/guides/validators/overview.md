@@ -8,11 +8,11 @@ Learn about validating on Uptick {synopsis}
 
 ## Introduction
 
-Uptick is based on [Tendermint](https://github.com/cometbft/cometbft/blob/master/docs/introduction/what-is-tendermint.md), which relies on a set of validators that are responsible for committing new blocks in the blockchain. These validators participate in the consensus protocol by broadcasting votes which contain cryptographic signatures signed by each validator's private key.
+Uptick is based on [CometBFT](https://github.com/cometbft/cometbft/blob/main/docs/introduction/what-is-cometbft.md), which relies on a set of validators that are responsible for committing new blocks in the blockchain. These validators participate in the consensus protocol by broadcasting votes which contain cryptographic signatures signed by each validator's private key.
 
 Validator candidates can bond their own staking tokens and have the tokens "delegated", or staked, to them by token holders. The **{{ $themeConfig.project.denom }}** is Uptick's native token. At its onset, Uptick will launch with 150 validators. The validators are determined by who has the most stake delegated to them — the top 150 validator candidates with the most stake will become Uptick validators.
 
-Validators and their delegators will earn {{ $themeConfig.project.denom }} as block provisions and tokens as transaction fees through execution of the Tendermint consensus protocol. Initially, transaction fees will be paid in UPTICK but in the future, any token in the Cosmos ecosystem will be valid as fee tender if it is whitelisted by governance. Note that validators can set commission on the fees their delegators receive as additional incentive.
+Validators and their delegators will earn {{ $themeConfig.project.denom }} as block provisions and tokens as transaction fees through execution of the CometBFT consensus protocol. Initially, transaction fees will be paid in UPTICK but in the future, any token in the Cosmos ecosystem will be valid as fee tender if it is whitelisted by governance. Note that validators can set commission on the fees their delegators receive as additional incentive.
 
 If validators double sign, are frequently offline or do not participate in governance, their staked {{ $themeConfig.project.denom }} (including {{ $themeConfig.project.denom }} of users that delegated to them) can be slashed. The penalty depends on the severity of the violation.
 

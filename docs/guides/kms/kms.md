@@ -2,9 +2,9 @@
 order: 1
 -->
 
-# Tendermint KMS
+# CometBFT KMS (tmkms)
 
-[Tendermint KMS](https://github.com/iqlusioninc/tmkms) is a key management service that allows separating key management from Tendermint nodes. In addition it provides other advantages such as:
+[CometBFT KMS](https://github.com/iqlusioninc/tmkms) (also known as `tmkms`) is a key management service that allows separating key management from CometBFT nodes. In addition it provides other advantages such as:
 
 - Improved security and risk management policies
 - Unified API and support for various HSM (hardware security modules)
@@ -23,7 +23,7 @@ When compiling the KMS, ensure you have enabled the applicable features:
 | Backend                 | Recommended Command line          |
 | ----------------------- | --------------------------------- |
 | YubiHSM                 | `cargo build --features yubihsm`  |
-| Ledger + Tendermint App | `cargo build --features ledgertm` |
+| Ledger + CometBFT App | `cargo build --features ledgertm` |
 
 ## Configuration
 

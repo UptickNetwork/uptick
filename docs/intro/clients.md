@@ -10,7 +10,7 @@ Learn about the client supported by your Uptick node. {synopsis}
 
 The Uptick client supports both [gRPC endpoints](https://cosmos.network/rpc) from the SDK and [Ethereum's JSON-RPC](https://eth.wiki/json-rpc/API).
 
-### Cosmos gRPC and Tendermint RPC
+### Cosmos gRPC and CometBFT RPC
 
 Uptick exposes gRPC endpoints (and REST) for all the integrated Cosmos-SDK modules. This makes it easier for
 wallets and block explorers to interact with the proof-of-stake logic and native Cosmos transactions and queries:

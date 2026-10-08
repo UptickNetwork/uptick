@@ -31,7 +31,7 @@ make localnet-start
 This command creates a 4-node network using the `uptickdnode` Docker image.
 The ports for each node are found in this table:
 
-| Node ID       | P2P Port | Tendermint RPC Port | REST/ Ethereum JSON-RPC Port | WebSocket Port |
+| Node ID       | P2P Port | CometBFT RPC Port | REST/ Ethereum JSON-RPC Port | WebSocket Port |
 | ------------- | -------- | ------------------- | ---------------------------- | -------------- |
 | `upticknode0` | `26656`  | `26657`             | `8545`                       | `8546`         |
 | `upticknode1` | `26659`  | `26660`             | `8547`                       | `8548`         |
@@ -131,7 +131,7 @@ docker exec uptickdnode0 tail uptickd.log
 The logs for the daemon will look like:
 
 ```bash
-I[2020-07-29|17:33:52.452] starting ABCI with Tendermint                module=main
+I[2020-07-29|17:33:52.452] starting ABCI with CometBFT                module=main
 E[2020-07-29|17:33:53.394] Can't add peer's address to addrbook         module=p2p err="Cannot add non-routable address 272a247b837653cf068d39efd4c407ffbd9a0e6f@192.168.10.5:26656"
 E[2020-07-29|17:33:53.394] Can't add peer's address to addrbook         module=p2p err="Cannot add non-routable address 3e05d3637b7ebf4fc0948bbef01b54d670aa810a@192.168.10.4:26656"
 E[2020-07-29|17:33:53.394] Can't add peer's address to addrbook         module=p2p err="Cannot add non-routable address 689f8606ede0b26ad5b79ae244c14cc67ab4efe7@192.168.10.3:26656"

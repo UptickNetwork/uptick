@@ -15,9 +15,9 @@ messages and index transactions. {synopsis}
 
 ## Subscribing to Events
 
-### SDK and Tendermint Events
+### SDK and CometBFT Events
 
-It is possible to subscribe to `Events` via Tendermint's [Websocket](https://tendermint.com/docs/app-dev/subscribing-to-events-via-websocket.html#subscribing-to-events-via-websocket).
+It is possible to subscribe to `Events` via CometBFT's [Websocket](https://docs.cometbft.com/v0.38/core/subscription).
 This is done by calling the `subscribe` RPC method via Websocket:
 
 ```json
@@ -66,7 +66,7 @@ subscribe to [state logs](https://eth.wiki/json-rpc/API#eth_newfilter),
 [blocks](https://eth.wiki/json-rpc/API#eth_newblockfilter) or [pending
 transactions](https://eth.wiki/json-rpc/API#eth_newpendingtransactionfilter) changes.
 
-Under the hood, it uses the Tendermint RPC client's event system to process subscriptions that are
+Under the hood, it uses the CometBFT RPC client's event system to process subscriptions that are
 then formatted to Ethereum-compatible events.
 
 ```bash
@@ -85,9 +85,9 @@ curl -X POST --data '{"jsonrpc":"2.0","method":"eth_getFilterChanges","params":[
 
 ## Websocket Connection
 
-### Tendermint Websocket
+### CometBFT Websocket
 
-To start a connection with the Tendermint websocket you need to define the address with the `--rpc.laddr`
+To start a connection with the CometBFT websocket you need to define the address with the `--rpc.laddr`
 flag when starting the node (default `tcp://127.0.0.1:26657`):
 
 ```bash
@@ -97,19 +97,19 @@ uptickd start --rpc.laddr="tcp://127.0.0.1:26657"
 Then, start a websocket subscription with [ws](https://github.com/hashrocket/ws)
 
 ```bash
-# connect to tendermint websocket at port 8080 as defined above
+# connect to CometBFT websocket at port 8080 as defined above
 ws ws://localhost:8080/websocket
 
-# subscribe to new Tendermint block headers
+# subscribe to new CometBFT block headers
 > { "jsonrpc": "2.0", "method": "subscribe", "params": ["tm.event='NewBlockHeader'"], "id": 1 }
 ```
 
 ### Ethereum Websocket
 
-Since Uptick runs uses Tendermint Core as it's consensus Engine and it's built with the Cosmos
+Since Uptick uses CometBFT as its consensus engine and it's built with the Cosmos
 SDK framework, it inherits the event format from them. However, in order to support the native Web3
 compatibility for websockets of the [Ethereum's
-PubSubAPI](https://geth.ethereum.org/docs/rpc/pubsub), Uptick needs to cast the Tendermint
+PubSubAPI](https://geth.ethereum.org/docs/rpc/pubsub), Uptick needs to cast the CometBFT
 responses retrieved into the Ethereum types.
 
 You can start a connection with the Ethereum websocket using the `--json-rpc.ws-address` flag when starting
@@ -122,7 +122,7 @@ uptickd start --json-rpc.address="0.0.0.0:8545" --json-rpc.ws-address="0.0.0.0:8
 Then, start a websocket subscription with [`ws`](https://github.com/hashrocket/ws)
 
 ```bash
-# connect to tendermint websocet at port 8546 as defined above
+# connect to CometBFT websocket at port 8546 as defined above
 ws ws://localhost:8546/
 
 # subscribe to new Ethereum-formatted block Headers

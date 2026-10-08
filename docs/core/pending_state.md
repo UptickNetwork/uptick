@@ -8,7 +8,7 @@ Learn how Uptick handles pending state queries. {synopsis}
 
 ## Pre-requisite Readings
 
-- [Tendermint Mempool](https://docs.tendermint.com/master/tendermint-core/mempool.htm) {prereq}
+- [CometBFT Mempool](https://docs.cometbft.com/v0.38/core/mempool/) {prereq}
 
 ## Uptick vs Ethereum
 
@@ -19,13 +19,13 @@ committed with probabilistic finality, which means that transactions and blocks 
 to become reverted as more time (and blocks) passes.
 
 Uptick is designed quite differently on this front as there is no concept of a "pending state".
-Uptick uses [Tendermint Core](https://docs.tendermint.com/) BFT consensus which provides instant
+Uptick uses [CometBFT](https://docs.cometbft.com/) BFT consensus which provides instant
 finality for transaction. For this reason, Etheremint does not require a pending state mechanism, as
 all (if not most) of the transactions will be committed to the next block (avg. block time on Cosmos chains is ~8s). However, this causes a
 few hiccups in terms of the Ethereum Web3-compatible queries that can be made to pending state.
 
 Another significant difference with Ethereum, is that blocks are produced by validators or block producers, who include transactions from their local mempool into blocks in a
-first-in-first-out (FIFO) fashion. Transactions on Uptick cannot be ordered or cherry picked out from the Tendermint node [mempool](https://docs.tendermint.com/master/tendermint-core/mempool.html#transaction-ordering).
+first-in-first-out (FIFO) fashion. Transactions on Uptick cannot be ordered or cherry picked out from the CometBFT node [mempool](https://docs.cometbft.com/v0.38/core/mempool/).
 
 ## Pending State Queries
 

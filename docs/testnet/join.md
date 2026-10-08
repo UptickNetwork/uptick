@@ -86,7 +86,7 @@ For more details on how to configure your validator, follow the validator [setup
 ```bash
 uptickd tx staking create-validator \
   --amount=5000000000000000000auptick \
-  --pubkey=$(uptickd tendermint show-validator) \
+  --pubkey=$(uptickd comet show-validator) \
   --moniker=<$moniker>" \
   --chain-id=origin_1170-3 \
   --commission-rate="0.10" \
@@ -113,7 +113,7 @@ First, remove the outdated files and reset the data.
 
 ```bash
 rm $HOME/.uptickd/config/addrbook.json $HOME/.uptickd/config/genesis.json
-uptickd tendermint unsafe-reset-all
+uptickd comet unsafe-reset-all
 ```
 
 Your node is now in a pristine state while keeping the original `priv_validator.json` and `config.toml`. If you had any sentry nodes or full nodes setup before,

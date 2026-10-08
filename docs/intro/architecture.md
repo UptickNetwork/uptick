@@ -4,28 +4,28 @@ order: 2
 
 # Architecture
 
-Learn how Uptick's architecture leverages the Cosmos SDK Proof-of-Stake functionality, EVM compatibility and fast-finality from Tendermint Core's BFT consensus. {synopsis}
+Learn how Uptick's architecture leverages the Cosmos SDK Proof-of-Stake functionality, EVM compatibility and fast-finality from CometBFT's BFT consensus. {synopsis}
 
 ## Cosmos SDK
 
 Uptick enables the full composability and modularity of the [Cosmos SDK](https://docs.cosmos.network/).
 
-## Tendermint Core & the Application Blockchain Interface (ABCI)
+## CometBFT & the Application Blockchain Interface (ABCI)
 
-Tendermint consists of two chief technical components: a blockchain consensus
+CometBFT consists of two chief technical components: a blockchain consensus
 engine and a generic application interface. The consensus engine, called
-[Tendermint Core](https://docs.tendermint.com/), ensures that the same transactions are recorded on every machine
-in the same order. The application interface, called the [Application Blockchain Interface (ABCI)](https://docs.tendermint.com/master/spec/abci/), enables the transactions to be processed in any programming
+[CometBFT Core](https://docs.cometbft.com/), ensures that the same transactions are recorded on every machine
+in the same order. The application interface, called the [Application Blockchain Interface (ABCI)](https://docs.cometbft.com/v0.38/spec/abci/), enables the transactions to be processed in any programming
 language.
 
-Tendermint has evolved to be a general purpose blockchain consensus engine that
-can host arbitrary application states. Since Tendermint can replicate arbitrary
+CometBFT (originally known as Tendermint) has evolved to be a general purpose blockchain consensus engine that
+can host arbitrary application states. Since CometBFT can replicate arbitrary
 applications, it can be used as a plug-and-play replacement for the consensus
 engines of other blockchains. Uptick is such an example of an ABCI application
-replacing Ethereum's PoW via Tendermint's consensus engine.
+replacing Ethereum's PoW via CometBFT's consensus engine.
 
-Another example of a cryptocurrency application built on Tendermint is the Cosmos
-network. Tendermint is able to decompose the blockchain design by offering a very
+Another example of a cryptocurrency application built on CometBFT is the Cosmos
+network. CometBFT is able to decompose the blockchain design by offering a very
 simple API (ie. the ABCI) between the application process and consensus process.
 
 ## EVM module

@@ -4,23 +4,23 @@ order: 1
 
 # State Sync
 
-Learn about Tendermint Core state sync and support offered by the Cosmos SDK. {synopsis}
+Learn about CometBFT state sync and support offered by the Cosmos SDK. {synopsis}
 
 :::tip
 **Note**: Only curious about how to sync a node with the network? Skip to [this section](#state-syncing-a-node).
 :::
 
-## Tendermint Core State Sync
+## CometBFT State Sync
 
 State sync allows a new node to join a network by fetching a snapshot of the network state at a recent height, instead of fetching and replaying all historical blocks. Since application state is smaller than the combination of all blocks, and restoring state is faster than replaying blocks, this reduces the time to sync with the network from days to minutes.
 
-This section of the document provides a brief overview of the Tendermint state sync protocol, and how to sync a node. For more details, refer to the [ABCI Application Guide](https://docs.tendermint.com/master/spec/abci/apps.html#state-sync) and the [ABCI Reference Documentation](https://docs.tendermint.com/master/spec/abci/abci.html).
+This section of the document provides a brief overview of the CometBFT state sync protocol, and how to sync a node. For more details, refer to the [ABCI Application Guide](https://docs.cometbft.com/v0.38/spec/abci/apps.html#state-sync) and the [ABCI Reference Documentation](https://docs.cometbft.com/v0.38/spec/abci/abci.html).
 
 ### State Sync Snapshots
 
-A guiding principle when designing Tendermint state sync was to give applications as much flexibility as possible. Therefore, Tendermint does not care what snapshots contain, how they are taken, or how they are restored. It is only concerned with discovering existing snapshots in the network, fetching them, and passing them to applications via ABCI. Tendermint uses light client verification to check the final app hash of a restored application against the chain app hash, but any further verification must be done by the application itself during restoration.
+A guiding principle when designing CometBFT state sync was to give applications as much flexibility as possible. Therefore, CometBFT does not care what snapshots contain, how they are taken, or how they are restored. It is only concerned with discovering existing snapshots in the network, fetching them, and passing them to applications via ABCI. CometBFT uses light client verification to check the final app hash of a restored application against the chain app hash, but any further verification must be done by the application itself during restoration.
 
-Snapshots consist of binary chunks in an arbitrary format. Chunks cannot be larger than 16 MB, but otherwise there are no restrictions. [Snapshot metadata](https://docs.tendermint.com/master/spec/abci/abci.html#snapshot), exchanged via ABCI and P2P, contains the following fields:
+Snapshots consist of binary chunks in an arbitrary format. Chunks cannot be larger than 16 MB, but otherwise there are no restrictions. [Snapshot metadata](https://docs.cometbft.com/v0.38/spec/abci/abci.html#snapshot), exchanged via ABCI and P2P, contains the following fields:
 
 - `height` (`uint64`): height at which the snapshot was taken
 - `format` (`uint32`): arbitrary application-specific format identifier (eg. version)
@@ -30,16 +30,16 @@ Snapshots consist of binary chunks in an arbitrary format. Chunks cannot be larg
 
 The `format` field allows applications to change their snapshot format in a backwards-compatible manner, by providing snapshots in multiple formats, and choosing which formats to accept during restoration. This is useful when, for example, changing serialization or compression formats: as nodes may be able to provide snapshots to peers running older verions, or make use of old snapshots when starting up with a newer version.
 
-The `hash` field contains an arbitrary snapshot hash. Snapshots that have identical `metadata` fields (including `hash`) across nodes are considered identical, and `chunks` will be fetched from any of these nodes. The `hash` cannot be trusted, and is not verified by Tendermint itself, which guards against inadvertent nondeterminism in snapshot generation. The `hash` may be verified by the application instead.
+The `hash` field contains an arbitrary snapshot hash. Snapshots that have identical `metadata` fields (including `hash`) across nodes are considered identical, and `chunks` will be fetched from any of these nodes. The `hash` cannot be trusted, and is not verified by CometBFT itself, which guards against inadvertent nondeterminism in snapshot generation. The `hash` may be verified by the application instead.
 
 The `metadata` field can contain any arbitrary metadata needed by the application. For example, the application may want to include chunk checksums to discard damaged `chunks`, or [Merkle proofs](https://ethereum.org/en/developers/tutorials/merkle-proofs-for-offline-data-integrity/) to verify each chunk individually against the chain app hash. In [Protobuf](https://developers.google.com/protocol-buffers/docs/overview)-encoded form, snapshot `metadata` messages cannot exceed 4 MB.
 
 ### Taking, Serving Snapshots
 
-To enable state sync, some nodes in the network must take and serve snapshots. When a peer is attempting to state sync, an existing Tendermint node will call the following ABCI methods on the application to provide snapshot data to this peer:
+To enable state sync, some nodes in the network must take and serve snapshots. When a peer is attempting to state sync, an existing CometBFT node will call the following ABCI methods on the application to provide snapshot data to this peer:
 
-- [`ListSnapshots`](https://docs.tendermint.com/master/spec/abci/abci.html#listsnapshots): returns a list of available snapshots, with metadata
-- [`LoadSnapshotChunk`](https://docs.tendermint.com/master/spec/abci/abci.html#loadsnapshotchunk): returns binary chunk data
+- [`ListSnapshots`](https://docs.cometbft.com/v0.38/spec/abci/abci.html#listsnapshots): returns a list of available snapshots, with metadata
+- [`LoadSnapshotChunk`](https://docs.cometbft.com/v0.38/spec/abci/abci.html#loadsnapshotchunk): returns binary chunk data
 
 Snapshots should typically be generated at regular intervals rather than on-demand: this improves state sync performance, since snapshot generation can be slow, and avoids a denial-of-service vector where an adversary floods a node with such requests. Older snapshots can usually be removed, but it may be useful to keep at least the two most recent to avoid deleting the previous snapshot while a node is restoring it.
 
@@ -65,34 +65,34 @@ Applications may want to take additional steps as well, such as compressing the 
 
 ### Restoring Snapshots
 
-When Tendermint starts, it will check whether the local node has any state (ie. whether `LastBlockHeight == 0`), and if it doesn't, it will begin discovering snapshots via the P2P network. These snapshots will be provided to the local application via the following ABCI calls:
+When CometBFT starts, it will check whether the local node has any state (ie. whether `LastBlockHeight == 0`), and if it doesn't, it will begin discovering snapshots via the P2P network. These snapshots will be provided to the local application via the following ABCI calls:
 
-- [`OfferSnapshot(snapshot, apphash)`](https://docs.tendermint.com/master/spec/abci/abci.html#offersnapshot): offers a discovered snapshot to the application
-- [`ApplySnapshotChunk(index, chunk, sender)`](https://docs.tendermint.com/master/spec/abci/abci.html#applysnapshotchunk): applies a snapshot chunk
+- [`OfferSnapshot(snapshot, apphash)`](https://docs.cometbft.com/v0.38/spec/abci/abci.html#offersnapshot): offers a discovered snapshot to the application
+- [`ApplySnapshotChunk(index, chunk, sender)`](https://docs.cometbft.com/v0.38/spec/abci/abci.html#applysnapshotchunk): applies a snapshot chunk
 
 Discovered snapshots are offered to the application and it can respond by accepting the snapshot, rejecting it, rejecting the format, rejecting the senders, aborting state sync, and so on.
 
-Once a snapshot is accepted, Tendermint will fetch chunks from across available peers, and apply them sequentially to the application, which can choose to accept the chunk, refetch it, reject the snapshot, reject the sender, abort state sync, and so on.
+Once a snapshot is accepted, CometBFT will fetch chunks from across available peers, and apply them sequentially to the application, which can choose to accept the chunk, refetch it, reject the snapshot, reject the sender, abort state sync, and so on.
 
-Once all chunks have been applied, Tendermint will call the [`Info` ABCI method](https://docs.tendermint.com/master/spec/abci/abci.html#info) on the application, and check that the app hash and height correspond to the trusted values from the chain. It will then switch to fast sync to fetch any remaining blocks (if enabled), before finally joining normal consensus operation.
+Once all chunks have been applied, CometBFT will call the [`Info` ABCI method](https://docs.cometbft.com/v0.38/spec/abci/abci.html#info) on the application, and check that the app hash and height correspond to the trusted values from the chain. It will then switch to fast sync to fetch any remaining blocks (if enabled), before finally joining normal consensus operation.
 
-How snapshots are actually restored is entirely up to the application, but will generally be the inverse of how they are generated. Note, however, that Tendermint only verifies snapshots after all chunks have been restored, and does not reject any P2P peers on its own. As long as the trusted hash and application code are correct, it is not possible for an adversary to cause a state synced node to have incorrect state when joining consensus, but it is up to the application to counteract state sync denial-of-service (eg. by implementing incremental verification, rejecting invalid peers).
+How snapshots are actually restored is entirely up to the application, but will generally be the inverse of how they are generated. Note, however, that CometBFT only verifies snapshots after all chunks have been restored, and does not reject any P2P peers on its own. As long as the trusted hash and application code are correct, it is not possible for an adversary to cause a state synced node to have incorrect state when joining consensus, but it is up to the application to counteract state sync denial-of-service (eg. by implementing incremental verification, rejecting invalid peers).
 
 Note that state synced nodes will have a truncated block history starting at the height of the restored snapshot, and there is currently no [backfill of all block data](https://github.com/cometbft/cometbft/issues/4629). Networks should consider broader implications of this, and may want to ensure at least a few archive nodes retain a complete block history, for both auditability and backup.
 
 ## Cosmos SDK State Sync
 
-[Cosmos SDK](https://github.com/cosmos/cosmos-sdk) v0.40+ includes automatic support for state sync, so application developers only need to enable it to take advantage. They will not need to implement the state sync protocol described in the [above section on Tendermint](#tendermint-core-state-sync) themselves.
+[Cosmos SDK](https://github.com/cosmos/cosmos-sdk) v0.40+ includes automatic support for state sync, so application developers only need to enable it to take advantage. They will not need to implement the state sync protocol described in the [above section on CometBFT](#cometbft-state-sync) themselves.
 
 ### State Sync Snapshots
 
-Tendermint Core handles most of the grunt work of discovering, exchanging, and verifying state data for state sync, but the application must take snapshots of its state at regular intervals, and make these available to Tendermint via ABCI calls, and be able to restore these when syncing a new node.
+CometBFT handles most of the grunt work of discovering, exchanging, and verifying state data for state sync, but the application must take snapshots of its state at regular intervals, and make these available to CometBFT via ABCI calls, and be able to restore these when syncing a new node.
 
 The Cosmos SDK stores application state in a data store called [IAVL](https://github.com/cosmos/iavl), and each module can set up its own IAVL stores. At regular height intervals (which are configurable), the Cosmos SDK will export the contents of each store at that height, [Protobuf](https://developers.google.com/protocol-buffers/docs/overview)-encode and compress it, and save it to a snapshot store in the local filesystem. Since IAVL keeps historical versions of data, these snapshots can be generated simultaneously with new blocks being executed. These snapshots will then be fetched by Tendermint via ABCI when a new node is state syncing.
 
-Note that only IAVL stores that are managed by the Cosmos SDK can be snapshotted. If the application stores additional data in external data stores, there is currently no mechanism to include these in state sync snapshots, so the application therefore cannot make use of automatic state sync via the SDK. However, it is free to implement the state sync protocol itself as described in the [ABCI Documentation](https://docs.tendermint.com/master/spec/abci/apps.html#state-sync).
+Note that only IAVL stores that are managed by the Cosmos SDK can be snapshotted. If the application stores additional data in external data stores, there is currently no mechanism to include these in state sync snapshots, so the application therefore cannot make use of automatic state sync via the SDK. However, it is free to implement the state sync protocol itself as described in the [ABCI Documentation](https://docs.cometbft.com/v0.38/spec/abci/apps.html#state-sync).
 
-When a new node is state synced, Tendermint will fetch a snapshot from peers in the network and provide it to the local (empty) application, which will import it into its IAVL stores. Tendermint then verifies the application's app hash against the main blockchain using light client verification, and proceeds to execute blocks as usual. Note that a state synced node will only restore the application state for the height the snapshot was taken at, and will not contain historical data nor historical blocks.
+When a new node is state synced, CometBFT will fetch a snapshot from peers in the network and provide it to the local (empty) application, which will import it into its IAVL stores. CometBFT then verifies the application's app hash against the main blockchain using light client verification, and proceeds to execute blocks as usual. Note that a state synced node will only restore the application state for the height the snapshot was taken at, and will not contain historical data nor historical blocks.
 
 ### Enabling State Sync Snapshots
 
@@ -137,7 +137,7 @@ Once a few nodes in a network have taken state sync snapshots, new nodes can joi
 - Trusted height
 - Block ID hash of trusted height
 
-The trusted hash must be obtained from a trusted source (eg. a block explorer), but the RPC servers do not need to be trusted. Tendermint will use the hash to obtain trusted app hashes from the blockchain in order to verify restored application snapshots. The app hash and corresponding height are the only pieces of information that can be trusted when restoring snapshots. Everything else can be forged by adversaries.
+The trusted hash must be obtained from a trusted source (eg. a block explorer), but the RPC servers do not need to be trusted. CometBFT will use the hash to obtain trusted app hashes from the blockchain in order to verify restored application snapshots. The app hash and corresponding height are the only pieces of information that can be trusted when restoring snapshots. Everything else can be forged by adversaries.
 
 In this guide we use Ubuntu 20.04
 
@@ -203,7 +203,7 @@ Reset the node
 
 ```bash
 cp $HOME/.uptickd/data/priv_validator_state.json $HOME/.uptickd/priv_validator_state.json.backup
-uptickd tendermint unsafe-reset-all --home $HOME/.uptickd --keep-addr-book
+uptickd comet unsafe-reset-all --home $HOME/.uptickd --keep-addr-book
 ```
 
 Change config files (set the node name, add persistent peers, set indexer = "null")

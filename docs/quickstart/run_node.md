@@ -99,7 +99,7 @@ For more information about the Keyring and its backend options, click [here](./.
 Alternatively, you can **reset** the blockchain database, remove the node's address book files, and reset the `priv_validator.json` to the genesis state.
 
 ::: danger
-If you are running a **validator node**, always be careful when doing `uptickd tendermint unsafe-reset-all`. You should never use this command if you are not switching `chain-id`.
+If you are running a **validator node**, always be careful when doing `uptickd comet unsafe-reset-all`. You should never use this command if you are not switching `chain-id`.
 :::
 
 ::: danger
@@ -110,7 +110,7 @@ First, remove the outdated files and reset the data.
 
 ```bash
 rm $HOME/.uptickd/config/addrbook.json $HOME/.uptickd/config/genesis.json
-uptickd tendermint unsafe-reset-all
+uptickd comet unsafe-reset-all
 ```
 
 Your node is now in a pristine state while keeping the original `priv_validator.json` and `config.toml`. If you had any sentry nodes or full nodes setup before, your node will still try to connect to them, but may fail if they haven't also been upgraded.

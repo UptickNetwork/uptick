@@ -6,7 +6,7 @@ order: 1
 
 Learn how to upgrade your full node to the latest software version {synopsis}
 
-With every new software release, we strongly recommend validators to perform a software upgrade, in order to prevent [double signing or halting the chain during consensus](https://docs.tendermint.com/master/spec/consensus/signing.html#double-signing).
+With every new software release, we strongly recommend validators to perform a software upgrade, in order to prevent [double signing or halting the chain during consensus](https://docs.cometbft.com/v0.38/spec/consensus/signing#double-signing).
 
 You can upgrade your node by 1) upgrading your software version and 2) upgrading your node to that version. In this guide, you can find out how to automatically upgrade your node with Cosmovisor or perform the update manually.
 
@@ -347,7 +347,7 @@ echo "2b5164f4bab00263cb424c3d0aa5c47a707184c6ff288322acc4c7e0c5f6f36f  genesis.
 There shouldn't be any chain database yet, but in case there is for some reason, you should reset it. This is a good idea especially if you ran `uptickd start` on an old, broken genesis file.
 
 ```bash
-uptickd tendermint unsafe-reset-all
+uptickd comet unsafe-reset-all
 ```
 
 #### Ensure that you have set peers
@@ -363,7 +363,7 @@ persistent_peers = "5576b0160761fe81ccdf88e06031a01bc8643d51@195.201.108.97:2465
 You can share your peer with
 
 ```bash
-uptickd tendermint show-node-id
+uptickd comet show-node-id
 ```
 
 **Peer Format**: `node-id@ip:port`

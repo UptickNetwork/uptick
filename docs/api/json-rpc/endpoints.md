@@ -308,7 +308,7 @@ curl -X POST --data '{"jsonrpc":"2.0","method":"eth_protocolVersion","params":[]
 
 ### `eth_syncing`
 
-The sync status object may need to be different depending on the details of Tendermint's sync protocol. However, the 'synced' result is simply a boolean, and can easily be derived from Tendermint's internal sync state.
+The sync status object may need to be different depending on the details of CometBFT's sync protocol. However, the 'synced' result is simply a boolean, and can easily be derived from CometBFT's internal sync state.
 
 ```json
 // Request
@@ -657,8 +657,8 @@ curl -X POST --data '{"jsonrpc":"2.0","method":"eth_getTransactionByBlockHashAnd
 
 Returns the receipt of a transaction by transaction hash.
 
-Note: Tx Code from Tendermint and the Ethereum receipt status are switched:
-|         | Tendermint | Ethereum |
+Note: Tx Code from CometBFT and the Ethereum receipt status are switched:
+|         | CometBFT | Ethereum |
 |---------|------------|----------|
 | Success | 0          | 1        |
 | Fail    | 1          | 0        |

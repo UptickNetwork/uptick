@@ -26,11 +26,11 @@ stack:
     color: "#1A1F36"
     label: ethereum-black
     url: https://eth.wiki
-  - title: Tendermint Core
+  - title: CometBFT
     desc: The leading BFT engine for building blockchains, powering Uptick.
     color: "#00BB00"
     label: core
-    url: http://docs.tendermint.com
+    url: https://docs.cometbft.com
 footer:
   newsletter: false
 aside: false

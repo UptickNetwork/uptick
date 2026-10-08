@@ -10,7 +10,7 @@ Check the FAQ for running a validator on Uptick {synopsis}
 
 ### What is a validator?
 
-Uptick is powered by [Tendermint](https://tendermint.com/docs/introduction/what-is-tendermint.html) Core, which relies on a set of validators to secure the network. Validators run a full node and participate in consensus by broadcasting votes which contain cryptographic signatures signed by their private key. Validators commit new blocks in the blockchain and receive revenue in exchange for their work. They also participate in on-procotol treasury governance by voting on governance proposals. A validator's voting influence is weighted according to their total stake.
+Uptick is powered by [CometBFT](https://docs.cometbft.com/), which relies on a set of validators to secure the network. Validators run a full node and participate in consensus by broadcasting votes which contain cryptographic signatures signed by their private key. Validators commit new blocks in the blockchain and receive revenue in exchange for their work. They also participate in on-procotol treasury governance by voting on governance proposals. A validator's voting influence is weighted according to their total stake.
 
 ### What is "staking"?
 
@@ -76,9 +76,9 @@ Once a validator is created and registered, UPTICK holders can delegate UPTICK t
 
 In short, there are two types of keys:
 
-- **Tendermint Key**: This is a unique key used to sign block hashes. It is associated with a public key `uptickvalconspub`.
+- **CometBFT Key**: This is a unique key used to sign block hashes. It is associated with a public key `uptickvalconspub`.
     - Generated when the node is created with `uptickd init`.
-    - Get this value with `uptickd tendermint show-validator`
+    - Get this value with `uptickd comet show-validator`
 
     e.g. `uptickvalconspub1zcjduc3qcyj09qc03elte23zwshdx92jm6ce88fgc90rtqhjx8v0608qh5ssp0w94c`
 
@@ -160,7 +160,7 @@ Even though delegated funds cannot be stolen by their validators, delegators are
 
 The validator that is selected to mine the next block is called the **proposer**, the "leader" in the consensus for the round. Each proposer is selected deterministically, and the frequency of being chosen is equal to the relative total stake (where total stake = self-bonded stake + delegators stake) of the validator. For example, if the total bonded stake across all validators is 100 UPTICK, and a validator's total stake is 10 UPTICK, then this validator will be chosen 10% of the time as the proposer.
 
-To understand more about the proposer selection process in Tendermint BFT consensus, read more [in their official docs](https://docs.tendermint.com/master/spec/reactors/consensus/proposer-selection.html).
+To understand more about the proposer selection process in CometBFT BFT consensus, read more [in their official docs](https://docs.cometbft.com/v0.38/spec/reactors/consensus/proposer-selection).
 
 ## Incentives
 

@@ -9,11 +9,11 @@ Learn about Uptick and its primary features. {synopsis}
 ## What is Uptick
 
 Uptick is a scalable, high-throughput Proof-of-Stake blockchain that is fully compatible and
-interoperable with Ethereum. It's built using the [Cosmos SDK](https://github.com/cosmos/cosmos-sdk/) which runs on top of [Tendermint Core](https://github.com/cometbft/cometbft) consensus engine.
+interoperable with Ethereum. It's built using the [Cosmos SDK](https://github.com/cosmos/cosmos-sdk/) which runs on top of [CometBFT](https://github.com/cometbft/cometbft) consensus engine.
 
 Uptick allows for running vanilla Ethereum as a [Cosmos](https://cosmos.network/)
 application-specific blockchain. This allows developers to have all the desired features of
-Ethereum, while at the same time, benefit from Tendermint’s PoS implementation. Also, because it is
+Ethereum, while at the same time, benefit from CometBFT's PoS implementation. Also, because it is
 built on top of the Cosmos SDK, it will be able to exchange value with the rest of the Cosmos
 Ecosystem through the Inter Blockchain Communication Protocol (IBC).
 
@@ -22,14 +22,14 @@ Ecosystem through the Inter Blockchain Communication Protocol (IBC).
 Here’s a glance at some of the key features of Uptick:
 
 * Web3 and EVM compatibility
-* High throughput via [Tendermint Core](https://github.com/cometbft/cometbft)
+* High throughput via [CometBFT](https://github.com/cometbft/cometbft)
 * Horizontal scalability via [IBC](https://cosmos.network/ibc)
 * Fast transaction finality
 * Native NFT interoperability: convert between Cosmos NFTs, ERC721 and CW721, and transfer them across chains with IBC (v0.4.0)
 
 Uptick enables these key features by:
 
-* Implementing Tendermint Core's Application Blockchain Interface ([ABCI](https://docs.tendermint.com/master/spec/abci/)) to manage the blockchain
+* Implementing CometBFT's Application Blockchain Interface ([ABCI](https://docs.cometbft.com/v0.38/spec/abci/)) to manage the blockchain
 * Leveraging [modules](https://docs.cosmos.network/master/building-modules/intro.html) and other mechanisms implemented by the [Cosmos SDK](https://docs.cosmos.network/).
 * Utilizing [`cosmos/evm`](https://github.com/cosmos/evm) (go-ethereum v1.16) to provide the EVM execution layer.
 * Exposing a fully compatible Web3 [JSON-RPC](./../basic/json_rpc.md) layer for interacting with existing Ethereum clients and tooling ([Metamask](./../guides/keys-wallets/metamask.md), [Remix](./../guides/tools/remix.md), [Truffle](./../guides/tools/truffle.md), etc).
