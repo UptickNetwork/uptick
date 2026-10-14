@@ -403,6 +403,17 @@ check-denom-format:
 	@./scripts/check-denom-format.sh
 .PHONY: check-denom-format
 
+# x/appmining (UGE) has no production code yet, so this gate is armed ahead of
+# the module: it passes while the directory carries only its guard test, and
+# enforces three rules the moment one lands. Two of them are about failures that
+# cannot be caught after the fact -- an EVM import makes a contract a possible
+# caller and voids every sdk.AccAddress permission check, and reading a field of
+# a PAV commitment re-derives what the commitment exists to make underivable.
+# See scripts/check-appmining-contract.sh.
+check-appmining-contract:
+	@./scripts/check-appmining-contract.sh
+.PHONY: check-appmining-contract
+
 ###############################################################################
 ###                           Tests & Simulation                            ###
 ###############################################################################

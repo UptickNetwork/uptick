@@ -56,8 +56,17 @@ idempotent, which is what lets `v0.5.1` re-apply them to mainnet as well.
 The on-chain upgrade name must be `v0.5.0` **verbatim** — the store loader, including the `capability` store deletion, is keyed on the plan name and nothing else:
 
 ```bash
-uptickd tx gov submit-proposal software-upgrade v0.5.0 ...
+uptickd tx upgrade software-upgrade v0.5.0 \
+  --title "Upgrade to v0.5.0" \
+  --summary "Upgrade the Uptick chain to v0.5.0" \
+  --upgrade-height <HEIGHT> \
+  --deposit <AMOUNT>auptick \
+  --from <KEY>
 ```
+
+Note the command group: upgrade proposals go through `tx upgrade software-upgrade`, **not** `tx gov submit-proposal software-upgrade` — the former takes `--upgrade-height` directly, while the latter would need the height packed into a legacy proposal JSON.
+
+`--summary` is the v0.53 spelling for the one-line proposal summary (it maps to the proposal's `Summary` field). The older `--description` flag still exists in v0.53.8, but it belongs to the legacy `gov submit-proposal` path and writes the long-form `Description` field instead — do not use it for this proposal.
 
 When using Cosmovisor, place the new binary under:
 
