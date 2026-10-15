@@ -1,0 +1,170 @@
+syntax = "proto3";
+
+package uptick.appmining.v1;
+
+import "cosmos/msg/v1/msg.proto";
+import "gogoproto/gogo.proto";
+import "google/api/annotations.proto";
+import "uptick/appmining/v1/types.proto";
+
+option go_package = "github.com/UptickNetwork/uptick/x/appmining/types";
+
+service Msg {
+  option (cosmos.msg.v1.service) = true;
+
+  rpc RegisterApplication(MsgRegisterApplication) returns (MsgRegisterApplicationResponse) {
+    option (google.api.http).post = "/uptick/appmining/v1/tx/register_application";
+  }
+  rpc SubmitAttestation(MsgSubmitAttestation) returns (MsgSubmitAttestationResponse) {
+    option (google.api.http).post = "/uptick/appmining/v1/tx/submit_attestation";
+  }
+  rpc ChallengeAttestation(MsgChallengeAttestation) returns (MsgChallengeAttestationResponse) {
+    option (google.api.http).post = "/uptick/appmining/v1/tx/challenge_attestation";
+  }
+  rpc ResolveChallenge(MsgResolveChallenge) returns (MsgResolveChallengeResponse);
+  rpc FinalizeAttestation(MsgFinalizeAttestation) returns (MsgFinalizeAttestationResponse) {
+    option (google.api.http).post = "/uptick/appmining/v1/tx/finalize_attestation";
+  }
+  rpc GrantGasPayer(MsgGrantGasPayer) returns (MsgGrantGasPayerResponse);
+  rpc RevokeGasPayer(MsgRevokeGasPayer) returns (MsgRevokeGasPayerResponse);
+  rpc ConsumeGasCredit(MsgConsumeGasCredit) returns (MsgConsumeGasCreditResponse) {
+    option (google.api.http).post = "/uptick/appmining/v1/tx/consume_gas_credit";
+  }
+  rpc SetEpochBudget(MsgSetEpochBudget) returns (MsgSetEpochBudgetResponse);
+  rpc UpdateParams(MsgUpdateParams) returns (MsgUpdateParamsResponse);
+  rpc SetApplicationStatus(MsgSetApplicationStatus) returns (MsgSetApplicationStatusResponse);
+  // Pause sets pause bits to true only (Q-06). Resume is authority-only via UpdateParams.
+  rpc Pause(MsgPause) returns (MsgPauseResponse);
+  // FundRewardPool transfers coins from authority into the module reward pool (C-5 / stage 2).
+  rpc FundRewardPool(MsgFundRewardPool) returns (MsgFundRewardPoolResponse) {
+    option (google.api.http).post = "/uptick/appmining/v1/tx/fund_reward_pool";
+  }
+}
+
+message MsgRegisterApplication {
+  option (cosmos.msg.v1.signer) = "authority";
+  string authority = 1;
+  bytes app_id = 2;
+  string owner = 3;
+  string attestation_submitter = 4;
+}
+
+message MsgRegisterApplicationResponse {}
+
+message MsgSubmitAttestation {
+  option (cosmos.msg.v1.signer) = "submitter";
+  string submitter = 1;
+  AttestationCommitment attestation = 2 [(gogoproto.nullable) = false];
+}
+
+message MsgSubmitAttestationResponse {
+  int64 challenge_deadline_height = 1;
+}
+
+message MsgChallengeAttestation {
+  option (cosmos.msg.v1.signer) = "challenger";
+  string challenger = 1;
+  bytes app_id = 2;
+  uint64 epoch = 3;
+  bytes evidence_hash = 4;
+}
+
+message MsgChallengeAttestationResponse {
+  uint64 challenge_id = 1;
+}
+
+message MsgResolveChallenge {
+  option (cosmos.msg.v1.signer) = "authority";
+  string authority = 1;
+  uint64 challenge_id = 2;
+  bool uphold = 3;
+  bytes resolution_hash = 4;
+}
+
+message MsgResolveChallengeResponse {}
+
+message MsgFinalizeAttestation {
+  option (cosmos.msg.v1.signer) = "caller";
+  string caller = 1;
+  bytes app_id = 2;
+  uint64 epoch = 3;
+}
+
+message MsgFinalizeAttestationResponse {
+  Settlement settlement = 1 [(gogoproto.nullable) = false];
+}
+
+message MsgGrantGasPayer {
+  option (cosmos.msg.v1.signer) = "owner";
+  string owner = 1;
+  bytes app_id = 2;
+  string gas_payer = 3;
+}
+
+message MsgGrantGasPayerResponse {}
+
+message MsgRevokeGasPayer {
+  option (cosmos.msg.v1.signer) = "owner";
+  string owner = 1;
+  bytes app_id = 2;
+  string gas_payer = 3;
+}
+
+message MsgRevokeGasPayerResponse {}
+
+message MsgConsumeGasCredit {
+  option (cosmos.msg.v1.signer) = "gas_payer";
+  string gas_payer = 1;
+  bytes app_id = 2;
+  string amount = 3;
+  bytes source_tx_hash = 4;
+}
+
+message MsgConsumeGasCreditResponse {
+  string remaining_balance = 1;
+}
+
+message MsgSetEpochBudget {
+  option (cosmos.msg.v1.signer) = "authority";
+  string authority = 1;
+  EpochBudget budget = 2 [(gogoproto.nullable) = false];
+}
+
+message MsgSetEpochBudgetResponse {}
+
+message MsgUpdateParams {
+  option (cosmos.msg.v1.signer) = "authority";
+  string authority = 1;
+  Params params = 2 [(gogoproto.nullable) = false];
+}
+
+message MsgUpdateParamsResponse {}
+
+message MsgSetApplicationStatus {
+  option (cosmos.msg.v1.signer) = "authority";
+  string authority = 1;
+  bytes app_id = 2;
+  ApplicationStatus status = 3;
+}
+
+message MsgSetApplicationStatusResponse {}
+
+// MsgPause applies only true bits from pause_bits onto current PauseState (OR).
+// Any attempt to clear a bit via this message is rejected (Q-06 PAUSE_ONLY_TRUE).
+message MsgPause {
+  option (cosmos.msg.v1.signer) = "pause_authority";
+  string pause_authority = 1;
+  PauseState pause_bits = 2 [(gogoproto.nullable) = false];
+}
+
+message MsgPauseResponse {}
+
+// MsgFundRewardPool deposits coins into the appmining module account (authority-only).
+message MsgFundRewardPool {
+  option (cosmos.msg.v1.signer) = "authority";
+  string authority = 1;
+  string denom = 2;
+  string amount = 3;
+}
+
+message MsgFundRewardPoolResponse {}

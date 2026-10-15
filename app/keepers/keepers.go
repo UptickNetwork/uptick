@@ -14,6 +14,8 @@ import (
 	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
 	cmdcfg "github.com/UptickNetwork/uptick/cmd/config"
 	upticktypes "github.com/UptickNetwork/uptick/types"
+	appminingkeeper "github.com/UptickNetwork/uptick/x/appmining/keeper"
+	appminingtypes "github.com/UptickNetwork/uptick/x/appmining/types"
 	nftkeeper "github.com/UptickNetwork/uptick/x/collection/keeper"
 	nfttypes "github.com/UptickNetwork/uptick/x/collection/types"
 	cw721keeper "github.com/UptickNetwork/uptick/x/cw721/keeper"
@@ -168,10 +170,11 @@ type AppKeepers struct {
 	Erc20Keeper cosmoserc20keeper.Keeper
 	// Uptick keepers
 
-	Erc721Keeper erc721keeper.Keeper
-	Cw721Keeper  cw721keeper.Keeper
-	EVMIBCKeeper evmIBCKeepr.Keeper
-	NFTKeeper    nftkeeper.Keeper
+	Erc721Keeper    erc721keeper.Keeper
+	Cw721Keeper     cw721keeper.Keeper
+	AppminingKeeper appminingkeeper.Keeper
+	EVMIBCKeeper    evmIBCKeepr.Keeper
+	NFTKeeper       nftkeeper.Keeper
 	// wasm keepers
 	//
 	// Held by value, like every other keeper in this struct. The ante handler
@@ -585,6 +588,13 @@ func New(
 		appKeepers.NFTKeeper,
 		appKeepers.EvmKeeper,
 		appKeepers.IBCNFTTransferKeeper,
+	)
+
+	appKeepers.AppminingKeeper = appminingkeeper.NewKeeper(
+		appCodec,
+		appKeepers.keys[appminingtypes.StoreKey],
+		appKeepers.BankKeeper,
+		appKeepers.AccountKeeper,
 	)
 
 	// Close the burn hole between the collection module and the two conversion

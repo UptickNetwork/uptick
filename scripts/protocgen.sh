@@ -33,4 +33,5 @@ cp -r github.com/UptickNetwork/uptick/x/cw721/types/* ./x/cw721/types
 cp -r github.com/UptickNetwork/uptick/x/erc721/types/* ./x/erc721/types
 cp -r github.com/UptickNetwork/uptick/x/evmibc/types/* ./x/evmibc/types
 cp -r github.com/UptickNetwork/uptick/x/nft/types/* ./x/nft/types
+cp -r github.com/UptickNetwork/uptick/x/appmining/types/* ./x/appmining/types
 #rm -rf github.com

@@ -1,0 +1,145 @@
+syntax = "proto3";
+
+package uptick.appmining.v1;
+
+import "cosmos/base/query/v1beta1/pagination.proto";
+import "gogoproto/gogo.proto";
+import "google/api/annotations.proto";
+import "uptick/appmining/v1/types.proto";
+
+option go_package = "github.com/UptickNetwork/uptick/x/appmining/types";
+
+service Query {
+  rpc Params(QueryParamsRequest) returns (QueryParamsResponse) {
+    option (google.api.http).get = "/uptick/appmining/v1/params";
+  }
+  rpc Application(QueryApplicationRequest) returns (QueryApplicationResponse) {
+    option (google.api.http).get = "/uptick/appmining/v1/applications/{app_id}";
+  }
+  rpc Applications(QueryApplicationsRequest) returns (QueryApplicationsResponse) {
+    option (google.api.http).get = "/uptick/appmining/v1/applications";
+  }
+  rpc EpochBudget(QueryEpochBudgetRequest) returns (QueryEpochBudgetResponse) {
+    option (google.api.http).get = "/uptick/appmining/v1/epoch_budgets/{epoch}";
+  }
+  rpc Attestation(QueryAttestationRequest) returns (QueryAttestationResponse) {
+    option (google.api.http).get = "/uptick/appmining/v1/attestations/{app_id}/{epoch}";
+  }
+  rpc Attestations(QueryAttestationsRequest) returns (QueryAttestationsResponse) {
+    option (google.api.http).get = "/uptick/appmining/v1/attestations";
+  }
+  rpc Challenge(QueryChallengeRequest) returns (QueryChallengeResponse) {
+    option (google.api.http).get = "/uptick/appmining/v1/challenges/{challenge_id}";
+  }
+  rpc OpenChallenges(QueryOpenChallengesRequest) returns (QueryOpenChallengesResponse) {
+    option (google.api.http).get = "/uptick/appmining/v1/open_challenges";
+  }
+  rpc Settlement(QuerySettlementRequest) returns (QuerySettlementResponse) {
+    option (google.api.http).get = "/uptick/appmining/v1/settlements/{app_id}/{epoch}";
+  }
+  rpc Settlements(QuerySettlementsRequest) returns (QuerySettlementsResponse) {
+    option (google.api.http).get = "/uptick/appmining/v1/settlements";
+  }
+  rpc GasCredit(QueryGasCreditRequest) returns (QueryGasCreditResponse) {
+    option (google.api.http).get = "/uptick/appmining/v1/gas_credits/{app_id}";
+  }
+  rpc GasCreditConsumptions(QueryGasCreditConsumptionsRequest) returns (QueryGasCreditConsumptionsResponse) {
+    option (google.api.http).get = "/uptick/appmining/v1/gas_credits/{app_id}/consumptions";
+  }
+}
+
+message QueryParamsRequest {}
+message QueryParamsResponse {
+  Params params = 1 [(gogoproto.nullable) = false];
+}
+
+message QueryApplicationRequest {
+  bytes app_id = 1;
+}
+message QueryApplicationResponse {
+  Application application = 1 [(gogoproto.nullable) = false];
+}
+
+message QueryApplicationsRequest {
+  // optional status filter; UNSPECIFIED = all
+  ApplicationStatus status = 1;
+  cosmos.base.query.v1beta1.PageRequest pagination = 2;
+}
+message QueryApplicationsResponse {
+  repeated Application applications = 1 [(gogoproto.nullable) = false];
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
+}
+
+message QueryEpochBudgetRequest {
+  uint64 epoch = 1;
+}
+message QueryEpochBudgetResponse {
+  EpochBudget budget = 1 [(gogoproto.nullable) = false];
+}
+
+message QueryAttestationRequest {
+  bytes app_id = 1;
+  uint64 epoch = 2;
+}
+message QueryAttestationResponse {
+  AttestationCommitment attestation = 1 [(gogoproto.nullable) = false];
+}
+
+message QueryAttestationsRequest {
+  // optional status filter; UNSPECIFIED = all
+  AttestationStatus status = 1;
+  cosmos.base.query.v1beta1.PageRequest pagination = 2;
+}
+message QueryAttestationsResponse {
+  repeated AttestationCommitment attestations = 1 [(gogoproto.nullable) = false];
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
+}
+
+message QueryChallengeRequest {
+  uint64 challenge_id = 1;
+}
+message QueryChallengeResponse {
+  Challenge challenge = 1 [(gogoproto.nullable) = false];
+}
+
+message QueryOpenChallengesRequest {
+  bytes app_id = 1; // optional; empty = all apps
+  uint64 epoch = 2; // optional; 0 = all epochs when app_id set still scans open index
+  cosmos.base.query.v1beta1.PageRequest pagination = 3;
+}
+message QueryOpenChallengesResponse {
+  repeated Challenge challenges = 1 [(gogoproto.nullable) = false];
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
+}
+
+message QuerySettlementRequest {
+  bytes app_id = 1;
+  uint64 epoch = 2;
+}
+message QuerySettlementResponse {
+  Settlement settlement = 1 [(gogoproto.nullable) = false];
+}
+
+message QuerySettlementsRequest {
+  cosmos.base.query.v1beta1.PageRequest pagination = 1;
+}
+message QuerySettlementsResponse {
+  repeated Settlement settlements = 1 [(gogoproto.nullable) = false];
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
+}
+
+message QueryGasCreditRequest {
+  bytes app_id = 1;
+}
+message QueryGasCreditResponse {
+  GasCreditAccount account = 1 [(gogoproto.nullable) = false];
+}
+
+message QueryGasCreditConsumptionsRequest {
+  bytes app_id = 1;
+  cosmos.base.query.v1beta1.PageRequest pagination = 2;
+}
+message QueryGasCreditConsumptionsResponse {
+  repeated GasCreditConsumption consumptions = 1 [(gogoproto.nullable) = false];
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
+}

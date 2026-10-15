@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package uptick.appmining.v1;
+
+import "gogoproto/gogo.proto";
+import "uptick/appmining/v1/types.proto";
+
+option go_package = "github.com/UptickNetwork/uptick/x/appmining/types";
+
+// GenesisState defines the appmining module genesis state.
+message GenesisState {
+  Params params = 1 [(gogoproto.nullable) = false];
+  repeated Application applications = 2 [(gogoproto.nullable) = false];
+  repeated EpochBudget epoch_budgets = 3 [(gogoproto.nullable) = false];
+  repeated AttestationCommitment attestations = 4 [(gogoproto.nullable) = false];
+  repeated Challenge challenges = 5 [(gogoproto.nullable) = false];
+  repeated Settlement settlements = 6 [(gogoproto.nullable) = false];
+  repeated GasCreditAccount gas_credit_accounts = 7 [(gogoproto.nullable) = false];
+  repeated GasCreditConsumption gas_credit_consumptions = 8 [(gogoproto.nullable) = false];
+  uint64 next_challenge_id = 9;
+}

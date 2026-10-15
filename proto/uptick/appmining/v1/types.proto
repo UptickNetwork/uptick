@@ -1,0 +1,139 @@
+syntax = "proto3";
+
+package uptick.appmining.v1;
+
+import "gogoproto/gogo.proto";
+
+option go_package = "github.com/UptickNetwork/uptick/x/appmining/types";
+
+enum AttestationStatus {
+  option (gogoproto.goproto_enum_prefix) = false;
+
+  ATTESTATION_STATUS_UNSPECIFIED = 0 [(gogoproto.enumvalue_customname) = "AttestationStatusUnspecified"];
+  ATTESTATION_STATUS_CHALLENGE_WINDOW = 1 [(gogoproto.enumvalue_customname) = "AttestationStatusChallengeWindow"];
+  ATTESTATION_STATUS_CHALLENGED = 2 [(gogoproto.enumvalue_customname) = "AttestationStatusChallenged"];
+  ATTESTATION_STATUS_FINALIZED = 3 [(gogoproto.enumvalue_customname) = "AttestationStatusFinalized"];
+  ATTESTATION_STATUS_REJECTED = 4 [(gogoproto.enumvalue_customname) = "AttestationStatusRejected"];
+}
+
+enum ChallengeStatus {
+  option (gogoproto.goproto_enum_prefix) = false;
+
+  CHALLENGE_STATUS_UNSPECIFIED = 0 [(gogoproto.enumvalue_customname) = "ChallengeStatusUnspecified"];
+  CHALLENGE_STATUS_OPEN = 1 [(gogoproto.enumvalue_customname) = "ChallengeStatusOpen"];
+  CHALLENGE_STATUS_REJECTED = 2 [(gogoproto.enumvalue_customname) = "ChallengeStatusRejected"];
+  CHALLENGE_STATUS_UPHELD = 3 [(gogoproto.enumvalue_customname) = "ChallengeStatusUpheld"];
+  // closed without ruling because another upheld challenge terminated the
+  // attestation; bond fully refunded (CLARIFICATIONS-REPLY Q-04)
+  CHALLENGE_STATUS_SUPERSEDED = 4 [(gogoproto.enumvalue_customname) = "ChallengeStatusSuperseded"];
+}
+
+enum ApplicationStatus {
+  option (gogoproto.goproto_enum_prefix) = false;
+
+  APPLICATION_STATUS_UNSPECIFIED = 0 [(gogoproto.enumvalue_customname) = "ApplicationStatusUnspecified"];
+  APPLICATION_STATUS_ACTIVE = 1 [(gogoproto.enumvalue_customname) = "ApplicationStatusActive"];
+  APPLICATION_STATUS_SUSPENDED = 2 [(gogoproto.enumvalue_customname) = "ApplicationStatusSuspended"];
+  APPLICATION_STATUS_REVOKED = 3 [(gogoproto.enumvalue_customname) = "ApplicationStatusRevoked"];
+}
+
+message AttestationProfile {
+  string profile = 1;
+  string version = 2;
+  bool active = 3;
+}
+
+message PauseState {
+  bool registration_paused = 1;
+  bool attestation_paused = 2;
+  bool challenge_paused = 3;
+  bool settlement_paused = 4;
+  bool gas_credit_paused = 5;
+}
+
+message Params {
+  string authority = 1;
+  uint64 challenge_window_blocks = 2;
+  string challenge_bond_denom = 3;
+  string challenge_bond_amount = 4;
+  uint32 gas_credit_share_bps = 5;
+  PauseState pause_state = 6;
+  repeated AttestationProfile allowed_profiles = 7 [(gogoproto.nullable) = false];
+  // hot path: may only set pause bits to true; resume is authority-only (Q-06)
+  string pause_authority = 8;
+  // governance-approved reward denoms (Q-08)
+  repeated string reward_denom_allowlist = 9;
+}
+
+message Application {
+  bytes app_id = 1;
+  string owner = 2;
+  string attestation_submitter = 3;
+  repeated string gas_payers = 4;
+  ApplicationStatus status = 5;
+}
+
+message EpochBudget {
+  uint64 epoch = 1;
+  string denom = 2;
+  string limit = 3;
+  string spent = 4;
+  bool closed = 5;
+  int64 opened_height = 6;
+  int64 closed_height = 7;
+}
+
+message AttestationCommitment {
+  bytes app_id = 1;
+  uint64 epoch = 2;
+  string profile = 3;
+  string profile_version = 4;
+  bytes attestation_hash = 5;
+  bytes evidence_root = 6;
+  bytes result_commitment = 7;
+  string reward_requested = 8;
+  string gas_credit_requested = 9;
+  string submitter = 10;
+  int64 submitted_height = 11;
+  int64 challenge_deadline_height = 12;
+  AttestationStatus status = 13;
+}
+
+message Challenge {
+  uint64 challenge_id = 1;
+  bytes app_id = 2;
+  uint64 epoch = 3;
+  string challenger = 4;
+  bytes evidence_hash = 5;
+  string bond_denom = 6;
+  string bond_amount = 7;
+  ChallengeStatus status = 8;
+  bytes resolution_hash = 9;
+  int64 resolved_height = 10;
+}
+
+message Settlement {
+  bytes app_id = 1;
+  uint64 epoch = 2;
+  string profile = 3;
+  string profile_version = 4;
+  bytes attestation_hash = 5;
+  string reward_released = 6;
+  string gas_credit_issued = 7;
+  int64 finalized_height = 8;
+}
+
+message GasCreditAccount {
+  bytes app_id = 1;
+  string balance = 2;
+  string total_issued = 3;
+  string total_consumed = 4;
+}
+
+message GasCreditConsumption {
+  bytes app_id = 1;
+  string gas_payer = 2;
+  bytes source_tx_hash = 3;
+  string amount = 4;
+  int64 consumed_height = 5;
+}

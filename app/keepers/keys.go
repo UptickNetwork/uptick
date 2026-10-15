@@ -6,6 +6,7 @@ import (
 	"cosmossdk.io/x/feegrant"
 	upgradetypes "cosmossdk.io/x/upgrade/types"
 	wasmtypes "github.com/CosmWasm/wasmd/x/wasm/types"
+	appminingtypes "github.com/UptickNetwork/uptick/x/appmining/types"
 	nfttypes "github.com/UptickNetwork/uptick/x/collection/types"
 	cw721types "github.com/UptickNetwork/uptick/x/cw721/types"
 	erc721types "github.com/UptickNetwork/uptick/x/erc721/types"
@@ -63,6 +64,7 @@ func (appKeepers *AppKeepers) genStoreKeys() {
 		erc721types.StoreKey,
 		cw721types.StoreKey,
 		nfttypes.StoreKey,
+		appminingtypes.StoreKey,
 
 		wasmtypes.StoreKey,
 	)

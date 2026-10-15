@@ -11,11 +11,13 @@ import (
 	// v030-v032 were removed: they were build-ignored historical upgrades with
 	// SDK 0.50 API incompatibilities and stale ethermint fork fields.
 	v033 "github.com/UptickNetwork/uptick/app/upgrades/v033"
-	// v040 and v041 are deliberately not imported here. Their packages still
-	// build into the binary -- v050 calls their handler constructors directly --
-	// but neither name is registered as a plan this binary will execute. See the
-	// note on `router` below: the absence is the guard.
+	// v040 is deliberately not registered as a plan name. v050/v051 call its
+	// handler constructor directly when composing migrations. Registering
+	// "v0.4.0" would leave a non-idempotent legacy-pair deletion schedulable
+	// by governance forever on mainnet (no done record).
+	v041 "github.com/UptickNetwork/uptick/app/upgrades/v041"
 	v050 "github.com/UptickNetwork/uptick/app/upgrades/v050"
+	v051 "github.com/UptickNetwork/uptick/app/upgrades/v051"
 )
 
 // router holds exactly the upgrade plans this binary is meant to serve.
@@ -23,58 +25,28 @@ import (
 // The table is scoped per release AND per chain. x/upgrade's startup self-check
 // (abci.go:38-62) requires the name of the last completed upgrade to have a
 // handler, so the table must contain the plan name of EVERY chain this binary is
-// pointed at -- and it should contain nothing else. Mainnet is the only chain
-// v0.5.0 serves: it is stopped on v0.3.3 and upgrades to v0.5.0, which replays
-// the v0.4.0 change set and then the v0.4.1 repairs itself (see v050's package
-// doc for why the starting state, not a flag, decides which stage runs).
+// pointed at -- and it should contain nothing else.
 //
 // # The roll-out, release by release
 //
-//	release   registers                serves
-//	v0.5.0    v0.3.3, v0.5.0           mainnet (v0.3.3 -> v0.5.0); testnet NOT served
-//	v0.5.1    + v0.4.1, + v0.5.1       both: mainnet (v0.5.0 -> v0.5.1) and
-//	                                   testnet (v0.4.1 -> v0.5.1)
+//	release   registers                         serves
+//	v0.5.0    v0.3.3, v0.5.0                    mainnet (v0.3.3 -> v0.5.0)
+//	v0.5.1    v0.3.3, v0.4.1, v0.5.0, v0.5.1   mainnet (v0.5.0 -> v0.5.1) and
+//	                                            testnet (v0.4.1 -> v0.5.1)
 //
-// Testnet stays on v0.4.1 through this release and follows a plan named v0.5.1
-// later, so it is absent from the table above on purpose. That v0.5.1 row is not
-// a preference: the same self-check forces it. Once mainnet has run its v0.5.0
-// plan, v0.5.0 is mainnet's LAST COMPLETED name and every mainnet node aborts on
-// start unless the running binary has a handler for it; testnet's last completed
-// name stays v0.4.1 until its own plan executes, so v0.5.1 owes a handler for
-// both names. v0.5.1 also carries the v0.5.0 handler's tail migrations forward,
-// because testnet never runs that plan and would otherwise keep an erc20 switch
-// that is off, voucher metadata that reports decimals() == 0 and voucher pairs
-// that were never backfilled.
+// v0.4.1 is registered so a testnet node whose last completed plan is v0.4.1
+// passes the startup self-check. v0.5.0 stays registered for the same reason on
+// mainnet. The executable upgrade is v0.5.1 (adds x/appmining + re-applies the
+// v0.5.0 tail migrations for testnet).
 //
-// v0.4.0 and v0.4.1 are absent HERE on purpose, and the absence is the guard:
-//
-//   - x/upgrade keeps a name schedulable until it has a done record, and mainnet
-//     has none for either. Registering v0.4.0 would leave it reachable by
-//     governance, and its legacy-pair deletion is not idempotent -- a replayed
-//     plan deletes the pairs registered after the upgrade. Registering v0.4.1
-//     would leave reachable a handler that cannot run on a v0.3.3 chain at all:
-//     its first repair reads the ICA controller params (v041/upgrades.go:68, and
-//     before the module manager gets to run), and ibc-go v10's controller keeper
-//     PANICS rather than defaulting when the module store has no "params" key
-//     (27-interchain-accounts/controller/keeper/keeper.go:307-315). That is the
-//     state a chain which never ran the v0.4.0 change set is in, those params
-//     having lived in the legacy x/params subspace.
-//   - With neither name registered, such a plan cannot reach ApplyUpgrade: the
-//     module fails the upgrade height with "UPGRADE NEEDED" and halts, and an
-//     operator clears it with --unsafe-skip-upgrades. A halt is recoverable; a
-//     replayed deletion is not.
-//
-// Neither removal touches the upgrade path: v050 builds both of its stages from
-// the v040 and v041 packages directly, never by looking them up here.
-//
-// The cost, deliberate and temporary: this binary must NOT be handed to a node
-// stopped on v0.4.1 -- that is the testnet, and it aborts on every start with
-// "upgrade handler is missing for v0.4.1 upgrade plan". v0.5.1 registers v0.4.1
-// back, which is a line in that release's table and not a change to this one.
+// v0.4.0 remains unregistered on purpose: its legacy-pair deletion is not
+// idempotent, and mainnet has no done record for that name.
 var (
 	router = upgrades.NewUpgradeRouter().
 		Register(v033.Upgrade).
-		Register(v050.Upgrade)
+		Register(v041.Upgrade).
+		Register(v050.Upgrade).
+		Register(v051.Upgrade)
 )
 
 // RegisterUpgradePlans register a handler of upgrade plan

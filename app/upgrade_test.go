@@ -93,46 +93,25 @@ func TestUpgradeRouter_Registration(t *testing.T) {
 func TestAppRouterRegistration(t *testing.T) {
 	t.Parallel()
 
-	// Present: a binary that cannot name the last completed upgrade of the chain
-	// it runs on fails x/upgrade's startup self-check and never starts, and a
-	// plan name it cannot name is a plan it refuses to execute. A missing entry
-	// is not a missing migration -- it is a node that will not boot.
-	for _, name := range []string{"v0.3.3", "v0.5.0"} {
+	// Present: last-completed names for every chain this binary serves, plus the
+	// executable v0.5.1 plan (adds x/appmining; re-applies v0.5.0 tail for testnet).
+	for _, name := range []string{"v0.3.3", "v0.4.1", "v0.5.0", "v0.5.1"} {
 		require.Equal(t, name, router.UpgradeInfo(name).UpgradeName,
 			"the app router must register %s", name)
 	}
 
-	// Absent: this is the fence, not an oversight. Nothing on mainnet ever writes
-	// a done record for either name -- the one-hop upgrade records only "v0.5.0"
-	// -- so both stay schedulable by governance forever, and neither is safe to
-	// run:
-	//
-	//   - v0.4.0's legacy-pair deletion is not idempotent, and it selects pairs
-	//     by ContractOwner == OWNER_MODULE alone, which is what cosmos/evm's IBC
-	//     auto-registration produces. Running it on a chain that is already on
-	//     v0.5.0 state -- which has no v0.4.0 done record to stop a re-proposal --
-	//     deletes the STRv2 pairs registered since the upgrade.
-	//   - v0.4.1 cannot run until the v0.4.0 change set has: its first repair
-	//     reads the ICA controller params (v041/upgrades.go:68, before the module
-	//     manager runs), and ibc-go v10's controller keeper panics rather than
-	//     defaulting when the module store has no "params" key
-	//     (27-interchain-accounts/controller/keeper/keeper.go:307-315) -- the
-	//     state of a chain that never ran that set.
-	//
-	// Unregistered, such a plan fails the upgrade height with "UPGRADE NEEDED"
-	// instead of reaching ApplyUpgrade. Registering either one again is not a
-	// fix; it re-opens the hole.
-	for _, name := range []string{"v0.4.0", "v0.4.1"} {
-		require.Empty(t, router.UpgradeInfo(name).UpgradeName,
-			"%s must not be registered: it stays schedulable on mainnet forever and is "+
-				"not safe to run there", name)
-	}
+	// Absent: v0.4.0 stays unregistered. Mainnet never wrote a done record for
+	// it, so the name remains schedulable forever; its legacy-pair deletion is
+	// not idempotent and would delete STRv2 pairs registered after upgrade.
+	require.Empty(t, router.UpgradeInfo("v0.4.0").UpgradeName,
+		"v0.4.0 must not be registered: non-idempotent and forever schedulable on mainnet")
 
-	require.Len(t, router.Routers(), 2,
-		"the table is scoped to the chains this release serves, not to the whole bloodline")
+	require.Len(t, router.Routers(), 4,
+		"v0.5.1 serves mainnet + testnet: v0.3.3, v0.4.1, v0.5.0, v0.5.1")
 
-	// The capability-store deletion travels with the plan name: a mainnet node
-	// follows "v0.5.0" and consults nothing else, so a v0.5.0 entry without the
-	// deletion would boot the node with the legacy store still mounted.
+	// The capability-store deletion travels with the v0.5.0 plan name.
 	require.Equal(t, []string{"capability"}, router.UpgradeInfo("v0.5.0").StoreUpgrades.Deleted)
+
+	// v0.5.1 adds the appmining store.
+	require.Equal(t, []string{"appmining"}, router.UpgradeInfo("v0.5.1").StoreUpgrades.Added)
 }

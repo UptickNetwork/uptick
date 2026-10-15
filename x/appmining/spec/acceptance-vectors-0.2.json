@@ -1,0 +1,5 @@
+{
+  "schema_version": "uptick-appmining-settlement-acceptance-vectors-0.2",
+  "superseded_by": "uptick-appmining-settlement-acceptance-vectors-0.3",
+  "note": "Historical baseline. Use acceptance-vectors-0.3.json for current acceptance."
+}

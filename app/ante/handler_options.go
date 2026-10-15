@@ -44,6 +44,9 @@ type HandlerOptions struct {
 	WasmKeeper            *wasmkeeper.Keeper
 	WasmNodeConfig        *wasmtypes.NodeConfig
 	TXCounterStoreService corestoretypes.KVStoreService
+	// GasCreditConsumer enables Cosmos PostHandler auto-debit of appmining
+	// gas credit for enrolled fee payers. Optional: nil disables the feature.
+	GasCreditConsumer GasCreditAutoConsumer
 }
 
 // Validate checks if the keepers are defined.
@@ -69,6 +72,7 @@ type HandlerOptions struct {
 //     optional decorator inside cosmosAnteDecorators, and
 //     TestWasmDecoratorsOmittedWhenKeepersNil pins the nil form as supported
 //     input. Requiring them would break that contract.
+//   - GasCreditConsumer: optional PostHandler ledger debit; nil disables.
 func (options HandlerOptions) Validate() error {
 	if options.AccountKeeper == nil {
 		return sdkerrors.Wrap(errortypes.ErrLogic, "account keeper is required for AnteHandler")

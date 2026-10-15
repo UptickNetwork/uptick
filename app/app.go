@@ -133,6 +133,8 @@ import (
 	"cosmossdk.io/x/upgrade"
 	upgradetypes "cosmossdk.io/x/upgrade/types"
 
+	appmining "github.com/UptickNetwork/uptick/x/appmining"
+	appminingtypes "github.com/UptickNetwork/uptick/x/appmining/types"
 	cw721 "github.com/UptickNetwork/uptick/x/cw721"
 	cw721types "github.com/UptickNetwork/uptick/x/cw721/types"
 	erc721 "github.com/UptickNetwork/uptick/x/erc721"
@@ -188,7 +190,8 @@ var (
 
 		cosmoserc20types.ModuleName: {authtypes.Minter, authtypes.Burner},
 
-		cw721types.ModuleName: nil,
+		cw721types.ModuleName:     nil,
+		appminingtypes.ModuleName: nil, // reward-pool escrow; no mint/burn/withdraw Msg
 
 		// cosmosnft.ModuleName: retained because cosmossdk.io/x/nft/keeper.NewKeeper
 		// at app/keepers/keepers.go:332 (via x/collection/keeper.NewKeeper) requires
@@ -406,6 +409,7 @@ func NewUptick(
 		cosmoserc20.NewAppModule(app.Erc20Keeper, app.AccountKeeper),
 		erc721.NewAppModule(app.Erc721Keeper, app.AccountKeeper),
 		cw721.NewAppModule(app.Cw721Keeper, app.AccountKeeper),
+		appmining.NewAppModule(app.AppminingKeeper),
 		nftmodule.NewAppModule(app.codec, app.NFTKeeper, app.AccountKeeper, app.BankKeeper),
 
 		// this line is used by starport scaffolding # stargate/app/appModule
@@ -497,6 +501,7 @@ func NewUptick(
 		cosmoserc20types.ModuleName,
 		erc721types.ModuleName,
 		cw721types.ModuleName,
+		appminingtypes.ModuleName,
 		nfttypes.ModuleName,
 
 		ibcnfttransfertypes.ModuleName,
@@ -532,6 +537,7 @@ func NewUptick(
 		cosmoserc20types.ModuleName,
 		erc721types.ModuleName,
 		cw721types.ModuleName,
+		appminingtypes.ModuleName,
 		nfttypes.ModuleName,
 		ibcnfttransfertypes.ModuleName,
 		icatypes.ModuleName,
@@ -577,6 +583,7 @@ func NewUptick(
 		icatypes.ModuleName,
 		wasmtypes.ModuleName,
 		cw721types.ModuleName,
+		appminingtypes.ModuleName,
 		consensusparamtypes.ModuleName,
 	)
 
@@ -616,6 +623,7 @@ func NewUptick(
 		icatypes.ModuleName,
 		wasmtypes.ModuleName,
 		cw721types.ModuleName,
+		appminingtypes.ModuleName,
 		consensusparamtypes.ModuleName,
 	)
 	// Create and set the configurator
@@ -688,6 +696,7 @@ func NewUptick(
 		WasmNodeConfig:        &app.WasmConfig,
 		TXCounterStoreService: runtime.NewKVStoreService(app.GetKey(wasm.StoreKey)),
 		DisabledAuthzMsgs:     ante.DisabledAuthzMsgTypeURLs(),
+		GasCreditConsumer:     app.AppminingKeeper,
 	}
 
 	if err := options.Validate(); err != nil {
@@ -696,6 +705,7 @@ func NewUptick(
 
 	// initialize
 	app.SetAnteHandler(ante.NewAnteHandler(options))
+	app.SetPostHandler(ante.NewPostHandler(options))
 	app.SetInitChainer(app.InitChainer)
 	app.SetPreBlocker(app.PreBlocker)
 	app.SetBeginBlocker(app.BeginBlocker)

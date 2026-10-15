@@ -39,6 +39,11 @@ Ref: https://keepachangelog.com/en/1.0.0/
 
 ### State Machine Breaking
 
+* (upgrade/appmining) New `v0.5.1` plan adds the `x/appmining` store (`uptick.appmining.v1`) and re-applies the
+  v0.5.0 tail migrations for testnet convergence. See `app/upgrades/v051`. Consensus module: Application registry,
+  epoch budget, attestation/challenge/settlement, gas-credit ledger, `MsgFundRewardPool`, and Cosmos/EVM PostHandler
+  ledger auto-consume (not fee replacement).
+
 * (upgrade) New `v0.5.0` plan: the one-hop upgrade mainnet follows from v0.3.3. It runs the whole v0.4.0
   change set and then the v0.4.1 repairs inside ONE governance plan, where the testnet executed those as two
   plans (`v0.4.0` first, then `v0.4.1`). The handler probes its starting state from state rather than from a
@@ -155,6 +160,10 @@ Ref: https://keepachangelog.com/en/1.0.0/
 
 ### Features
 
+* (appmining) New `x/appmining` module for UGE application-mining settlement: registry, epoch budget, attestation,
+  challenge (incl. SUPERSEDED), settlement, gas-credit account/consumption, pagination queries, `MsgFundRewardPool`
+  (authority-only, allowlisted denoms), and PostHandler auto-debit for enrolled Cosmos/WASM fee payers and EVM
+  senders (ledger only; no bank/ETH fee offset).
 * (tooling) `make check-clock-skew` (`scripts/check-clock-skew.sh`): preflight a node's clock against the
   `consensus.block_time_tolerance` cometbft enforces from v0.38.22. Block time tracks the network's median clock,
   so the host that trips the check is the slow one: at the `1m0s` default, a node more than 60s behind rejects

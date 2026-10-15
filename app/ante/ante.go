@@ -29,6 +29,11 @@ func NewAnteHandler(options HandlerOptions) sdk.AnteHandler {
 	}
 }
 
+// NewPostHandler returns the PostHandler chain (Cosmos gas-credit auto debit).
+func NewPostHandler(options HandlerOptions) sdk.PostHandler {
+	return sdk.ChainPostDecorators(NewGasCreditPostDecorator(options.GasCreditConsumer))
+}
+
 // Extension option type URLs recognized by the ante router.
 const (
 	extOptionEthereumTx = "/cosmos.evm.vm.v1.ExtensionOptionsEthereumTx"
