@@ -232,7 +232,7 @@ func TestExportDiagnosticsWriteIsAtomicThroughSymlink(t *testing.T) {
 	require.NoError(t, os.Symlink(target, link))
 
 	writer := &Uptick{homeDir: home}
-	path, err := writer.writeExportDiagnosticsReport(7, []ExportDiagnostic{
+	path, err := writer.writeExportDiagnosticsReportFor(newExportID(), 7, []ExportDiagnostic{
 		{Module: "erc721", Kind: "token_pair_corrupt", Key: "0xdead", Detail: "boom"},
 	})
 	require.NoError(t, err)
@@ -411,7 +411,7 @@ func TestExportDiagnosticsReportCarriesStalenessFields(t *testing.T) {
 	home := t.TempDir()
 	writer := &Uptick{homeDir: home}
 
-	path, err := writer.writeExportDiagnosticsReport(4242, []ExportDiagnostic{
+	path, err := writer.writeExportDiagnosticsReportFor(newExportID(), 4242, []ExportDiagnostic{
 		{Module: "erc721", Kind: "token_pair_corrupt", Key: "0xdeadbeef", Detail: "boom"},
 	})
 	require.NoError(t, err)
@@ -437,7 +437,7 @@ func TestExportDiagnosticsReportCarriesStalenessFields(t *testing.T) {
 	require.WithinDuration(t, time.Now().UTC(), finishedAt.UTC(), time.Minute)
 
 	// Two runs must never share an id.
-	other, err := writer.writeExportDiagnosticsReport(4242, nil)
+	other, err := writer.writeExportDiagnosticsReportFor(newExportID(), 4242, nil)
 	require.NoError(t, err)
 	require.Equal(t, path, other)
 

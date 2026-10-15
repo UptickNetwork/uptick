@@ -93,7 +93,7 @@ func (k Keeper) SettleIBCVoucherPairs(ctx sdk.Context) (settled, staleCleared, k
 
 		cleared := 0
 		for _, b := range bindings {
-			switch k.settleVoucherBinding(ctx, pair, b) {
+			switch k.settleVoucherBinding(ctx, b) {
 			case settledOutcome:
 				settled++
 				cleared++
@@ -125,7 +125,7 @@ func (k Keeper) SettleIBCVoucherPairs(ctx sdk.Context) (settled, staleCleared, k
 
 // settleVoucherBinding settles a single binding, isolated in a cache context so
 // a failure rolls back cleanly. It returns the outcome classification.
-func (k Keeper) settleVoucherBinding(ctx sdk.Context, pair types.TokenPair, b voucherBinding) settleOutcome {
+func (k Keeper) settleVoucherBinding(ctx sdk.Context, b voucherBinding) settleOutcome {
 	logger := k.Logger(ctx)
 
 	// Native owner: empty means the NFT does not exist.
@@ -187,11 +187,11 @@ func (k Keeper) settleVoucherBinding(ctx sdk.Context, pair types.TokenPair, b vo
 	case ercIsUser && nativeIsModule:
 		// wrapped: burn the user's ERC721, hand the escrowed native voucher to
 		// the same account, drop the binding.
-		return k.settleWrapped(ctx, pair, b, contract, bigTokenID, ercOwner)
+		return k.settleWrapped(ctx, b, contract, bigTokenID, ercOwner)
 
 	case ercIsModule && nativeIsNone:
 		// orphan: burn the module-held ERC721 and drop the binding.
-		return k.settleOrphan(ctx, pair, b, contract, bigTokenID)
+		return k.settleOrphan(ctx, b, contract, bigTokenID)
 
 	case nativeIsNone && (ercIsUser || ercIsNone):
 		// stale: the native NFT is already gone; just drop the binding.
@@ -213,7 +213,7 @@ func (k Keeper) settleVoucherBinding(ctx sdk.Context, pair types.TokenPair, b vo
 // native voucher from the module account to the same 20-byte account, then
 // drops the binding. All writes run in a cache context so a transfer failure
 // rolls the burn back.
-func (k Keeper) settleWrapped(ctx sdk.Context, pair types.TokenPair, b voucherBinding, contract common.Address, bigTokenID *big.Int, ercOwner common.Address) settleOutcome {
+func (k Keeper) settleWrapped(ctx sdk.Context, b voucherBinding, contract common.Address, bigTokenID *big.Int, ercOwner common.Address) settleOutcome {
 	cctx, commit := ctx.CacheContext()
 	abi := contracts.ERC721UpticksContract.ABI
 
@@ -254,7 +254,7 @@ func (k Keeper) settleWrapped(ctx sdk.Context, pair types.TokenPair, b voucherBi
 
 // settleOrphan burns the module-held ERC721 half of a voucher whose native side
 // is already gone, then drops the binding.
-func (k Keeper) settleOrphan(ctx sdk.Context, pair types.TokenPair, b voucherBinding, contract common.Address, bigTokenID *big.Int) settleOutcome {
+func (k Keeper) settleOrphan(ctx sdk.Context, b voucherBinding, contract common.Address, bigTokenID *big.Int) settleOutcome {
 	cctx, commit := ctx.CacheContext()
 	abi := contracts.ERC721UpticksContract.ABI
 

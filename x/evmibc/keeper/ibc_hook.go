@@ -13,7 +13,6 @@ import (
 	channeltypes "github.com/cosmos/ibc-go/v10/modules/core/04-channel/types"
 )
 
-
 // OnAcknowledgementPacket responds to the success or failure of a packet
 // acknowledgement written on the receiving chain. If the acknowledgement
 // was a success then nothing occurs. If the acknowledgement failed, then

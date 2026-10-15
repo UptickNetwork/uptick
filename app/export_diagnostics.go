@@ -397,12 +397,6 @@ func (app *Uptick) exportDiagnosticsReportPath() string {
 	return filepath.Join(app.homeDir, ExportDiagnosticsFileName)
 }
 
-// writeExportDiagnosticsReport persists the report into the node home
-// directory and returns the path it wrote.
-func (app *Uptick) writeExportDiagnosticsReport(height int64, diags []ExportDiagnostic) (string, error) {
-	return app.writeExportDiagnosticsReportFor(newExportID(), height, diags)
-}
-
 // writeExportDiagnosticsReportFor persists the report under a caller-supplied
 // export id.
 //

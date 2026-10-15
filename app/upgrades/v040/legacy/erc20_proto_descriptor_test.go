@@ -10,10 +10,34 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/dynamicpb"
 
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 )
+
+// legacyERC20ProposalNames are the four gov `Content` implementations that can
+// appear as the `Any` payload of a historical
+// cosmos.gov.v1.MsgExecLegacyContent. Only these must resolve for
+// `uptickd query gov ...` to work; the rest of the removed package (Msg/Query/
+// GenesisState) never reaches retained state through an `Any`.
+var legacyERC20ProposalNames = []protoreflect.FullName{
+	"uptick.erc20.v1.RegisterCoinProposal",
+	"uptick.erc20.v1.RegisterERC20Proposal",
+	"uptick.erc20.v1.ToggleTokenRelayProposal",
+	"uptick.erc20.v1.UpdateTokenPairERC20Proposal",
+}
+
+// registeredLegacyERC20Descriptor returns the descriptor as registered in
+// protoregistry.GlobalFiles, failing the test when registration did not
+// happen, so the guard tests assert against the registered artifact rather
+// than a freshly rebuilt one.
+func registeredLegacyERC20Descriptor(t *testing.T) protoreflect.FileDescriptor {
+	t.Helper()
+	fd, err := protoregistry.GlobalFiles.FindFileByPath(legacyERC20ProtoFilename)
+	require.NoErrorf(t, err, "the legacy erc20 descriptor %s is not registered", legacyERC20ProtoFilename)
+	return fd
+}
 
 // These tests guard the descriptor in erc20_proto_descriptor.go. That file
 // exists because the auto-generated CLI (autocli + aminojson) resolves `Any`
@@ -62,8 +86,7 @@ func TestLegacyERC20DescriptorsResolveFromTheCliResolver(t *testing.T) {
 func TestLegacyERC20DescriptorMatchesTheGogoStructs(t *testing.T) {
 	require.NoError(t, RegisterLegacyERC20ProtoDescriptor())
 
-	fd := LegacyERC20ProtoFileDescriptor()
-	require.NotNil(t, fd)
+	fd := registeredLegacyERC20Descriptor(t)
 	require.Equal(t, legacyERC20ProtoFilename, fd.Path())
 	require.Equal(t, protoreflect.FullName(legacyERC20ProtoPackage), fd.Package())
 
@@ -120,8 +143,7 @@ func TestLegacyERC20DescriptorMatchesTheGogoStructs(t *testing.T) {
 func TestLegacyERC20DescriptorMarshalIsByteIdentical(t *testing.T) {
 	require.NoError(t, RegisterLegacyERC20ProtoDescriptor())
 
-	fd := LegacyERC20ProtoFileDescriptor()
-	require.NotNil(t, fd)
+	fd := registeredLegacyERC20Descriptor(t)
 
 	metadata := banktypes.Metadata{
 		Description: "IBC voucher of auoc",

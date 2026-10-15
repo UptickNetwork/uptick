@@ -165,12 +165,12 @@ func ClampDenomMetadataBounds(schema, data string) (clampedSchema, clampedData s
 // is passed through strings.ToValidUTF8 with an empty replacement, which drops
 // invalid bytes instead of expanding them to U+FFFD. Both steps only ever shrink
 // the value, so the bound cannot be re-exceeded.
-func clampToValidUTF8Bound(s string, max int) (string, bool) {
-	if len(s) <= max && utf8.ValidString(s) {
+func clampToValidUTF8Bound(s string, maxLen int) (string, bool) {
+	if len(s) <= maxLen && utf8.ValidString(s) {
 		return s, false
 	}
 
-	cut := max
+	cut := maxLen
 	if cut > len(s) {
 		cut = len(s)
 	}

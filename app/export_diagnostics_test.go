@@ -28,7 +28,7 @@ func TestWriteExportDiagnosticsReport(t *testing.T) {
 		{Module: "collection", Kind: "class_metadata_missing", Key: "ibc/ABC", Detail: "no metadata blob"},
 	}
 
-	path, err := app.writeExportDiagnosticsReport(4242, diags)
+	path, err := app.writeExportDiagnosticsReportFor(newExportID(), 4242, diags)
 	require.NoError(t, err)
 	require.Equal(t, filepath.Join(home, ExportDiagnosticsFileName), path)
 
@@ -47,7 +47,7 @@ func TestWriteExportDiagnosticsReport(t *testing.T) {
 func TestWriteExportDiagnosticsReportWithoutHome(t *testing.T) {
 	app := &Uptick{}
 
-	_, err := app.writeExportDiagnosticsReport(1, []ExportDiagnostic{{Module: "erc721"}})
+	_, err := app.writeExportDiagnosticsReportFor(newExportID(), 1, []ExportDiagnostic{{Module: "erc721"}})
 	require.Error(t, err)
 }
 
@@ -55,7 +55,7 @@ func TestRemoveStaleExportDiagnosticsReport(t *testing.T) {
 	home := t.TempDir()
 	app := &Uptick{homeDir: home}
 
-	path, err := app.writeExportDiagnosticsReport(1, []ExportDiagnostic{{Module: "erc721", Kind: "k"}})
+	path, err := app.writeExportDiagnosticsReportFor(newExportID(), 1, []ExportDiagnostic{{Module: "erc721", Kind: "k"}})
 	require.NoError(t, err)
 	require.FileExists(t, path)
 
@@ -128,7 +128,7 @@ func TestCollectExportDiagnosticsReportsSupplyMismatch(t *testing.T) {
 	// of D-G1. A fresh writer keeps the file in a temp dir, isolated from the
 	// shared application's home.
 	writer := &Uptick{homeDir: t.TempDir()}
-	path, err := writer.writeExportDiagnosticsReport(ctx.BlockHeight(), diags)
+	path, err := writer.writeExportDiagnosticsReportFor(newExportID(), ctx.BlockHeight(), diags)
 	require.NoError(t, err)
 
 	bz, err := os.ReadFile(path)

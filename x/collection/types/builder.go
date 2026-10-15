@@ -469,7 +469,7 @@ func (tb TokenBuilder) Build(classId, tokenId, tokenURI, tokenData string) (nft.
 	}
 
 	// The JSON branch carries the bound too, and it is not covered by the
-	// check above: Build keeps every key it does not recognise and re-marshals
+	// check above: Build keeps every key it does not recognize and re-marshals
 	// the leftovers into NFTMetadata.Data, so what reaches the store is this
 	// re-encoded blob rather than the packet's raw bytes.
 	if err := ValidateTokenMetadataBounds(data); err != nil {

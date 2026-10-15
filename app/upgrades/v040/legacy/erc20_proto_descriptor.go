@@ -9,7 +9,6 @@ import (
 	gogoproto "github.com/cosmos/gogoproto/proto"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protodesc"
-	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/descriptorpb"
 )
@@ -78,18 +77,6 @@ var (
 	legacyERC20ProtoErr  error
 )
 
-// legacyERC20ProposalNames are the four gov `Content` implementations that can
-// appear as the `Any` payload of a historical
-// cosmos.gov.v1.MsgExecLegacyContent. Only these must resolve for
-// `uptickd query gov ...` to work; the rest of the removed package (Msg/Query/
-// GenesisState) never reaches retained state through an `Any`.
-var legacyERC20ProposalNames = []protoreflect.FullName{
-	"uptick.erc20.v1.RegisterCoinProposal",
-	"uptick.erc20.v1.RegisterERC20Proposal",
-	"uptick.erc20.v1.ToggleTokenRelayProposal",
-	"uptick.erc20.v1.UpdateTokenPairERC20Proposal",
-}
-
 func init() {
 	legacyERC20ProtoErr = RegisterLegacyERC20ProtoDescriptor()
 }
@@ -134,18 +121,6 @@ func registerLegacyERC20ProtoDescriptor() error {
 	}
 
 	return nil
-}
-
-// LegacyERC20ProtoFileDescriptor returns the descriptor as registered in
-// protoregistry.GlobalFiles, or nil when registration did not happen. Test-only
-// convenience so a guard test can assert against the registered artifact rather
-// than a freshly rebuilt one.
-func LegacyERC20ProtoFileDescriptor() protoreflect.FileDescriptor {
-	fd, err := protoregistry.GlobalFiles.FindFileByPath(legacyERC20ProtoFilename)
-	if err != nil {
-		return nil
-	}
-	return fd
 }
 
 // legacyERC20FileDescriptorProto builds the FileDescriptorProto for the v0.3.3

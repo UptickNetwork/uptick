@@ -78,7 +78,7 @@ const (
 // i.e. the registration fails on a value the caller never typed, and the error
 // names ICA rather than the flag, so it reads as "ICA is broken".
 //
-// Marking the flag as changed is the signal bindFlags honours, and it is
+// Marking the flag as changed is the signal bindFlags honors, and it is
 // deliberately conditional: a value the user *did* pass survives untouched
 // (`--version foo` stays "foo"), and so does the flag's own default.
 //
@@ -452,13 +452,18 @@ func (a appCreator) appExport(
 // On top of the code, a degraded export always prints a standing one-line
 // marker on stderr, so a human sees it even without inspecting the exit code.
 //
+// exportCommandName is the cobra command name of `uptickd export`. The
+// export-diagnostics wrapping locates and recognizes the command by this name
+// in three places, so it is pinned as one constant.
+const exportCommandName = "export"
+
 // The command is located by name and its RunE is composed, rather than
 // reconstructed, so the SDK keeps owning the export logic. It reports whether
 // the command was found, so the caller can refuse to start a CLI whose export
 // silently lost the reporting step.
 func wrapExportCommand(rootCmd *cobra.Command) bool {
-	exportCmd, _, err := rootCmd.Find([]string{"export"})
-	if err != nil || exportCmd == nil || exportCmd.Name() != "export" || exportCmd.RunE == nil {
+	exportCmd, _, err := rootCmd.Find([]string{exportCommandName})
+	if err != nil || exportCmd == nil || exportCmd.Name() != exportCommandName || exportCmd.RunE == nil {
 		return false
 	}
 	exportCmd.RunE = composeExportRunE(exportCmd.RunE)
@@ -484,7 +489,7 @@ func wrapExportCommand(rootCmd *cobra.Command) bool {
 // serverCtx.Logger to the app creator), so this one swap covers every log
 // line an export can produce.
 func keepExportStdoutClean(cmd *cobra.Command) error {
-	if cmd.Name() != "export" {
+	if cmd.Name() != exportCommandName {
 		return nil
 	}
 	serverCtx := server.GetServerContextFromCmd(cmd)

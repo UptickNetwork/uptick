@@ -42,7 +42,7 @@ var (
 const (
 	// devVersion marks a binary that no release build produced. It is
 	// deliberately not the empty string: an unversioned binary has to be
-	// recognisable as exactly that, and never look like a release.
+	// recognizable as exactly that, and never look like a release.
 	devVersion = "dev"
 
 	// unknownBuildDate is what a build that injected no date reports. Go records
