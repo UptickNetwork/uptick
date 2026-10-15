@@ -4,8 +4,6 @@ on:
   pull_request:
   push:
     branches:
-      - development
-      - release/v0.4.0
       - release/**
 
 # Audit O-05: every third-party action below is pinned to an immutable commit
