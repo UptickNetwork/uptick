@@ -26,7 +26,7 @@ PACKAGES_NOSIMULATION=$(shell go list ./... | grep -v '/simulation')
 PACKAGES_SIMTEST=$(shell go list ./... | grep '/simulation')
 
 # TMVERSION is expanded at parse time, i.e. for EVERY target, so the `go` call is
-# guarded: a pure-git target (e.g. check-v040-frozen) must not print
+# guarded: a pure-git target (e.g. check-doc-make-targets) must not print
 # "/bin/sh: go: command not found" on a machine without Go.
 TMVERSION := $(shell command -v go >/dev/null 2>&1 && go list -m github.com/cometbft/cometbft | sed 's:.* ::')
 COMMIT := $(shell git log -1 --format='%H')
@@ -369,21 +369,6 @@ build-docs-versioned:
 ###############################################################################
 ###                          Repository invariants                          ###
 ###############################################################################
-
-# Keep app/upgrades/v040/ pinned to known content, and require every surviving
-# (frontier) change to the pin (scripts/v040-frozen.sha256) to be a `fix(v040):`
-# commit. Rationale, rejected designs and residual gaps (including the accepted
-# forgery cost): see scripts/check-v040-frozen.sh.
-check-v040-frozen:
-	@./scripts/check-v040-frozen.sh
-.PHONY: check-v040-frozen
-
-# Regenerate scripts/v040-frozen.sha256 from the working tree. Remediation for
-# an intentional v040 change: edit, run this target, then commit the file changes
-# AND the refreshed manifest TOGETHER in ONE `fix(v040):` commit.
-v040-frozen-manifest:
-	@./scripts/check-v040-frozen.sh --write-manifest
-.PHONY: v040-frozen-manifest
 
 # CONTRIBUTING.md advertises `make <target>` commands, so it is a contract: this
 # fails when a documented target has no rule here (the `make test-import` gate
