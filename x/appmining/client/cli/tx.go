@@ -178,6 +178,10 @@ func CmdSubmitAttestation() *cobra.Command {
 					ResultCommitment:   result,
 					RewardRequested:    args[5],
 					GasCreditRequested: gasCredit,
+					// ValidateBasic runs validateAttestationFields, which requires
+					// attestation.submitter to be a valid bech32; the keeper overwrites
+					// it from msg.submitter at execution time.
+					Submitter: clientCtx.GetFromAddress().String(),
 				},
 			}
 			return tx.GenerateOrBroadcastTxCLI(clientCtx, cmd.Flags(), msg)

@@ -42,4 +42,5 @@ var (
 	ErrGasPayerLimitExceeded   = sdkerrors.Register(ModuleName, 36, "gas payer limit exceeded")
 	ErrApplicationRevoked      = sdkerrors.Register(ModuleName, 37, "application is permanently revoked")
 	ErrInvalidStatusTransition = sdkerrors.Register(ModuleName, 38, "invalid application status transition")
+	ErrInvalidAddress          = sdkerrors.Register(ModuleName, 39, "invalid account address")
 )

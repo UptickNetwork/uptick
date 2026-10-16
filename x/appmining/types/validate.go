@@ -3,6 +3,7 @@ package types
 import (
 	"encoding/base64"
 
+	sdkerrors "cosmossdk.io/errors"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
@@ -37,10 +38,12 @@ func ValidateOptionalCommitment(h []byte) error {
 	return ValidateHash(h)
 }
 
-// ValidateAddress checks bech32 account address.
+// ValidateAddress checks bech32 account address. Returns ErrInvalidAddress
+// (not ErrUnauthorized) so that malformed addresses are distinguishable from
+// signer-identity failures in ValidateBasic paths.
 func ValidateAddress(addr string) error {
 	if _, err := sdk.AccAddressFromBech32(addr); err != nil {
-		return ErrUnauthorized
+		return sdkerrors.Wrapf(ErrInvalidAddress, "malformed bech32 address %q: %v", addr, err)
 	}
 	return nil
 }
