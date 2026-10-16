@@ -38,4 +38,8 @@ var (
 	ErrPauseOnlyTrue           = sdkerrors.Register(ModuleName, 32, "pause can only set bits to true")
 	ErrResumeRequiresAuthority = sdkerrors.Register(ModuleName, 33, "resume requires params authority")
 	ErrGasPayerAlreadyBound    = sdkerrors.Register(ModuleName, 34, "gas payer already bound to another application")
+	ErrManualConsumeDisabled   = sdkerrors.Register(ModuleName, 35, "manual MsgConsumeGasCredit disabled; use PostHandler auto-debit")
+	ErrGasPayerLimitExceeded   = sdkerrors.Register(ModuleName, 36, "gas payer limit exceeded")
+	ErrApplicationRevoked      = sdkerrors.Register(ModuleName, 37, "application is permanently revoked")
+	ErrInvalidStatusTransition = sdkerrors.Register(ModuleName, 38, "invalid application status transition")
 )

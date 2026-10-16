@@ -62,9 +62,10 @@
     { "id": "AUTO_CONSUME_ENROLLED_PAYER", "input": { "gas_payer_enrolled": true, "gas_used": 42 }, "expect": "CREDIT_DEBITED_SOURCE_TX_RECORDED" },
     { "id": "AUTO_CONSUME_UNENROLLED_NOOP", "input": { "gas_payer_enrolled": false }, "expect": "NO_DEBIT" },
     { "id": "AUTO_CONSUME_INSUFFICIENT_SKIP", "input": { "balance": "5", "gas_used": 10 }, "expect": "SKIP_EVENT_NO_DEBIT_NO_TX_FAIL" },
-    { "id": "FUND_REWARD_POOL", "input": { "authority": true, "denom_allowlisted": true, "amount": "1000" }, "expect": "MODULE_BALANCE_INCREASED" },
-    { "id": "FUND_REWARD_POOL_UNAUTHORIZED", "input": { "authority": false }, "expect": "REJECT" },
-    { "id": "FUND_REWARD_POOL_DENOM_REJECTED", "input": { "denom_allowlisted": false }, "expect": "REJECT" }
+    { "id": "FUND_REWARD_POOL", "input": { "funder_any_allowlisted_holder": true, "amount": "1000" }, "expect": "REWARD_POOL_BALANCE_INCREASED" },
+    { "id": "FUND_REWARD_POOL_DENOM_REJECTED", "input": { "denom_allowlisted": false }, "expect": "REJECT" },
+    { "id": "FAILED_TX_NO_GAS_CREDIT_DEBIT", "input": { "success": false, "paths": ["cosmos", "cosmwasm", "evm"] }, "expect": "NO_DEBIT" },
+    { "id": "CHALLENGE_BOND_SEGREGATED_FROM_REWARD_POOL", "input": { "open_challenge": true }, "expect": "BOND_IN_ESCROW_NOT_REWARD_POOL" }
   ],
   "chain_supplied_not_machine_portable": [
     { "id": "UPGRADE_MIGRATION", "reason": "requires upgrade handler harness and multi-validator rehearsal", "reference": "request package 05 §5" }

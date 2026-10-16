@@ -3,6 +3,7 @@ package types
 const (
 	EventTypeApplicationRegistered    = "application_registered"
 	EventTypeApplicationStatusChanged = "application_status_changed"
+	EventTypeSubmitterRotated         = "attestation_submitter_rotated"
 	EventTypeAttestationSubmitted     = "attestation_submitted"
 	EventTypeAttestationChallenged    = "attestation_challenged"
 	EventTypeChallengeResolved        = "challenge_resolved"
@@ -21,7 +22,9 @@ const (
 	AttributeKeyOwner           = "owner"
 	AttributeKeyBondFlow        = "bond_flow" // slash_in | refund_in
 	AttributeKeySubmitter       = "submitter"
+	AttributeKeyPrevSubmitter   = "previous_submitter"
 	AttributeKeyAuthority       = "authority"
+	AttributeKeyFunder          = "funder"
 	AttributeKeyOldStatus       = "old_status"
 	AttributeKeyNewStatus       = "new_status"
 	AttributeKeyEpoch           = "epoch"

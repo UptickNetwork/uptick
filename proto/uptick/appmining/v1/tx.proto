@@ -27,6 +27,7 @@ service Msg {
   }
   rpc GrantGasPayer(MsgGrantGasPayer) returns (MsgGrantGasPayerResponse);
   rpc RevokeGasPayer(MsgRevokeGasPayer) returns (MsgRevokeGasPayerResponse);
+  rpc SetAttestationSubmitter(MsgSetAttestationSubmitter) returns (MsgSetAttestationSubmitterResponse);
   rpc ConsumeGasCredit(MsgConsumeGasCredit) returns (MsgConsumeGasCreditResponse) {
     option (google.api.http).post = "/uptick/appmining/v1/tx/consume_gas_credit";
   }
@@ -47,6 +48,7 @@ message MsgRegisterApplication {
   bytes app_id = 2;
   string owner = 3;
   string attestation_submitter = 4;
+  bytes metadata_commitment = 5; // optional; empty or exactly 32 bytes
 }
 
 message MsgRegisterApplicationResponse {}
@@ -112,6 +114,15 @@ message MsgRevokeGasPayer {
 
 message MsgRevokeGasPayerResponse {}
 
+message MsgSetAttestationSubmitter {
+  option (cosmos.msg.v1.signer) = "owner";
+  string owner = 1;
+  bytes app_id = 2;
+  string attestation_submitter = 3;
+}
+
+message MsgSetAttestationSubmitterResponse {}
+
 message MsgConsumeGasCredit {
   option (cosmos.msg.v1.signer) = "gas_payer";
   string gas_payer = 1;
@@ -159,10 +170,12 @@ message MsgPause {
 
 message MsgPauseResponse {}
 
-// MsgFundRewardPool deposits coins into the appmining module account (authority-only).
+// MsgFundRewardPool deposits coins into appmining_reward_pool.
+// Any allowlisted-denom holder may fund (funder ≠ governance authority on purpose:
+// gov module accounts cannot practically sign/hold spendable balances).
 message MsgFundRewardPool {
-  option (cosmos.msg.v1.signer) = "authority";
-  string authority = 1;
+  option (cosmos.msg.v1.signer) = "funder";
+  string funder = 1;
   string denom = 2;
   string amount = 3;
 }

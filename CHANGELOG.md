@@ -162,8 +162,8 @@ Ref: https://keepachangelog.com/en/1.0.0/
 
 * (appmining) New `x/appmining` module for UGE application-mining settlement: registry, epoch budget, attestation,
   challenge (incl. SUPERSEDED), settlement, gas-credit account/consumption, pagination queries, `MsgFundRewardPool`
-  (authority-only, allowlisted denoms), and PostHandler auto-debit for enrolled Cosmos/WASM fee payers and EVM
-  senders (ledger only; no bank/ETH fee offset).
+  (permissionless allowlisted-denom funder → `appmining_reward_pool`), segregated `appmining_challenge_escrow`,
+  and PostHandler auto-debit **only on successful** enrolled Cosmos/WASM/EVM txs (ledger only; no fee offset).
 * (tooling) `make check-clock-skew` (`scripts/check-clock-skew.sh`): preflight a node's clock against the
   `consensus.block_time_tolerance` cometbft enforces from v0.38.22. Block time tracks the network's median clock,
   so the host that trips the check is the slow one: at the `1m0s` default, a node more than 60s behind rejects

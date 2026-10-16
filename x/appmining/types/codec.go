@@ -19,6 +19,7 @@ func RegisterInterfaces(registry codectypes.InterfaceRegistry) {
 		&MsgFinalizeAttestation{},
 		&MsgGrantGasPayer{},
 		&MsgRevokeGasPayer{},
+		&MsgSetAttestationSubmitter{},
 		&MsgConsumeGasCredit{},
 		&MsgSetEpochBudget{},
 		&MsgUpdateParams{},
@@ -38,6 +39,7 @@ func RegisterLegacyAminoCodec(cdc *codec.LegacyAmino) {
 	cdc.RegisterConcrete(&MsgFinalizeAttestation{}, "appmining/FinalizeAttestation", nil)
 	cdc.RegisterConcrete(&MsgGrantGasPayer{}, "appmining/GrantGasPayer", nil)
 	cdc.RegisterConcrete(&MsgRevokeGasPayer{}, "appmining/RevokeGasPayer", nil)
+	cdc.RegisterConcrete(&MsgSetAttestationSubmitter{}, "appmining/SetAttestationSubmitter", nil)
 	cdc.RegisterConcrete(&MsgConsumeGasCredit{}, "appmining/ConsumeGasCredit", nil)
 	cdc.RegisterConcrete(&MsgSetEpochBudget{}, "appmining/SetEpochBudget", nil)
 	cdc.RegisterConcrete(&MsgUpdateParams{}, "appmining/UpdateParams", nil)

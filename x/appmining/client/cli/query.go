@@ -29,6 +29,7 @@ func GetQueryCmd() *cobra.Command {
 		CmdQueryEpochBudget(),
 		CmdQueryAttestation(),
 		CmdQueryAttestations(),
+		CmdQueryChallenge(),
 		CmdQuerySettlement(),
 		CmdQuerySettlements(),
 		CmdQueryOpenChallenges(),
@@ -128,6 +129,31 @@ func CmdQueryAttestation() *cobra.Command {
 				return err
 			}
 			res, err := types.NewQueryClient(clientCtx).Attestation(cmd.Context(), &types.QueryAttestationRequest{AppId: appID, Epoch: epoch})
+			if err != nil {
+				return err
+			}
+			return clientCtx.PrintProto(res)
+		},
+	}
+	flags.AddQueryFlagsToCmd(cmd)
+	return cmd
+}
+
+func CmdQueryChallenge() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "challenge [challenge-id]",
+		Short: "Query a challenge by id",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			clientCtx, err := client.GetClientQueryContext(cmd)
+			if err != nil {
+				return err
+			}
+			id, err := strconv.ParseUint(args[0], 10, 64)
+			if err != nil {
+				return fmt.Errorf("challenge-id: %w", err)
+			}
+			res, err := types.NewQueryClient(clientCtx).Challenge(cmd.Context(), &types.QueryChallengeRequest{ChallengeId: id})
 			if err != nil {
 				return err
 			}

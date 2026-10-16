@@ -76,6 +76,7 @@ func TestSuspendedApplicationBlocksAll(t *testing.T) {
 	})
 	require.ErrorIs(t, err, types.ErrApplicationNotActive)
 
+	enableManualConsume(t, e2)
 	_, err = e2.server.ConsumeGasCredit(e2.ctx, &types.MsgConsumeGasCredit{
 		GasPayer: e2.payer.String(), AppId: appID2, Amount: "1", SourceTxHash: hash32(0x88),
 	})

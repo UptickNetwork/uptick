@@ -5,6 +5,8 @@ import (
 	"strconv"
 
 	sdkerrors "cosmossdk.io/errors"
+	sdkmath "cosmossdk.io/math"
+	storetypes "cosmossdk.io/store/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
 
@@ -34,12 +36,16 @@ func (k msgServer) RegisterApplication(goCtx context.Context, msg *types.MsgRegi
 	if _, found := k.GetApplication(ctx, msg.AppId); found {
 		return nil, types.ErrApplicationExists
 	}
+	if err := types.ValidateOptionalCommitment(msg.MetadataCommitment); err != nil {
+		return nil, err
+	}
 	app := types.Application{
 		AppId:                msg.AppId,
 		Owner:                msg.Owner,
 		AttestationSubmitter: msg.AttestationSubmitter,
 		GasPayers:            nil,
 		Status:               types.ApplicationStatusActive,
+		MetadataCommitment:   msg.MetadataCommitment,
 	}
 	k.SetApplication(ctx, app)
 	ctx.EventManager().EmitEvent(eventWithAppID(
@@ -59,6 +65,9 @@ func (k msgServer) SetApplicationStatus(goCtx context.Context, msg *types.MsgSet
 	app, found := k.GetApplication(ctx, msg.AppId)
 	if !found {
 		return nil, types.ErrApplicationNotFound
+	}
+	if err := types.CanSetApplicationStatus(app.Status, msg.Status); err != nil {
+		return nil, err
 	}
 	old := app.Status
 	app.Status = msg.Status
@@ -104,6 +113,15 @@ func (k msgServer) SubmitAttestation(goCtx context.Context, msg *types.MsgSubmit
 	if err := types.CanSubmitAttestation(app, existingPtr, att.Epoch); err != nil {
 		return nil, err
 	}
+	// Soft reservation: pending non-terminal charges for this epoch + this
+	// request must fit in remaining budget (first-writer wins; no proto field).
+	charge, err := types.AttestationBudgetCharge(att)
+	if err != nil {
+		return nil, err
+	}
+	if err := k.ensureEpochBudgetRoom(ctx, budget, charge); err != nil {
+		return nil, err
+	}
 
 	height := ctx.BlockHeight()
 	att.Submitter = msg.Submitter
@@ -147,7 +165,7 @@ func (k msgServer) ChallengeAttestation(goCtx context.Context, msg *types.MsgCha
 		return nil, err
 	}
 	coin := sdk.NewCoin(params.ChallengeBondDenom, bondAmt)
-	if err := k.bank.SendCoinsFromAccountToModule(ctx, challenger, types.ModuleName, sdk.NewCoins(coin)); err != nil {
+	if err := k.bank.SendCoinsFromAccountToModule(ctx, challenger, types.ChallengeEscrowName, sdk.NewCoins(coin)); err != nil {
 		return nil, sdkerrors.Wrap(err, "escrow challenge bond")
 	}
 
@@ -205,9 +223,12 @@ func (k msgServer) ResolveChallenge(goCtx context.Context, msg *types.MsgResolve
 	coin := sdk.NewCoin(chal.BondDenom, bondAmt)
 	bondFlow := "refund_in"
 	if msg.Uphold {
-		// Bond stays in module reward pool as slash_in (Q-05); does not change epoch limit/spent.
+		// Slash bond: move from challenge escrow into reward pool (Q-05).
 		att.Status = types.AttestationStatusRejected
 		bondFlow = "slash_in"
+		if err := k.bank.SendCoinsFromModuleToModule(ctx, types.ChallengeEscrowName, types.RewardPoolName, sdk.NewCoins(coin)); err != nil {
+			return nil, sdkerrors.Wrap(err, "slash challenge bond into reward pool")
+		}
 		// Supersede every other OPEN challenge and fully refund their bonds (Q-04).
 		for _, oid := range k.ListOpenChallengeIDs(ctx, chal.AppId, chal.Epoch) {
 			if oid == chal.ChallengeId {
@@ -230,7 +251,7 @@ func (k msgServer) ResolveChallenge(goCtx context.Context, msg *types.MsgResolve
 				return nil, err
 			}
 			otherCoin := sdk.NewCoin(other.BondDenom, otherAmt)
-			if err := k.bank.SendCoinsFromModuleToAccount(ctx, types.ModuleName, otherAddr, sdk.NewCoins(otherCoin)); err != nil {
+			if err := k.bank.SendCoinsFromModuleToAccount(ctx, types.ChallengeEscrowName, otherAddr, sdk.NewCoins(otherCoin)); err != nil {
 				return nil, sdkerrors.Wrapf(err, "refund superseded challenge %d", oid)
 			}
 			k.SetChallenge(ctx, other)
@@ -246,7 +267,7 @@ func (k msgServer) ResolveChallenge(goCtx context.Context, msg *types.MsgResolve
 		if err != nil {
 			return nil, err
 		}
-		if err := k.bank.SendCoinsFromModuleToAccount(ctx, types.ModuleName, challenger, sdk.NewCoins(coin)); err != nil {
+		if err := k.bank.SendCoinsFromModuleToAccount(ctx, types.ChallengeEscrowName, challenger, sdk.NewCoins(coin)); err != nil {
 			return nil, sdkerrors.Wrap(err, "refund challenge bond")
 		}
 		if !k.HasOpenChallenge(ctx, chal.AppId, chal.Epoch) && att.Status != types.AttestationStatusRejected {
@@ -307,8 +328,8 @@ func (k msgServer) FinalizeAttestation(goCtx context.Context, msg *types.MsgFina
 		return nil, err
 	}
 	if !rewardAmt.IsZero() {
-		modAddr := k.ak.GetModuleAddress(types.ModuleName)
-		bal := k.bank.GetBalance(ctx, modAddr, budget.Denom)
+		poolAddr := k.ak.GetModuleAddress(types.RewardPoolName)
+		bal := k.bank.GetBalance(ctx, poolAddr, budget.Denom)
 		if bal.Amount.LT(rewardAmt) {
 			return nil, types.ErrPoolInsufficient
 		}
@@ -316,7 +337,7 @@ func (k msgServer) FinalizeAttestation(goCtx context.Context, msg *types.MsgFina
 		if err != nil {
 			return nil, err
 		}
-		if err := k.bank.SendCoinsFromModuleToAccount(ctx, types.ModuleName, owner, sdk.NewCoins(sdk.NewCoin(budget.Denom, rewardAmt))); err != nil {
+		if err := k.bank.SendCoinsFromModuleToAccount(ctx, types.RewardPoolName, owner, sdk.NewCoins(sdk.NewCoin(budget.Denom, rewardAmt))); err != nil {
 			return nil, sdkerrors.Wrap(err, "release reward")
 		}
 	}
@@ -374,6 +395,9 @@ func (k msgServer) GrantGasPayer(goCtx context.Context, msg *types.MsgGrantGasPa
 	if !found {
 		return nil, types.ErrApplicationNotFound
 	}
+	if app.Status == types.ApplicationStatusRevoked {
+		return nil, types.ErrApplicationRevoked
+	}
 	if msg.Owner != app.Owner {
 		return nil, types.ErrUnauthorized
 	}
@@ -382,12 +406,40 @@ func (k msgServer) GrantGasPayer(goCtx context.Context, msg *types.MsgGrantGasPa
 			return &types.MsgGrantGasPayerResponse{}, nil
 		}
 	}
+	params := k.GetParams(ctx)
+	if uint32(len(app.GasPayers)) >= params.EffectiveMaxGasPayers() {
+		return nil, types.ErrGasPayerLimitExceeded
+	}
 	if err := k.SetGasPayerIndex(ctx, msg.GasPayer, msg.AppId); err != nil {
 		return nil, err
 	}
 	app.GasPayers = append(app.GasPayers, msg.GasPayer)
 	k.SetApplication(ctx, app)
 	return &types.MsgGrantGasPayerResponse{}, nil
+}
+
+func (k msgServer) SetAttestationSubmitter(goCtx context.Context, msg *types.MsgSetAttestationSubmitter) (*types.MsgSetAttestationSubmitterResponse, error) {
+	ctx := sdk.UnwrapSDKContext(goCtx)
+	app, found := k.GetApplication(ctx, msg.AppId)
+	if !found {
+		return nil, types.ErrApplicationNotFound
+	}
+	if app.Status == types.ApplicationStatusRevoked {
+		return nil, types.ErrApplicationRevoked
+	}
+	if msg.Owner != app.Owner {
+		return nil, types.ErrUnauthorized
+	}
+	old := app.AttestationSubmitter
+	app.AttestationSubmitter = msg.AttestationSubmitter
+	k.SetApplication(ctx, app)
+	ctx.EventManager().EmitEvent(eventWithAppID(
+		types.EventTypeSubmitterRotated, msg.AppId,
+		sdk.NewAttribute(types.AttributeKeyOwner, msg.Owner),
+		sdk.NewAttribute(types.AttributeKeyPrevSubmitter, old),
+		sdk.NewAttribute(types.AttributeKeySubmitter, msg.AttestationSubmitter),
+	))
+	return &types.MsgSetAttestationSubmitterResponse{}, nil
 }
 
 func (k msgServer) RevokeGasPayer(goCtx context.Context, msg *types.MsgRevokeGasPayer) (*types.MsgRevokeGasPayerResponse, error) {
@@ -413,6 +465,9 @@ func (k msgServer) RevokeGasPayer(goCtx context.Context, msg *types.MsgRevokeGas
 
 func (k msgServer) ConsumeGasCredit(goCtx context.Context, msg *types.MsgConsumeGasCredit) (*types.MsgConsumeGasCreditResponse, error) {
 	ctx := sdk.UnwrapSDKContext(goCtx)
+	if !k.GetParams(ctx).AllowManualGasCreditConsume {
+		return nil, types.ErrManualConsumeDisabled
+	}
 	remaining, err := k.Keeper.ConsumeGasCredit(ctx, msg.AppId, msg.GasPayer, msg.Amount, msg.SourceTxHash)
 	if err != nil {
 		return nil, err
@@ -434,6 +489,11 @@ func (k msgServer) SetEpochBudget(goCtx context.Context, msg *types.MsgSetEpochB
 		b.Spent = "0"
 	}
 	if existing, ok := k.GetEpochBudget(ctx, b.Epoch); ok {
+		// Denom is immutable once the epoch budget is opened (P0 audit).
+		if b.Denom != existing.Denom {
+			return nil, sdkerrors.Wrapf(types.ErrInvalidDenom,
+				"cannot change epoch %d denom from %s to %s", b.Epoch, existing.Denom, b.Denom)
+		}
 		// Do not decrease spent; preserve spent if re-setting limit upward only.
 		b.Spent = existing.Spent
 		b.OpenedHeight = existing.OpenedHeight
@@ -452,14 +512,17 @@ func (k msgServer) SetEpochBudget(goCtx context.Context, msg *types.MsgSetEpochB
 	} else if b.OpenedHeight == 0 {
 		b.OpenedHeight = ctx.BlockHeight()
 	}
-	limit, err := types.ParseAmount(b.Limit)
+	poolAddr := k.ak.GetModuleAddress(types.RewardPoolName)
+	bal := k.bank.GetBalance(ctx, poolAddr, b.Denom)
+	// Bound open commitments: sum(remaining limit) across non-closed budgets of
+	// this denom, substituting this message's new limit for the same epoch.
+	committed, err := k.openBudgetCommitment(ctx, b.Denom, b)
 	if err != nil {
 		return nil, err
 	}
-	modAddr := k.ak.GetModuleAddress(types.ModuleName)
-	bal := k.bank.GetBalance(ctx, modAddr, b.Denom)
-	if bal.Amount.LT(limit) {
-		return nil, sdkerrors.Wrapf(types.ErrPoolInsufficient, "pool %s < limit %s", bal.Amount, limit)
+	if bal.Amount.LT(committed) {
+		return nil, sdkerrors.Wrapf(types.ErrPoolInsufficient,
+			"reward pool %s < open budget commitment %s (incl. epoch %d)", bal.Amount, committed, b.Epoch)
 	}
 	k.StoreEpochBudget(ctx, b)
 	ctx.EventManager().EmitEvent(sdk.NewEvent(
@@ -518,9 +581,9 @@ func (k msgServer) Pause(goCtx context.Context, msg *types.MsgPause) (*types.Msg
 func (k msgServer) FundRewardPool(goCtx context.Context, msg *types.MsgFundRewardPool) (*types.MsgFundRewardPoolResponse, error) {
 	ctx := sdk.UnwrapSDKContext(goCtx)
 	params := k.GetParams(ctx)
-	if msg.Authority != params.Authority {
-		return nil, sdkerrors.Wrap(types.ErrUnauthorized, "not params authority")
-	}
+	// Permissionless deposit into reward pool (allowlisted denoms only).
+	// Governance authority remains separate for budgets/params (gov accounts
+	// cannot practically hold/spend liquid balances as Msg funders).
 	if !types.DenomAllowed(params, msg.Denom) {
 		return nil, types.ErrInvalidDenom
 	}
@@ -531,20 +594,117 @@ func (k msgServer) FundRewardPool(goCtx context.Context, msg *types.MsgFundRewar
 	if !amt.IsPositive() {
 		return nil, sdkerrors.Wrap(types.ErrInvalidAmount, "fund amount must be > 0")
 	}
-	from, err := sdk.AccAddressFromBech32(msg.Authority)
+	from, err := sdk.AccAddressFromBech32(msg.Funder)
 	if err != nil {
 		return nil, err
 	}
 	coins := sdk.NewCoins(sdk.NewCoin(msg.Denom, amt))
-	if err := k.bank.SendCoinsFromAccountToModule(ctx, from, types.ModuleName, coins); err != nil {
+	if err := k.bank.SendCoinsFromAccountToModule(ctx, from, types.RewardPoolName, coins); err != nil {
 		return nil, err
 	}
 	ctx.EventManager().EmitEvent(sdk.NewEvent(
 		types.EventTypeRewardPoolFunded,
-		sdk.NewAttribute(types.AttributeKeyAuthority, msg.Authority),
+		sdk.NewAttribute(types.AttributeKeyFunder, msg.Funder),
 		sdk.NewAttribute(types.AttributeKeyDenom, msg.Denom),
 		sdk.NewAttribute(types.AttributeKeyAmount, msg.Amount),
 		sdk.NewAttribute(types.AttributeKeyHeight, strconv.FormatInt(ctx.BlockHeight(), 10)),
 	))
 	return &types.MsgFundRewardPoolResponse{}, nil
+}
+
+// ensureEpochBudgetRoom rejects submit when spent + pending non-terminal
+// charges + thisCharge would exceed the epoch limit.
+func (k Keeper) ensureEpochBudgetRoom(ctx sdk.Context, budget types.EpochBudget, thisCharge string) error {
+	remaining, err := remainingBudget(budget)
+	if err != nil {
+		return err
+	}
+	pending, err := k.pendingEpochCharge(ctx, budget.Epoch)
+	if err != nil {
+		return err
+	}
+	add, err := types.ParseAmount(thisCharge)
+	if err != nil {
+		return err
+	}
+	if pending.Add(add).GT(remaining) {
+		return types.ErrBudgetExceeded
+	}
+	return nil
+}
+
+// pendingEpochCharge sums AttestationBudgetCharge for non-terminal attestations
+// in the given epoch.
+func (k Keeper) pendingEpochCharge(ctx sdk.Context, epoch uint64) (sdkmath.Int, error) {
+	total := sdkmath.ZeroInt()
+	store := k.store(ctx)
+	it := storetypes.KVStorePrefixIterator(store, types.KeyPrefixAttestation)
+	defer it.Close()
+	for ; it.Valid(); it.Next() {
+		var a types.AttestationCommitment
+		k.cdc.MustUnmarshal(it.Value(), &a)
+		if a.Epoch != epoch || !types.AttestationCountsTowardBudget(a.Status) {
+			continue
+		}
+		charge, err := types.AttestationBudgetCharge(a)
+		if err != nil {
+			return sdkmath.ZeroInt(), err
+		}
+		amt, err := types.ParseAmount(charge)
+		if err != nil {
+			return sdkmath.ZeroInt(), err
+		}
+		total = total.Add(amt)
+	}
+	return total, nil
+}
+
+// openBudgetCommitment returns sum(limit-spent) for non-closed budgets of denom,
+// using proposed as the value for its epoch (replace-or-insert).
+func (k Keeper) openBudgetCommitment(ctx sdk.Context, denom string, proposed types.EpochBudget) (sdkmath.Int, error) {
+	total := sdkmath.ZeroInt()
+	seen := false
+	store := k.store(ctx)
+	it := storetypes.KVStorePrefixIterator(store, types.KeyPrefixEpochBudget)
+	defer it.Close()
+	for ; it.Valid(); it.Next() {
+		var b types.EpochBudget
+		k.cdc.MustUnmarshal(it.Value(), &b)
+		if b.Denom != denom || b.Closed {
+			continue
+		}
+		cur := b
+		if b.Epoch == proposed.Epoch {
+			cur = proposed
+			seen = true
+		}
+		remaining, err := remainingBudget(cur)
+		if err != nil {
+			return sdkmath.ZeroInt(), err
+		}
+		total = total.Add(remaining)
+	}
+	if !seen && !proposed.Closed {
+		remaining, err := remainingBudget(proposed)
+		if err != nil {
+			return sdkmath.ZeroInt(), err
+		}
+		total = total.Add(remaining)
+	}
+	return total, nil
+}
+
+func remainingBudget(b types.EpochBudget) (sdkmath.Int, error) {
+	limit, err := types.ParseAmount(b.Limit)
+	if err != nil {
+		return sdkmath.ZeroInt(), err
+	}
+	spent, err := types.ParseAmount(b.Spent)
+	if err != nil {
+		return sdkmath.ZeroInt(), err
+	}
+	if spent.GT(limit) {
+		return sdkmath.ZeroInt(), types.ErrBudgetExceeded
+	}
+	return limit.Sub(spent), nil
 }

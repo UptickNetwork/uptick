@@ -14,6 +14,7 @@ var (
 	_ sdk.Msg = &MsgFinalizeAttestation{}
 	_ sdk.Msg = &MsgGrantGasPayer{}
 	_ sdk.Msg = &MsgRevokeGasPayer{}
+	_ sdk.Msg = &MsgSetAttestationSubmitter{}
 	_ sdk.Msg = &MsgConsumeGasCredit{}
 	_ sdk.Msg = &MsgSetEpochBudget{}
 	_ sdk.Msg = &MsgUpdateParams{}
@@ -34,6 +35,9 @@ func (m *MsgRegisterApplication) ValidateBasic() error {
 	}
 	if err := ValidateAddress(m.AttestationSubmitter); err != nil {
 		return sdkerrors.Wrap(errortypes.ErrInvalidAddress, "attestation_submitter")
+	}
+	if err := ValidateOptionalCommitment(m.MetadataCommitment); err != nil {
+		return err
 	}
 	return nil
 }
@@ -121,6 +125,27 @@ func (m *MsgFinalizeAttestation) ValidateBasic() error {
 
 func (m *MsgFinalizeAttestation) GetSigners() []sdk.AccAddress {
 	addr, err := sdk.AccAddressFromBech32(m.Caller)
+	if err != nil {
+		return nil
+	}
+	return []sdk.AccAddress{addr}
+}
+
+func (m *MsgSetAttestationSubmitter) ValidateBasic() error {
+	if err := ValidateAddress(m.Owner); err != nil {
+		return sdkerrors.Wrap(errortypes.ErrInvalidAddress, "owner")
+	}
+	if err := ValidateAppID(m.AppId); err != nil {
+		return err
+	}
+	if err := ValidateAddress(m.AttestationSubmitter); err != nil {
+		return sdkerrors.Wrap(errortypes.ErrInvalidAddress, "attestation_submitter")
+	}
+	return nil
+}
+
+func (m *MsgSetAttestationSubmitter) GetSigners() []sdk.AccAddress {
+	addr, err := sdk.AccAddressFromBech32(m.Owner)
 	if err != nil {
 		return nil
 	}
@@ -278,8 +303,8 @@ func (m *MsgPause) GetSigners() []sdk.AccAddress {
 }
 
 func (m *MsgFundRewardPool) ValidateBasic() error {
-	if err := ValidateAddress(m.Authority); err != nil {
-		return sdkerrors.Wrap(errortypes.ErrInvalidAddress, "authority")
+	if err := ValidateAddress(m.Funder); err != nil {
+		return sdkerrors.Wrap(errortypes.ErrInvalidAddress, "funder")
 	}
 	if err := sdk.ValidateDenom(m.Denom); err != nil {
 		return sdkerrors.Wrap(ErrInvalidDenom, err.Error())
@@ -298,7 +323,7 @@ func (m *MsgFundRewardPool) ValidateBasic() error {
 }
 
 func (m *MsgFundRewardPool) GetSigners() []sdk.AccAddress {
-	addr, err := sdk.AccAddressFromBech32(m.Authority)
+	addr, err := sdk.AccAddressFromBech32(m.Funder)
 	if err != nil {
 		return nil
 	}

@@ -46,6 +46,10 @@ func TestV051UpgradeHandlerAddsAppmining(t *testing.T) {
 		"appmining must be initialized at ConsensusVersion 1")
 
 	require.True(t, upgradeStore.Has([]byte(migrationsAppliedV051Key)))
+	require.NotNil(t, app.AccountKeeper.GetModuleAccount(ctx, appminingtypes.RewardPoolName),
+		"appmining_reward_pool module account must exist after upgrade")
+	require.NotNil(t, app.AccountKeeper.GetModuleAccount(ctx, appminingtypes.ChallengeEscrowName),
+		"appmining_challenge_escrow module account must exist after upgrade")
 	acc := app.AccountKeeper.GetModuleAccount(ctx, appminingtypes.ModuleName)
 	require.NotNil(t, acc)
 

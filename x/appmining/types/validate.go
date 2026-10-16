@@ -29,6 +29,14 @@ func ValidateHash(h []byte) error {
 	return nil
 }
 
+// ValidateOptionalCommitment accepts empty or exactly 32 bytes.
+func ValidateOptionalCommitment(h []byte) error {
+	if len(h) == 0 {
+		return nil
+	}
+	return ValidateHash(h)
+}
+
 // ValidateAddress checks bech32 account address.
 func ValidateAddress(addr string) error {
 	if _, err := sdk.AccAddressFromBech32(addr); err != nil {

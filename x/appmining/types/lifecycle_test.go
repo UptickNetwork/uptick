@@ -8,6 +8,19 @@ import (
 	"github.com/UptickNetwork/uptick/x/appmining/types"
 )
 
+func TestCanSetApplicationStatusRevokedPermanent(t *testing.T) {
+	require.NoError(t, types.CanSetApplicationStatus(
+		types.ApplicationStatusActive, types.ApplicationStatusRevoked))
+	require.NoError(t, types.CanSetApplicationStatus(
+		types.ApplicationStatusSuspended, types.ApplicationStatusActive))
+	require.ErrorIs(t, types.CanSetApplicationStatus(
+		types.ApplicationStatusRevoked, types.ApplicationStatusActive), types.ErrApplicationRevoked)
+	require.ErrorIs(t, types.CanSetApplicationStatus(
+		types.ApplicationStatusRevoked, types.ApplicationStatusSuspended), types.ErrApplicationRevoked)
+	require.NoError(t, types.CanSetApplicationStatus(
+		types.ApplicationStatusRevoked, types.ApplicationStatusRevoked))
+}
+
 func TestCanSubmitAttestationBlocksResubmit(t *testing.T) {
 	app := types.Application{Status: types.ApplicationStatusActive}
 	existing := &types.AttestationCommitment{Status: types.AttestationStatusChallenged}
@@ -34,6 +47,24 @@ func TestComputeSettlementAmountsRejectsZeroBudget(t *testing.T) {
 	budget := types.EpochBudget{Limit: "0", Spent: "0"}
 	_, _, _, err := types.ComputeSettlementAmounts(att, budget, 0)
 	require.ErrorIs(t, err, types.ErrBudgetUnavailable)
+}
+
+func TestComputeSettlementAmountsPureCredit(t *testing.T) {
+	att := types.AttestationCommitment{RewardRequested: "0", GasCreditRequested: "40"}
+	budget := types.EpochBudget{Limit: "100", Spent: "10"}
+	reward, credit, spent, err := types.ComputeSettlementAmounts(att, budget, 5000)
+	require.NoError(t, err)
+	require.Equal(t, "0", reward)
+	require.Equal(t, "40", credit)
+	require.Equal(t, "50", spent)
+
+	att.GasCreditRequested = "0"
+	_, _, _, err = types.ComputeSettlementAmounts(att, budget, 0)
+	require.ErrorIs(t, err, types.ErrBudgetUnavailable)
+
+	att.GasCreditRequested = "100"
+	_, _, _, err = types.ComputeSettlementAmounts(att, budget, 0)
+	require.ErrorIs(t, err, types.ErrBudgetExceeded)
 }
 
 func TestCanFinalizeOpenChallenge(t *testing.T) {

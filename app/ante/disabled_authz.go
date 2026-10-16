@@ -16,6 +16,8 @@ import (
 	connectiontypes "github.com/cosmos/ibc-go/v10/modules/core/03-connection/types"
 
 	upgradetypes "cosmossdk.io/x/upgrade/types"
+
+	appminingtypes "github.com/UptickNetwork/uptick/x/appmining/types"
 )
 
 // DisabledAuthzMsgTypeURLs is the set of message type URLs that cannot be granted
@@ -129,5 +131,30 @@ func DisabledAuthzMsgTypeURLs() []string {
 		// delegate it.
 		sdk.MsgTypeURL(&transfertypes.MsgTransfer{}),
 		sdk.MsgTypeURL(&nfttransfertypes.MsgTransfer{}),
+
+		// --- appmining: authority-gated -------------------------------------
+		//
+		// Same rationale as IBC authority msgs: gov module account cannot grant
+		// today, but the list asserts the partition if authority moves to a
+		// multisig/EOA. Pause uses pause_authority (may be a normal account).
+		sdk.MsgTypeURL(&appminingtypes.MsgRegisterApplication{}),
+		sdk.MsgTypeURL(&appminingtypes.MsgResolveChallenge{}),
+		sdk.MsgTypeURL(&appminingtypes.MsgSetEpochBudget{}),
+		sdk.MsgTypeURL(&appminingtypes.MsgUpdateParams{}),
+		sdk.MsgTypeURL(&appminingtypes.MsgSetApplicationStatus{}),
+		sdk.MsgTypeURL(&appminingtypes.MsgPause{}),
+
+		// --- appmining: owner / submitter / gas-payer keyed -----------------
+		//
+		// Live escalation if delegated via GenericAuthorization.
+		sdk.MsgTypeURL(&appminingtypes.MsgGrantGasPayer{}),
+		sdk.MsgTypeURL(&appminingtypes.MsgRevokeGasPayer{}),
+		sdk.MsgTypeURL(&appminingtypes.MsgSetAttestationSubmitter{}),
+		sdk.MsgTypeURL(&appminingtypes.MsgSubmitAttestation{}),
+		sdk.MsgTypeURL(&appminingtypes.MsgConsumeGasCredit{}),
+		// MsgChallengeAttestation moves the challenger's bond — same class as
+		// MsgTransfer (signer's own assets).
+		sdk.MsgTypeURL(&appminingtypes.MsgChallengeAttestation{}),
+		// Finalize / FundRewardPool stay grantable: permissionless identity.
 	}
 }

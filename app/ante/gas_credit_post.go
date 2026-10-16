@@ -44,7 +44,9 @@ func (d GasCreditPostDecorator) PostHandle(
 	simulate, success bool,
 	next sdk.PostHandler,
 ) (sdk.Context, error) {
-	if d.consumer != nil && !simulate {
+	// Fail-closed for the ledger: failed txs must NOT debit gas credit
+	// (Cosmos / CosmWasm / EVM share this PostHandler).
+	if d.consumer != nil && !simulate && success {
 		for _, t := range resolveGasCreditTargets(ctx, tx) {
 			if t.payer.Empty() || t.gas == 0 || len(t.txHash) != 32 {
 				continue
@@ -72,13 +74,19 @@ func resolveGasCreditTargets(ctx sdk.Context, tx sdk.Tx) []gasCreditTarget {
 			continue
 		}
 		hash := ethMsg.Hash().Bytes()
+		limit := ethTx.Gas()
+		// Prefer EVM-emitted txGasUsed, else SDK gas meter. Always clamp to the
+		// tx gas limit so forged/overstated events cannot debit above limit.
+		// Never fall back to ethTx.Gas() alone (that would debit the full limit).
 		gas := ethGasByHash[ethMsg.Hash().Hex()]
 		if gas == 0 {
-			// Fallback: meter after EVM ResetGasMeterAndConsumeGas, or tx gas limit.
 			gas = ctx.GasMeter().GasConsumed()
-			if gas == 0 {
-				gas = ethTx.Gas()
-			}
+		}
+		if gas > limit {
+			gas = limit
+		}
+		if gas == 0 {
+			continue
 		}
 		out = append(out, gasCreditTarget{
 			payer:  ethMsg.GetFrom(),

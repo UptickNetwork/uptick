@@ -10,6 +10,8 @@ import (
 	govv1beta1 "github.com/cosmos/cosmos-sdk/x/gov/types/v1beta1"
 	cosmosante "github.com/cosmos/evm/ante/cosmos"
 	"github.com/stretchr/testify/require"
+
+	appminingtypes "github.com/UptickNetwork/uptick/x/appmining/types"
 )
 
 func TestDisabledAuthzMsgTypeURLsIncludesGovV1Beta1(t *testing.T) {
@@ -38,6 +40,21 @@ func TestAuthzLimiterRejectsGovV1Beta1VoteInMsgExec(t *testing.T) {
 	_, err := dec.AnteHandle(sdk.Context{}, &mockTxWithMsgs{msgs: []sdk.Msg{&exec}}, false, next)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), sdk.MsgTypeURL(&govv1beta1.MsgVote{}))
+}
+
+func TestDisabledAuthzIncludesAppminingSensitiveMsgs(t *testing.T) {
+	urls := map[string]struct{}{}
+	for _, u := range DisabledAuthzMsgTypeURLs() {
+		urls[u] = struct{}{}
+	}
+	require.Contains(t, urls, sdk.MsgTypeURL(&appminingtypes.MsgUpdateParams{}))
+	require.Contains(t, urls, sdk.MsgTypeURL(&appminingtypes.MsgGrantGasPayer{}))
+	require.Contains(t, urls, sdk.MsgTypeURL(&appminingtypes.MsgSubmitAttestation{}))
+	require.Contains(t, urls, sdk.MsgTypeURL(&appminingtypes.MsgChallengeAttestation{}))
+	require.Contains(t, urls, sdk.MsgTypeURL(&appminingtypes.MsgPause{}))
+	// Permissionless surfaces stay grantable.
+	require.NotContains(t, urls, sdk.MsgTypeURL(&appminingtypes.MsgFinalizeAttestation{}))
+	require.NotContains(t, urls, sdk.MsgTypeURL(&appminingtypes.MsgFundRewardPool{}))
 }
 
 func TestAuthzLimiterAllowsBankSendInMsgExec(t *testing.T) {

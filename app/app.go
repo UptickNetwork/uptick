@@ -190,8 +190,10 @@ var (
 
 		cosmoserc20types.ModuleName: {authtypes.Minter, authtypes.Burner},
 
-		cw721types.ModuleName:     nil,
-		appminingtypes.ModuleName: nil, // reward-pool escrow; no mint/burn/withdraw Msg
+		cw721types.ModuleName:              nil,
+		appminingtypes.ModuleName:          nil, // module identity
+		appminingtypes.RewardPoolName:      nil, // settlement-releasable rewards only
+		appminingtypes.ChallengeEscrowName: nil, // open challenge bonds until resolve
 
 		// cosmosnft.ModuleName: retained because cosmossdk.io/x/nft/keeper.NewKeeper
 		// at app/keepers/keepers.go:332 (via x/collection/keeper.NewKeeper) requires

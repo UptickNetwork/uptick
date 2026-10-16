@@ -56,20 +56,16 @@ func TestVector_ZERO_BUDGET(t *testing.T) {
 	e := setupTest(t)
 	appID := registerApp(t, e)
 	setBudget(t, e, 1, "0")
+	// Soft reservation rejects at submit (REJECT_NO_RELEASE).
 	_, err := e.server.SubmitAttestation(e.ctx, &types.MsgSubmitAttestation{
 		Submitter:   e.sub.String(),
 		Attestation: sampleAttestation(appID, 1, "1"),
 	})
-	require.NoError(t, err)
-	e = e.withHeight(2000)
-	_, err = e.server.FinalizeAttestation(e.ctx, &types.MsgFinalizeAttestation{
-		Caller: e.owner.String(),
-		AppId:  appID,
-		Epoch:  1,
-	})
-	require.ErrorIs(t, err, types.ErrBudgetUnavailable)
+	require.ErrorIs(t, err, types.ErrBudgetExceeded)
 	_, found := e.k.GetSettlement(e.ctx, appID, 1)
 	require.False(t, found)
+	_, attFound := e.k.GetAttestation(e.ctx, appID, 1)
+	require.False(t, attFound)
 }
 
 func TestVector_OVER_BUDGET(t *testing.T) {
@@ -80,16 +76,11 @@ func TestVector_OVER_BUDGET(t *testing.T) {
 		Submitter:   e.sub.String(),
 		Attestation: sampleAttestation(appID, 1, "101"),
 	})
-	require.NoError(t, err)
-	e = e.withHeight(2000)
-	_, err = e.server.FinalizeAttestation(e.ctx, &types.MsgFinalizeAttestation{
-		Caller: e.owner.String(),
-		AppId:  appID,
-		Epoch:  1,
-	})
 	require.ErrorIs(t, err, types.ErrBudgetExceeded)
 	b, _ := e.k.GetEpochBudget(e.ctx, 1)
 	require.Equal(t, "0", b.Spent)
+	_, attFound := e.k.GetAttestation(e.ctx, appID, 1)
+	require.False(t, attFound)
 }
 
 func TestVector_DUPLICATE_ATTESTATION(t *testing.T) {
@@ -185,6 +176,7 @@ func TestVector_UNAUTHORIZED_SUBMITTER(t *testing.T) {
 
 func TestVector_UNAUTHORIZED_GAS_PAYER(t *testing.T) {
 	e := setupTest(t)
+	enableManualConsume(t, e)
 	appID := registerApp(t, e)
 	e.k.SetGasCredit(e.ctx, types.GasCreditAccount{
 		AppId: appID, Balance: "100", TotalIssued: "100", TotalConsumed: "0",
@@ -199,6 +191,7 @@ func TestVector_UNAUTHORIZED_GAS_PAYER(t *testing.T) {
 
 func TestVector_CREDIT_OVERSPEND(t *testing.T) {
 	e := setupTest(t)
+	enableManualConsume(t, e)
 	appID := registerApp(t, e)
 	_, err := e.server.GrantGasPayer(e.ctx, &types.MsgGrantGasPayer{
 		Owner: e.owner.String(), AppId: appID, GasPayer: e.payer.String(),
@@ -229,6 +222,7 @@ func TestVector_UNSUPPORTED_PROFILE(t *testing.T) {
 
 func TestVector_SOURCE_TX_REPLAY(t *testing.T) {
 	e := setupTest(t)
+	enableManualConsume(t, e)
 	appID := registerApp(t, e)
 	_, err := e.server.GrantGasPayer(e.ctx, &types.MsgGrantGasPayer{
 		Owner: e.owner.String(), AppId: appID, GasPayer: e.payer.String(),

@@ -12,6 +12,11 @@ const (
 	StoreKey   = ModuleName
 	RouterKey  = ModuleName
 
+	// RewardPoolName holds settlement-releasable reward funds only.
+	RewardPoolName = "appmining_reward_pool"
+	// ChallengeEscrowName holds open challenge bonds until resolve.
+	ChallengeEscrowName = "appmining_challenge_escrow"
+
 	// AppIDLength is the fixed length of app_id (SHA-256 digest).
 	AppIDLength = 32
 	// HashLength is the fixed length for attestation/evidence/result hashes.
@@ -20,11 +25,18 @@ const (
 	SourceTxHashLength = 32
 )
 
-// AccModuleAddress is the module account that holds the reward pool.
-var AccModuleAddress sdk.AccAddress
+// AccModuleAddress is the primary module address (legacy alias of reward pool).
+// Prefer AccRewardPoolAddress / AccChallengeEscrowAddress for fund movement.
+var (
+	AccModuleAddress          sdk.AccAddress
+	AccRewardPoolAddress      sdk.AccAddress
+	AccChallengeEscrowAddress sdk.AccAddress
+)
 
 func init() {
-	AccModuleAddress = authtypes.NewModuleAddress(ModuleName)
+	AccRewardPoolAddress = authtypes.NewModuleAddress(RewardPoolName)
+	AccChallengeEscrowAddress = authtypes.NewModuleAddress(ChallengeEscrowName)
+	AccModuleAddress = AccRewardPoolAddress
 }
 
 const (

@@ -85,6 +85,26 @@ func (b *mockBank) SendCoinsFromModuleToAccount(_ context.Context, senderModule 
 	return nil
 }
 
+func (b *mockBank) SendCoinsFromModuleToModule(_ context.Context, senderModule, recipientModule string, amt sdk.Coins) error {
+	from := authtypes.NewModuleAddress(senderModule)
+	to := authtypes.NewModuleAddress(recipientModule)
+	for _, c := range amt {
+		fk := b.key(from, c.Denom)
+		cur, ok := b.balances[fk]
+		if !ok || cur.LT(c.Amount) {
+			return types.ErrPoolInsufficient
+		}
+		b.balances[fk] = cur.Sub(c.Amount)
+		tk := b.key(to, c.Denom)
+		tv, ok := b.balances[tk]
+		if !ok {
+			tv = math.ZeroInt()
+		}
+		b.balances[tk] = tv.Add(c.Amount)
+	}
+	return nil
+}
+
 func (b *mockBank) fundModule(module, denom string, amount math.Int) {
 	mod := authtypes.NewModuleAddress(module)
 	b.balances[b.key(mod, denom)] = amount
@@ -141,7 +161,7 @@ func setupTest(t *testing.T) testEnv {
 	params.Authority = auth.String()
 	params.PauseAuthority = auth.String() // P0 default: same as authority; tests may split
 	require.NoError(t, k.SetParams(ctx, params))
-	bank.fundModule(types.ModuleName, params.ChallengeBondDenom, math.NewInt(1_000_000_000))
+	bank.fundModule(types.RewardPoolName, params.ChallengeBondDenom, math.NewInt(1_000_000_000))
 
 	return testEnv{
 		k:      k,
@@ -174,4 +194,13 @@ func hash32(seed byte) []byte {
 func (e testEnv) withHeight(h int64) testEnv {
 	e.ctx = e.ctx.WithBlockHeight(h)
 	return e
+}
+
+// enableManualConsume turns on MsgConsumeGasCredit for unit tests that exercise
+// the manual path (production default is PostHandler-only).
+func enableManualConsume(t *testing.T, e testEnv) {
+	t.Helper()
+	p := e.k.GetParams(e.ctx)
+	p.AllowManualGasCreditConsume = true
+	require.NoError(t, e.k.SetParams(e.ctx, p))
 }

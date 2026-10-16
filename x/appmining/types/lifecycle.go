@@ -2,6 +2,25 @@ package types
 
 import "fmt"
 
+// CanSetApplicationStatus enforces permanent Revoked and valid transitions.
+func CanSetApplicationStatus(from, to ApplicationStatus) error {
+	if to == ApplicationStatusUnspecified {
+		return ErrInvalidStatusTransition
+	}
+	if from == to {
+		return nil
+	}
+	if from == ApplicationStatusRevoked {
+		return ErrApplicationRevoked
+	}
+	switch to {
+	case ApplicationStatusActive, ApplicationStatusSuspended, ApplicationStatusRevoked:
+		return nil
+	default:
+		return ErrInvalidStatusTransition
+	}
+}
+
 // CanSubmitAttestation enforces uniqueness and non-overwrite (BLOCK-1 fix).
 // existing may be nil when no record exists.
 func CanSubmitAttestation(app Application, existing *AttestationCommitment, epoch uint64) error {
@@ -53,11 +72,8 @@ func ApplyResolveChallenge(
 		att.Status = AttestationStatusRejected
 	} else {
 		chal.Status = ChallengeStatusRejected
-		// Restore challenge window status if no other open challenges remain —
-		// caller must decide based on open-challenge index.
-		if att.Status == AttestationStatusChallenged {
-			att.Status = AttestationStatusChallengeWindow
-		}
+		// Keep Challenged while other OPENs may remain; caller restores
+		// CHALLENGE_WINDOW only after confirming HasOpenChallenge is false.
 	}
 	return att, chal, nil
 }
@@ -83,9 +99,43 @@ func CanFinalize(att AttestationCommitment, height int64, hasOpenChallenge bool)
 	return nil
 }
 
-// ComputeSettlementAmounts validates budget and returns reward/credit split of
-// reward_requested. gas_credit_requested is informational; issued credit comes
-// from gas_credit_share_bps of reward_requested (chain-enforced D-09).
+// AttestationBudgetCharge is the amount counted against epoch budget for an
+// attestation: reward_requested, or gas_credit_requested when reward is zero.
+func AttestationBudgetCharge(att AttestationCommitment) (string, error) {
+	if err := ValidateAmountString(att.RewardRequested); err != nil {
+		return "", err
+	}
+	if IsZeroAmount(att.RewardRequested) {
+		if err := ValidateAmountString(att.GasCreditRequested); err != nil {
+			return "", err
+		}
+		if IsZeroAmount(att.GasCreditRequested) {
+			return "", ErrBudgetUnavailable
+		}
+		return att.GasCreditRequested, nil
+	}
+	return att.RewardRequested, nil
+}
+
+// AttestationCountsTowardBudget reports whether the attestation still holds a
+// budget claim (not yet settled or rejected).
+func AttestationCountsTowardBudget(status AttestationStatus) bool {
+	switch status {
+	case AttestationStatusFinalized, AttestationStatusRejected:
+		return false
+	default:
+		return true
+	}
+}
+
+// ComputeSettlementAmounts validates budget and returns reward/credit split.
+//
+// When reward_requested > 0: credit = share_bps of reward_requested (D-09);
+// gas_credit_requested is informational. Budget spent increases by reward_requested.
+//
+// When reward_requested = 0 (Q-03 pure-credit): credit = gas_credit_requested
+// (must be > 0); no bank reward. Budget spent increases by gas_credit_requested
+// so epoch limits still cap credit issuance.
 func ComputeSettlementAmounts(
 	att AttestationCommitment,
 	budget EpochBudget,
@@ -94,12 +144,8 @@ func ComputeSettlementAmounts(
 	if budget.Closed {
 		return "", "", "", ErrInvalidEpoch
 	}
-	if IsZeroAmount(budget.Limit) || IsZeroAmount(att.RewardRequested) {
+	if IsZeroAmount(budget.Limit) {
 		return "", "", "", ErrBudgetUnavailable
-	}
-	requested, err := ParseAmount(att.RewardRequested)
-	if err != nil {
-		return "", "", "", err
 	}
 	spent, err := ParseAmount(budget.Spent)
 	if err != nil {
@@ -110,6 +156,28 @@ func ComputeSettlementAmounts(
 		return "", "", "", err
 	}
 	remaining := limit.Sub(spent)
+
+	if IsZeroAmount(att.RewardRequested) {
+		if err := ValidateAmountString(att.GasCreditRequested); err != nil {
+			return "", "", "", err
+		}
+		if IsZeroAmount(att.GasCreditRequested) {
+			return "", "", "", ErrBudgetUnavailable
+		}
+		creditAmt, err := ParseAmount(att.GasCreditRequested)
+		if err != nil {
+			return "", "", "", err
+		}
+		if creditAmt.GT(remaining) {
+			return "", "", "", ErrBudgetExceeded
+		}
+		return "0", att.GasCreditRequested, AmountString(spent.Add(creditAmt)), nil
+	}
+
+	requested, err := ParseAmount(att.RewardRequested)
+	if err != nil {
+		return "", "", "", err
+	}
 	if requested.GT(remaining) {
 		return "", "", "", ErrBudgetExceeded
 	}

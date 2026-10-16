@@ -63,6 +63,10 @@ message Params {
   string pause_authority = 8;
   // governance-approved reward denoms (Q-08)
   repeated string reward_denom_allowlist = 9;
+  // max gas payers per application (0 = use module default 16)
+  uint32 max_gas_payers = 10;
+  // when false (default), MsgConsumeGasCredit is rejected; PostHandler auto-debit remains
+  bool allow_manual_gas_credit_consume = 11;
 }
 
 message Application {
@@ -71,6 +75,8 @@ message Application {
   string attestation_submitter = 3;
   repeated string gas_payers = 4;
   ApplicationStatus status = 5;
+  // opaque 32-byte metadata commitment (empty allowed until set)
+  bytes metadata_commitment = 6;
 }
 
 message EpochBudget {

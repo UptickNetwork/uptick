@@ -12,9 +12,12 @@ func (k Keeper) InitGenesis(ctx sdk.Context, gs types.GenesisState) {
 	if err := types.ValidateGenesis(gs); err != nil {
 		panic(err)
 	}
-	// Ensure the reward-pool module account exists (genesis and upgrade InitGenesis).
-	if acc := k.ak.GetModuleAccount(ctx, types.ModuleName); acc == nil {
-		panic("the appmining module account has not been set")
+	// Ensure segregated fund accounts exist (genesis and upgrade InitGenesis).
+	if acc := k.ak.GetModuleAccount(ctx, types.RewardPoolName); acc == nil {
+		panic("the appmining_reward_pool module account has not been set")
+	}
+	if acc := k.ak.GetModuleAccount(ctx, types.ChallengeEscrowName); acc == nil {
+		panic("the appmining_challenge_escrow module account has not been set")
 	}
 	if err := k.SetParams(ctx, gs.Params); err != nil {
 		panic(err)

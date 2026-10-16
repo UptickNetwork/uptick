@@ -15,6 +15,7 @@ const (
 	DefaultGasCreditShareBps     = 0
 	DefaultUGEProfile            = "uge.pav"
 	DefaultUGEProfileVersion     = "pav-0.1"
+	DefaultMaxGasPayers          = 16
 )
 
 // DefaultParams returns production-safe defaults.
@@ -32,8 +33,18 @@ func DefaultParams() Params {
 		AllowedProfiles: []AttestationProfile{
 			{Profile: DefaultUGEProfile, Version: DefaultUGEProfileVersion, Active: true},
 		},
-		RewardDenomAllowlist: []string{DefaultChallengeBondDenom},
+		RewardDenomAllowlist:        []string{DefaultChallengeBondDenom},
+		MaxGasPayers:                DefaultMaxGasPayers,
+		AllowManualGasCreditConsume: false,
 	}
+}
+
+// EffectiveMaxGasPayers returns the configured cap (default 16 when unset).
+func (p Params) EffectiveMaxGasPayers() uint32 {
+	if p.MaxGasPayers == 0 {
+		return DefaultMaxGasPayers
+	}
+	return p.MaxGasPayers
 }
 
 // Validate performs params validation.

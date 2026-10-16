@@ -97,16 +97,47 @@ func upgradeHandlerConstructor(
 			return nil, fmt.Errorf("run migrations: %w", err)
 		}
 
-		// Ensure the reward-pool module account exists even if InitGenesis was
-		// skipped for an unexpected reason (permissions are in maccPerms).
-		if acc := box.AccountKeeper.GetModuleAccount(sdkCtx, appminingtypes.ModuleName); acc == nil {
-			return nil, fmt.Errorf("appmining module account was not created during upgrade")
+		// Ensure segregated fund accounts exist (permissions are in maccPerms).
+		if acc := box.AccountKeeper.GetModuleAccount(sdkCtx, appminingtypes.RewardPoolName); acc == nil {
+			return nil, fmt.Errorf("appmining_reward_pool module account was not created during upgrade")
+		}
+		if acc := box.AccountKeeper.GetModuleAccount(sdkCtx, appminingtypes.ChallengeEscrowName); acc == nil {
+			return nil, fmt.Errorf("appmining_challenge_escrow module account was not created during upgrade")
+		}
+
+		// RC/dev builds once funded the legacy ModuleName account; settleable
+		// funds now live in RewardPoolName. Move any leftover balances over.
+		if err := migrateLegacyAppminingPool(sdkCtx, box); err != nil {
+			return nil, err
 		}
 
 		upgradeStore.Set(migrationsAppliedKey, []byte{0x01})
 		logger.Info("v0.5.1 migration set complete", "upgrade", upgradeName)
 		return newVM, nil
 	}
+}
+
+// migrateLegacyAppminingPool moves balances from the legacy "appmining" module
+// account into appmining_reward_pool when present and non-empty.
+func migrateLegacyAppminingPool(ctx sdk.Context, box upgrades.Toolbox) error {
+	legacy := box.AccountKeeper.GetModuleAccount(ctx, appminingtypes.ModuleName)
+	if legacy == nil {
+		return nil
+	}
+	bal := box.BankKeeper.GetAllBalances(ctx, legacy.GetAddress())
+	if bal.IsZero() {
+		return nil
+	}
+	if err := box.BankKeeper.SendCoinsFromModuleToModule(
+		ctx, appminingtypes.ModuleName, appminingtypes.RewardPoolName, bal,
+	); err != nil {
+		return fmt.Errorf("migrate legacy appmining balances to reward pool: %w", err)
+	}
+	ctx.Logger().Info("migrated legacy appmining module balances to reward pool",
+		"upgrade", upgradeName,
+		"amount", bal.String(),
+	)
+	return nil
 }
 
 func evmCoinInfoPresent(ctx sdk.Context, evmStoreKey *storetypes.KVStoreKey) bool {
