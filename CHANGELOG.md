@@ -158,6 +158,11 @@ Ref: https://keepachangelog.com/en/1.0.0/
   past the local clock plus the tolerance — see `make check-clock-skew` — and `double_sign_check_height = 1` now
   checks the previous block, which an off-by-one had stopped it from ever doing (#5668).
 
+### Improvements
+
+* (appmining) Acceptance vectors upgraded to 0.4: add machine-testable cases for in-flight epoch budget
+  commitment and `MsgSetAttestationSubmitter` rotation; 0.3 marked `superseded_by` 0.4. No consensus logic change.
+
 ### Features
 
 * (appmining) New `x/appmining` module for UGE application-mining settlement: registry, epoch budget, attestation,

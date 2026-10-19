@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"cosmossdk.io/math"
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/stretchr/testify/require"
 
 	"github.com/UptickNetwork/uptick/x/appmining/types"
@@ -267,4 +268,116 @@ func TestGenesisRoundTrip(t *testing.T) {
 	require.Equal(t, len(exported.Applications), len(exported2.Applications))
 	require.Equal(t, len(exported.GasCreditConsumptions), len(exported2.GasCreditConsumptions))
 	require.True(t, e2.k.HasGasCreditConsumption(e2.ctx, appID, hash32(0x77)))
+}
+
+// --- acceptance-vectors-0.4 additions ---
+
+func TestVector_IN_FLIGHT_BUDGET_COMMITMENT_EXCEEDS(t *testing.T) {
+	e := setupTest(t)
+	setBudget(t, e, 1, "100")
+	appA := registerApp(t, e)
+	appB := hash32(0xBB)
+	_, err := e.server.RegisterApplication(e.ctx, &types.MsgRegisterApplication{
+		Authority: e.auth.String(), AppId: appB, Owner: e.owner.String(), AttestationSubmitter: e.sub.String(),
+	})
+	require.NoError(t, err)
+
+	_, err = e.server.SubmitAttestation(e.ctx, &types.MsgSubmitAttestation{
+		Submitter: e.sub.String(), Attestation: sampleAttestation(appA, 1, "60"),
+	})
+	require.NoError(t, err)
+
+	_, err = e.server.SubmitAttestation(e.ctx, &types.MsgSubmitAttestation{
+		Submitter: e.sub.String(), Attestation: sampleAttestation(appB, 1, "50"),
+	})
+	require.ErrorIs(t, err, types.ErrBudgetExceeded)
+}
+
+func TestVector_IN_FLIGHT_BUDGET_RELEASED_ON_TERMINAL(t *testing.T) {
+	e := setupTest(t)
+	setBudget(t, e, 1, "100")
+	appA := registerApp(t, e)
+	appB := hash32(0xBB)
+	_, err := e.server.RegisterApplication(e.ctx, &types.MsgRegisterApplication{
+		Authority: e.auth.String(), AppId: appB, Owner: e.owner.String(), AttestationSubmitter: e.sub.String(),
+	})
+	require.NoError(t, err)
+
+	_, err = e.server.SubmitAttestation(e.ctx, &types.MsgSubmitAttestation{
+		Submitter: e.sub.String(), Attestation: sampleAttestation(appA, 1, "60"),
+	})
+	require.NoError(t, err)
+
+	e = e.withHeight(2000)
+	_, err = e.server.FinalizeAttestation(e.ctx, &types.MsgFinalizeAttestation{
+		Caller: e.owner.String(), AppId: appA, Epoch: 1,
+	})
+	require.NoError(t, err)
+	budget, ok := e.k.GetEpochBudget(e.ctx, 1)
+	require.True(t, ok)
+	require.Equal(t, "60", budget.Spent)
+
+	_, err = e.server.SubmitAttestation(e.ctx, &types.MsgSubmitAttestation{
+		Submitter: e.sub.String(), Attestation: sampleAttestation(appB, 1, "40"),
+	})
+	require.NoError(t, err)
+}
+
+func TestVector_ATTESTATION_SUBMITTER_ROTATION(t *testing.T) {
+	e := setupTest(t)
+	appID := registerApp(t, e)
+	setBudget(t, e, 1, "100")
+	newSub := sdk.AccAddress(bytes20(0x33))
+	oldSub := e.sub.String()
+
+	_, err := e.server.SetAttestationSubmitter(e.ctx, &types.MsgSetAttestationSubmitter{
+		Owner: e.owner.String(), AppId: appID, AttestationSubmitter: newSub.String(),
+	})
+	require.NoError(t, err)
+
+	found := false
+	for _, ev := range e.ctx.EventManager().Events() {
+		if ev.Type != types.EventTypeSubmitterRotated {
+			continue
+		}
+		attrs := map[string]string{}
+		for _, a := range ev.Attributes {
+			attrs[a.Key] = a.Value
+		}
+		require.Equal(t, e.owner.String(), attrs[types.AttributeKeyOwner])
+		require.Equal(t, oldSub, attrs[types.AttributeKeyPrevSubmitter])
+		require.Equal(t, newSub.String(), attrs[types.AttributeKeySubmitter])
+		found = true
+	}
+	require.True(t, found)
+
+	_, err = e.server.SubmitAttestation(e.ctx, &types.MsgSubmitAttestation{
+		Submitter: e.sub.String(), Attestation: sampleAttestation(appID, 1, "10"),
+	})
+	require.ErrorIs(t, err, types.ErrUnauthorized)
+
+	_, err = e.server.SubmitAttestation(e.ctx, &types.MsgSubmitAttestation{
+		Submitter: newSub.String(), Attestation: sampleAttestation(appID, 1, "10"),
+	})
+	require.NoError(t, err)
+}
+
+func TestVector_ATTESTATION_SUBMITTER_ROTATION_UNAUTHORIZED(t *testing.T) {
+	e := setupTest(t)
+	appID := registerApp(t, e)
+	newSub := sdk.AccAddress(bytes20(0x33))
+
+	_, err := e.server.SetAttestationSubmitter(e.ctx, &types.MsgSetAttestationSubmitter{
+		Owner: e.payer.String(), AppId: appID, AttestationSubmitter: newSub.String(),
+	})
+	require.ErrorIs(t, err, types.ErrUnauthorized)
+
+	_, err = e.server.SetApplicationStatus(e.ctx, &types.MsgSetApplicationStatus{
+		Authority: e.auth.String(), AppId: appID, Status: types.ApplicationStatusRevoked,
+	})
+	require.NoError(t, err)
+	_, err = e.server.SetAttestationSubmitter(e.ctx, &types.MsgSetAttestationSubmitter{
+		Owner: e.owner.String(), AppId: appID, AttestationSubmitter: newSub.String(),
+	})
+	require.ErrorIs(t, err, types.ErrApplicationRevoked)
 }

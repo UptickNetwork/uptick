@@ -1,0 +1,77 @@
+{
+  "schema_version": "uptick-appmining-settlement-acceptance-vectors-0.4",
+  "supersedes": "uptick-appmining-settlement-acceptance-vectors-0.3",
+  "generated": "2026-10-19",
+  "interface": "uptick.appmining.v1",
+  "change_note": "0.4 链侧定型。继承 0.3 的 30 条 case；补 2 个语义点 4 条机器可测 case：① 在途预算承诺——IN_FLIGHT_BUDGET_COMMITMENT_EXCEEDS（非终态 attestation 的 budget charge 计入预算占用，pending + 新提交累计超 limit 整体拒绝，错误码 16，无截断路径）+ IN_FLIGHT_BUDGET_RELEASED_ON_TERMINAL（FINALIZED/REJECTED 不再计入 pending；FINALIZED 路径下 spent 已含该笔 charge，新提交仅受 remaining=limit−spent 约束）；② SetAttestationSubmitter 轮换——ATTESTATION_SUBMITTER_ROTATION（owner 轮换，旧 submitter 提交被拒、新 submitter 生效，事件 attestation_submitter_rotated 携带 previous_submitter + submitter）+ ATTESTATION_SUBMITTER_ROTATION_UNAUTHORIZED（非 owner 或 Revoked 应用拒绝；Suspended 不阻止轮换）。相对 UGE 提案草稿：修正 RELEASED_ON_TERMINAL 的 FINALIZED 路径须带 epoch_spent=charge、new_submission 落入 remaining（原 spent=0 + submit 50 与 as-built finalize 账本不一致）。",
+  "invariants": [
+    "epoch.spent <= epoch.limit",
+    "total_reward_released <= dedicated_reward_pool_balance",
+    "one finalized settlement per app_id and epoch",
+    "cannot finalize before the challenge window ends or while any challenge is open",
+    "rejected attestation releases zero reward and zero gas credit",
+    "only an active application's authorized submitter can submit",
+    "only an authorized gas payer can consume the application's credit",
+    "gas credit is non-transferable, non-withdrawable, non-stakeable and cannot vote",
+    "credit consumption binds to a real source transaction and cannot be replayed",
+    "parameter changes cannot alter finalized historical settlements",
+    "pause must not delete, rewrite, or hide history",
+    "genesis, restart, snapshot and upgrade must preserve ledger conservation"
+  ],
+  "profiles": [
+    {
+      "profile": "uge.pav",
+      "profile_version": "pav-0.1",
+      "role": "initial UGE attestation profile"
+    }
+  ],
+  "app_id_convention": {
+    "consensus_layer": "bytes, exactly 32 (raw SHA-256 digest); 31/33/empty rejected at ValidateBasic",
+    "display_layer": "base64url without padding, exactly 43 chars, carried as app_id_display in every event containing app_id",
+    "canonical_example": {
+      "input": "uge-sample-01",
+      "sha256_hex": "220 27 0d 14 56 86 6d 2d 28 e3 94 ed d4 1c e9 14 ca 1d b7 25 0b da 4b 23 96 9c 55 8b 31 85 5b 68",
+      "display": "IgcNFMVoZtLSg5Tt1BzpFMKhtyUL2ksjlpxVizGFW2g"
+    },
+    "protojson_note": "protojson renders bytes as padded standard base64 (44 chars); it is NOT the canonical form. Events must carry app_id_display."
+  },
+  "cases": [
+    { "id": "ZERO_BUDGET", "input": { "budget": "0", "reward_requested": "1" }, "expect": "REJECT_NO_RELEASE" },
+    { "id": "OVER_BUDGET", "input": { "budget_remaining": "100", "reward_requested": "101" }, "expect": "REJECT_NO_RELEASE" },
+    { "id": "DUPLICATE_ATTESTATION", "input": { "same_app_epoch_twice": true }, "expect": "SECOND_REJECTED" },
+    { "id": "OPEN_CHALLENGE", "input": { "challenge_status": "OPEN" }, "expect": "FINALIZE_BLOCKED" },
+    { "id": "UPHELD_CHALLENGE", "input": { "challenge_status": "UPHELD", "bond_destination": "module_reward_pool_not_burned", "slash_in_distinct_from_fund_in": true }, "expect": "ATTESTATION_REJECTED_BOND_POLICY_APPLIED" },
+    { "id": "CHALLENGE_WINDOW_EXPIRED", "input": { "challenge_count": 0 }, "expect": "FINALIZE_ONCE" },
+    { "id": "UNAUTHORIZED_SUBMITTER", "input": { "submitter_matches_registry": false }, "expect": "REJECT" },
+    { "id": "UNAUTHORIZED_GAS_PAYER", "input": { "gas_payer_authorized": false }, "expect": "REJECT_NO_DEBIT" },
+    { "id": "CREDIT_OVERSPEND", "input": { "balance": "50", "consume": "51" }, "expect": "REJECT_NO_DEBIT" },
+    { "id": "RESTART_RECOVERY", "input": { "restart_between_finalize_and_query": true }, "expect": "IDENTICAL_STATE_NO_DOUBLE_RELEASE" },
+    { "id": "UNSUPPORTED_PROFILE", "input": { "profile": "unknown", "profile_version": "1" }, "expect": "REJECT" },
+    { "id": "APP_ID_BYTES_32_ACCEPTED_DISPLAY_CANONICAL", "input": { "msg_layer_bytes_len": 32, "event_must_carry": "app_id_display", "app_id_display_expected": "IgcNFMVoZtLSg5Tt1BzpFMKhtyUL2ksjlpxVizGFW2g" }, "expect": "ACCEPT_EVENT_DISPLAY_IS_CANONICAL_43CHAR" },
+    { "id": "APP_ID_WRONG_LENGTH_REJECTED", "input": { "msg_layer_bytes_len": [31, 33, 0] }, "expect": "ALL_REJECTED_AT_VALIDATEBASIC" },
+    { "id": "AMOUNT_FORMAT_REJECTED", "input": { "amounts": ["007", "1.5", "-1", "+1", "1e3", ""] }, "expect": "ALL_REJECTED" },
+    { "id": "MULTI_OPEN_UPHELD_SUPERSEDES_OTHERS", "input": { "open_challenges": 3, "one_upheld": true }, "expect": "ATTESTATION_REJECTED_OTHERS_SUPERSEDED_BONDS_FULLY_REFUNDED_NO_DOUBLE_SLASH" },
+    { "id": "PAUSE_ONLY_TRUE", "input": { "pause_msg_attempts_unset": true, "signer": "pause_authority" }, "expect": "REJECTED_PAUSE_CAN_ONLY_SET_TRUE" },
+    { "id": "RESUME_REQUIRES_AUTHORITY", "input": { "resume_signed_by": "pause_authority" }, "expect": "REJECTED_RESUME_IS_AUTHORITY_ONLY" },
+    { "id": "BUDGET_DENOM_NOT_ALLOWLISTED", "input": { "epoch_denom": "not-in-params-allowlist" }, "expect": "REJECT_SET_EPOCH_BUDGET" },
+    { "id": "BUDGET_EXCEEDS_POOL_REJECTED", "input": { "limit": "1000", "pool_balance_same_denom": "500" }, "expect": "REJECT_SET_EPOCH_BUDGET" },
+    { "id": "SOURCE_TX_REPLAY", "input": { "same_source_tx_hash_twice": true }, "expect": "SECOND_CONSUME_REJECTED" },
+    { "id": "SUSPENDED_APPLICATION_BLOCKS_ALL", "input": { "app_status": "SUSPENDED", "actions": ["submit_attestation", "finalize", "consume_credit"] }, "expect": "ALL_REJECTED_HISTORY_PRESERVED" },
+    { "id": "PAUSE_PRESERVES_HISTORY", "input": { "paused": true, "query_settlements_and_challenges": true }, "expect": "HISTORY_QUERYABLE_AND_UNCHANGED" },
+    { "id": "GENESIS_EXPORT_IMPORT", "input": { "roundtrip": true, "must_include": ["applications", "epoch_budgets", "attestations_all_statuses", "challenges_all_statuses_including_superseded", "settlements", "gas_credit_accounts", "gas_credit_consumptions_replay_set"] }, "expect": "STATE_AND_TOTALS_IDENTICAL_REPLAY_SET_PRESERVED" },
+    { "id": "AUTO_CONSUME_ENROLLED_PAYER", "input": { "gas_payer_enrolled": true, "gas_used": 42 }, "expect": "CREDIT_DEBITED_SOURCE_TX_RECORDED" },
+    { "id": "AUTO_CONSUME_UNENROLLED_NOOP", "input": { "gas_payer_enrolled": false }, "expect": "NO_DEBIT" },
+    { "id": "AUTO_CONSUME_INSUFFICIENT_SKIP", "input": { "balance": "5", "gas_used": 10 }, "expect": "SKIP_EVENT_NO_DEBIT_NO_TX_FAIL" },
+    { "id": "FUND_REWARD_POOL", "input": { "funder_any_allowlisted_holder": true, "amount": "1000" }, "expect": "REWARD_POOL_BALANCE_INCREASED" },
+    { "id": "FUND_REWARD_POOL_DENOM_REJECTED", "input": { "denom_allowlisted": false }, "expect": "REJECT" },
+    { "id": "FAILED_TX_NO_GAS_CREDIT_DEBIT", "input": { "success": false, "paths": ["cosmos", "cosmwasm", "evm"] }, "expect": "NO_DEBIT" },
+    { "id": "CHALLENGE_BOND_SEGREGATED_FROM_REWARD_POOL", "input": { "open_challenge": true }, "expect": "BOND_IN_ESCROW_NOT_REWARD_POOL" },
+    { "id": "IN_FLIGHT_BUDGET_COMMITMENT_EXCEEDS", "input": { "epoch_limit": "100", "epoch_spent": "0", "pending_non_terminal": [{ "app": "A", "status": "CHALLENGE_WINDOW", "reward_requested": "60" }], "new_submission": { "app": "B", "reward_requested": "50" } }, "expect": "REJECT_BUDGET_EXCEEDED_PENDING_PLUS_NEW_EXCEEDS_LIMIT" },
+    { "id": "IN_FLIGHT_BUDGET_RELEASED_ON_TERMINAL", "input": { "epoch_limit": "100", "epoch_spent": "60", "terminal": [{ "app": "A", "status": "FINALIZED", "reward_requested": "60" }], "new_submission": { "app": "B", "reward_requested": "40" } }, "expect": "ACCEPT_TERMINAL_ATTESTATION_NO_LONGER_COUNTS_TOWARD_BUDGET" },
+    { "id": "ATTESTATION_SUBMITTER_ROTATION", "input": { "signed_by": "owner", "rotate_to": "submitter_B", "then": { "submit_by_old_submitter": true, "submit_by_new_submitter": true } }, "expect": "ROTATED_OLD_SUBMITTER_REJECTED_NEW_SUBMITTER_ACCEPTED_EVENT_CARRIES_PREV_AND_NEW" },
+    { "id": "ATTESTATION_SUBMITTER_ROTATION_UNAUTHORIZED", "input": { "attempts": [{ "signed_by": "non_owner", "app_status": "ACTIVE" }, { "signed_by": "owner", "app_status": "REVOKED" }] }, "expect": "ALL_REJECTED_OWNER_ONLY_AND_APPLICATION_NOT_REVOKED" }
+  ],
+  "chain_supplied_not_machine_portable": [
+    { "id": "UPGRADE_MIGRATION", "reason": "requires upgrade handler harness and multi-validator rehearsal", "reference": "request package 05 §5" }
+  ]
+}
