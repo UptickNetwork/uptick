@@ -36,6 +36,7 @@ func GetQueryCmd() *cobra.Command {
 		CmdQueryGasCredit(),
 		CmdQueryGasCreditConsumptions(),
 	)
+	addV1QueryCommands(cmd)
 	return cmd
 }
 

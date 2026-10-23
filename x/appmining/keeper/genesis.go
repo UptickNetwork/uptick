@@ -1,6 +1,8 @@
 package keeper
 
 import (
+	"strings"
+
 	storetypes "cosmossdk.io/store/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
@@ -56,6 +58,34 @@ func (k Keeper) InitGenesis(ctx sdk.Context, gs types.GenesisState) {
 		next = 1
 	}
 	k.SetNextChallengeID(ctx, next)
+
+	// --- V1 entitlement flow ---
+	for _, p := range gs.EntitlementPools {
+		k.SetEntitlementPool(ctx, p)
+	}
+	for _, rk := range gs.RoleKeys {
+		k.SetRoleKey(ctx, rk)
+	}
+	for _, c := range gs.Candidates {
+		k.SetCandidate(ctx, c)
+	}
+	for _, c := range gs.EntitlementChallenges {
+		k.SetEntitlementChallenge(ctx, c)
+	}
+	for _, e := range gs.Entitlements {
+		k.SetEntitlement(ctx, e)
+	}
+	for _, n := range gs.UsedAuthNonces {
+		parts := strings.SplitN(n, "/", 3)
+		if len(parts) != 3 {
+			continue // validated by types.ValidateGenesis
+		}
+		role, ok := types.RoleFromWire(parts[0])
+		if !ok {
+			continue
+		}
+		k.SetAuthNonce(ctx, role, parts[1], parts[2])
+	}
 }
 
 // ExportGenesis exports full module state (BLOCK-2 fix).
@@ -121,6 +151,57 @@ func (k Keeper) ExportGenesis(ctx sdk.Context) *types.GenesisState {
 		k.cdc.MustUnmarshal(it7.Value(), &c)
 		gs.GasCreditConsumptions = append(gs.GasCreditConsumptions, c)
 	}
+
+	// --- V1 entitlement flow ---
+	it8 := storetypes.KVStorePrefixIterator(store, types.KeyPrefixEntitlementPool)
+	defer it8.Close()
+	for ; it8.Valid(); it8.Next() {
+		var p types.Pool
+		k.cdc.MustUnmarshal(it8.Value(), &p)
+		gs.EntitlementPools = append(gs.EntitlementPools, p)
+	}
+
+	for _, role := range []types.EntitlementRole{
+		types.EntitlementRolePublisher,
+		types.EntitlementRoleApprover,
+		types.EntitlementRoleReviewer,
+		types.EntitlementRoleRisk,
+		types.EntitlementRoleAudit,
+	} {
+		k.IterateRoleKeys(ctx, role, func(rk types.RoleKey) bool {
+			gs.RoleKeys = append(gs.RoleKeys, rk)
+			return true
+		})
+	}
+
+	it9 := storetypes.KVStorePrefixIterator(store, types.KeyPrefixCandidate)
+	defer it9.Close()
+	for ; it9.Valid(); it9.Next() {
+		var c types.Candidate
+		k.cdc.MustUnmarshal(it9.Value(), &c)
+		gs.Candidates = append(gs.Candidates, c)
+	}
+
+	it10 := storetypes.KVStorePrefixIterator(store, types.KeyPrefixEntitlementChallenge)
+	defer it10.Close()
+	for ; it10.Valid(); it10.Next() {
+		var c types.EntitlementChallenge
+		k.cdc.MustUnmarshal(it10.Value(), &c)
+		gs.EntitlementChallenges = append(gs.EntitlementChallenges, c)
+	}
+
+	it11 := storetypes.KVStorePrefixIterator(store, types.KeyPrefixEntitlement)
+	defer it11.Close()
+	for ; it11.Valid(); it11.Next() {
+		var e types.Entitlement
+		k.cdc.MustUnmarshal(it11.Value(), &e)
+		gs.Entitlements = append(gs.Entitlements, e)
+	}
+
+	k.IterateAuthNonces(ctx, func(n string) bool {
+		gs.UsedAuthNonces = append(gs.UsedAuthNonces, n)
+		return true
+	})
 
 	return gs
 }

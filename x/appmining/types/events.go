@@ -46,4 +46,34 @@ const (
 	AttributeKeyRemaining       = "remaining"
 	AttributeKeyReasonHash      = "reason_hash"
 	AttributeKeySkipReason      = "skip_reason"
+
+	// --- V1 entitlement flow (spec app-mining-v1-events-errors-0.1 §1/§6.1) ---
+	EventTypeEntitlementPoolOpened        = "entitlement_pool_opened"
+	EventTypeEntitlementPoolFunded        = "entitlement_pool_funded"
+	EventTypeEntitlementPoolPaused        = "entitlement_pool_paused"
+	EventTypeRoleKeyRegistered            = "role_key_registered"
+	EventTypeRoleKeyStatusChanged         = "role_key_status_changed"
+	EventTypeCandidatePublished           = "candidate_published"
+	EventTypeEntitlementChallengeOpened   = "entitlement_challenge_opened"
+	EventTypeEntitlementChallengeResolved = "entitlement_challenge_resolved"
+	EventTypeEntitlementApproved          = "entitlement_approved"
+	EventTypeEntitlementClaimed           = "entitlement_claimed"
+	EventTypeEntitlementFrozen            = "entitlement_frozen"
+	EventTypeEntitlementRevoked           = "entitlement_revoked"
+
+	AttributeKeyChainID   = "chain_id"
+	AttributeKeyPoolID    = "pool_id"
+	AttributeKeyKeyID     = "key_id"
+	AttributeKeyRole      = "role"
+	AttributeKeyVersion   = "version"
+	AttributeKeyFunded    = "funded"
+	AttributeKeyAvailable = "available"
+	AttributeKeyAction    = "action"
+	AttributeKeyPrevState = "prev_state"
+	AttributeKeyNewState  = "new_state"
+	// EvidenceOrResolutionDigest is the §6.1 stable field
+	// evidence_or_resolution_digest.
+	AttributeKeyEvidenceOrResolutionDigest = "evidence_or_resolution_digest"
+	AttributeKeyEntitlementID              = "entitlement_id"
+	AttributeKeyTxHash                     = "tx_hash"
 )

@@ -39,6 +39,7 @@ func NewTxCmd() *cobra.Command {
 		CmdPause(),
 		CmdFundRewardPool(),
 	)
+	addV1TxCommands(cmd)
 	return cmd
 }
 

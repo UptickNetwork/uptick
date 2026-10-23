@@ -18,6 +18,38 @@ func RegisterInvariants(ir sdk.InvariantRegistry, k Keeper) {
 	ir.RegisterRoute(types.ModuleName, "open-challenge-escrow", OpenChallengeEscrowInvariant(k))
 	ir.RegisterRoute(types.ModuleName, "settlement-attestation-consistent", SettlementAttestationInvariant(k))
 	ir.RegisterRoute(types.ModuleName, "open-budget-pool-covered", OpenBudgetPoolInvariant(k))
+	ir.RegisterRoute(types.ModuleName, "entitlement-pool-invariant", EntitlementPoolInvariant(k))
+}
+
+// EntitlementPoolInvariant checks funded = available + reserved + paid and
+// reserved <= module account balance for every V1 entitlement pool.
+func EntitlementPoolInvariant(k Keeper) sdk.Invariant {
+	return func(ctx sdk.Context) (string, bool) {
+		store := k.store(ctx)
+		it := storetypes.KVStorePrefixIterator(store, types.KeyPrefixEntitlementPool)
+		defer it.Close()
+		for ; it.Valid(); it.Next() {
+			var p types.Pool
+			k.cdc.MustUnmarshal(it.Value(), &p)
+			if err := types.ValidatePoolInvariant(p); err != nil {
+				return sdk.FormatInvariant(types.ModuleName, "entitlement-pool-invariant",
+					fmt.Sprintf("pool %q: %v", p.PoolId, err)), true
+			}
+			modAddr := k.ak.GetModuleAddress(types.EntitlementPoolName)
+			reserved, err := types.ParseAmount(p.Reserved)
+			if err != nil {
+				return sdk.FormatInvariant(types.ModuleName, "entitlement-pool-invariant",
+					fmt.Sprintf("pool %q reserved parse: %v", p.PoolId, err)), true
+			}
+			bal := k.bank.GetBalance(ctx, modAddr, p.Denom).Amount
+			if bal.LT(reserved) {
+				return sdk.FormatInvariant(types.ModuleName, "entitlement-pool-invariant",
+					fmt.Sprintf("pool %q module balance %s < reserved %s (%s)",
+						p.PoolId, bal, p.Reserved, p.Denom)), true
+			}
+		}
+		return sdk.FormatInvariant(types.ModuleName, "entitlement-pool-invariant", "ok"), false
+	}
 }
 
 // EpochSpentInvariant checks spent <= limit for every epoch budget.

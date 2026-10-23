@@ -1,6 +1,8 @@
 package types
 
 import (
+	"strconv"
+
 	sdkerrors "cosmossdk.io/errors"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	errortypes "github.com/cosmos/cosmos-sdk/types/errors"
@@ -328,4 +330,345 @@ func (m *MsgFundRewardPool) GetSigners() []sdk.AccAddress {
 		return nil
 	}
 	return []sdk.AccAddress{addr}
+}
+
+// --- V1 entitlement flow msgs (workorder 13 §3) ---
+
+var (
+	_ sdk.Msg = &MsgOpenEntitlementPool{}
+	_ sdk.Msg = &MsgFundEntitlementPool{}
+	_ sdk.Msg = &MsgSetEntitlementPoolPaused{}
+	_ sdk.Msg = &MsgRegisterRoleKey{}
+	_ sdk.Msg = &MsgSetRoleKeyStatus{}
+	_ sdk.Msg = &MsgPublishCandidate{}
+	_ sdk.Msg = &MsgOpenChallenge{}
+	_ sdk.Msg = &MsgResolveEntitlementChallenge{}
+	_ sdk.Msg = &MsgApproveEntitlement{}
+	_ sdk.Msg = &MsgClaimEntitlement{}
+	_ sdk.Msg = &MsgFreezeEntitlement{}
+	_ sdk.Msg = &MsgRevokeEntitlement{}
+)
+
+func validateSigner(addr string) error {
+	if _, err := sdk.AccAddressFromBech32(addr); err != nil {
+		return sdkerrors.Wrap(ErrInvalidAddress, "signer must be valid bech32")
+	}
+	return nil
+}
+
+func (m *MsgOpenEntitlementPool) ValidateBasic() error {
+	if err := validateSigner(m.Authority); err != nil {
+		return err
+	}
+	if err := ValidateWireID(m.PoolId); err != nil {
+		return sdkerrors.Wrap(ErrInvalidWireID, "pool_id")
+	}
+	if err := sdk.ValidateDenom(m.Denom); err != nil {
+		return sdkerrors.Wrap(ErrInvalidDenom, "denom")
+	}
+	return nil
+}
+
+func (m *MsgOpenEntitlementPool) GetSigners() []sdk.AccAddress {
+	addr, _ := sdk.AccAddressFromBech32(m.Authority)
+	return []sdk.AccAddress{addr}
+}
+
+func (m *MsgFundEntitlementPool) ValidateBasic() error {
+	if err := validateSigner(m.Funder); err != nil {
+		return err
+	}
+	if err := ValidateWireID(m.PoolId); err != nil {
+		return sdkerrors.Wrap(ErrInvalidWireID, "pool_id")
+	}
+	if err := ValidateAmountString(m.Amount); err != nil {
+		return sdkerrors.Wrap(ErrInvalidAmount, "amount")
+	}
+	if IsZeroAmount(m.Amount) {
+		return sdkerrors.Wrap(ErrInvalidAmount, "amount must be > 0")
+	}
+	return nil
+}
+
+func (m *MsgFundEntitlementPool) GetSigners() []sdk.AccAddress {
+	addr, _ := sdk.AccAddressFromBech32(m.Funder)
+	return []sdk.AccAddress{addr}
+}
+
+func (m *MsgSetEntitlementPoolPaused) ValidateBasic() error {
+	if err := validateSigner(m.Authority); err != nil {
+		return err
+	}
+	if err := ValidateWireID(m.PoolId); err != nil {
+		return sdkerrors.Wrap(ErrInvalidWireID, "pool_id")
+	}
+	return nil
+}
+
+func (m *MsgSetEntitlementPoolPaused) GetSigners() []sdk.AccAddress {
+	addr, _ := sdk.AccAddressFromBech32(m.Authority)
+	return []sdk.AccAddress{addr}
+}
+
+func (m *MsgRegisterRoleKey) ValidateBasic() error {
+	if err := validateSigner(m.Authority); err != nil {
+		return err
+	}
+	if m.Role == EntitlementRoleUnspecified {
+		return sdkerrors.Wrap(ErrInvalidRole, "role unspecified")
+	}
+	if err := ValidateWireID(m.KeyId); err != nil {
+		return sdkerrors.Wrap(ErrInvalidWireID, "key_id")
+	}
+	if err := ValidateEd25519PubKey(m.Pubkey); err != nil {
+		return sdkerrors.Wrap(ErrInvalidCommitment, "pubkey must be 32-byte Ed25519")
+	}
+	return nil
+}
+
+func (m *MsgRegisterRoleKey) GetSigners() []sdk.AccAddress {
+	addr, _ := sdk.AccAddressFromBech32(m.Authority)
+	return []sdk.AccAddress{addr}
+}
+
+func (m *MsgSetRoleKeyStatus) ValidateBasic() error {
+	if err := validateSigner(m.Authority); err != nil {
+		return err
+	}
+	if m.Role == EntitlementRoleUnspecified {
+		return sdkerrors.Wrap(ErrInvalidRole, "role unspecified")
+	}
+	if err := ValidateWireID(m.KeyId); err != nil {
+		return sdkerrors.Wrap(ErrInvalidWireID, "key_id")
+	}
+	if m.Status == RoleKeyStatusUnspecified {
+		return sdkerrors.Wrap(ErrInvalidRoleKeyStatus, "status unspecified")
+	}
+	return nil
+}
+
+func (m *MsgSetRoleKeyStatus) GetSigners() []sdk.AccAddress {
+	addr, _ := sdk.AccAddressFromBech32(m.Authority)
+	return []sdk.AccAddress{addr}
+}
+
+func (m *MsgPublishCandidate) ValidateBasic() error {
+	if err := validateSigner(m.Submitter); err != nil {
+		return err
+	}
+	if m.ChainId == "" {
+		return sdkerrors.Wrap(ErrChainIDMismatch, "chain_id empty")
+	}
+	if err := ValidateWireID(m.PoolId); err != nil {
+		return sdkerrors.Wrap(ErrInvalidWireID, "pool_id")
+	}
+	if len(m.EntitlementId) != HashLength*2 || ValidateWireID(m.EntitlementId) != nil {
+		return sdkerrors.Wrap(ErrInvalidWireID, "entitlement_id must be 64-hex")
+	}
+	if len(m.AppId) != AppIDLength*2 || ValidateWireID(m.AppId) != nil {
+		return sdkerrors.Wrap(ErrInvalidAppID, "app_id must be 64-hex")
+	}
+	if err := ValidateAmountString(m.Amount); err != nil {
+		return sdkerrors.Wrap(ErrInvalidAmount, "amount")
+	}
+	if IsZeroAmount(m.Amount) {
+		return sdkerrors.Wrap(ErrInvalidAmount, "amount must be > 0")
+	}
+	if err := sdk.ValidateDenom(m.Denom); err != nil {
+		return sdkerrors.Wrap(ErrInvalidDenom, "denom")
+	}
+	if err := ValidateWireID(m.RuleVersion); err != nil {
+		return sdkerrors.Wrap(ErrInvalidWireID, "rule_version")
+	}
+	if err := ValidateWireHash(m.EvidenceRoot); err != nil {
+		return sdkerrors.Wrap(ErrInvalidHash, "evidence_root")
+	}
+	if m.GasEvidenceRoot != "" {
+		if err := ValidateWireHash(m.GasEvidenceRoot); err != nil {
+			return sdkerrors.Wrap(ErrInvalidHash, "gas_evidence_root")
+		}
+	}
+	return validateWireProofShape(m.Proof)
+}
+
+func (m *MsgPublishCandidate) GetSigners() []sdk.AccAddress {
+	addr, _ := sdk.AccAddressFromBech32(m.Submitter)
+	return []sdk.AccAddress{addr}
+}
+
+func (m *MsgOpenChallenge) ValidateBasic() error {
+	if err := validateSigner(m.Challenger); err != nil {
+		return err
+	}
+	if err := ValidateWireID(m.EntitlementId); err != nil {
+		return sdkerrors.Wrap(ErrInvalidWireID, "entitlement_id")
+	}
+	if _, ok := EvidenceTypeWire(m.EvidenceType); !ok {
+		return ErrInvalidEvidenceType
+	}
+	if err := ValidateWireHash(m.EvidenceDigest); err != nil {
+		return sdkerrors.Wrap(ErrInvalidHash, "evidence_digest")
+	}
+	return nil
+}
+
+func (m *MsgOpenChallenge) GetSigners() []sdk.AccAddress {
+	addr, _ := sdk.AccAddressFromBech32(m.Challenger)
+	return []sdk.AccAddress{addr}
+}
+
+func (m *MsgResolveEntitlementChallenge) ValidateBasic() error {
+	if err := validateSigner(m.Submitter); err != nil {
+		return err
+	}
+	if m.ChainId == "" {
+		return sdkerrors.Wrap(ErrChainIDMismatch, "chain_id empty")
+	}
+	if err := ValidateWireID(m.ChallengeId); err != nil {
+		return sdkerrors.Wrap(ErrInvalidWireID, "challenge_id")
+	}
+	if err := ValidateWireID(m.PoolId); err != nil {
+		return sdkerrors.Wrap(ErrInvalidWireID, "pool_id")
+	}
+	if m.Outcome != "UPHELD" && m.Outcome != "DISMISSED" {
+		return ErrInvalidOutcome
+	}
+	if err := ValidateWireHash(m.RationaleDigest); err != nil {
+		return sdkerrors.Wrap(ErrInvalidHash, "rationale_digest")
+	}
+	return validateWireProofShape(m.Proof)
+}
+
+func (m *MsgResolveEntitlementChallenge) GetSigners() []sdk.AccAddress {
+	addr, _ := sdk.AccAddressFromBech32(m.Submitter)
+	return []sdk.AccAddress{addr}
+}
+
+func (m *MsgApproveEntitlement) ValidateBasic() error {
+	if err := validateSigner(m.Submitter); err != nil {
+		return err
+	}
+	if m.ChainId == "" {
+		return sdkerrors.Wrap(ErrChainIDMismatch, "chain_id empty")
+	}
+	if err := ValidateWireID(m.PoolId); err != nil {
+		return sdkerrors.Wrap(ErrInvalidWireID, "pool_id")
+	}
+	if len(m.EntitlementId) != HashLength*2 {
+		return sdkerrors.Wrap(ErrInvalidWireID, "entitlement_id must be 64-hex")
+	}
+	if m.ChallengeResolutionHash != "" {
+		if err := ValidateWireHash(m.ChallengeResolutionHash); err != nil {
+			return sdkerrors.Wrap(ErrInvalidHash, "challenge_resolution_hash")
+		}
+	}
+	return validateWireProofShape(m.Proof)
+}
+
+func (m *MsgApproveEntitlement) GetSigners() []sdk.AccAddress {
+	addr, _ := sdk.AccAddressFromBech32(m.Submitter)
+	return []sdk.AccAddress{addr}
+}
+
+func (m *MsgClaimEntitlement) ValidateBasic() error {
+	if err := validateSigner(m.Owner); err != nil {
+		return err
+	}
+	if len(m.EntitlementId) != HashLength*2 {
+		return sdkerrors.Wrap(ErrInvalidWireID, "entitlement_id must be 64-hex")
+	}
+	return nil
+}
+
+func (m *MsgClaimEntitlement) GetSigners() []sdk.AccAddress {
+	addr, _ := sdk.AccAddressFromBech32(m.Owner)
+	return []sdk.AccAddress{addr}
+}
+
+func (m *MsgFreezeEntitlement) ValidateBasic() error {
+	if err := validateSigner(m.Submitter); err != nil {
+		return err
+	}
+	if m.ChainId == "" {
+		return sdkerrors.Wrap(ErrChainIDMismatch, "chain_id empty")
+	}
+	if err := ValidateWireID(m.PoolId); err != nil {
+		return sdkerrors.Wrap(ErrInvalidWireID, "pool_id")
+	}
+	if len(m.EntitlementId) != HashLength*2 {
+		return sdkerrors.Wrap(ErrInvalidWireID, "entitlement_id must be 64-hex")
+	}
+	if _, ok := EvidenceTypeWire(m.EvidenceType); !ok {
+		return ErrInvalidEvidenceType
+	}
+	if err := ValidateWireHash(m.EvidenceDigest); err != nil {
+		return sdkerrors.Wrap(ErrInvalidHash, "evidence_digest")
+	}
+	if _, err := strconv.ParseInt(m.FreezeUntil, 10, 64); err != nil {
+		return sdkerrors.Wrap(ErrFreezeDuration, "freeze_until must be unix seconds")
+	}
+	return validateWireProofShape(m.Proof)
+}
+
+func (m *MsgFreezeEntitlement) GetSigners() []sdk.AccAddress {
+	addr, _ := sdk.AccAddressFromBech32(m.Submitter)
+	return []sdk.AccAddress{addr}
+}
+
+func (m *MsgRevokeEntitlement) ValidateBasic() error {
+	if err := validateSigner(m.Submitter); err != nil {
+		return err
+	}
+	if m.ChainId == "" {
+		return sdkerrors.Wrap(ErrChainIDMismatch, "chain_id empty")
+	}
+	if err := ValidateWireID(m.PoolId); err != nil {
+		return sdkerrors.Wrap(ErrInvalidWireID, "pool_id")
+	}
+	if len(m.EntitlementId) != HashLength*2 {
+		return sdkerrors.Wrap(ErrInvalidWireID, "entitlement_id must be 64-hex")
+	}
+	if _, ok := EvidenceTypeWire(m.EvidenceType); !ok {
+		return ErrInvalidEvidenceType
+	}
+	if err := ValidateWireHash(m.EvidenceDigest); err != nil {
+		return sdkerrors.Wrap(ErrInvalidHash, "evidence_digest")
+	}
+	if err := ValidateWireHash(m.RationaleDigest); err != nil {
+		return sdkerrors.Wrap(ErrInvalidHash, "rationale_digest")
+	}
+	if m.RiskProof.KeyId == m.AuditProof.KeyId {
+		return ErrDualAuthRequired
+	}
+	if err := validateWireProofShape(m.RiskProof); err != nil {
+		return err
+	}
+	return validateWireProofShape(m.AuditProof)
+}
+
+func (m *MsgRevokeEntitlement) GetSigners() []sdk.AccAddress {
+	addr, _ := sdk.AccAddressFromBech32(m.Submitter)
+	return []sdk.AccAddress{addr}
+}
+
+// validateWireProofShape checks the structural fields of a wire-v1 proof
+// (key_id / nonce / expires_at present). Signature validity is checked by the
+// keeper against the registered role key.
+func validateWireProofShape(p WireProof) error {
+	if p.KeyId == "" {
+		return sdkerrors.Wrap(ErrAuthMalformed, "key_id empty")
+	}
+	if err := ValidateWireID(p.KeyId); err != nil {
+		return sdkerrors.Wrap(ErrAuthMalformed, "key_id")
+	}
+	if p.Nonce == "" {
+		return sdkerrors.Wrap(ErrAuthMalformed, "nonce empty")
+	}
+	if _, err := strconv.ParseInt(p.ExpiresAt, 10, 64); err != nil {
+		return sdkerrors.Wrap(ErrAuthMalformed, "expires_at must be unix seconds")
+	}
+	if p.SignatureBase64 == "" {
+		return sdkerrors.Wrap(ErrAuthMalformed, "signature empty")
+	}
+	return nil
 }

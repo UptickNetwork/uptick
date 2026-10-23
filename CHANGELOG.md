@@ -163,6 +163,20 @@ Ref: https://keepachangelog.com/en/1.0.0/
 * (appmining) Acceptance vectors upgraded to 0.4: add machine-testable cases for in-flight epoch budget
   commitment and `MsgSetAttestationSubmitter` rotation; 0.3 marked `superseded_by` 0.4. No consensus logic change.
 
+* (appmining) UGE Application Mining V1 P0–P4: fixed `Pool` + role keys + `wirev1`; Publish /
+  challenge / Approve / Claim; `MsgFreezeEntitlement` (≤72h, once) and `MsgRevokeEntitlement`
+  (independent risk+audit wire proofs while frozen). ConsensusVersion 2 pauses legacy
+  attestation/GasCredit/Finalize writes (`Migrate1to2`); genesis validates V1 candidates /
+  challenges / entitlements; funding preflight `scripts/check-entitlement-pool-funding.sh`;
+  acceptance vectors mirrored at `x/appmining/spec/app-mining-v1-acceptance-vectors-0.1.json`.
+  Gap coverage: `UNAUTHORIZED_AMOUNT_AND_DUPLICATE_APPROVAL`, `INVALID_EVIDENCE_CANNOT_FREEZE`,
+  E-3/E-4/E-7/E-8; events/errors table at `x/appmining/spec/app-mining-v1-events-errors-0.1.md`.
+  Follow-up: `OPEN_OR_UPHELD…` / cross-app Claim vectors; `publish_tx_hash`/`approval_tx`/`claim_tx`;
+  §6.1 event schema; entitlement pool invariant; DefaultParams pauses legacy writes; V1 CLI query/tx.
+  Feature tests (`entitlement_features_test.go`): auth replay/expiry, pool/role pause, freeze-once,
+  challenge deadline, §6.1 events+tx hash, pool invariant, V1 queries, revoke dual-proof, E-6 claim watermark.
+
+
 ### Features
 
 * (appmining) New `x/appmining` module for UGE application-mining settlement: registry, epoch budget, attestation,

@@ -265,3 +265,120 @@ func (k Keeper) GasCreditConsumptions(goCtx context.Context, req *types.QueryGas
 func prefixStore(store storetypes.KVStore, pfx []byte) storetypes.KVStore {
 	return prefix.NewStore(store, pfx)
 }
+
+// --- V1 entitlement flow queries ---
+
+// Pool returns the entitlement pool record, module balance and flow status.
+func (k Keeper) Pool(goCtx context.Context, req *types.QueryPoolRequest) (*types.QueryPoolResponse, error) {
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "empty request")
+	}
+	ctx := sdk.UnwrapSDKContext(goCtx)
+	pool, found := k.GetEntitlementPool(ctx, req.PoolId)
+	if !found {
+		return nil, status.Error(codes.NotFound, "entitlement pool not found")
+	}
+	params := k.GetParams(ctx)
+	modAddr := k.ak.GetModuleAddress(types.EntitlementPoolName)
+	bal := k.bank.GetBalance(ctx, modAddr, pool.Denom)
+	return &types.QueryPoolResponse{
+		Pool:                   pool,
+		ModuleBalance:          bal.Amount.String(),
+		EntitlementFlowEnabled: types.EntitlementFlowEnabled(pool, params, types.AmountString(bal.Amount)),
+	}, nil
+}
+
+// Roles returns registered role keys, optionally filtered by role and status.
+func (k Keeper) Roles(goCtx context.Context, req *types.QueryRolesRequest) (*types.QueryRolesResponse, error) {
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "empty request")
+	}
+	ctx := sdk.UnwrapSDKContext(goCtx)
+	roles := []types.EntitlementRole{
+		types.EntitlementRolePublisher,
+		types.EntitlementRoleApprover,
+		types.EntitlementRoleReviewer,
+		types.EntitlementRoleRisk,
+		types.EntitlementRoleAudit,
+	}
+	if req.Role != types.EntitlementRoleUnspecified {
+		roles = []types.EntitlementRole{req.Role}
+	}
+	var keys []types.RoleKey
+	for _, role := range roles {
+		k.IterateRoleKeys(ctx, role, func(rk types.RoleKey) bool {
+			if req.Status != types.RoleKeyStatusUnspecified && rk.Status != req.Status {
+				return true
+			}
+			keys = append(keys, rk)
+			return true
+		})
+	}
+	return &types.QueryRolesResponse{Keys: keys}, nil
+}
+
+func (k Keeper) Candidate(goCtx context.Context, req *types.QueryCandidateRequest) (*types.QueryCandidateResponse, error) {
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "empty request")
+	}
+	ctx := sdk.UnwrapSDKContext(goCtx)
+	cand, found := k.GetCandidate(ctx, req.EntitlementId)
+	if !found {
+		return nil, status.Error(codes.NotFound, "candidate not found")
+	}
+	return &types.QueryCandidateResponse{Candidate: cand}, nil
+}
+
+func (k Keeper) EntitlementChallenge(goCtx context.Context, req *types.QueryEntitlementChallengeRequest) (*types.QueryEntitlementChallengeResponse, error) {
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "empty request")
+	}
+	ctx := sdk.UnwrapSDKContext(goCtx)
+	chal, found := k.GetEntitlementChallenge(ctx, req.ChallengeId)
+	if !found {
+		return nil, status.Error(codes.NotFound, "entitlement challenge not found")
+	}
+	return &types.QueryEntitlementChallengeResponse{Challenge: chal}, nil
+}
+
+func (k Keeper) Entitlement(goCtx context.Context, req *types.QueryEntitlementRequest) (*types.QueryEntitlementResponse, error) {
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "empty request")
+	}
+	ctx := sdk.UnwrapSDKContext(goCtx)
+	ent, found := k.GetEntitlement(ctx, req.EntitlementId)
+	if !found {
+		return nil, status.Error(codes.NotFound, "entitlement not found")
+	}
+	return &types.QueryEntitlementResponse{Entitlement: ent}, nil
+}
+
+func (k Keeper) EntitlementsByApp(goCtx context.Context, req *types.QueryEntitlementsByAppRequest) (*types.QueryEntitlementsByAppResponse, error) {
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "empty request")
+	}
+	ctx := sdk.UnwrapSDKContext(goCtx)
+	pageReq, err := shapePageRequest(req.Pagination)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+	store := prefixStore(k.store(ctx), types.KeyPrefixEntitlement)
+	var out []types.Entitlement
+	pageRes, err := query.FilteredPaginate(store, pageReq, func(_ []byte, value []byte, accumulate bool) (bool, error) {
+		var ent types.Entitlement
+		if err := k.cdc.Unmarshal(value, &ent); err != nil {
+			return false, err
+		}
+		if ent.AppId != req.AppId {
+			return false, nil
+		}
+		if accumulate {
+			out = append(out, ent)
+		}
+		return true, nil
+	})
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	return &types.QueryEntitlementsByAppResponse{Entitlements: out, Pagination: pageRes}, nil
+}

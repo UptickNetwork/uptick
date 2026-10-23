@@ -18,4 +18,11 @@ message GenesisState {
   repeated GasCreditAccount gas_credit_accounts = 7 [(gogoproto.nullable) = false];
   repeated GasCreditConsumption gas_credit_consumptions = 8 [(gogoproto.nullable) = false];
   uint64 next_challenge_id = 9;
+  // V1 entitlement state (UGE requirements 1.0)
+  repeated Pool entitlement_pools = 10 [(gogoproto.nullable) = false];
+  repeated RoleKey role_keys = 11 [(gogoproto.nullable) = false];
+  repeated Candidate candidates = 12 [(gogoproto.nullable) = false];
+  repeated EntitlementChallenge entitlement_challenges = 13 [(gogoproto.nullable) = false];
+  repeated string used_auth_nonces = 14; // "role/key_id/nonce" consumed proofs
+  repeated Entitlement entitlements = 15 [(gogoproto.nullable) = false];
 }

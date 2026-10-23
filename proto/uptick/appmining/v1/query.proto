@@ -9,137 +9,262 @@ import "uptick/appmining/v1/types.proto";
 
 option go_package = "github.com/UptickNetwork/uptick/x/appmining/types";
 
+// Query defines the gRPC query/tx service for x/appmining.
 service Query {
+  // Params handles the corresponding module request.
   rpc Params(QueryParamsRequest) returns (QueryParamsResponse) {
     option (google.api.http).get = "/uptick/appmining/v1/params";
   }
+  // Application handles the corresponding module request.
   rpc Application(QueryApplicationRequest) returns (QueryApplicationResponse) {
     option (google.api.http).get = "/uptick/appmining/v1/applications/{app_id}";
   }
+  // Applications handles the corresponding module request.
   rpc Applications(QueryApplicationsRequest) returns (QueryApplicationsResponse) {
     option (google.api.http).get = "/uptick/appmining/v1/applications";
   }
+  // EpochBudget handles the corresponding module request.
   rpc EpochBudget(QueryEpochBudgetRequest) returns (QueryEpochBudgetResponse) {
     option (google.api.http).get = "/uptick/appmining/v1/epoch_budgets/{epoch}";
   }
+  // Attestation handles the corresponding module request.
   rpc Attestation(QueryAttestationRequest) returns (QueryAttestationResponse) {
     option (google.api.http).get = "/uptick/appmining/v1/attestations/{app_id}/{epoch}";
   }
+  // Attestations handles the corresponding module request.
   rpc Attestations(QueryAttestationsRequest) returns (QueryAttestationsResponse) {
     option (google.api.http).get = "/uptick/appmining/v1/attestations";
   }
+  // Challenge handles the corresponding module request.
   rpc Challenge(QueryChallengeRequest) returns (QueryChallengeResponse) {
     option (google.api.http).get = "/uptick/appmining/v1/challenges/{challenge_id}";
   }
+  // OpenChallenges handles the corresponding module request.
   rpc OpenChallenges(QueryOpenChallengesRequest) returns (QueryOpenChallengesResponse) {
     option (google.api.http).get = "/uptick/appmining/v1/open_challenges";
   }
+  // Settlement handles the corresponding module request.
   rpc Settlement(QuerySettlementRequest) returns (QuerySettlementResponse) {
     option (google.api.http).get = "/uptick/appmining/v1/settlements/{app_id}/{epoch}";
   }
+  // Settlements handles the corresponding module request.
   rpc Settlements(QuerySettlementsRequest) returns (QuerySettlementsResponse) {
     option (google.api.http).get = "/uptick/appmining/v1/settlements";
   }
+  // GasCredit handles the corresponding module request.
   rpc GasCredit(QueryGasCreditRequest) returns (QueryGasCreditResponse) {
     option (google.api.http).get = "/uptick/appmining/v1/gas_credits/{app_id}";
   }
+  // GasCreditConsumptions handles the corresponding module request.
   rpc GasCreditConsumptions(QueryGasCreditConsumptionsRequest) returns (QueryGasCreditConsumptionsResponse) {
     option (google.api.http).get = "/uptick/appmining/v1/gas_credits/{app_id}/consumptions";
   }
+
+  // V1 entitlement queries (UGE requirements 1.0)
+  rpc Pool(QueryPoolRequest) returns (QueryPoolResponse) {
+    option (google.api.http).get = "/uptick/appmining/v1/pools/{pool_id}";
+  }
+  // Roles handles the corresponding module request.
+  rpc Roles(QueryRolesRequest) returns (QueryRolesResponse) {
+    option (google.api.http).get = "/uptick/appmining/v1/roles";
+  }
+  // Candidate handles the corresponding module request.
+  rpc Candidate(QueryCandidateRequest) returns (QueryCandidateResponse) {
+    option (google.api.http).get = "/uptick/appmining/v1/candidates/{entitlement_id}";
+  }
+  // EntitlementChallenge handles the corresponding module request.
+  rpc EntitlementChallenge(QueryEntitlementChallengeRequest) returns (QueryEntitlementChallengeResponse) {
+    option (google.api.http).get = "/uptick/appmining/v1/entitlement_challenges/{challenge_id}";
+  }
+  // Entitlement handles the corresponding module request.
+  rpc Entitlement(QueryEntitlementRequest) returns (QueryEntitlementResponse) {
+    option (google.api.http).get = "/uptick/appmining/v1/entitlements/{entitlement_id}";
+  }
+  // EntitlementsByApp handles the corresponding module request.
+  rpc EntitlementsByApp(QueryEntitlementsByAppRequest) returns (QueryEntitlementsByAppResponse) {
+    option (google.api.http).get = "/uptick/appmining/v1/applications/{app_id}/entitlements";
+  }
 }
 
+// QueryParamsRequest is the request/response type for the module API.
 message QueryParamsRequest {}
+// QueryParamsResponse is the request/response type for the module API.
 message QueryParamsResponse {
   Params params = 1 [(gogoproto.nullable) = false];
 }
 
+// QueryApplicationRequest is the request/response type for the module API.
 message QueryApplicationRequest {
   bytes app_id = 1;
 }
+// QueryApplicationResponse is the request/response type for the module API.
 message QueryApplicationResponse {
   Application application = 1 [(gogoproto.nullable) = false];
 }
 
+// QueryApplicationsRequest is the request/response type for the module API.
 message QueryApplicationsRequest {
   // optional status filter; UNSPECIFIED = all
   ApplicationStatus status = 1;
   cosmos.base.query.v1beta1.PageRequest pagination = 2;
 }
+// QueryApplicationsResponse is the request/response type for the module API.
 message QueryApplicationsResponse {
   repeated Application applications = 1 [(gogoproto.nullable) = false];
   cosmos.base.query.v1beta1.PageResponse pagination = 2;
 }
 
+// QueryEpochBudgetRequest is the request/response type for the module API.
 message QueryEpochBudgetRequest {
   uint64 epoch = 1;
 }
+// QueryEpochBudgetResponse is the request/response type for the module API.
 message QueryEpochBudgetResponse {
   EpochBudget budget = 1 [(gogoproto.nullable) = false];
 }
 
+// QueryAttestationRequest is the request/response type for the module API.
 message QueryAttestationRequest {
   bytes app_id = 1;
   uint64 epoch = 2;
 }
+// QueryAttestationResponse is the request/response type for the module API.
 message QueryAttestationResponse {
   AttestationCommitment attestation = 1 [(gogoproto.nullable) = false];
 }
 
+// QueryAttestationsRequest is the request/response type for the module API.
 message QueryAttestationsRequest {
   // optional status filter; UNSPECIFIED = all
   AttestationStatus status = 1;
   cosmos.base.query.v1beta1.PageRequest pagination = 2;
 }
+// QueryAttestationsResponse is the request/response type for the module API.
 message QueryAttestationsResponse {
   repeated AttestationCommitment attestations = 1 [(gogoproto.nullable) = false];
   cosmos.base.query.v1beta1.PageResponse pagination = 2;
 }
 
+// QueryChallengeRequest is the request/response type for the module API.
 message QueryChallengeRequest {
   uint64 challenge_id = 1;
 }
+// QueryChallengeResponse is the request/response type for the module API.
 message QueryChallengeResponse {
   Challenge challenge = 1 [(gogoproto.nullable) = false];
 }
 
+// QueryOpenChallengesRequest is the request/response type for the module API.
 message QueryOpenChallengesRequest {
   bytes app_id = 1; // optional; empty = all apps
   uint64 epoch = 2; // optional; 0 = all epochs when app_id set still scans open index
   cosmos.base.query.v1beta1.PageRequest pagination = 3;
 }
+// QueryOpenChallengesResponse is the request/response type for the module API.
 message QueryOpenChallengesResponse {
   repeated Challenge challenges = 1 [(gogoproto.nullable) = false];
   cosmos.base.query.v1beta1.PageResponse pagination = 2;
 }
 
+// QuerySettlementRequest is the request/response type for the module API.
 message QuerySettlementRequest {
   bytes app_id = 1;
   uint64 epoch = 2;
 }
+// QuerySettlementResponse is the request/response type for the module API.
 message QuerySettlementResponse {
   Settlement settlement = 1 [(gogoproto.nullable) = false];
 }
 
+// QuerySettlementsRequest is the request/response type for the module API.
 message QuerySettlementsRequest {
   cosmos.base.query.v1beta1.PageRequest pagination = 1;
 }
+// QuerySettlementsResponse is the request/response type for the module API.
 message QuerySettlementsResponse {
   repeated Settlement settlements = 1 [(gogoproto.nullable) = false];
   cosmos.base.query.v1beta1.PageResponse pagination = 2;
 }
 
+// QueryGasCreditRequest is the request/response type for the module API.
 message QueryGasCreditRequest {
   bytes app_id = 1;
 }
+// QueryGasCreditResponse is the request/response type for the module API.
 message QueryGasCreditResponse {
   GasCreditAccount account = 1 [(gogoproto.nullable) = false];
 }
 
+// QueryGasCreditConsumptionsRequest is the request/response type for the module API.
 message QueryGasCreditConsumptionsRequest {
   bytes app_id = 1;
   cosmos.base.query.v1beta1.PageRequest pagination = 2;
 }
+// QueryGasCreditConsumptionsResponse is the request/response type for the module API.
 message QueryGasCreditConsumptionsResponse {
   repeated GasCreditConsumption consumptions = 1 [(gogoproto.nullable) = false];
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
+}
+
+// QueryPoolRequest is the request/response type for the module API.
+message QueryPoolRequest {
+  string pool_id = 1;
+}
+// QueryPoolResponse is the request/response type for the module API.
+message QueryPoolResponse {
+  Pool pool = 1 [(gogoproto.nullable) = false];
+  // module account balance for pool.denom (for off-chain reconciliation)
+  string module_balance = 2;
+  // true when pool is open, not paused, and funded >= entitlement_enable_min_funded
+  bool entitlement_flow_enabled = 3;
+}
+
+// QueryRolesRequest is the request/response type for the module API.
+message QueryRolesRequest {
+  // optional filter; UNSPECIFIED = all roles
+  EntitlementRole role = 1;
+  // optional filter; UNSPECIFIED = all statuses
+  RoleKeyStatus status = 2;
+}
+// QueryRolesResponse is the request/response type for the module API.
+message QueryRolesResponse {
+  repeated RoleKey keys = 1 [(gogoproto.nullable) = false];
+}
+
+// QueryCandidateRequest is the request/response type for the module API.
+message QueryCandidateRequest {
+  string entitlement_id = 1;
+}
+// QueryCandidateResponse is the request/response type for the module API.
+message QueryCandidateResponse {
+  Candidate candidate = 1 [(gogoproto.nullable) = false];
+}
+
+// QueryEntitlementChallengeRequest is the request/response type for the module API.
+message QueryEntitlementChallengeRequest {
+  string challenge_id = 1;
+}
+// QueryEntitlementChallengeResponse is the request/response type for the module API.
+message QueryEntitlementChallengeResponse {
+  EntitlementChallenge challenge = 1 [(gogoproto.nullable) = false];
+}
+
+// QueryEntitlementRequest is the request/response type for the module API.
+message QueryEntitlementRequest {
+  string entitlement_id = 1;
+}
+// QueryEntitlementResponse is the request/response type for the module API.
+message QueryEntitlementResponse {
+  Entitlement entitlement = 1 [(gogoproto.nullable) = false];
+}
+
+// QueryEntitlementsByAppRequest is the request/response type for the module API.
+message QueryEntitlementsByAppRequest {
+  string app_id = 1; // 64 hex
+  cosmos.base.query.v1beta1.PageRequest pagination = 2;
+}
+// QueryEntitlementsByAppResponse is the request/response type for the module API.
+message QueryEntitlementsByAppResponse {
+  repeated Entitlement entitlements = 1 [(gogoproto.nullable) = false];
   cosmos.base.query.v1beta1.PageResponse pagination = 2;
 }

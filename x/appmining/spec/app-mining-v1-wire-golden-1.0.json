@@ -1,0 +1,39 @@
+{
+  "schema_version": "uge-app-mining-wire-golden-1.0",
+  "test_only_key_notice": "Ed25519 seed is 32 bytes of 0x01; public deterministic fixture, never a production key",
+  "public_key_der_hex": "302a300506032b65700321008a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+  "candidate": {
+    "schema_version": "uge-app-mining-candidate-0.1",
+    "entitlement_id": "970c4147badb6d3d95505024ae52d123f436f09957666f9a5b940bbf90a9ceb9",
+    "app_id": "1111111111111111111111111111111111111111111111111111111111111111",
+    "epoch": 1,
+    "amount": "31500",
+    "denom": "auptick",
+    "gas_used": "21000",
+    "qualified_tx_count": 1,
+    "pav_id": "2222222222222222222222222222222222222222222222222222222222222222",
+    "evidence_root": "3333333333333333333333333333333333333333333333333333333333333333",
+    "gas_evidence_root": "4444444444444444444444444444444444444444444444444444444444444444",
+    "rule_version": "gas-reward-candidate-0.1"
+  },
+  "candidate_hash": "a2824b8d6cd1e9d361fb91838acffc8648a7124031a8bd68c4cc44c0aa5e3dc1",
+  "authorization": {
+    "protocol_version": "1",
+    "operation": "APPROVE",
+    "role": "approver",
+    "chain_id": "uptick_7777-1",
+    "pool_id": "ecosystem-v0",
+    "key_id": "test-key-1",
+    "nonce": "1",
+    "expires_at": "1893456000",
+    "entitlement_id": "970c4147badb6d3d95505024ae52d123f436f09957666f9a5b940bbf90a9ceb9",
+    "app_id": "1111111111111111111111111111111111111111111111111111111111111111",
+    "candidate_hash": "a2824b8d6cd1e9d361fb91838acffc8648a7124031a8bd68c4cc44c0aa5e3dc1",
+    "challenge_resolution_hash": "5555555555555555555555555555555555555555555555555555555555555555",
+    "amount": "31500",
+    "denom": "auptick",
+    "rule_version": "gas-reward-candidate-0.1"
+  },
+  "authorization_digest_sha256": "30bed740d39dda649c7c9686f443ca30291b5a008a8dd385d14d70ab3a71caa5",
+  "signature_base64": "83pyPQfbbxJ8GaK+qDlSAavADwyoXn0wyJdgMu6BQnkTQU/QdOqQJtmLAAt469K6tKR9h2AtWKCvxh4nBH9fDA=="
+}

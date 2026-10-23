@@ -9,30 +9,43 @@ import "uptick/appmining/v1/types.proto";
 
 option go_package = "github.com/UptickNetwork/uptick/x/appmining/types";
 
+// Msg defines the gRPC query/tx service for x/appmining.
 service Msg {
   option (cosmos.msg.v1.service) = true;
 
+  // RegisterApplication handles the corresponding module request.
   rpc RegisterApplication(MsgRegisterApplication) returns (MsgRegisterApplicationResponse) {
     option (google.api.http).post = "/uptick/appmining/v1/tx/register_application";
   }
+  // SubmitAttestation handles the corresponding module request.
   rpc SubmitAttestation(MsgSubmitAttestation) returns (MsgSubmitAttestationResponse) {
     option (google.api.http).post = "/uptick/appmining/v1/tx/submit_attestation";
   }
+  // ChallengeAttestation handles the corresponding module request.
   rpc ChallengeAttestation(MsgChallengeAttestation) returns (MsgChallengeAttestationResponse) {
     option (google.api.http).post = "/uptick/appmining/v1/tx/challenge_attestation";
   }
+  // ResolveChallenge handles the corresponding module request.
   rpc ResolveChallenge(MsgResolveChallenge) returns (MsgResolveChallengeResponse);
+  // FinalizeAttestation handles the corresponding module request.
   rpc FinalizeAttestation(MsgFinalizeAttestation) returns (MsgFinalizeAttestationResponse) {
     option (google.api.http).post = "/uptick/appmining/v1/tx/finalize_attestation";
   }
+  // GrantGasPayer handles the corresponding module request.
   rpc GrantGasPayer(MsgGrantGasPayer) returns (MsgGrantGasPayerResponse);
+  // RevokeGasPayer handles the corresponding module request.
   rpc RevokeGasPayer(MsgRevokeGasPayer) returns (MsgRevokeGasPayerResponse);
+  // SetAttestationSubmitter handles the corresponding module request.
   rpc SetAttestationSubmitter(MsgSetAttestationSubmitter) returns (MsgSetAttestationSubmitterResponse);
+  // ConsumeGasCredit handles the corresponding module request.
   rpc ConsumeGasCredit(MsgConsumeGasCredit) returns (MsgConsumeGasCreditResponse) {
     option (google.api.http).post = "/uptick/appmining/v1/tx/consume_gas_credit";
   }
+  // SetEpochBudget handles the corresponding module request.
   rpc SetEpochBudget(MsgSetEpochBudget) returns (MsgSetEpochBudgetResponse);
+  // UpdateParams handles the corresponding module request.
   rpc UpdateParams(MsgUpdateParams) returns (MsgUpdateParamsResponse);
+  // SetApplicationStatus handles the corresponding module request.
   rpc SetApplicationStatus(MsgSetApplicationStatus) returns (MsgSetApplicationStatusResponse);
   // Pause sets pause bits to true only (Q-06). Resume is authority-only via UpdateParams.
   rpc Pause(MsgPause) returns (MsgPauseResponse);
@@ -40,8 +53,60 @@ service Msg {
   rpc FundRewardPool(MsgFundRewardPool) returns (MsgFundRewardPoolResponse) {
     option (google.api.http).post = "/uptick/appmining/v1/tx/fund_reward_pool";
   }
+
+  // --- V1 entitlement control plane (UGE requirements 1.0 / workorder P0) ---
+  // OpenEntitlementPool creates a V1 fixed entitlement fund pool ledger.
+  rpc OpenEntitlementPool(MsgOpenEntitlementPool) returns (MsgOpenEntitlementPoolResponse) {
+    option (google.api.http).post = "/uptick/appmining/v1/tx/open_entitlement_pool";
+  }
+  // FundEntitlementPool handles the corresponding module request.
+  rpc FundEntitlementPool(MsgFundEntitlementPool) returns (MsgFundEntitlementPoolResponse) {
+    option (google.api.http).post = "/uptick/appmining/v1/tx/fund_entitlement_pool";
+  }
+  // SetEntitlementPoolPaused handles the corresponding module request.
+  rpc SetEntitlementPoolPaused(MsgSetEntitlementPoolPaused) returns (MsgSetEntitlementPoolPausedResponse) {
+    option (google.api.http).post = "/uptick/appmining/v1/tx/set_entitlement_pool_paused";
+  }
+  // RegisterRoleKey handles the corresponding module request.
+  rpc RegisterRoleKey(MsgRegisterRoleKey) returns (MsgRegisterRoleKeyResponse) {
+    option (google.api.http).post = "/uptick/appmining/v1/tx/register_role_key";
+  }
+  // SetRoleKeyStatus handles the corresponding module request.
+  rpc SetRoleKeyStatus(MsgSetRoleKeyStatus) returns (MsgSetRoleKeyStatusResponse) {
+    option (google.api.http).post = "/uptick/appmining/v1/tx/set_role_key_status";
+  }
+
+  // PublishCandidate publishes an immutable V1 candidate commitment (no pool lock).
+  rpc PublishCandidate(MsgPublishCandidate) returns (MsgPublishCandidateResponse) {
+    option (google.api.http).post = "/uptick/appmining/v1/tx/publish_candidate";
+  }
+  // OpenChallenge is the V1 entitlement challenge opener (attestation uses ChallengeAttestation).
+  rpc OpenChallenge(MsgOpenChallenge) returns (MsgOpenChallengeResponse) {
+    option (google.api.http).post = "/uptick/appmining/v1/tx/open_challenge";
+  }
+  // ResolveEntitlementChallenge avoids clashing with attestation MsgResolveChallenge.
+  rpc ResolveEntitlementChallenge(MsgResolveEntitlementChallenge) returns (MsgResolveEntitlementChallengeResponse) {
+    option (google.api.http).post = "/uptick/appmining/v1/tx/resolve_entitlement_challenge";
+  }
+  // ApproveEntitlement handles the corresponding module request.
+  rpc ApproveEntitlement(MsgApproveEntitlement) returns (MsgApproveEntitlementResponse) {
+    option (google.api.http).post = "/uptick/appmining/v1/tx/approve_entitlement";
+  }
+  // ClaimEntitlement handles the corresponding module request.
+  rpc ClaimEntitlement(MsgClaimEntitlement) returns (MsgClaimEntitlementResponse) {
+    option (google.api.http).post = "/uptick/appmining/v1/tx/claim_entitlement";
+  }
+  // FreezeEntitlement handles the corresponding module request.
+  rpc FreezeEntitlement(MsgFreezeEntitlement) returns (MsgFreezeEntitlementResponse) {
+    option (google.api.http).post = "/uptick/appmining/v1/tx/freeze_entitlement";
+  }
+  // RevokeEntitlement handles the corresponding module request.
+  rpc RevokeEntitlement(MsgRevokeEntitlement) returns (MsgRevokeEntitlementResponse) {
+    option (google.api.http).post = "/uptick/appmining/v1/tx/revoke_entitlement";
+  }
 }
 
+// MsgRegisterApplication is the request/response type for the module API.
 message MsgRegisterApplication {
   option (cosmos.msg.v1.signer) = "authority";
   string authority = 1;
@@ -51,18 +116,22 @@ message MsgRegisterApplication {
   bytes metadata_commitment = 5; // optional; empty or exactly 32 bytes
 }
 
+// MsgRegisterApplicationResponse is the request/response type for the module API.
 message MsgRegisterApplicationResponse {}
 
+// MsgSubmitAttestation is the request/response type for the module API.
 message MsgSubmitAttestation {
   option (cosmos.msg.v1.signer) = "submitter";
   string submitter = 1;
   AttestationCommitment attestation = 2 [(gogoproto.nullable) = false];
 }
 
+// MsgSubmitAttestationResponse is the request/response type for the module API.
 message MsgSubmitAttestationResponse {
   int64 challenge_deadline_height = 1;
 }
 
+// MsgChallengeAttestation is the request/response type for the module API.
 message MsgChallengeAttestation {
   option (cosmos.msg.v1.signer) = "challenger";
   string challenger = 1;
@@ -71,10 +140,12 @@ message MsgChallengeAttestation {
   bytes evidence_hash = 4;
 }
 
+// MsgChallengeAttestationResponse is the request/response type for the module API.
 message MsgChallengeAttestationResponse {
   uint64 challenge_id = 1;
 }
 
+// MsgResolveChallenge is the request/response type for the module API.
 message MsgResolveChallenge {
   option (cosmos.msg.v1.signer) = "authority";
   string authority = 1;
@@ -83,8 +154,10 @@ message MsgResolveChallenge {
   bytes resolution_hash = 4;
 }
 
+// MsgResolveChallengeResponse is the request/response type for the module API.
 message MsgResolveChallengeResponse {}
 
+// MsgFinalizeAttestation is the request/response type for the module API.
 message MsgFinalizeAttestation {
   option (cosmos.msg.v1.signer) = "caller";
   string caller = 1;
@@ -92,10 +165,12 @@ message MsgFinalizeAttestation {
   uint64 epoch = 3;
 }
 
+// MsgFinalizeAttestationResponse is the request/response type for the module API.
 message MsgFinalizeAttestationResponse {
   Settlement settlement = 1 [(gogoproto.nullable) = false];
 }
 
+// MsgGrantGasPayer is the request/response type for the module API.
 message MsgGrantGasPayer {
   option (cosmos.msg.v1.signer) = "owner";
   string owner = 1;
@@ -103,8 +178,10 @@ message MsgGrantGasPayer {
   string gas_payer = 3;
 }
 
+// MsgGrantGasPayerResponse is the request/response type for the module API.
 message MsgGrantGasPayerResponse {}
 
+// MsgRevokeGasPayer is the request/response type for the module API.
 message MsgRevokeGasPayer {
   option (cosmos.msg.v1.signer) = "owner";
   string owner = 1;
@@ -112,8 +189,10 @@ message MsgRevokeGasPayer {
   string gas_payer = 3;
 }
 
+// MsgRevokeGasPayerResponse is the request/response type for the module API.
 message MsgRevokeGasPayerResponse {}
 
+// MsgSetAttestationSubmitter is the request/response type for the module API.
 message MsgSetAttestationSubmitter {
   option (cosmos.msg.v1.signer) = "owner";
   string owner = 1;
@@ -121,8 +200,10 @@ message MsgSetAttestationSubmitter {
   string attestation_submitter = 3;
 }
 
+// MsgSetAttestationSubmitterResponse is the request/response type for the module API.
 message MsgSetAttestationSubmitterResponse {}
 
+// MsgConsumeGasCredit is the request/response type for the module API.
 message MsgConsumeGasCredit {
   option (cosmos.msg.v1.signer) = "gas_payer";
   string gas_payer = 1;
@@ -131,26 +212,32 @@ message MsgConsumeGasCredit {
   bytes source_tx_hash = 4;
 }
 
+// MsgConsumeGasCreditResponse is the request/response type for the module API.
 message MsgConsumeGasCreditResponse {
   string remaining_balance = 1;
 }
 
+// MsgSetEpochBudget is the request/response type for the module API.
 message MsgSetEpochBudget {
   option (cosmos.msg.v1.signer) = "authority";
   string authority = 1;
   EpochBudget budget = 2 [(gogoproto.nullable) = false];
 }
 
+// MsgSetEpochBudgetResponse is the request/response type for the module API.
 message MsgSetEpochBudgetResponse {}
 
+// MsgUpdateParams is the request/response type for the module API.
 message MsgUpdateParams {
   option (cosmos.msg.v1.signer) = "authority";
   string authority = 1;
   Params params = 2 [(gogoproto.nullable) = false];
 }
 
+// MsgUpdateParamsResponse is the request/response type for the module API.
 message MsgUpdateParamsResponse {}
 
+// MsgSetApplicationStatus is the request/response type for the module API.
 message MsgSetApplicationStatus {
   option (cosmos.msg.v1.signer) = "authority";
   string authority = 1;
@@ -158,6 +245,7 @@ message MsgSetApplicationStatus {
   ApplicationStatus status = 3;
 }
 
+// MsgSetApplicationStatusResponse is the request/response type for the module API.
 message MsgSetApplicationStatusResponse {}
 
 // MsgPause applies only true bits from pause_bits onto current PauseState (OR).
@@ -168,6 +256,7 @@ message MsgPause {
   PauseState pause_bits = 2 [(gogoproto.nullable) = false];
 }
 
+// MsgPauseResponse is the request/response type for the module API.
 message MsgPauseResponse {}
 
 // MsgFundRewardPool deposits coins into appmining_reward_pool.
@@ -180,4 +269,185 @@ message MsgFundRewardPool {
   string amount = 3;
 }
 
+// MsgFundRewardPoolResponse is the request/response type for the module API.
 message MsgFundRewardPoolResponse {}
+
+// MsgOpenEntitlementPool creates a V1 fixed fund pool ledger (funded=0).
+// Does not mint; activation requires FundEntitlementPool to reach enable min.
+message MsgOpenEntitlementPool {
+  option (cosmos.msg.v1.signer) = "authority";
+  string authority = 1;
+  string pool_id = 2;
+  string denom = 3;
+  uint64 version = 4;
+}
+
+// MsgOpenEntitlementPoolResponse is the request/response type for the module API.
+message MsgOpenEntitlementPoolResponse {}
+
+// MsgFundEntitlementPool deposits coins into appmining_entitlement_pool and
+// increases Pool.funded and Pool.available by the same amount (no mint).
+message MsgFundEntitlementPool {
+  option (cosmos.msg.v1.signer) = "funder";
+  string funder = 1;
+  string pool_id = 2;
+  string amount = 3;
+}
+
+// MsgFundEntitlementPoolResponse is the request/response type for the module API.
+message MsgFundEntitlementPoolResponse {}
+
+// MsgSetEntitlementPoolPaused sets Pool.paused (authority only).
+message MsgSetEntitlementPoolPaused {
+  option (cosmos.msg.v1.signer) = "authority";
+  string authority = 1;
+  string pool_id = 2;
+  bool paused = 3;
+}
+
+// MsgSetEntitlementPoolPausedResponse is the request/response type for the module API.
+message MsgSetEntitlementPoolPausedResponse {}
+
+// MsgRegisterRoleKey registers or rotates an Ed25519 role public key.
+// Same (role, key_id) with identical pubkey is idempotent; conflicting pubkey rejected.
+message MsgRegisterRoleKey {
+  option (cosmos.msg.v1.signer) = "authority";
+  string authority = 1;
+  EntitlementRole role = 2;
+  string key_id = 3;
+  bytes pubkey = 4; // raw Ed25519, 32 bytes
+  uint64 version = 5;
+}
+
+// MsgRegisterRoleKeyResponse is the request/response type for the module API.
+message MsgRegisterRoleKeyResponse {}
+
+// MsgSetRoleKeyStatus pauses or revokes a role key (ACTIVE keys only authorize new msgs).
+message MsgSetRoleKeyStatus {
+  option (cosmos.msg.v1.signer) = "authority";
+  string authority = 1;
+  EntitlementRole role = 2;
+  string key_id = 3;
+  RoleKeyStatus status = 4; // ACTIVE | PAUSED | REVOKED
+}
+
+// MsgSetRoleKeyStatusResponse is the request/response type for the module API.
+message MsgSetRoleKeyStatusResponse {}
+
+// MsgPublishCandidate publishes an immutable candidate commitment (no lock).
+message MsgPublishCandidate {
+  option (cosmos.msg.v1.signer) = "submitter";
+  string submitter = 1;
+  string chain_id = 2;
+  string pool_id = 3;
+  // Candidate body (schema fields); status/timestamps filled by keeper.
+  string entitlement_id = 4;
+  string app_id = 5;
+  string epoch = 6;
+  string amount = 7;
+  string denom = 8;
+  string gas_used = 9;
+  string qualified_tx_count = 10;
+  string pav_id = 11;
+  string evidence_root = 12;
+  string gas_evidence_root = 13;
+  string rule_version = 14;
+  WireProof proof = 15 [(gogoproto.nullable) = false];
+}
+
+// MsgPublishCandidateResponse is the request/response type for the module API.
+message MsgPublishCandidateResponse {
+  string candidate_hash = 1;
+  int64 challenge_deadline = 2;
+}
+
+// MsgOpenChallenge opens a public challenge against a published V1 candidate.
+message MsgOpenChallenge {
+  option (cosmos.msg.v1.signer) = "challenger";
+  string challenger = 1;
+  string entitlement_id = 2;
+  EvidenceType evidence_type = 3;
+  string evidence_digest = 4;
+  string reference_digest = 5; // optional; empty allowed -> normalized to 64 zero hex
+}
+
+// MsgOpenChallengeResponse is the request/response type for the module API.
+message MsgOpenChallengeResponse {
+  string challenge_id = 1;
+}
+
+// MsgResolveEntitlementChallenge resolves an OPEN entitlement challenge.
+message MsgResolveEntitlementChallenge {
+  option (cosmos.msg.v1.signer) = "submitter";
+  string submitter = 1;
+  string chain_id = 2;
+  string pool_id = 3;
+  string challenge_id = 4;
+  string outcome = 5; // UPHELD | DISMISSED
+  string rationale_digest = 6;
+  WireProof proof = 7 [(gogoproto.nullable) = false];
+}
+
+// MsgResolveEntitlementChallengeResponse is the request/response type for the module API.
+message MsgResolveEntitlementChallengeResponse {}
+
+// MsgApproveEntitlement locks pool available→reserved and creates CLAIMABLE entitlement.
+message MsgApproveEntitlement {
+  option (cosmos.msg.v1.signer) = "submitter";
+  string submitter = 1;
+  string chain_id = 2;
+  string pool_id = 3;
+  string entitlement_id = 4;
+  // challenge_resolution_hash binds approval to dispute state (wire APPROVE field).
+  string challenge_resolution_hash = 5;
+  WireProof proof = 6 [(gogoproto.nullable) = false];
+}
+
+// MsgApproveEntitlementResponse is the request/response type for the module API.
+message MsgApproveEntitlementResponse {}
+
+// MsgClaimEntitlement pays reserved funds to the current app owner (beneficiary = owner).
+message MsgClaimEntitlement {
+  option (cosmos.msg.v1.signer) = "owner";
+  string owner = 1;
+  string entitlement_id = 2;
+}
+
+// MsgClaimEntitlementResponse is the request/response type for the module API.
+message MsgClaimEntitlementResponse {
+  string amount = 1;
+  string denom = 2;
+}
+
+// MsgFreezeEntitlement temporarily blocks claim (max 72h, once per entitlement).
+message MsgFreezeEntitlement {
+  option (cosmos.msg.v1.signer) = "submitter";
+  string submitter = 1;
+  string chain_id = 2;
+  string pool_id = 3;
+  string entitlement_id = 4;
+  EvidenceType evidence_type = 5;
+  string evidence_digest = 6;
+  string freeze_until = 7; // unix seconds decimal
+  WireProof proof = 8 [(gogoproto.nullable) = false];
+}
+
+// MsgFreezeEntitlementResponse is the request/response type for the module API.
+message MsgFreezeEntitlementResponse {}
+
+// MsgRevokeEntitlement requires independent risk + audit wire proofs while frozen.
+message MsgRevokeEntitlement {
+  option (cosmos.msg.v1.signer) = "submitter";
+  string submitter = 1;
+  string chain_id = 2;
+  string pool_id = 3;
+  string entitlement_id = 4;
+  EvidenceType evidence_type = 5;
+  string evidence_digest = 6;
+  string rationale_digest = 7;
+  WireProof risk_proof = 8 [(gogoproto.nullable) = false];
+  WireProof audit_proof = 9 [(gogoproto.nullable) = false];
+}
+
+// MsgRevokeEntitlementResponse is the request/response type for the module API.
+message MsgRevokeEntitlementResponse {}

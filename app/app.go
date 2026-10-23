@@ -194,6 +194,7 @@ var (
 		appminingtypes.ModuleName:          nil, // module identity
 		appminingtypes.RewardPoolName:      nil, // settlement-releasable rewards only
 		appminingtypes.ChallengeEscrowName: nil, // open challenge bonds until resolve
+		appminingtypes.EntitlementPoolName: nil, // V1 fixed-fund entitlement reserves
 
 		// cosmosnft.ModuleName: retained because cosmossdk.io/x/nft/keeper.NewKeeper
 		// at app/keepers/keepers.go:332 (via x/collection/keeper.NewKeeper) requires

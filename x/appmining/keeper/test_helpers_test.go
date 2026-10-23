@@ -154,6 +154,10 @@ func setupTest(t *testing.T) testEnv {
 	ak := mockAccountKeeper{codec: codecAddress.NewBech32Codec("uptick")}
 	k := keeper.NewKeeper(cdc, key, bank, ak)
 	params := types.DefaultParams()
+	// POC vectors exercise the legacy flow, so tests start with every legacy
+	// pause bit cleared; V1 entitlement bits stay independent (Q-06) and are
+	// configured per-suite.
+	params.PauseState = &types.PauseState{}
 	auth := sdk.AccAddress(bytes20(0x01))
 	owner := sdk.AccAddress(bytes20(0x02))
 	sub := sdk.AccAddress(bytes20(0x03))

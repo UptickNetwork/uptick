@@ -204,3 +204,160 @@ func (k Keeper) ListOpenChallengeIDs(ctx sdk.Context, appID []byte, epoch uint64
 	}
 	return ids
 }
+
+// --- V1 entitlement flow storage ---
+
+func (k Keeper) SetEntitlementPool(ctx sdk.Context, p types.Pool) {
+	k.store(ctx).Set(types.EntitlementPoolKey(p.PoolId), k.cdc.MustMarshal(&p))
+}
+
+func (k Keeper) GetEntitlementPool(ctx sdk.Context, poolID string) (types.Pool, bool) {
+	bz := k.store(ctx).Get(types.EntitlementPoolKey(poolID))
+	if bz == nil {
+		return types.Pool{}, false
+	}
+	var p types.Pool
+	k.cdc.MustUnmarshal(bz, &p)
+	return p, true
+}
+
+func (k Keeper) SetCandidate(ctx sdk.Context, c types.Candidate) {
+	k.store(ctx).Set(types.CandidateKey(c.EntitlementId), k.cdc.MustMarshal(&c))
+}
+
+func (k Keeper) GetCandidate(ctx sdk.Context, entitlementID string) (types.Candidate, bool) {
+	bz := k.store(ctx).Get(types.CandidateKey(entitlementID))
+	if bz == nil {
+		return types.Candidate{}, false
+	}
+	var c types.Candidate
+	k.cdc.MustUnmarshal(bz, &c)
+	return c, true
+}
+
+func (k Keeper) SetEntitlement(ctx sdk.Context, e types.Entitlement) {
+	k.store(ctx).Set(types.EntitlementKey(e.EntitlementId), k.cdc.MustMarshal(&e))
+}
+
+func (k Keeper) GetEntitlement(ctx sdk.Context, entitlementID string) (types.Entitlement, bool) {
+	bz := k.store(ctx).Get(types.EntitlementKey(entitlementID))
+	if bz == nil {
+		return types.Entitlement{}, false
+	}
+	var e types.Entitlement
+	k.cdc.MustUnmarshal(bz, &e)
+	return e, true
+}
+
+func (k Keeper) SetEntitlementChallenge(ctx sdk.Context, c types.EntitlementChallenge) {
+	k.store(ctx).Set(types.EntitlementChallengeKey(c.ChallengeId), k.cdc.MustMarshal(&c))
+}
+
+func (k Keeper) GetEntitlementChallenge(ctx sdk.Context, challengeID string) (types.EntitlementChallenge, bool) {
+	bz := k.store(ctx).Get(types.EntitlementChallengeKey(challengeID))
+	if bz == nil {
+		return types.EntitlementChallenge{}, false
+	}
+	var c types.EntitlementChallenge
+	k.cdc.MustUnmarshal(bz, &c)
+	return c, true
+}
+
+func (k Keeper) SetOpenEntitlementChallenge(ctx sdk.Context, entitlementID, challenger, challengeID string) {
+	k.store(ctx).Set(types.OpenEntitlementChallengeKey(entitlementID, challenger), []byte(challengeID))
+}
+
+func (k Keeper) GetOpenEntitlementChallenge(ctx sdk.Context, entitlementID, challenger string) (string, bool) {
+	bz := k.store(ctx).Get(types.OpenEntitlementChallengeKey(entitlementID, challenger))
+	if bz == nil {
+		return "", false
+	}
+	return string(bz), true
+}
+
+func (k Keeper) DeleteOpenEntitlementChallenge(ctx sdk.Context, entitlementID, challenger string) {
+	k.store(ctx).Delete(types.OpenEntitlementChallengeKey(entitlementID, challenger))
+}
+
+// HasOpenOrUpheldEntitlementChallenge reports whether any challenge for the
+// candidate is OPEN or UPHELD (blocks approval). DISMISSED does not block.
+func (k Keeper) HasOpenOrUpheldEntitlementChallenge(ctx sdk.Context, entitlementID string) bool {
+	store := k.store(ctx)
+	it := storetypes.KVStorePrefixIterator(store, types.KeyPrefixEntitlementChallenge)
+	defer it.Close()
+	for ; it.Valid(); it.Next() {
+		var c types.EntitlementChallenge
+		k.cdc.MustUnmarshal(it.Value(), &c)
+		if c.CandidateId != entitlementID {
+			continue
+		}
+		if c.Status == types.EntitlementChallengeStatusOpen || c.Status == types.EntitlementChallengeStatusUpheld {
+			return true
+		}
+	}
+	return false
+}
+
+// IterateEntitlementChallenges walks every entitlement challenge record.
+func (k Keeper) IterateEntitlementChallenges(ctx sdk.Context, fn func(types.EntitlementChallenge) bool) {
+	it := storetypes.KVStorePrefixIterator(k.store(ctx), types.KeyPrefixEntitlementChallenge)
+	defer it.Close()
+	for ; it.Valid(); it.Next() {
+		var c types.EntitlementChallenge
+		k.cdc.MustUnmarshal(it.Value(), &c)
+		if !fn(c) {
+			return
+		}
+	}
+}
+
+func (k Keeper) SetRoleKey(ctx sdk.Context, rk types.RoleKey) {
+	k.store(ctx).Set(types.RoleKeyStoreKey(rk.Role, rk.KeyId), k.cdc.MustMarshal(&rk))
+}
+
+func (k Keeper) GetRoleKey(ctx sdk.Context, role types.EntitlementRole, keyID string) (types.RoleKey, bool) {
+	bz := k.store(ctx).Get(types.RoleKeyStoreKey(role, keyID))
+	if bz == nil {
+		return types.RoleKey{}, false
+	}
+	var rk types.RoleKey
+	k.cdc.MustUnmarshal(bz, &rk)
+	return rk, true
+}
+
+// IterateRoleKeys walks every registered key of one role (key order = key_id).
+func (k Keeper) IterateRoleKeys(ctx sdk.Context, role types.EntitlementRole, fn func(types.RoleKey) bool) {
+	prefix := append(append([]byte{}, types.KeyPrefixRoleKey...), byte(role))
+	it := storetypes.KVStorePrefixIterator(k.store(ctx), prefix)
+	defer it.Close()
+	for ; it.Valid(); it.Next() {
+		var rk types.RoleKey
+		k.cdc.MustUnmarshal(it.Value(), &rk)
+		if !fn(rk) {
+			return
+		}
+	}
+}
+
+// HasAuthNonce reports whether the wire-v1 nonce was already consumed.
+func (k Keeper) HasAuthNonce(ctx sdk.Context, role types.EntitlementRole, keyID, nonce string) bool {
+	return k.store(ctx).Has(types.AuthNonceKey(role, keyID, nonce))
+}
+
+// SetAuthNonce consumes the wire-v1 nonce. The value records
+// "role_wire/key_id/nonce" so genesis export can reconstruct UsedAuthNonces.
+func (k Keeper) SetAuthNonce(ctx sdk.Context, role types.EntitlementRole, keyID, nonce string) {
+	roleWire, _ := types.RoleWire(role)
+	k.store(ctx).Set(types.AuthNonceKey(role, keyID, nonce), []byte(roleWire+"/"+keyID+"/"+nonce))
+}
+
+// IterateAuthNonces walks consumed wire-v1 nonces ("role/key_id/nonce").
+func (k Keeper) IterateAuthNonces(ctx sdk.Context, fn func(string) bool) {
+	it := storetypes.KVStorePrefixIterator(k.store(ctx), types.KeyPrefixAuthNonce)
+	defer it.Close()
+	for ; it.Valid(); it.Next() {
+		if !fn(string(it.Value())) {
+			return
+		}
+	}
+}

@@ -23,6 +23,9 @@ const (
 	HashLength = 32
 	// SourceTxHashLength is the fixed length for source transaction hashes.
 	SourceTxHashLength = 32
+
+	// EntitlementPoolName holds V1 entitlement pool funds (funded=available+reserved+paid).
+	EntitlementPoolName = "appmining_entitlement_pool"
 )
 
 // AccModuleAddress is the primary module address (legacy alias of reward pool).
@@ -51,20 +54,34 @@ const (
 	prefixNextChallengeID
 	prefixOpenChallengeIndex // app_id|epoch|challenge_id -> 1
 	prefixGasPayerIndex      // bech32 gas_payer -> app_id (unique)
+	prefixEntitlementPool
+	prefixCandidate
+	prefixEntitlement
+	prefixEntitlementChallenge
+	prefixOpenEntitlementChallenge
+	prefixRoleKey
+	prefixAuthNonce
 )
 
 var (
-	KeyPrefixParams               = []byte{prefixParams}
-	KeyPrefixApplication          = []byte{prefixApplication}
-	KeyPrefixEpochBudget          = []byte{prefixEpochBudget}
-	KeyPrefixAttestation          = []byte{prefixAttestation}
-	KeyPrefixChallenge            = []byte{prefixChallenge}
-	KeyPrefixSettlement           = []byte{prefixSettlement}
-	KeyPrefixGasCredit            = []byte{prefixGasCredit}
-	KeyPrefixGasCreditConsumption = []byte{prefixGasCreditConsumption}
-	KeyPrefixNextChallengeID      = []byte{prefixNextChallengeID}
-	KeyPrefixOpenChallengeIndex   = []byte{prefixOpenChallengeIndex}
-	KeyPrefixGasPayerIndex        = []byte{prefixGasPayerIndex}
+	KeyPrefixParams                   = []byte{prefixParams}
+	KeyPrefixApplication              = []byte{prefixApplication}
+	KeyPrefixEpochBudget              = []byte{prefixEpochBudget}
+	KeyPrefixAttestation              = []byte{prefixAttestation}
+	KeyPrefixChallenge                = []byte{prefixChallenge}
+	KeyPrefixSettlement               = []byte{prefixSettlement}
+	KeyPrefixGasCredit                = []byte{prefixGasCredit}
+	KeyPrefixGasCreditConsumption     = []byte{prefixGasCreditConsumption}
+	KeyPrefixNextChallengeID          = []byte{prefixNextChallengeID}
+	KeyPrefixOpenChallengeIndex       = []byte{prefixOpenChallengeIndex}
+	KeyPrefixGasPayerIndex            = []byte{prefixGasPayerIndex}
+	KeyPrefixEntitlementPool          = []byte{prefixEntitlementPool}
+	KeyPrefixCandidate                = []byte{prefixCandidate}
+	KeyPrefixEntitlement              = []byte{prefixEntitlement}
+	KeyPrefixEntitlementChallenge     = []byte{prefixEntitlementChallenge}
+	KeyPrefixOpenEntitlementChallenge = []byte{prefixOpenEntitlementChallenge}
+	KeyPrefixRoleKey                  = []byte{prefixRoleKey}
+	KeyPrefixAuthNonce                = []byte{prefixAuthNonce}
 )
 
 func ApplicationKey(appID []byte) []byte {
@@ -118,4 +135,47 @@ func Uint64Bytes(v uint64) []byte {
 	b := make([]byte, 8)
 	binary.BigEndian.PutUint64(b, v)
 	return b
+}
+
+// --- V1 entitlement flow keys ---
+
+// EntitlementPoolKey stores the Pool record by pool_id.
+func EntitlementPoolKey(poolID string) []byte {
+	return append(append([]byte{}, KeyPrefixEntitlementPool...), []byte(poolID)...)
+}
+
+// CandidateKey stores the Candidate record by entitlement_id.
+func CandidateKey(entitlementID string) []byte {
+	return append(append([]byte{}, KeyPrefixCandidate...), []byte(entitlementID)...)
+}
+
+// EntitlementKey stores the Entitlement record by entitlement_id.
+func EntitlementKey(entitlementID string) []byte {
+	return append(append([]byte{}, KeyPrefixEntitlement...), []byte(entitlementID)...)
+}
+
+// EntitlementChallengeKey stores the EntitlementChallenge record by challenge_id.
+func EntitlementChallengeKey(challengeID string) []byte {
+	return append(append([]byte{}, KeyPrefixEntitlementChallenge...), []byte(challengeID)...)
+}
+
+// OpenEntitlementChallengeKey indexes the open challenge of one challenger for
+// one candidate: entitlement_id | challenger -> challenge_id.
+func OpenEntitlementChallengeKey(entitlementID, challenger string) []byte {
+	key := append(append([]byte{}, KeyPrefixOpenEntitlementChallenge...), []byte(entitlementID)...)
+	return append(key, []byte(challenger)...)
+}
+
+// RoleKeyStoreKey stores a registered role key: role_byte | key_id -> RoleKey.
+func RoleKeyStoreKey(role EntitlementRole, keyID string) []byte {
+	key := append(append([]byte{}, KeyPrefixRoleKey...), byte(role))
+	return append(key, []byte(keyID)...)
+}
+
+// AuthNonceKey stores consumed wire-v1 nonces: role_byte | key_id | 0 | nonce -> 1.
+func AuthNonceKey(role EntitlementRole, keyID, nonce string) []byte {
+	key := append(append([]byte{}, KeyPrefixAuthNonce...), byte(role))
+	key = append(key, []byte(keyID)...)
+	key = append(key, []byte{0}...)
+	return append(key, []byte(nonce)...)
 }

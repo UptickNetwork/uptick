@@ -6,51 +6,72 @@ import "gogoproto/gogo.proto";
 
 option go_package = "github.com/UptickNetwork/uptick/x/appmining/types";
 
+// AttestationStatus enumerates allowed values for the module.
 enum AttestationStatus {
   option (gogoproto.goproto_enum_prefix) = false;
 
+  // ATTESTATION_STATUS_UNSPECIFIED is a valid enum value.
   ATTESTATION_STATUS_UNSPECIFIED = 0 [(gogoproto.enumvalue_customname) = "AttestationStatusUnspecified"];
+  // ATTESTATION_STATUS_CHALLENGE_WINDOW is a valid enum value.
   ATTESTATION_STATUS_CHALLENGE_WINDOW = 1 [(gogoproto.enumvalue_customname) = "AttestationStatusChallengeWindow"];
+  // ATTESTATION_STATUS_CHALLENGED is a valid enum value.
   ATTESTATION_STATUS_CHALLENGED = 2 [(gogoproto.enumvalue_customname) = "AttestationStatusChallenged"];
+  // ATTESTATION_STATUS_FINALIZED is a valid enum value.
   ATTESTATION_STATUS_FINALIZED = 3 [(gogoproto.enumvalue_customname) = "AttestationStatusFinalized"];
+  // ATTESTATION_STATUS_REJECTED is a valid enum value.
   ATTESTATION_STATUS_REJECTED = 4 [(gogoproto.enumvalue_customname) = "AttestationStatusRejected"];
 }
 
+// ChallengeStatus enumerates allowed values for the module.
 enum ChallengeStatus {
   option (gogoproto.goproto_enum_prefix) = false;
 
+  // CHALLENGE_STATUS_UNSPECIFIED is a valid enum value.
   CHALLENGE_STATUS_UNSPECIFIED = 0 [(gogoproto.enumvalue_customname) = "ChallengeStatusUnspecified"];
+  // CHALLENGE_STATUS_OPEN is a valid enum value.
   CHALLENGE_STATUS_OPEN = 1 [(gogoproto.enumvalue_customname) = "ChallengeStatusOpen"];
+  // CHALLENGE_STATUS_REJECTED is a valid enum value.
   CHALLENGE_STATUS_REJECTED = 2 [(gogoproto.enumvalue_customname) = "ChallengeStatusRejected"];
+  // CHALLENGE_STATUS_UPHELD is a valid enum value.
   CHALLENGE_STATUS_UPHELD = 3 [(gogoproto.enumvalue_customname) = "ChallengeStatusUpheld"];
   // closed without ruling because another upheld challenge terminated the
   // attestation; bond fully refunded (CLARIFICATIONS-REPLY Q-04)
   CHALLENGE_STATUS_SUPERSEDED = 4 [(gogoproto.enumvalue_customname) = "ChallengeStatusSuperseded"];
 }
 
+// ApplicationStatus enumerates allowed values for the module.
 enum ApplicationStatus {
   option (gogoproto.goproto_enum_prefix) = false;
 
+  // APPLICATION_STATUS_UNSPECIFIED is a valid enum value.
   APPLICATION_STATUS_UNSPECIFIED = 0 [(gogoproto.enumvalue_customname) = "ApplicationStatusUnspecified"];
+  // APPLICATION_STATUS_ACTIVE is a valid enum value.
   APPLICATION_STATUS_ACTIVE = 1 [(gogoproto.enumvalue_customname) = "ApplicationStatusActive"];
+  // APPLICATION_STATUS_SUSPENDED is a valid enum value.
   APPLICATION_STATUS_SUSPENDED = 2 [(gogoproto.enumvalue_customname) = "ApplicationStatusSuspended"];
+  // APPLICATION_STATUS_REVOKED is a valid enum value.
   APPLICATION_STATUS_REVOKED = 3 [(gogoproto.enumvalue_customname) = "ApplicationStatusRevoked"];
 }
 
+// AttestationProfile is the request/response type for the module API.
 message AttestationProfile {
   string profile = 1;
   string version = 2;
   bool active = 3;
 }
 
+// PauseState is the request/response type for the module API.
 message PauseState {
   bool registration_paused = 1;
   bool attestation_paused = 2;
   bool challenge_paused = 3;
   bool settlement_paused = 4;
   bool gas_credit_paused = 5;
+  // V1 entitlement flow (Publish/Approve/Claim/…); independent of attestation pause bits
+  bool entitlement_paused = 6;
 }
 
+// Params is the request/response type for the module API.
 message Params {
   string authority = 1;
   uint64 challenge_window_blocks = 2;
@@ -67,8 +88,15 @@ message Params {
   uint32 max_gas_payers = 10;
   // when false (default), MsgConsumeGasCredit is rejected; PostHandler auto-debit remains
   bool allow_manual_gas_credit_consume = 11;
+  // V1: minimum Pool.funded (smallest units, unsigned decimal string) required before
+  // entitlement msgs are enabled. Empty or "0" keeps the new flow disabled.
+  string entitlement_enable_min_funded = 12;
+  // V1: allowlist of rule_version values accepted by MsgApproveEntitlement (§3
+  // "规则版本允许"). Empty list denies every approval (default-deny).
+  repeated string entitlement_allowed_rule_versions = 13;
 }
 
+// Application is the request/response type for the module API.
 message Application {
   bytes app_id = 1;
   string owner = 2;
@@ -79,6 +107,7 @@ message Application {
   bytes metadata_commitment = 6;
 }
 
+// EpochBudget is the request/response type for the module API.
 message EpochBudget {
   uint64 epoch = 1;
   string denom = 2;
@@ -89,6 +118,7 @@ message EpochBudget {
   int64 closed_height = 7;
 }
 
+// AttestationCommitment is the request/response type for the module API.
 message AttestationCommitment {
   bytes app_id = 1;
   uint64 epoch = 2;
@@ -105,6 +135,7 @@ message AttestationCommitment {
   AttestationStatus status = 13;
 }
 
+// Challenge is the request/response type for the module API.
 message Challenge {
   uint64 challenge_id = 1;
   bytes app_id = 2;
@@ -118,6 +149,7 @@ message Challenge {
   int64 resolved_height = 10;
 }
 
+// Settlement is the request/response type for the module API.
 message Settlement {
   bytes app_id = 1;
   uint64 epoch = 2;
@@ -129,6 +161,7 @@ message Settlement {
   int64 finalized_height = 8;
 }
 
+// GasCreditAccount is the request/response type for the module API.
 message GasCreditAccount {
   bytes app_id = 1;
   string balance = 2;
@@ -136,10 +169,197 @@ message GasCreditAccount {
   string total_consumed = 4;
 }
 
+// GasCreditConsumption is the request/response type for the module API.
 message GasCreditConsumption {
   bytes app_id = 1;
   string gas_payer = 2;
   bytes source_tx_hash = 3;
   string amount = 4;
   int64 consumed_height = 5;
+}
+
+// --- Application Mining V1 (UGE authoritative requirements 1.0) ---
+
+// EntitlementRole is the five UGE authorization roles (wire role strings).
+enum EntitlementRole {
+  option (gogoproto.goproto_enum_prefix) = false;
+
+  // ENTITLEMENT_ROLE_UNSPECIFIED is a valid enum value.
+  ENTITLEMENT_ROLE_UNSPECIFIED = 0 [(gogoproto.enumvalue_customname) = "EntitlementRoleUnspecified"];
+  // ENTITLEMENT_ROLE_PUBLISHER is a valid enum value.
+  ENTITLEMENT_ROLE_PUBLISHER = 1 [(gogoproto.enumvalue_customname) = "EntitlementRolePublisher"];
+  // ENTITLEMENT_ROLE_APPROVER is a valid enum value.
+  ENTITLEMENT_ROLE_APPROVER = 2 [(gogoproto.enumvalue_customname) = "EntitlementRoleApprover"];
+  // ENTITLEMENT_ROLE_REVIEWER is a valid enum value.
+  ENTITLEMENT_ROLE_REVIEWER = 3 [(gogoproto.enumvalue_customname) = "EntitlementRoleReviewer"];
+  // ENTITLEMENT_ROLE_RISK is a valid enum value.
+  ENTITLEMENT_ROLE_RISK = 4 [(gogoproto.enumvalue_customname) = "EntitlementRoleRisk"];
+  // ENTITLEMENT_ROLE_AUDIT is a valid enum value.
+  ENTITLEMENT_ROLE_AUDIT = 5 [(gogoproto.enumvalue_customname) = "EntitlementRoleAudit"];
+}
+
+// RoleKeyStatus enumerates allowed values for the module.
+enum RoleKeyStatus {
+  option (gogoproto.goproto_enum_prefix) = false;
+
+  // ROLE_KEY_STATUS_UNSPECIFIED is a valid enum value.
+  ROLE_KEY_STATUS_UNSPECIFIED = 0 [(gogoproto.enumvalue_customname) = "RoleKeyStatusUnspecified"];
+  // ROLE_KEY_STATUS_ACTIVE is a valid enum value.
+  ROLE_KEY_STATUS_ACTIVE = 1 [(gogoproto.enumvalue_customname) = "RoleKeyStatusActive"];
+  // ROLE_KEY_STATUS_PAUSED is a valid enum value.
+  ROLE_KEY_STATUS_PAUSED = 2 [(gogoproto.enumvalue_customname) = "RoleKeyStatusPaused"];
+  // ROLE_KEY_STATUS_REVOKED is a valid enum value.
+  ROLE_KEY_STATUS_REVOKED = 3 [(gogoproto.enumvalue_customname) = "RoleKeyStatusRevoked"];
+}
+
+// Pool is the fixed entitlement fund ledger.
+// Invariant: funded = available + reserved + paid; reserved <= module account balance.
+message Pool {
+  string pool_id = 1;
+  string denom = 2;
+  string funded = 3;
+  string available = 4;
+  string reserved = 5;
+  string paid = 6;
+  bool paused = 7;
+  uint64 version = 8;
+}
+
+// RoleKey is a versioned Ed25519 public key for one UGE role.
+message RoleKey {
+  EntitlementRole role = 1;
+  string key_id = 2;
+  // raw Ed25519 public key, exactly 32 bytes
+  bytes pubkey = 3;
+  RoleKeyStatus status = 4;
+  uint64 version = 5;
+  int64 registered_height = 6;
+}
+
+// WireProof is the Ed25519 domain-separated authorization attached to V1 msgs.
+message WireProof {
+  string key_id = 1;
+  string nonce = 2;
+  string expires_at = 3; // unix seconds, unsigned decimal
+  string signature_base64 = 4;
+}
+
+// CandidateStatus enumerates allowed values for the module.
+enum CandidateStatus {
+  option (gogoproto.goproto_enum_prefix) = false;
+
+  // CANDIDATE_STATUS_UNSPECIFIED is a valid enum value.
+  CANDIDATE_STATUS_UNSPECIFIED = 0 [(gogoproto.enumvalue_customname) = "CandidateStatusUnspecified"];
+  // CANDIDATE_STATUS_PUBLISHED is a valid enum value.
+  CANDIDATE_STATUS_PUBLISHED = 1 [(gogoproto.enumvalue_customname) = "CandidateStatusPublished"];
+  // CANDIDATE_STATUS_REJECTED is a valid enum value.
+  CANDIDATE_STATUS_REJECTED = 2 [(gogoproto.enumvalue_customname) = "CandidateStatusRejected"];
+}
+
+// EvidenceType enumerates allowed values for the module.
+enum EvidenceType {
+  option (gogoproto.goproto_enum_prefix) = false;
+
+  // EVIDENCE_TYPE_UNSPECIFIED is a valid enum value.
+  EVIDENCE_TYPE_UNSPECIFIED = 0 [(gogoproto.enumvalue_customname) = "EvidenceTypeUnspecified"];
+  // EVIDENCE_TYPE_TX_MISSING_OR_UNFINALIZED is a valid enum value.
+  EVIDENCE_TYPE_TX_MISSING_OR_UNFINALIZED = 1 [(gogoproto.enumvalue_customname) = "EvidenceTypeTxMissingOrUnfinalized"];
+  // EVIDENCE_TYPE_RECEIPT_QBT_MISMATCH is a valid enum value.
+  EVIDENCE_TYPE_RECEIPT_QBT_MISMATCH = 2 [(gogoproto.enumvalue_customname) = "EvidenceTypeReceiptQbtMismatch"];
+  // EVIDENCE_TYPE_DUPLICATE_OR_FAMILY_CONFLICT is a valid enum value.
+  EVIDENCE_TYPE_DUPLICATE_OR_FAMILY_CONFLICT = 3 [(gogoproto.enumvalue_customname) = "EvidenceTypeDuplicateOrFamilyConflict"];
+  // EVIDENCE_TYPE_CONFIRMED_REFUND_OR_REVERSAL is a valid enum value.
+  EVIDENCE_TYPE_CONFIRMED_REFUND_OR_REVERSAL = 4 [(gogoproto.enumvalue_customname) = "EvidenceTypeConfirmedRefundOrReversal"];
+  // EVIDENCE_TYPE_APP_OR_EMITTER_INELIGIBLE is a valid enum value.
+  EVIDENCE_TYPE_APP_OR_EMITTER_INELIGIBLE = 5 [(gogoproto.enumvalue_customname) = "EvidenceTypeAppOrEmitterIneligible"];
+  // EVIDENCE_TYPE_REPRODUCIBLE_CALCULATION_ERROR is a valid enum value.
+  EVIDENCE_TYPE_REPRODUCIBLE_CALCULATION_ERROR = 6 [(gogoproto.enumvalue_customname) = "EvidenceTypeReproducibleCalculationError"];
+}
+
+// EntitlementChallengeStatus enumerates allowed values for the module.
+enum EntitlementChallengeStatus {
+  option (gogoproto.goproto_enum_prefix) = false;
+
+  // ENTITLEMENT_CHALLENGE_STATUS_UNSPECIFIED is a valid enum value.
+  ENTITLEMENT_CHALLENGE_STATUS_UNSPECIFIED = 0 [(gogoproto.enumvalue_customname) = "EntitlementChallengeStatusUnspecified"];
+  // ENTITLEMENT_CHALLENGE_STATUS_OPEN is a valid enum value.
+  ENTITLEMENT_CHALLENGE_STATUS_OPEN = 1 [(gogoproto.enumvalue_customname) = "EntitlementChallengeStatusOpen"];
+  // ENTITLEMENT_CHALLENGE_STATUS_UPHELD is a valid enum value.
+  ENTITLEMENT_CHALLENGE_STATUS_UPHELD = 2 [(gogoproto.enumvalue_customname) = "EntitlementChallengeStatusUpheld"];
+  // ENTITLEMENT_CHALLENGE_STATUS_DISMISSED is a valid enum value.
+  ENTITLEMENT_CHALLENGE_STATUS_DISMISSED = 3 [(gogoproto.enumvalue_customname) = "EntitlementChallengeStatusDismissed"];
+}
+
+// Candidate is a published entitlement candidate (no pool liability until Approve).
+message Candidate {
+  string entitlement_id = 1; // 64 hex
+  string app_id = 2;         // 64 hex (wire); registry lookup uses raw 32 bytes
+  string epoch = 3;
+  string amount = 4;
+  string denom = 5;
+  string gas_used = 6;
+  string qualified_tx_count = 7;
+  string pav_id = 8;
+  string evidence_root = 9;
+  string gas_evidence_root = 10;
+  string rule_version = 11;
+  string candidate_hash = 12;
+  string pool_id = 13;
+  string publish_tx_hash = 14;
+  int64 publish_height = 15;
+  int64 published_at = 16;         // unix seconds (block time)
+  int64 challenge_deadline = 17;   // published_at + 604800
+  string publisher = 18;           // cosmos bech32 submitter
+  CandidateStatus status = 19;
+  int64 max_observed_time = 20;    // anti-rollback watermark
+}
+
+// EntitlementChallenge is the V1 challenge record (distinct from attestation Challenge).
+message EntitlementChallenge {
+  string challenge_id = 1;   // 64 hex
+  string candidate_id = 2;   // entitlement_id
+  string challenger = 3;
+  EvidenceType evidence_type = 4;
+  string evidence_digest = 5;    // 64 hex
+  string reference_digest = 6;   // 64 hex; may be empty -> store as 64 zero hex if unset at open
+  EntitlementChallengeStatus status = 7;
+  int64 opened_at = 8;
+  string reviewer = 9;           // key_id of resolving reviewer
+  string resolution_digest = 10; // 64 hex
+  int64 resolved_at = 11;
+}
+
+// EntitlementState enumerates allowed values for the module.
+enum EntitlementState {
+  option (gogoproto.goproto_enum_prefix) = false;
+
+  // ENTITLEMENT_STATE_UNSPECIFIED is a valid enum value.
+  ENTITLEMENT_STATE_UNSPECIFIED = 0 [(gogoproto.enumvalue_customname) = "EntitlementStateUnspecified"];
+  // ENTITLEMENT_STATE_CLAIMABLE is a valid enum value.
+  ENTITLEMENT_STATE_CLAIMABLE = 1 [(gogoproto.enumvalue_customname) = "EntitlementStateClaimable"];
+  // ENTITLEMENT_STATE_FROZEN is a valid enum value.
+  ENTITLEMENT_STATE_FROZEN = 2 [(gogoproto.enumvalue_customname) = "EntitlementStateFrozen"];
+  // ENTITLEMENT_STATE_REVOKED is a valid enum value.
+  ENTITLEMENT_STATE_REVOKED = 3 [(gogoproto.enumvalue_customname) = "EntitlementStateRevoked"];
+  // ENTITLEMENT_STATE_CLAIMED is a valid enum value.
+  ENTITLEMENT_STATE_CLAIMED = 4 [(gogoproto.enumvalue_customname) = "EntitlementStateClaimed"];
+}
+
+// Entitlement is created only after Approve (pool liability reserved).
+message Entitlement {
+  string entitlement_id = 1;
+  string app_id = 2;
+  string owner_at_last_query = 3;
+  string amount = 4;
+  string denom = 5;
+  EntitlementState state = 6;
+  int64 freeze_until = 7;
+  uint32 freeze_count = 8;
+  string approval_tx = 9;
+  string claim_tx = 10;
+  string evidence_root = 11;
+  string rule_version = 12;
+  string pool_id = 13;
+  int64 approved_at = 14;
+  int64 max_observed_time = 15;
 }

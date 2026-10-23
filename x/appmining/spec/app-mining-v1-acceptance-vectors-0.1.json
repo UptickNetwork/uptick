@@ -1,0 +1,145 @@
+{
+  "schema_version": "uge-app-mining-handoff-vectors-0.1",
+  "status": "chain_implementation_mirrored",
+  "unit": "reward_token_smallest_unit",
+  "challenge_window_seconds": 604800,
+  "max_freeze_seconds": 259200,
+  "cases": [
+    {
+      "id": "PUBLISH_IS_NOT_PAYMENT",
+      "funded": "100",
+      "steps": [
+        { "op": "publish", "id": "e1", "hash": "h1", "at": 0, "authority": "UGE", "expect": "OK" },
+        { "op": "publish", "id": "e1", "hash": "h1", "at": 1, "authority": "UGE", "expect": "IDEMPOTENT" },
+        { "op": "publish", "id": "e1", "hash": "h2", "at": 2, "authority": "UGE", "expect": "REJECT" }
+      ],
+      "final": { "available": "100", "reserved": "0", "paid": "0", "e1": "PUBLISHED" }
+    },
+    {
+      "id": "APPROVAL_BEFORE_SEVEN_DAYS",
+      "funded": "100",
+      "steps": [
+        { "op": "publish", "id": "e1", "hash": "h1", "at": 0, "authority": "UGE", "expect": "OK" },
+        { "op": "approve", "id": "e1", "app": "A", "amount": "40", "at": 604799, "authority": "UGE", "expect": "REJECT" },
+        { "op": "approve", "id": "e1", "app": "A", "amount": "40", "at": 604800, "authority": "UGE", "expect": "OK" }
+      ],
+      "final": { "available": "60", "reserved": "40", "paid": "0", "e1": "CLAIMABLE" }
+    },
+    {
+      "id": "OPEN_OR_UPHELD_CHALLENGE_BLOCKS_APPROVAL",
+      "funded": "100",
+      "steps": [
+        { "op": "publish", "id": "e1", "hash": "h1", "at": 0, "authority": "UGE", "expect": "OK" },
+        { "op": "challenge", "id": "e1", "at": 10, "evidence": "CONFIRMED_REFUND_OR_REVERSAL", "expect": "OK" },
+        { "op": "approve", "id": "e1", "app": "A", "amount": "40", "at": 604800, "authority": "UGE", "expect": "REJECT" },
+        { "op": "resolve", "id": "e1", "outcome": "UPHELD", "authority": "reviewer", "expect": "OK" },
+        { "op": "approve", "id": "e1", "app": "A", "amount": "40", "at": 604801, "authority": "UGE", "expect": "REJECT" }
+      ],
+      "final": { "available": "100", "reserved": "0", "paid": "0", "e1": "REJECTED" }
+    },
+    {
+      "id": "DISMISSED_CHALLENGE_ALLOWS_APPROVAL",
+      "funded": "100",
+      "steps": [
+        { "op": "publish", "id": "e1", "hash": "h1", "at": 0, "authority": "UGE", "expect": "OK" },
+        { "op": "challenge", "id": "e1", "at": 1, "evidence": "RECEIPT_QBT_MISMATCH", "expect": "OK" },
+        { "op": "resolve", "id": "e1", "outcome": "DISMISSED", "authority": "reviewer", "expect": "OK" },
+        { "op": "approve", "id": "e1", "app": "A", "amount": "40", "at": 604800, "authority": "UGE", "expect": "OK" }
+      ],
+      "final": { "available": "60", "reserved": "40", "paid": "0", "e1": "CLAIMABLE" }
+    },
+    {
+      "id": "UNAUTHORIZED_AMOUNT_AND_DUPLICATE_APPROVAL",
+      "funded": "100",
+      "steps": [
+        { "op": "publish", "id": "e1", "hash": "h1", "at": 0, "authority": "UGE", "expect": "OK" },
+        { "op": "approve", "id": "e1", "app": "A", "amount": "40", "at": 604800, "authority": "APP", "expect": "REJECT" },
+        { "op": "approve", "id": "e1", "app": "A", "amount": "40", "at": 604800, "authority": "UGE", "expect": "OK" },
+        { "op": "approve", "id": "e1", "app": "A", "amount": "40", "at": 604801, "authority": "UGE", "expect": "REJECT" }
+      ],
+      "final": { "available": "60", "reserved": "40", "paid": "0", "e1": "CLAIMABLE" }
+    },
+    {
+      "id": "FIXED_POOL_EXHAUSTION_AND_CROSS_EPOCH_RESERVATION",
+      "funded": "100",
+      "steps": [
+        { "op": "publish", "id": "e1", "hash": "h1", "at": 0, "authority": "UGE", "expect": "OK" },
+        { "op": "publish", "id": "e2", "hash": "h2", "at": 0, "authority": "UGE", "expect": "OK" },
+        { "op": "approve", "id": "e1", "app": "A", "amount": "70", "at": 604800, "authority": "UGE", "expect": "OK" },
+        { "op": "approve", "id": "e2", "app": "B", "amount": "40", "at": 604800, "authority": "UGE", "expect": "REJECT" }
+      ],
+      "final": { "available": "30", "reserved": "70", "paid": "0", "e1": "CLAIMABLE", "e2": "PUBLISHED" }
+    },
+    {
+      "id": "OWNER_CLAIM_ONCE_AND_CROSS_APP_REJECTED",
+      "funded": "100",
+      "steps": [
+        { "op": "publish", "id": "e1", "hash": "h1", "at": 0, "authority": "UGE", "expect": "OK" },
+        { "op": "approve", "id": "e1", "app": "A", "amount": "40", "at": 604800, "authority": "UGE", "expect": "OK" },
+        { "op": "claim", "id": "e1", "app": "B", "authority": "owner-B", "expect": "REJECT" },
+        { "op": "claim", "id": "e1", "app": "A", "authority": "owner-A", "expect": "OK" },
+        { "op": "claim", "id": "e1", "app": "A", "authority": "owner-A", "expect": "REJECT" }
+      ],
+      "final": { "available": "60", "reserved": "0", "paid": "40", "e1": "CLAIMED" }
+    },
+    {
+      "id": "FREEZE_PRESERVES_LIABILITY_AND_BLOCKS_CLAIM",
+      "funded": "100",
+      "steps": [
+        { "op": "publish", "id": "e1", "hash": "h1", "at": 0, "authority": "UGE", "expect": "OK" },
+        { "op": "approve", "id": "e1", "app": "A", "amount": "40", "at": 604800, "authority": "UGE", "expect": "OK" },
+        { "op": "freeze", "id": "e1", "at": 604801, "until": 864001, "evidence": "CONFIRMED_REFUND_OR_REVERSAL", "authority": "risk", "expect": "OK" },
+        { "op": "claim", "id": "e1", "app": "A", "authority": "owner-A", "expect": "REJECT" }
+      ],
+      "final": { "available": "60", "reserved": "40", "paid": "0", "e1": "FROZEN" }
+    },
+    {
+      "id": "FREEZE_MAX_72_HOURS_AND_EXPIRY",
+      "funded": "100",
+      "steps": [
+        { "op": "publish", "id": "e1", "hash": "h1", "at": 0, "authority": "UGE", "expect": "OK" },
+        { "op": "approve", "id": "e1", "app": "A", "amount": "40", "at": 604800, "authority": "UGE", "expect": "OK" },
+        { "op": "freeze", "id": "e1", "at": 604801, "until": 864002, "evidence": "CONFIRMED_REFUND_OR_REVERSAL", "authority": "risk", "expect": "REJECT" },
+        { "op": "freeze", "id": "e1", "at": 604801, "until": 864001, "evidence": "CONFIRMED_REFUND_OR_REVERSAL", "authority": "risk", "expect": "OK" },
+        { "op": "claim", "id": "e1", "app": "A", "at": 864001, "authority": "owner-A", "expect": "OK" }
+      ],
+      "final": { "available": "60", "reserved": "0", "paid": "40", "e1": "CLAIMED" }
+    },
+    {
+      "id": "REVOKE_REQUIRES_INDEPENDENT_DUAL_AUTHORITY",
+      "funded": "100",
+      "steps": [
+        { "op": "publish", "id": "e1", "hash": "h1", "at": 0, "authority": "UGE", "expect": "OK" },
+        { "op": "approve", "id": "e1", "app": "A", "amount": "40", "at": 604800, "authority": "UGE", "expect": "OK" },
+        { "op": "freeze", "id": "e1", "at": 604801, "until": 864001, "evidence": "CONFIRMED_REFUND_OR_REVERSAL", "authority": "risk", "expect": "OK" },
+        { "op": "revoke", "id": "e1", "at": 604802, "evidence": "CONFIRMED_REFUND_OR_REVERSAL", "authorities": ["risk"], "expect": "REJECT" },
+        { "op": "revoke", "id": "e1", "at": 604802, "evidence": "CONFIRMED_REFUND_OR_REVERSAL", "authorities": ["risk", "risk"], "expect": "REJECT" },
+        { "op": "revoke", "id": "e1", "at": 604802, "evidence": "CONFIRMED_REFUND_OR_REVERSAL", "authorities": ["risk", "audit"], "expect": "OK" },
+        { "op": "revoke", "id": "e1", "at": 604803, "evidence": "CONFIRMED_REFUND_OR_REVERSAL", "authorities": ["risk", "audit"], "expect": "REJECT" }
+      ],
+      "final": { "available": "100", "reserved": "0", "paid": "0", "e1": "REVOKED" }
+    },
+    {
+      "id": "CLAIM_PRECEDES_REVOKE_AT_MOST_ONE_WINS",
+      "funded": "100",
+      "steps": [
+        { "op": "publish", "id": "e1", "hash": "h1", "at": 0, "authority": "UGE", "expect": "OK" },
+        { "op": "approve", "id": "e1", "app": "A", "amount": "40", "at": 604800, "authority": "UGE", "expect": "OK" },
+        { "op": "claim", "id": "e1", "app": "A", "authority": "owner-A", "expect": "OK" },
+        { "op": "freeze", "id": "e1", "at": 604801, "until": 864001, "evidence": "CONFIRMED_REFUND_OR_REVERSAL", "authority": "risk", "expect": "REJECT" },
+        { "op": "revoke", "id": "e1", "at": 604802, "evidence": "CONFIRMED_REFUND_OR_REVERSAL", "authorities": ["risk", "audit"], "expect": "REJECT" }
+      ],
+      "final": { "available": "60", "reserved": "0", "paid": "40", "e1": "CLAIMED" }
+    },
+    {
+      "id": "INVALID_EVIDENCE_CANNOT_FREEZE",
+      "funded": "100",
+      "steps": [
+        { "op": "publish", "id": "e1", "hash": "h1", "at": 0, "authority": "UGE", "expect": "OK" },
+        { "op": "approve", "id": "e1", "app": "A", "amount": "40", "at": 604800, "authority": "UGE", "expect": "OK" },
+        { "op": "freeze", "id": "e1", "at": 604801, "until": 864001, "evidence": "SUSPICIOUS_ONLY", "authority": "risk", "expect": "REJECT" }
+      ],
+      "final": { "available": "60", "reserved": "40", "paid": "0", "e1": "CLAIMABLE" }
+    }
+  ]
+}

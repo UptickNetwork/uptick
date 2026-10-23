@@ -1,6 +1,12 @@
 package types
 
-import "fmt"
+import (
+	"encoding/hex"
+	"fmt"
+	"strings"
+
+	sdk "github.com/cosmos/cosmos-sdk/types"
+)
 
 // DefaultGenesisState returns an empty genesis with default params.
 func DefaultGenesisState() *GenesisState {
@@ -14,6 +20,12 @@ func DefaultGenesisState() *GenesisState {
 		GasCreditAccounts:     []GasCreditAccount{},
 		GasCreditConsumptions: []GasCreditConsumption{},
 		NextChallengeId:       1,
+		EntitlementPools:      []Pool{},
+		RoleKeys:              []RoleKey{},
+		Candidates:            []Candidate{},
+		EntitlementChallenges: []EntitlementChallenge{},
+		UsedAuthNonces:        []string{},
+		Entitlements:          []Entitlement{},
 	}
 }
 
@@ -161,6 +173,151 @@ func ValidateGenesis(gs GenesisState) error {
 		if err := ValidateAddress(c.GasPayer); err != nil {
 			return err
 		}
+	}
+	return validateV1Genesis(gs)
+}
+
+// validateV1Genesis validates the V1 entitlement flow records (workorder 13).
+func validateV1Genesis(gs GenesisState) error {
+	poolSeen := make(map[string]struct{}, len(gs.EntitlementPools))
+	pools := make(map[string]Pool, len(gs.EntitlementPools))
+	for _, p := range gs.EntitlementPools {
+		if p.PoolId == "" {
+			return fmt.Errorf("entitlement pool id empty")
+		}
+		if err := sdk.ValidateDenom(p.Denom); err != nil {
+			return fmt.Errorf("entitlement pool %q denom: %w", p.PoolId, err)
+		}
+		if err := ValidatePoolInvariant(p); err != nil {
+			return fmt.Errorf("entitlement pool %q: %w", p.PoolId, err)
+		}
+		if _, ok := poolSeen[p.PoolId]; ok {
+			return fmt.Errorf("duplicate entitlement pool %q", p.PoolId)
+		}
+		poolSeen[p.PoolId] = struct{}{}
+		pools[p.PoolId] = p
+	}
+
+	roleKeySeen := make(map[string]struct{}, len(gs.RoleKeys))
+	pubkeyRoles := make(map[string]string) // pubkey hex -> "role/key_id" (first ACTIVE owner)
+	for _, rk := range gs.RoleKeys {
+		if rk.Role == EntitlementRoleUnspecified {
+			return fmt.Errorf("role key %q role unspecified", rk.KeyId)
+		}
+		if rk.Status == RoleKeyStatusUnspecified {
+			return fmt.Errorf("role key %q status unspecified", rk.KeyId)
+		}
+		if rk.KeyId == "" || len(rk.KeyId) > 128 {
+			return fmt.Errorf("role key id %q invalid", rk.KeyId)
+		}
+		if err := ValidateEd25519PubKey(rk.Pubkey); err != nil {
+			return fmt.Errorf("role key %q pubkey: %w", rk.KeyId, err)
+		}
+		key := fmt.Sprintf("%d/%s", rk.Role, rk.KeyId)
+		if _, ok := roleKeySeen[key]; ok {
+			return fmt.Errorf("duplicate role key %s", key)
+		}
+		roleKeySeen[key] = struct{}{}
+		// F-2 (§1.5): one pubkey must never be ACTIVE under two roles.
+		if rk.Status == RoleKeyStatusActive {
+			pk := hex.EncodeToString(rk.Pubkey)
+			if prev, ok := pubkeyRoles[pk]; ok {
+				return fmt.Errorf("same pubkey active under two roles: %s and %d/%s", prev, rk.Role, rk.KeyId)
+			}
+			pubkeyRoles[pk] = fmt.Sprintf("%d/%s", rk.Role, rk.KeyId)
+		}
+	}
+
+	candSeen := make(map[string]struct{}, len(gs.Candidates))
+	for _, c := range gs.Candidates {
+		if err := ValidateWireID(c.EntitlementId); err != nil || len(c.EntitlementId) != HashLength*2 {
+			return fmt.Errorf("candidate entitlement_id %q invalid", c.EntitlementId)
+		}
+		if _, ok := candSeen[c.EntitlementId]; ok {
+			return fmt.Errorf("duplicate candidate %q", c.EntitlementId)
+		}
+		candSeen[c.EntitlementId] = struct{}{}
+		if err := ValidateWireHash(c.CandidateHash); err != nil {
+			return fmt.Errorf("candidate %q candidate_hash: %w", c.EntitlementId, err)
+		}
+		if err := ValidateWireHash(c.EvidenceRoot); err != nil {
+			return fmt.Errorf("candidate %q evidence_root: %w", c.EntitlementId, err)
+		}
+		pool, ok := pools[c.PoolId]
+		if !ok {
+			return fmt.Errorf("candidate %q references missing pool %q", c.EntitlementId, c.PoolId)
+		}
+		if c.Denom != pool.Denom {
+			return fmt.Errorf("candidate %q denom %q != pool denom", c.EntitlementId, c.Denom)
+		}
+		if err := ValidateAmountString(c.Amount); err != nil {
+			return fmt.Errorf("candidate %q amount: %w", c.EntitlementId, err)
+		}
+		if c.PublishedAt <= 0 {
+			return fmt.Errorf("candidate %q published_at unset", c.EntitlementId)
+		}
+		if c.ChallengeDeadline != c.PublishedAt+ChallengeWindowSeconds {
+			return fmt.Errorf("candidate %q challenge_deadline mismatch", c.EntitlementId)
+		}
+	}
+
+	entSeen := make(map[string]struct{}, len(gs.Entitlements))
+	for _, e := range gs.Entitlements {
+		if err := ValidateWireID(e.EntitlementId); err != nil || len(e.EntitlementId) != HashLength*2 {
+			return fmt.Errorf("entitlement %q id invalid", e.EntitlementId)
+		}
+		if _, ok := entSeen[e.EntitlementId]; ok {
+			return fmt.Errorf("duplicate entitlement %q", e.EntitlementId)
+		}
+		entSeen[e.EntitlementId] = struct{}{}
+		pool, ok := pools[e.PoolId]
+		if !ok {
+			return fmt.Errorf("entitlement %q references missing pool %q", e.EntitlementId, e.PoolId)
+		}
+		if e.Denom != pool.Denom {
+			return fmt.Errorf("entitlement %q denom %q != pool denom", e.EntitlementId, e.Denom)
+		}
+		if err := ValidateAmountString(e.Amount); err != nil {
+			return fmt.Errorf("entitlement %q amount: %w", e.EntitlementId, err)
+		}
+		if e.State == EntitlementStateUnspecified {
+			return fmt.Errorf("entitlement %q state unspecified", e.EntitlementId)
+		}
+	}
+
+	chalSeen := make(map[string]struct{}, len(gs.EntitlementChallenges))
+	for _, c := range gs.EntitlementChallenges {
+		if len(c.ChallengeId) != HashLength*2 {
+			return fmt.Errorf("entitlement challenge %q id invalid", c.ChallengeId)
+		}
+		if _, ok := chalSeen[c.ChallengeId]; ok {
+			return fmt.Errorf("duplicate entitlement challenge %q", c.ChallengeId)
+		}
+		chalSeen[c.ChallengeId] = struct{}{}
+		if _, ok := candSeen[c.CandidateId]; !ok {
+			return fmt.Errorf("entitlement challenge %q references unknown candidate %q", c.ChallengeId, c.CandidateId)
+		}
+		if err := ValidateAddress(c.Challenger); err != nil {
+			return fmt.Errorf("entitlement challenge %q challenger: %w", c.ChallengeId, err)
+		}
+		if err := ValidateWireHash(c.EvidenceDigest); err != nil {
+			return fmt.Errorf("entitlement challenge %q evidence_digest: %w", c.ChallengeId, err)
+		}
+		if c.Status == EntitlementChallengeStatusUnspecified {
+			return fmt.Errorf("entitlement challenge %q status unspecified", c.ChallengeId)
+		}
+	}
+
+	nonceSeen := make(map[string]struct{}, len(gs.UsedAuthNonces))
+	for _, n := range gs.UsedAuthNonces {
+		parts := strings.Split(n, "/")
+		if len(parts) != 3 {
+			return fmt.Errorf("used_auth_nonce %q malformed", n)
+		}
+		if _, ok := nonceSeen[n]; ok {
+			return fmt.Errorf("duplicate used_auth_nonce %q", n)
+		}
+		nonceSeen[n] = struct{}{}
 	}
 	return nil
 }
