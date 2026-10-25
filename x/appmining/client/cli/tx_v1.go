@@ -24,6 +24,7 @@ func addV1TxCommands(cmd *cobra.Command) {
 		CmdSetRoleKeyStatus(),
 		CmdClaimEntitlement(),
 	)
+	addV1WireTxCommands(cmd)
 }
 
 func CmdOpenEntitlementPool() *cobra.Command {

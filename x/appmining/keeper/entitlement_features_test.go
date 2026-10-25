@@ -165,6 +165,59 @@ func TestFeature_OpenChallengeAfterDeadlineRejected(t *testing.T) {
 	require.ErrorIs(t, err, types.ErrChallengeWindowClosed)
 }
 
+func TestFeature_ChallengeOpenedEventIndexKey(t *testing.T) {
+	// Doc 14 §4: Comet tx_search query entitlement_challenge_opened.entitlement_id
+	e, pubPriv, _ := setupP1(t)
+	c := sampleCandidateFields()
+	hash, err := wirev1.CandidateHash(c)
+	require.NoError(t, err)
+	rec := map[string]string{
+		"protocol_version": "1", "operation": "PUBLISH", "role": "publisher",
+		"chain_id": testChainID, "pool_id": testPoolID, "key_id": "pub-1",
+		"nonce": "1340", "expires_at": "1893456000",
+		"entitlement_id": c.EntitlementID, "app_id": c.AppID,
+		"candidate_hash": hash, "rule_version": c.RuleVersion,
+	}
+	_, err = e.server.PublishCandidate(e.ctx, &types.MsgPublishCandidate{
+		Submitter: e.sub.String(), ChainId: testChainID, PoolId: testPoolID,
+		EntitlementId: c.EntitlementID, AppId: c.AppID, Epoch: c.Epoch, Amount: c.Amount,
+		Denom: c.Denom, GasUsed: c.GasUsed, QualifiedTxCount: c.QualifiedTxCount,
+		PavId: c.PavID, EvidenceRoot: c.EvidenceRoot, GasEvidenceRoot: c.GasEvidenceRoot,
+		RuleVersion: c.RuleVersion, Proof: signProof(t, pubPriv, rec),
+	})
+	require.NoError(t, err)
+
+	e.ctx = e.ctx.WithEventManager(sdk.NewEventManager())
+	openRes, err := e.server.OpenChallenge(e.ctx, &types.MsgOpenChallenge{
+		Challenger: e.payer.String(), EntitlementId: c.EntitlementID,
+		EvidenceType:   types.EvidenceTypeReceiptQbtMismatch,
+		EvidenceDigest: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+	})
+	require.NoError(t, err)
+
+	ev, ok := findEvent(e.ctx.EventManager().Events(), types.EventTypeEntitlementChallengeOpened)
+	require.True(t, ok)
+	require.Equal(t, c.EntitlementID, eventAttr(ev, types.AttributeKeyEntitlementID))
+	require.Equal(t, openRes.ChallengeId, eventAttr(ev, types.AttributeKeyChallengeID))
+	require.Equal(t, "open_challenge", eventAttr(ev, types.AttributeKeyAction))
+
+	// Empty index-events → index all (app.toml default). Explicit allow-list also works.
+	abciEv := sdk.Events{ev}.ToABCIEvents()
+	indexedAll := sdk.MarkEventsToIndex(abciEv, nil)
+	require.True(t, indexedAll[0].Attributes[0].Index)
+	allow := map[string]struct{}{
+		types.EventTypeEntitlementChallengeOpened + "." + types.AttributeKeyEntitlementID: {},
+	}
+	indexedSel := sdk.MarkEventsToIndex(abciEv, allow)
+	var entitlementIndexed bool
+	for _, a := range indexedSel[0].Attributes {
+		if a.Key == types.AttributeKeyEntitlementID {
+			entitlementIndexed = a.Index
+		}
+	}
+	require.True(t, entitlementIndexed)
+}
+
 func TestFeature_ApproveEventSchemaAndTxHash(t *testing.T) {
 	e, _, _, aprPriv, c := setupP2(t)
 	cand, _ := e.k.GetCandidate(e.ctx, c.EntitlementID)

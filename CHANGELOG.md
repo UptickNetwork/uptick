@@ -37,6 +37,12 @@ Ref: https://keepachangelog.com/en/1.0.0/
 
 ## Unreleased
 
+### Features
+
+* (appmining) V1 entitlement wire Msg CLI (`publish-candidate`, `open-entitlement-challenge`,
+  `resolve-entitlement-challenge`, `approve-entitlement`, `freeze-entitlement`, `revoke-entitlement`)
+  and UGE doc14 integration contract (`workorder/UPTICK-UGE-V1-INTEGRATION-CONTRACT-0.1.md`).
+
 ### State Machine Breaking
 
 * (upgrade/appmining) New `v0.5.1` plan adds the `x/appmining` store (`uptick.appmining.v1`) and re-applies the

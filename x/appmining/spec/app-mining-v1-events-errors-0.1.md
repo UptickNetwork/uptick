@@ -34,6 +34,20 @@ Attribute 常量名见 `types/events.go`。
 **读链提示：** `app_id` 在 V1 事件里为 **64 位小写 hex**；POC 登记事件可能仍带 raw/hex 展示差异，UGE 黑盒以 V1 事件为准。  
 控制面 Msg 定名以 ACK Q-C 为准（非工单 §3.8 示例旧名）。
 
+### 1.1 Comet `tx_search`（UGE doc14 §4）
+
+规范索引键（属性名稳定）：
+
+```text
+entitlement_challenge_opened.entitlement_id='<64-lowercase-hex>'
+```
+
+可选：`entitlement_challenge_opened.challenge_id='<64hex>'`。
+
+节点默认 `app.toml` 的 `index-events` **为空**时索引全部事件属性。若运维改为白名单，须显式包含上述键。单测：`TestFeature_ChallengeOpenedEventIndexKey`。
+
+完整联调契约：`workorder/UPTICK-UGE-V1-INTEGRATION-CONTRACT-0.1.md`。
+
 ---
 
 ## 2. V1 错误码（codespace `appmining`）

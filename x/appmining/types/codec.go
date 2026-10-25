@@ -26,6 +26,19 @@ func RegisterInterfaces(registry codectypes.InterfaceRegistry) {
 		&MsgSetApplicationStatus{},
 		&MsgPause{},
 		&MsgFundRewardPool{},
+		// V1 entitlement control plane + business msgs
+		&MsgOpenEntitlementPool{},
+		&MsgFundEntitlementPool{},
+		&MsgSetEntitlementPoolPaused{},
+		&MsgRegisterRoleKey{},
+		&MsgSetRoleKeyStatus{},
+		&MsgPublishCandidate{},
+		&MsgOpenChallenge{},
+		&MsgResolveEntitlementChallenge{},
+		&MsgApproveEntitlement{},
+		&MsgClaimEntitlement{},
+		&MsgFreezeEntitlement{},
+		&MsgRevokeEntitlement{},
 	)
 	msgservice.RegisterMsgServiceDesc(registry, &_Msg_serviceDesc)
 }
@@ -46,4 +59,16 @@ func RegisterLegacyAminoCodec(cdc *codec.LegacyAmino) {
 	cdc.RegisterConcrete(&MsgSetApplicationStatus{}, "appmining/SetApplicationStatus", nil)
 	cdc.RegisterConcrete(&MsgPause{}, "appmining/Pause", nil)
 	cdc.RegisterConcrete(&MsgFundRewardPool{}, "appmining/FundRewardPool", nil)
+	cdc.RegisterConcrete(&MsgOpenEntitlementPool{}, "appmining/OpenEntitlementPool", nil)
+	cdc.RegisterConcrete(&MsgFundEntitlementPool{}, "appmining/FundEntitlementPool", nil)
+	cdc.RegisterConcrete(&MsgSetEntitlementPoolPaused{}, "appmining/SetEntitlementPoolPaused", nil)
+	cdc.RegisterConcrete(&MsgRegisterRoleKey{}, "appmining/RegisterRoleKey", nil)
+	cdc.RegisterConcrete(&MsgSetRoleKeyStatus{}, "appmining/SetRoleKeyStatus", nil)
+	cdc.RegisterConcrete(&MsgPublishCandidate{}, "appmining/PublishCandidate", nil)
+	cdc.RegisterConcrete(&MsgOpenChallenge{}, "appmining/OpenChallenge", nil)
+	cdc.RegisterConcrete(&MsgResolveEntitlementChallenge{}, "appmining/ResolveEntitlementChallenge", nil)
+	cdc.RegisterConcrete(&MsgApproveEntitlement{}, "appmining/ApproveEntitlement", nil)
+	cdc.RegisterConcrete(&MsgClaimEntitlement{}, "appmining/ClaimEntitlement", nil)
+	cdc.RegisterConcrete(&MsgFreezeEntitlement{}, "appmining/FreezeEntitlement", nil)
+	cdc.RegisterConcrete(&MsgRevokeEntitlement{}, "appmining/RevokeEntitlement", nil)
 }
