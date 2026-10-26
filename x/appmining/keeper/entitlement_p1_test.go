@@ -65,6 +65,8 @@ func setupP1(t *testing.T) (testEnv, ed25519.PrivateKey, ed25519.PrivateKey) {
 	})
 	require.NoError(t, err)
 
+	e.revPriv = revPriv
+
 	return e, pubPriv, revPriv
 }
 

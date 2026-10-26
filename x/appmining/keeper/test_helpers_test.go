@@ -2,6 +2,7 @@ package keeper_test
 
 import (
 	"context"
+	"crypto/ed25519"
 	"testing"
 
 	coreaddress "cosmossdk.io/core/address"
@@ -127,14 +128,15 @@ func (m mockAccountKeeper) GetModuleAccount(_ context.Context, name string) sdk.
 }
 
 type testEnv struct {
-	k      keeper.Keeper
-	ctx    sdk.Context
-	bank   *mockBank
-	server types.MsgServer
-	auth   sdk.AccAddress
-	owner  sdk.AccAddress
-	sub    sdk.AccAddress
-	payer  sdk.AccAddress
+	k       keeper.Keeper
+	ctx     sdk.Context
+	bank    *mockBank
+	server  types.MsgServer
+	auth    sdk.AccAddress
+	owner   sdk.AccAddress
+	sub     sdk.AccAddress
+	payer   sdk.AccAddress
+	revPriv ed25519.PrivateKey // reviewer key registered as rev-1 (set by setupP1)
 }
 
 func setupTest(t *testing.T) testEnv {

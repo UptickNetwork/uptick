@@ -45,6 +45,11 @@ Ref: https://keepachangelog.com/en/1.0.0/
 
 ### Bug Fixes
 
+* (appmining) Approve now validates that `challenge_resolution_hash` references an actual DISMISSED
+  challenge resolution on the same candidate (new error 78 `ErrResolutionUnbound`); a well-signed
+  approve with a fabricated digest no longer passes. Behavior change flagged to UGE: an approval
+  without any prior dismissed challenge is rejected.
+
 * (appmining) Entitlement enable gate and pool invariant now require module balance to cover
   `available + reserved` (denom-aggregated across pools), not `reserved` alone (UGE doc15).
 

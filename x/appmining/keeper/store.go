@@ -298,6 +298,27 @@ func (k Keeper) HasOpenOrUpheldEntitlementChallenge(ctx sdk.Context, entitlement
 	return false
 }
 
+// HasDismissedEntitlementChallengeResolution reports whether the candidate has
+// a DISMISSED challenge whose stored ResolutionDigest equals digest. Approvals
+// must reference such a resolution so challenge_resolution_hash cannot be
+// fabricated (see ApproveEntitlement).
+func (k Keeper) HasDismissedEntitlementChallengeResolution(ctx sdk.Context, entitlementID, digest string) bool {
+	store := k.store(ctx)
+	it := storetypes.KVStorePrefixIterator(store, types.KeyPrefixEntitlementChallenge)
+	defer it.Close()
+	for ; it.Valid(); it.Next() {
+		var c types.EntitlementChallenge
+		k.cdc.MustUnmarshal(it.Value(), &c)
+		if c.CandidateId != entitlementID {
+			continue
+		}
+		if c.Status == types.EntitlementChallengeStatusDismissed && c.ResolutionDigest == digest {
+			return true
+		}
+	}
+	return false
+}
+
 // IterateEntitlementChallenges walks every entitlement challenge record.
 func (k Keeper) IterateEntitlementChallenges(ctx sdk.Context, fn func(types.EntitlementChallenge) bool) {
 	it := storetypes.KVStorePrefixIterator(k.store(ctx), types.KeyPrefixEntitlementChallenge)

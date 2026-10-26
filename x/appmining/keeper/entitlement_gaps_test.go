@@ -339,3 +339,80 @@ func TestGapF2_RevokeWithSamePubkeyBytesRejected(t *testing.T) {
 	_, err = e.server.RevokeEntitlement(e.ctx, msg)
 	require.NoError(t, err)
 }
+
+// TestGapF3_ApproveResolutionHashMustReferenceDismissedChallenge pins the
+// approve→dispute binding: challenge_resolution_hash must equal the stored
+// ResolutionDigest of a DISMISSED challenge on the same candidate. A
+// well-signed approve with an arbitrary hash (no dispute, or a digest that
+// matches no dismissed resolution) must be rejected with
+// ErrResolutionUnbound — the wire field is documented as binding the approval
+// to dispute state, and a fabricated hash would otherwise make the audit
+// trail unfalsifiable.
+func TestGapF3_ApproveResolutionHashMustReferenceDismissedChallenge(t *testing.T) {
+	e, _, revPriv, aprPriv, c := setupP2(t)
+
+	const dismissedDigest = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+	const unboundDigest = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+
+	// Dismiss one real challenge while the window is open.
+	openRes, err := e.server.OpenChallenge(e.ctx, &types.MsgOpenChallenge{
+		Challenger: e.payer.String(), EntitlementId: c.EntitlementID,
+		EvidenceType:   types.EvidenceTypeConfirmedRefundOrReversal,
+		EvidenceDigest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+	})
+	require.NoError(t, err)
+	resolveRec := map[string]string{
+		"protocol_version": "1", "operation": "RESOLVE", "role": "reviewer",
+		"chain_id": testChainID, "pool_id": testPoolID, "key_id": "rev-1",
+		"nonce": "1501", "expires_at": "1893456000",
+		"challenge_id": openRes.ChallengeId, "candidate_id": c.EntitlementID,
+		"outcome": "DISMISSED", "rationale_digest": dismissedDigest,
+	}
+	_, err = e.server.ResolveEntitlementChallenge(e.ctx, &types.MsgResolveEntitlementChallenge{
+		Submitter: e.sub.String(), ChainId: testChainID, PoolId: testPoolID,
+		ChallengeId: openRes.ChallengeId, Outcome: "DISMISSED",
+		RationaleDigest: resolveRec["rationale_digest"],
+		Proof:           signProof(t, revPriv, resolveRec),
+	})
+	require.NoError(t, err)
+
+	cand, _ := e.k.GetCandidate(e.ctx, c.EntitlementID)
+	e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.ChallengeWindowSeconds, 0))
+
+	// Negative: well-signed approve whose resolution hash matches no dismissed
+	// challenge (nothing was fabricated on-chain for this digest).
+	buildApprove := func(digest, nonce string) *types.MsgApproveEntitlement {
+		cand, ok := e.k.GetCandidate(e.ctx, c.EntitlementID)
+		require.True(t, ok)
+		rec := map[string]string{
+			"protocol_version": "1", "operation": "APPROVE", "role": "approver",
+			"chain_id": testChainID, "pool_id": testPoolID, "key_id": "apr-1",
+			"nonce": nonce, "expires_at": "1893456000",
+			"entitlement_id": c.EntitlementID, "app_id": c.AppID,
+			"candidate_hash":            cand.CandidateHash,
+			"challenge_resolution_hash": digest,
+			"amount":                    c.Amount, "denom": c.Denom, "rule_version": c.RuleVersion,
+		}
+		return &types.MsgApproveEntitlement{
+			Submitter: e.sub.String(), ChainId: testChainID, PoolId: testPoolID,
+			EntitlementId:           c.EntitlementID,
+			ChallengeResolutionHash: digest,
+			Proof:                   signProof(t, aprPriv, rec),
+		}
+	}
+	_, err = e.server.ApproveEntitlement(e.ctx, buildApprove(unboundDigest, "1502"))
+	require.ErrorIs(t, err, types.ErrResolutionUnbound)
+
+	// Positive control: the same well-signed flow with the real dismissed
+	// digest succeeds, so the rejection above is caused by the binding and not
+	// by any incidental state.
+	_, err = e.server.ApproveEntitlement(e.ctx, buildApprove(dismissedDigest, "1503"))
+	require.NoError(t, err)
+	ent, ok := e.k.GetEntitlement(e.ctx, c.EntitlementID)
+	require.True(t, ok)
+	require.Equal(t, types.EntitlementStateClaimable, ent.State)
+
+	// The bound digest is surfaced on the approval event for auditability.
+	_, err = e.server.ApproveEntitlement(e.ctx, buildApprove(dismissedDigest, "1504"))
+	require.ErrorIs(t, err, types.ErrEntitlementExists)
+}

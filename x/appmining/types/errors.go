@@ -82,4 +82,5 @@ var (
 	ErrNotFrozen                    = sdkerrors.Register(ModuleName, 75, "entitlement not effectively frozen")
 	ErrDualAuthRequired             = sdkerrors.Register(ModuleName, 76, "independent risk and audit proofs required")
 	ErrRuleVersionNotAllowed        = sdkerrors.Register(ModuleName, 77, "candidate rule_version is not allowed")
+	ErrResolutionUnbound            = sdkerrors.Register(ModuleName, 78, "approval does not reference a dismissed challenge resolution")
 )

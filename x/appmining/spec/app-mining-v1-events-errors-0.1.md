@@ -91,6 +91,8 @@ entitlement_challenge_opened.entitlement_id='<64-lowercase-hex>'
 | 74 | `ErrFreezeDuration` | freeze_until exceeds 72h or not in future | |
 | 75 | `ErrNotFrozen` | entitlement not effectively frozen | Revoke 要求有效冻结 |
 | 76 | `ErrDualAuthRequired` | independent risk and audit proofs required | 同 key / 缺一方 |
+| 77 | `ErrRuleVersionNotAllowed` | candidate rule_version is not allowed | F-1：`rule_version` 不在治理白名单（空白名单=全拒） |
+| 78 | `ErrResolutionUnbound` | approval does not reference a dismissed challenge resolution | F-3：approve 的 `challenge_resolution_hash` 未绑定任何 DISMISSED 裁决（含无挑战直接 approve） |
 | 2 | `ErrUnauthorized` | unauthorized | 签名篡改、金额与候选不一致等（E-1 / UNAUTHORIZED_AMOUNT） |
 | 11 | `ErrChallengeWindow` | challenge window not elapsed | Approve 早于 604800s（E-6） |
 

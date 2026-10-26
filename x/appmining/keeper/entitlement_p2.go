@@ -87,6 +87,13 @@ func (k msgServer) ApproveEntitlement(goCtx context.Context, msg *types.MsgAppro
 		return nil, err
 	}
 
+	// The approve wire field challenge_resolution_hash is documented as binding
+	// the approval to dispute state: it must reference an actual DISMISSED
+	// challenge resolution on this candidate, not an arbitrary digest.
+	if !k.HasDismissedEntitlementChallengeResolution(ctx, msg.EntitlementId, msg.ChallengeResolutionHash) {
+		return nil, types.ErrResolutionUnbound
+	}
+
 	newAvailable, err := types.SubAmountStrings(pool.Available, cand.Amount)
 	if err != nil {
 		return nil, err
