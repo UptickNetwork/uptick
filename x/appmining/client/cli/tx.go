@@ -3,6 +3,7 @@ package cli
 import (
 	"encoding/hex"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
@@ -38,6 +39,7 @@ func NewTxCmd() *cobra.Command {
 		CmdSetEpochBudget(),
 		CmdPause(),
 		CmdFundRewardPool(),
+		CmdUpdateParams(),
 	)
 	addV1TxCommands(cmd)
 	return cmd
@@ -428,6 +430,35 @@ func CmdPause() *cobra.Command {
 			msg := &types.MsgPause{
 				PauseAuthority: clientCtx.GetFromAddress().String(),
 				PauseBits:      bits,
+			}
+			return tx.GenerateOrBroadcastTxCLI(clientCtx, cmd.Flags(), msg)
+		},
+	}
+	flags.AddTxFlagsToCmd(cmd)
+	return cmd
+}
+
+func CmdUpdateParams() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "update-params [params-json-file]",
+		Short: "Update module params from a full Params JSON file (authority signer; resume is authority-only via UpdateParams)",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			clientCtx, err := client.GetClientTxContext(cmd)
+			if err != nil {
+				return err
+			}
+			raw, err := os.ReadFile(args[0])
+			if err != nil {
+				return fmt.Errorf("read params json: %w", err)
+			}
+			var params types.Params
+			if err := clientCtx.Codec.UnmarshalJSON(raw, &params); err != nil {
+				return fmt.Errorf("parse params json: %w", err)
+			}
+			msg := &types.MsgUpdateParams{
+				Authority: clientCtx.GetFromAddress().String(),
+				Params:    params,
 			}
 			return tx.GenerateOrBroadcastTxCLI(clientCtx, cmd.Flags(), msg)
 		},
