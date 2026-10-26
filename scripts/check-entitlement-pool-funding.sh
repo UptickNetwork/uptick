@@ -5,8 +5,10 @@
 #   ./scripts/check-entitlement-pool-funding.sh <node_rpc> <pool_id> [min_funded]
 #
 # Compares QueryPool.funded / module_balance against entitlement_enable_min_funded
-# (or an explicit min_funded override). Exit 0 when the V1 flow may be enabled;
-# exit 1 on shortfall; exit 2 on query failure.
+# (or an explicit min_funded override) and verifies unpaid liability coverage:
+#   available + reserved <= module_balance  (UGE doc15; Query also aggregates
+#   same-denom pools inside entitlement_flow_enabled).
+# Exit 0 when the V1 flow may be enabled; exit 1 on shortfall; exit 2 on query failure.
 #
 # Does not mint or transfer. Report any gap to chain ops; keep entitlement msgs disabled.
 
@@ -44,11 +46,22 @@ ENABLED="$(echo "$POOL_JSON" | jq -r '.entitlement_flow_enabled')"
 
 echo "pool_id=$POOL_ID funded=$FUNDED available=$AVAILABLE reserved=$RESERVED paid=$PAID module_balance=$MOD_BAL min=$MIN enabled=$ENABLED"
 
-if [[ "$ENABLED" != "true" ]]; then
-  echo "FAIL: entitlement_flow_enabled=false" >&2
-  echo "gap: funded ($FUNDED) < min ($MIN) and/or pool paused / module balance < reserved" >&2
+if ! command -v bc >/dev/null 2>&1; then
+  echo "FAIL: bc required to compare available+reserved against module_balance" >&2
+  exit 2
+fi
+UNPAID="$(echo "$AVAILABLE + $RESERVED" | bc)"
+if [[ "$(echo "$MOD_BAL < $UNPAID" | bc)" == "1" ]]; then
+  echo "FAIL: module_balance ($MOD_BAL) < available+reserved ($UNPAID)" >&2
+  echo "gap: fund module account or reduce ledger unpaid; do not enable V1 on uncovered available" >&2
   exit 1
 fi
 
-echo "OK: V1 entitlement flow enable gate satisfied"
+if [[ "$ENABLED" != "true" ]]; then
+  echo "FAIL: entitlement_flow_enabled=false" >&2
+  echo "gap: funded ($FUNDED) < min ($MIN) and/or pool paused / module_balance < available+reserved (incl. same-denom multi-pool aggregate)" >&2
+  exit 1
+fi
+
+echo "OK: V1 entitlement flow enable gate satisfied (available+reserved covered)"
 exit 0

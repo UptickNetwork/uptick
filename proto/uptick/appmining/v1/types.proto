@@ -213,7 +213,8 @@ enum RoleKeyStatus {
 }
 
 // Pool is the fixed entitlement fund ledger.
-// Invariant: funded = available + reserved + paid; reserved <= module account balance.
+// Invariant: funded = available + reserved + paid;
+// module account balance for denom covers sum(available+reserved) across all pools of that denom.
 message Pool {
   string pool_id = 1;
   string denom = 2;

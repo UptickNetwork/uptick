@@ -2,6 +2,12 @@ package types
 
 import "fmt"
 
+// UnpaidLiability returns available + reserved (funds that must still sit
+// in the entitlement module account for this pool).
+func UnpaidLiability(p Pool) (string, error) {
+	return AddAmountStrings(p.Available, p.Reserved)
+}
+
 // ValidatePoolInvariant checks funded = available + reserved + paid.
 func ValidatePoolInvariant(p Pool) error {
 	if err := ValidateWireID(p.PoolId); err != nil {
@@ -71,11 +77,17 @@ func EntitlementFlowEnabled(p Pool, params Params, moduleBalance string) bool {
 	if err != nil || cmpFunded < 0 {
 		return false
 	}
-	// reserved must be coverable by module balance
+	// UGE doc15: unpaid liability (available + reserved) must be coverable by
+	// module balance. Callers that share one module account across pools must
+	// additionally enforce denom-aggregated unpaid via keeper.
 	if err := ValidateAmountString(moduleBalance); err != nil {
 		return false
 	}
-	cmpBal, err := CompareAmountStrings(moduleBalance, p.Reserved)
+	unpaid, err := UnpaidLiability(p)
+	if err != nil {
+		return false
+	}
+	cmpBal, err := CompareAmountStrings(moduleBalance, unpaid)
 	if err != nil || cmpBal < 0 {
 		return false
 	}

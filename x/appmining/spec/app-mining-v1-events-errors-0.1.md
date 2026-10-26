@@ -54,7 +54,7 @@ entitlement_challenge_opened.entitlement_id='<64-lowercase-hex>'
 
 | Code | 符号 | 文案 | 典型场景 |
 |---|---|---|---|
-| 40 | `ErrPoolNotEnabled` | entitlement pool not enabled | 未达 `entitlement_enable_min_funded` / 余额不覆盖 reserved（E-8） |
+| 40 | `ErrPoolNotEnabled` | entitlement pool not enabled | 未达 `entitlement_enable_min_funded` / 余额不覆盖 **available+reserved**（含同 denom 多池聚合；E-8 / UGE doc15） |
 | 41 | `ErrPoolPaused` | entitlement pool paused | 池 paused |
 | 42 | `ErrPoolNotFound` | entitlement pool not found | 未知 `pool_id` |
 | 43 | `ErrPoolExists` | entitlement pool already exists | 重复开池 |
@@ -104,7 +104,8 @@ POC 线常用码（仅审计，勿作 V1 验收）：`3–39`（如 `ErrAttestat
 |---|---|
 | `pool.funded` / `available` / `reserved` / `paid` | 四分账；恒等式 `funded = available + reserved + paid` |
 | `module_balance` | 模块账户 `appmining_entitlement_pool` 对 `pool.denom` 余额 |
-| 期望 | `module_balance = available + reserved`（已 `paid` 部分已转出） |
-| `entitlement_flow_enabled` | 未 pause 且 `funded >= entitlement_enable_min_funded` 且余额覆盖 `reserved` |
+| 期望 | 单池：`module_balance >= available + reserved`；同 denom 多池：`module_balance >= Σ(available+reserved)`（已 `paid` 已转出） |
+| `entitlement_flow_enabled` | 未 pause 且 `funded >= entitlement_enable_min_funded` 且 **denom 聚合未支付负债**由模块余额覆盖 |
 
-预检脚本：`scripts/check-entitlement-pool-funding.sh`。
+预检脚本：`scripts/check-entitlement-pool-funding.sh`（显式检查 `available+reserved <= module_balance`）。  
+不变量：`EntitlementPoolInvariant`（ledger 恒等式 + 按 denom 聚合 unpaid）。

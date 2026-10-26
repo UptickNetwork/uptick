@@ -278,13 +278,12 @@ func (k Keeper) Pool(goCtx context.Context, req *types.QueryPoolRequest) (*types
 	if !found {
 		return nil, status.Error(codes.NotFound, "entitlement pool not found")
 	}
-	params := k.GetParams(ctx)
 	modAddr := k.ak.GetModuleAddress(types.EntitlementPoolName)
 	bal := k.bank.GetBalance(ctx, modAddr, pool.Denom)
 	return &types.QueryPoolResponse{
 		Pool:                   pool,
 		ModuleBalance:          bal.Amount.String(),
-		EntitlementFlowEnabled: types.EntitlementFlowEnabled(pool, params, types.AmountString(bal.Amount)),
+		EntitlementFlowEnabled: k.IsEntitlementFlowEnabled(ctx, pool),
 	}, nil
 }
 

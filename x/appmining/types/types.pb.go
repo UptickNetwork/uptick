@@ -1357,7 +1357,8 @@ func (m *GasCreditConsumption) GetConsumedHeight() int64 {
 }
 
 // Pool is the fixed entitlement fund ledger.
-// Invariant: funded = available + reserved + paid; reserved <= module account balance.
+// Invariant: funded = available + reserved + paid;
+// module account balance for denom covers sum(available+reserved) across pools of that denom.
 type Pool struct {
 	PoolId    string `protobuf:"bytes,1,opt,name=pool_id,json=poolId,proto3" json:"pool_id,omitempty"`
 	Denom     string `protobuf:"bytes,2,opt,name=denom,proto3" json:"denom,omitempty"`

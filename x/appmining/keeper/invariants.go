@@ -21,10 +21,12 @@ func RegisterInvariants(ir sdk.InvariantRegistry, k Keeper) {
 	ir.RegisterRoute(types.ModuleName, "entitlement-pool-invariant", EntitlementPoolInvariant(k))
 }
 
-// EntitlementPoolInvariant checks funded = available + reserved + paid and
-// reserved <= module account balance for every V1 entitlement pool.
+// EntitlementPoolInvariant checks funded = available + reserved + paid per pool
+// and, per denom, module balance >= Σ(available + reserved) across all pools
+// sharing that denom (UGE doc15: unpaid liability must be fully backed).
 func EntitlementPoolInvariant(k Keeper) sdk.Invariant {
 	return func(ctx sdk.Context) (string, bool) {
+		unpaidByDenom := map[string]math.Int{}
 		store := k.store(ctx)
 		it := storetypes.KVStorePrefixIterator(store, types.KeyPrefixEntitlementPool)
 		defer it.Close()
@@ -35,17 +37,29 @@ func EntitlementPoolInvariant(k Keeper) sdk.Invariant {
 				return sdk.FormatInvariant(types.ModuleName, "entitlement-pool-invariant",
 					fmt.Sprintf("pool %q: %v", p.PoolId, err)), true
 			}
-			modAddr := k.ak.GetModuleAddress(types.EntitlementPoolName)
-			reserved, err := types.ParseAmount(p.Reserved)
+			unpaidStr, err := types.UnpaidLiability(p)
 			if err != nil {
 				return sdk.FormatInvariant(types.ModuleName, "entitlement-pool-invariant",
-					fmt.Sprintf("pool %q reserved parse: %v", p.PoolId, err)), true
+					fmt.Sprintf("pool %q unpaid: %v", p.PoolId, err)), true
 			}
-			bal := k.bank.GetBalance(ctx, modAddr, p.Denom).Amount
-			if bal.LT(reserved) {
+			unpaid, err := types.ParseAmount(unpaidStr)
+			if err != nil {
 				return sdk.FormatInvariant(types.ModuleName, "entitlement-pool-invariant",
-					fmt.Sprintf("pool %q module balance %s < reserved %s (%s)",
-						p.PoolId, bal, p.Reserved, p.Denom)), true
+					fmt.Sprintf("pool %q unpaid parse: %v", p.PoolId, err)), true
+			}
+			cur, ok := unpaidByDenom[p.Denom]
+			if !ok {
+				cur = math.ZeroInt()
+			}
+			unpaidByDenom[p.Denom] = cur.Add(unpaid)
+		}
+		modAddr := k.ak.GetModuleAddress(types.EntitlementPoolName)
+		for denom, want := range unpaidByDenom {
+			have := k.bank.GetBalance(ctx, modAddr, denom).Amount
+			if have.LT(want) {
+				return sdk.FormatInvariant(types.ModuleName, "entitlement-pool-invariant",
+					fmt.Sprintf("denom %s module balance %s < unpaid available+reserved %s",
+						denom, have, want)), true
 			}
 		}
 		return sdk.FormatInvariant(types.ModuleName, "entitlement-pool-invariant", "ok"), false

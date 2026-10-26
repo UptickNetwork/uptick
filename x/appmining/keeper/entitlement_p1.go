@@ -24,9 +24,7 @@ func (k msgServer) requireEntitlementFlow(ctx sdk.Context, poolID string) (types
 	if pool.Paused {
 		return types.Pool{}, params, types.ErrPoolPaused
 	}
-	modAddr := k.ak.GetModuleAddress(types.EntitlementPoolName)
-	bal := k.bank.GetBalance(ctx, modAddr, pool.Denom)
-	if !types.EntitlementFlowEnabled(pool, params, types.AmountString(bal.Amount)) {
+	if !k.IsEntitlementFlowEnabled(ctx, pool) {
 		return types.Pool{}, params, types.ErrPoolNotEnabled
 	}
 	return pool, params, nil
