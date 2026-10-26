@@ -147,6 +147,28 @@ cmd_start() {
 	"$BIN" gentx "$KEY_NAME" "$GENTX_STAKE" \
 		--chain-id "$CHAIN_ID" --home "$HOME_DIR" --keyring-backend "$KEYRING_BACKEND" >/dev/null
 	"$BIN" collect-gentxs --home "$HOME_DIR" >/dev/null
+
+	# The appmining V1 params authority defaults to governance, and three setup
+	# msgs (RegisterApplication / OpenEntitlementPool / RegisterRoleKey) are
+	# authority-gated. The e2e suite exercises them as real signed txs, so the
+	# test key is granted the authority directly in genesis, and the V1 flow is
+	# enabled (min funded + rule-version allowlist). The approve/claim/freeze
+	# success paths stay out of e2e: the challenge window is a hardcoded 7-day
+	# constant (types.ChallengeWindowSeconds) that no genesis patch can move.
+	log "granting the e2e key the appmining params authority in genesis"
+	E2E_ADDR=$("$BIN" keys show "$KEY_NAME" -a --home "$HOME_DIR" --keyring-backend "$KEYRING_BACKEND")
+	python3 - "$HOME_DIR/config/genesis.json" "$E2E_ADDR" <<'PYGENESIS'
+import json, sys
+path, addr = sys.argv[1], sys.argv[2]
+with open(path) as fh:
+    genesis = json.load(fh)
+params = genesis["app_state"]["appmining"]["params"]
+params["authority"] = addr
+params["entitlement_enable_min_funded"] = "1000"
+params["entitlement_allowed_rule_versions"] = ["gas-reward-candidate-0.1"]
+with open(path, "w") as fh:
+    json.dump(genesis, fh)
+PYGENESIS
 	"$BIN" validate-genesis --home "$HOME_DIR" >/dev/null
 
 	# The suite runs while the chain is otherwise idle: empty blocks must keep
