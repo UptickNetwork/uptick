@@ -76,4 +76,8 @@ const (
 	AttributeKeyEvidenceOrResolutionDigest = "evidence_or_resolution_digest"
 	AttributeKeyEntitlementID              = "entitlement_id"
 	AttributeKeyTxHash                     = "tx_hash"
+	// AttributeKeyResolutionBound marks approve dual-path (UGE DEC-01): true when
+	// challenge_resolution_hash bound a DISMISSED resolution; false for the
+	// no-challenge empty-hash path.
+	AttributeKeyResolutionBound = "resolution_bound"
 )

@@ -87,11 +87,17 @@ func (k msgServer) ApproveEntitlement(goCtx context.Context, msg *types.MsgAppro
 		return nil, err
 	}
 
-	// The approve wire field challenge_resolution_hash is documented as binding
-	// the approval to dispute state: it must reference an actual DISMISSED
-	// challenge resolution on this candidate, not an arbitrary digest.
-	if !k.HasDismissedEntitlementChallengeResolution(ctx, msg.EntitlementId, msg.ChallengeResolutionHash) {
-		return nil, types.ErrResolutionUnbound
+	// UGE DEC-01 scheme C — mutually exclusive approve paths:
+	//  - non-empty hash → must bind a DISMISSED ResolutionDigest (else 78)
+	//  - empty hash → window elapsed (already checked) and zero challenges (else 71)
+	resolutionBound := false
+	if msg.ChallengeResolutionHash != "" {
+		if !k.HasDismissedEntitlementChallengeResolution(ctx, msg.EntitlementId, msg.ChallengeResolutionHash) {
+			return nil, types.ErrResolutionUnbound
+		}
+		resolutionBound = true
+	} else if k.HasAnyEntitlementChallenge(ctx, msg.EntitlementId) {
+		return nil, types.ErrOpenOrUpheldChallenge
 	}
 
 	newAvailable, err := types.SubAmountStrings(pool.Available, cand.Amount)
@@ -130,10 +136,15 @@ func (k msgServer) ApproveEntitlement(goCtx context.Context, msg *types.MsgAppro
 	cand.MaxObservedTime = now
 	k.SetCandidate(ctx, cand)
 
+	boundAttr := "false"
+	if resolutionBound {
+		boundAttr = "true"
+	}
 	emitV1StateEvent(ctx, types.EventTypeEntitlementApproved, "approve",
 		cand.PoolId, msg.EntitlementId, cand.AppId,
 		cand.Status.String(), ent.State.String(), cand.Amount, cand.Denom, msg.ChallengeResolutionHash,
 		sdk.NewAttribute(types.AttributeKeyAvailable, pool.Available),
+		sdk.NewAttribute(types.AttributeKeyResolutionBound, boundAttr),
 	)
 	return &types.MsgApproveEntitlementResponse{}, nil
 }

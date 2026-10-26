@@ -18,7 +18,7 @@
 | `candidate_published` | `MsgPublishCandidate` | §6.1 + `action=publish` |
 | `entitlement_challenge_opened` | `MsgOpenChallenge` | §6.1 + `action=open_challenge` + `challenge_id`, `challenger` |
 | `entitlement_challenge_resolved` | `MsgResolveEntitlementChallenge` | §6.1 + `action=resolve` + `challenge_id`, challenge `status` |
-| `entitlement_approved` | `MsgApproveEntitlement` | §6.1 + `action=approve` + `available` |
+| `entitlement_approved` | `MsgApproveEntitlement` | §6.1 + `action=approve` + `available` + `resolution_bound` (`true`\|`false`, UGE DEC-01) |
 | `entitlement_claimed` | `MsgClaimEntitlement` | §6.1 + `action=claim` + `owner` |
 | `entitlement_frozen` | `MsgFreezeEntitlement` | §6.1 + `action=freeze` + `deadline`(=freeze_until) |
 | `entitlement_revoked` | `MsgRevokeEntitlement` | §6.1 + `action=revoke` + `available` |
@@ -92,7 +92,7 @@ entitlement_challenge_opened.entitlement_id='<64-lowercase-hex>'
 | 75 | `ErrNotFrozen` | entitlement not effectively frozen | Revoke 要求有效冻结 |
 | 76 | `ErrDualAuthRequired` | independent risk and audit proofs required | 同 key / 缺一方 |
 | 77 | `ErrRuleVersionNotAllowed` | candidate rule_version is not allowed | F-1：`rule_version` 不在治理白名单（空白名单=全拒） |
-| 78 | `ErrResolutionUnbound` | approval does not reference a dismissed challenge resolution | F-3：approve 的 `challenge_resolution_hash` 未绑定任何 DISMISSED 裁决（含无挑战直接 approve） |
+| 78 | `ErrResolutionUnbound` | non-empty challenge_resolution_hash is not bound to a dismissed challenge | F-3 / DEC-01 方案 C：**摘要非空**但未锚定 DISMISSED 裁决；无挑战路径用**空摘要**（窗口届满且零挑战） |
 | 2 | `ErrUnauthorized` | unauthorized | 签名篡改、金额与候选不一致等（E-1 / UNAUTHORIZED_AMOUNT） |
 | 11 | `ErrChallengeWindow` | challenge window not elapsed | Approve 早于 604800s（E-6） |
 

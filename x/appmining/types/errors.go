@@ -82,5 +82,7 @@ var (
 	ErrNotFrozen                    = sdkerrors.Register(ModuleName, 75, "entitlement not effectively frozen")
 	ErrDualAuthRequired             = sdkerrors.Register(ModuleName, 76, "independent risk and audit proofs required")
 	ErrRuleVersionNotAllowed        = sdkerrors.Register(ModuleName, 77, "candidate rule_version is not allowed")
-	ErrResolutionUnbound            = sdkerrors.Register(ModuleName, 78, "approval does not reference a dismissed challenge resolution")
+	// ErrResolutionUnbound (78): non-empty challenge_resolution_hash that does
+	// not bind a DISMISSED resolution (UGE DEC-01 scheme C / approve dual-path).
+	ErrResolutionUnbound = sdkerrors.Register(ModuleName, 78, "non-empty challenge_resolution_hash is not bound to a dismissed challenge")
 )

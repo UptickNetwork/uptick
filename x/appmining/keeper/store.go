@@ -298,11 +298,29 @@ func (k Keeper) HasOpenOrUpheldEntitlementChallenge(ctx sdk.Context, entitlement
 	return false
 }
 
+// HasAnyEntitlementChallenge reports whether the candidate has any stored
+// challenge record (any status). Used by the no-challenge approve path
+// (UGE DEC-01 scheme C): empty challenge_resolution_hash requires zero challenges.
+func (k Keeper) HasAnyEntitlementChallenge(ctx sdk.Context, entitlementID string) bool {
+	store := k.store(ctx)
+	it := storetypes.KVStorePrefixIterator(store, types.KeyPrefixEntitlementChallenge)
+	defer it.Close()
+	for ; it.Valid(); it.Next() {
+		var c types.EntitlementChallenge
+		k.cdc.MustUnmarshal(it.Value(), &c)
+		if c.CandidateId == entitlementID {
+			return true
+		}
+	}
+	return false
+}
+
 // HasDismissedEntitlementChallengeResolution reports whether the candidate has
-// a DISMISSED challenge whose stored ResolutionDigest equals digest. Approvals
-// must reference such a resolution so challenge_resolution_hash cannot be
-// fabricated (see ApproveEntitlement).
+// a DISMISSED challenge whose stored ResolutionDigest equals digest.
 func (k Keeper) HasDismissedEntitlementChallengeResolution(ctx sdk.Context, entitlementID, digest string) bool {
+	if digest == "" {
+		return false
+	}
 	store := k.store(ctx)
 	it := storetypes.KVStorePrefixIterator(store, types.KeyPrefixEntitlementChallenge)
 	defer it.Close()

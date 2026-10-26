@@ -64,6 +64,11 @@ func AuthorizationBytes(record map[string]string) ([]byte, error) {
 		"rationale_digest", "challenge_resolution_hash", "evidence_digest",
 	} {
 		if v, ok := record[name]; ok {
+			// UGE DEC-01 scheme C: empty challenge_resolution_hash selects the
+			// no-challenge approve path; all other hash fields stay 64-hex.
+			if name == "challenge_resolution_hash" && v == "" {
+				continue
+			}
 			if err := requireHash(name, v); err != nil {
 				return nil, err
 			}

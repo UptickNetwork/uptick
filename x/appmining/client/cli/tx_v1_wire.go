@@ -174,7 +174,9 @@ func CmdApproveEntitlement() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "approve-entitlement [pool-id] [entitlement-id] [challenge-resolution-hash]",
 		Short: "Approve a V1 entitlement (approver wire proof; locks available→reserved)",
-		Args:  cobra.ExactArgs(3),
+		Long: `challenge-resolution-hash: 64-hex binding a DISMISSED resolution, or empty "" for the
+no-challenge path (window elapsed and zero challenges on the candidate; UGE DEC-01).`,
+		Args: cobra.ExactArgs(3),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clientCtx, err := client.GetClientTxContext(cmd)
 			if err != nil {

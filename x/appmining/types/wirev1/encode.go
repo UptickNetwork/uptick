@@ -26,12 +26,14 @@ func frame(domain string, record map[string]string, expected []string) ([]byte, 
 		if !ok {
 			return nil, fmt.Errorf("missing field %q", name)
 		}
-		if value == "" || !utf8.ValidString(value) {
+		// Empty values are allowed only when higher-level validators permit them
+		// (UGE DEC-01: APPROVE challenge_resolution_hash may be "").
+		if !utf8.ValidString(value) {
 			return nil, fmt.Errorf("invalid %s", name)
 		}
 		key := []byte(name)
 		val := []byte(value)
-		if len(val) == 0 || len(val) > maxFieldUTF8Bytes {
+		if len(val) > maxFieldUTF8Bytes {
 			return nil, fmt.Errorf("invalid %s", name)
 		}
 		var hdr [6]byte

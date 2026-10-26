@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"crypto/ed25519"
 	"encoding/hex"
-	"strconv"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -62,71 +60,17 @@ func setupP2(t *testing.T) (testEnv, ed25519.PrivateKey, ed25519.PrivateKey, ed2
 	return e, pubPriv, revPriv, aprPriv, c
 }
 
-// approveResolutionDigest is the rationale digest used by the helper's own
-// open+dismiss cycle; it doubles as the approve record's
-// challenge_resolution_hash so the wire field references a real resolution.
-const approveResolutionDigest = "5555555555555555555555555555555555555555555555555555555555555555"
-
-// helperNonce hands out reviewer nonces that cannot collide with the literal
-// nonces used by individual tests (all well below 50000).
-var helperNonce atomic.Uint64
-
-func init() { helperNonce.Store(50000) }
-
-// ensureDismissedChallenge opens and dismisses one challenge for the candidate
-// so that approveMsg's challenge_resolution_hash matches an on-chain DISMISSED
-// resolution (the keeper rejects approvals whose hash binds to none, see
-// ApproveEntitlement / ErrResolutionUnbound). Best effort: when the candidate
-// is not PUBLISHED or a duplicate open challenge exists, the caller's approve
-// is expected to fail on an earlier check anyway.
-func ensureDismissedChallenge(t *testing.T, e testEnv, c wirev1.Candidate) {
-	t.Helper()
-	cand, ok := e.k.GetCandidate(e.ctx, c.EntitlementID)
-	if !ok || cand.Status != types.CandidateStatusPublished {
-		return
-	}
-	// open+resolve at publish time, where the challenge window is still open;
-	// restore the caller's block time and the candidate watermark afterwards
-	// (some tests advance MaxObservedTime artificially, which would otherwise
-	// block the helper's open, and resolve would clobber the watermark).
-	saved := e.ctx
-	e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt, 0))
-	savedMaxObserved := cand.MaxObservedTime
-	cand.MaxObservedTime = cand.PublishedAt
-	e.k.SetCandidate(e.ctx, cand)
-	defer func() {
-		e.ctx = saved
-		cand.MaxObservedTime = savedMaxObserved
-		e.k.SetCandidate(e.ctx, cand)
-	}()
-
-	openRes, err := e.server.OpenChallenge(e.ctx, &types.MsgOpenChallenge{
-		Challenger: e.payer.String(), EntitlementId: c.EntitlementID,
-		EvidenceType:   types.EvidenceTypeConfirmedRefundOrReversal,
-		EvidenceDigest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-	})
-	if err != nil {
-		return // e.g. payer already has an open challenge for this candidate
-	}
-	resolveRec := map[string]string{
-		"protocol_version": "1", "operation": "RESOLVE", "role": "reviewer",
-		"chain_id": testChainID, "pool_id": testPoolID, "key_id": "rev-1",
-		"nonce": strconv.FormatUint(helperNonce.Add(1), 10), "expires_at": "1893456000",
-		"challenge_id": openRes.ChallengeId, "candidate_id": c.EntitlementID,
-		"outcome": "DISMISSED", "rationale_digest": approveResolutionDigest,
-	}
-	_, err = e.server.ResolveEntitlementChallenge(e.ctx, &types.MsgResolveEntitlementChallenge{
-		Submitter: e.sub.String(), ChainId: testChainID, PoolId: testPoolID,
-		ChallengeId: openRes.ChallengeId, Outcome: "DISMISSED",
-		RationaleDigest: resolveRec["rationale_digest"],
-		Proof:           signProof(t, e.revPriv, resolveRec),
-	})
-	require.NoError(t, err)
-}
-
+// approveMsg builds the V0 no-challenge approve path (UGE DEC-01 scheme C):
+// empty challenge_resolution_hash after the window, with zero challenges on-chain.
 func approveMsg(t *testing.T, e testEnv, aprPriv ed25519.PrivateKey, c wirev1.Candidate, nonce string) *types.MsgApproveEntitlement {
 	t.Helper()
-	ensureDismissedChallenge(t, e, c)
+	return approveMsgWithResolution(t, e, aprPriv, c, nonce, "")
+}
+
+// approveMsgWithResolution builds a bound approve (non-empty digest must match a
+// DISMISSED ResolutionDigest already on-chain).
+func approveMsgWithResolution(t *testing.T, e testEnv, aprPriv ed25519.PrivateKey, c wirev1.Candidate, nonce, resolutionDigest string) *types.MsgApproveEntitlement {
+	t.Helper()
 	cand, ok := e.k.GetCandidate(e.ctx, c.EntitlementID)
 	require.True(t, ok)
 	rec := map[string]string{
@@ -135,13 +79,13 @@ func approveMsg(t *testing.T, e testEnv, aprPriv ed25519.PrivateKey, c wirev1.Ca
 		"nonce": nonce, "expires_at": "1893456000",
 		"entitlement_id": c.EntitlementID, "app_id": c.AppID,
 		"candidate_hash":            cand.CandidateHash,
-		"challenge_resolution_hash": approveResolutionDigest,
+		"challenge_resolution_hash": resolutionDigest,
 		"amount":                    c.Amount, "denom": c.Denom, "rule_version": c.RuleVersion,
 	}
 	return &types.MsgApproveEntitlement{
 		Submitter: e.sub.String(), ChainId: testChainID, PoolId: testPoolID,
 		EntitlementId:           c.EntitlementID,
-		ChallengeResolutionHash: rec["challenge_resolution_hash"],
+		ChallengeResolutionHash: resolutionDigest,
 		Proof:                   signProof(t, aprPriv, rec),
 	}
 }

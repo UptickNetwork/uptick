@@ -74,7 +74,7 @@ func TestVector_DISMISSED_CHALLENGE_ALLOWS_APPROVAL(t *testing.T) {
 
 	cand, _ := e.k.GetCandidate(e.ctx, c.EntitlementID)
 	e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.ChallengeWindowSeconds, 0))
-	_, err = e.server.ApproveEntitlement(e.ctx, approveMsg(t, e, aprPriv, c, "921"))
+	_, err = e.server.ApproveEntitlement(e.ctx, approveMsgWithResolution(t, e, aprPriv, c, "921", resolveRec["rationale_digest"]))
 	require.NoError(t, err)
 	ent, ok := e.k.GetEntitlement(e.ctx, c.EntitlementID)
 	require.True(t, ok)

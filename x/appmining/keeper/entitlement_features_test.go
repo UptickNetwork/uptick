@@ -84,11 +84,11 @@ func TestFeature_AuthExpiredRejected(t *testing.T) {
 		"nonce": "1310", "expires_at": "1",
 		"entitlement_id": c.EntitlementID, "app_id": c.AppID,
 		"candidate_hash":            cand.CandidateHash,
-		"challenge_resolution_hash": "5555555555555555555555555555555555555555555555555555555555555555",
+		"challenge_resolution_hash": "",
 		"amount":                    c.Amount, "denom": c.Denom, "rule_version": c.RuleVersion,
 	}
 	msg.Proof = signProof(t, aprPriv, rec)
-	msg.ChallengeResolutionHash = rec["challenge_resolution_hash"]
+	msg.ChallengeResolutionHash = ""
 	_, err := e.server.ApproveEntitlement(e.ctx, msg)
 	require.ErrorIs(t, err, types.ErrAuthExpired)
 }
@@ -243,6 +243,7 @@ func TestFeature_ApproveEventSchemaAndTxHash(t *testing.T) {
 	require.Equal(t, wantHash, eventAttr(ev, types.AttributeKeyTxHash))
 	require.Equal(t, c.Amount, eventAttr(ev, types.AttributeKeyAmount))
 	require.Equal(t, testPoolID, eventAttr(ev, types.AttributeKeyPoolID))
+	require.Equal(t, "false", eventAttr(ev, types.AttributeKeyResolutionBound))
 }
 
 func TestFeature_PublishStoresTxHash(t *testing.T) {

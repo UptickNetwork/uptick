@@ -9,6 +9,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	sdk "github.com/cosmos/cosmos-sdk/types"
+
 	"github.com/UptickNetwork/uptick/x/appmining/types"
 	"github.com/UptickNetwork/uptick/x/appmining/types/wirev1"
 )
@@ -69,7 +71,7 @@ func TestVector_UNAUTHORIZED_AMOUNT_AND_DUPLICATE_APPROVAL(t *testing.T) {
 		"nonce": "1101", "expires_at": "1893456000",
 		"entitlement_id": c.EntitlementID, "app_id": c.AppID,
 		"candidate_hash":            cand.CandidateHash,
-		"challenge_resolution_hash": "5555555555555555555555555555555555555555555555555555555555555555",
+		"challenge_resolution_hash": "",
 		"amount":                    c.Amount, "denom": c.Denom, "rule_version": c.RuleVersion,
 	}
 	_, err := e.server.ApproveEntitlement(e.ctx, &types.MsgApproveEntitlement{
@@ -87,7 +89,7 @@ func TestVector_UNAUTHORIZED_AMOUNT_AND_DUPLICATE_APPROVAL(t *testing.T) {
 		"nonce": "1102", "expires_at": "1893456000",
 		"entitlement_id": c.EntitlementID, "app_id": c.AppID,
 		"candidate_hash":            cand.CandidateHash,
-		"challenge_resolution_hash": "5555555555555555555555555555555555555555555555555555555555555555",
+		"challenge_resolution_hash": "",
 		"amount":                    "1", "denom": c.Denom, "rule_version": c.RuleVersion,
 	}
 	_, err = e.server.ApproveEntitlement(e.ctx, &types.MsgApproveEntitlement{
@@ -340,79 +342,95 @@ func TestGapF2_RevokeWithSamePubkeyBytesRejected(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// TestGapF3_ApproveResolutionHashMustReferenceDismissedChallenge pins the
-// approve→dispute binding: challenge_resolution_hash must equal the stored
-// ResolutionDigest of a DISMISSED challenge on the same candidate. A
-// well-signed approve with an arbitrary hash (no dispute, or a digest that
-// matches no dismissed resolution) must be rejected with
-// ErrResolutionUnbound — the wire field is documented as binding the approval
-// to dispute state, and a fabricated hash would otherwise make the audit
-// trail unfalsifiable.
-func TestGapF3_ApproveResolutionHashMustReferenceDismissedChallenge(t *testing.T) {
-	e, _, revPriv, aprPriv, c := setupP2(t)
-
+// TestGapF3_ApproveDualPathBinding covers UGE DEC-01 scheme C negatives:
+// non-empty unbound → 78; empty + any challenge → 71; empty + no challenge → OK;
+// non-empty bound to DISMISSED → OK with resolution_bound=true.
+func TestGapF3_ApproveDualPathBinding(t *testing.T) {
 	const dismissedDigest = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
 	const unboundDigest = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
 
-	// Dismiss one real challenge while the window is open.
-	openRes, err := e.server.OpenChallenge(e.ctx, &types.MsgOpenChallenge{
-		Challenger: e.payer.String(), EntitlementId: c.EntitlementID,
-		EvidenceType:   types.EvidenceTypeConfirmedRefundOrReversal,
-		EvidenceDigest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+	t.Run("nonempty_no_challenge_rejected_78", func(t *testing.T) {
+		e, _, _, aprPriv, c := setupP2(t)
+		cand, _ := e.k.GetCandidate(e.ctx, c.EntitlementID)
+		e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.ChallengeWindowSeconds, 0))
+		_, err := e.server.ApproveEntitlement(e.ctx, approveMsgWithResolution(t, e, aprPriv, c, "1502", unboundDigest))
+		require.ErrorIs(t, err, types.ErrResolutionUnbound)
 	})
-	require.NoError(t, err)
-	resolveRec := map[string]string{
-		"protocol_version": "1", "operation": "RESOLVE", "role": "reviewer",
-		"chain_id": testChainID, "pool_id": testPoolID, "key_id": "rev-1",
-		"nonce": "1501", "expires_at": "1893456000",
-		"challenge_id": openRes.ChallengeId, "candidate_id": c.EntitlementID,
-		"outcome": "DISMISSED", "rationale_digest": dismissedDigest,
-	}
-	_, err = e.server.ResolveEntitlementChallenge(e.ctx, &types.MsgResolveEntitlementChallenge{
-		Submitter: e.sub.String(), ChainId: testChainID, PoolId: testPoolID,
-		ChallengeId: openRes.ChallengeId, Outcome: "DISMISSED",
-		RationaleDigest: resolveRec["rationale_digest"],
-		Proof:           signProof(t, revPriv, resolveRec),
-	})
-	require.NoError(t, err)
 
-	cand, _ := e.k.GetCandidate(e.ctx, c.EntitlementID)
-	e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.ChallengeWindowSeconds, 0))
-
-	// Negative: well-signed approve whose resolution hash matches no dismissed
-	// challenge (nothing was fabricated on-chain for this digest).
-	buildApprove := func(digest, nonce string) *types.MsgApproveEntitlement {
-		cand, ok := e.k.GetCandidate(e.ctx, c.EntitlementID)
-		require.True(t, ok)
-		rec := map[string]string{
-			"protocol_version": "1", "operation": "APPROVE", "role": "approver",
-			"chain_id": testChainID, "pool_id": testPoolID, "key_id": "apr-1",
-			"nonce": nonce, "expires_at": "1893456000",
-			"entitlement_id": c.EntitlementID, "app_id": c.AppID,
-			"candidate_hash":            cand.CandidateHash,
-			"challenge_resolution_hash": digest,
-			"amount":                    c.Amount, "denom": c.Denom, "rule_version": c.RuleVersion,
+	t.Run("empty_after_dismissed_rejected_71", func(t *testing.T) {
+		e, _, revPriv, aprPriv, c := setupP2(t)
+		openRes, err := e.server.OpenChallenge(e.ctx, &types.MsgOpenChallenge{
+			Challenger: e.payer.String(), EntitlementId: c.EntitlementID,
+			EvidenceType:   types.EvidenceTypeConfirmedRefundOrReversal,
+			EvidenceDigest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		})
+		require.NoError(t, err)
+		resolveRec := map[string]string{
+			"protocol_version": "1", "operation": "RESOLVE", "role": "reviewer",
+			"chain_id": testChainID, "pool_id": testPoolID, "key_id": "rev-1",
+			"nonce": "1501", "expires_at": "1893456000",
+			"challenge_id": openRes.ChallengeId, "candidate_id": c.EntitlementID,
+			"outcome": "DISMISSED", "rationale_digest": dismissedDigest,
 		}
-		return &types.MsgApproveEntitlement{
+		_, err = e.server.ResolveEntitlementChallenge(e.ctx, &types.MsgResolveEntitlementChallenge{
 			Submitter: e.sub.String(), ChainId: testChainID, PoolId: testPoolID,
-			EntitlementId:           c.EntitlementID,
-			ChallengeResolutionHash: digest,
-			Proof:                   signProof(t, aprPriv, rec),
+			ChallengeId: openRes.ChallengeId, Outcome: "DISMISSED",
+			RationaleDigest: resolveRec["rationale_digest"],
+			Proof:           signProof(t, revPriv, resolveRec),
+		})
+		require.NoError(t, err)
+
+		cand, _ := e.k.GetCandidate(e.ctx, c.EntitlementID)
+		e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.ChallengeWindowSeconds, 0))
+		_, err = e.server.ApproveEntitlement(e.ctx, approveMsg(t, e, aprPriv, c, "1505"))
+		require.ErrorIs(t, err, types.ErrOpenOrUpheldChallenge)
+	})
+
+	t.Run("empty_no_challenge_ok", func(t *testing.T) {
+		e, _, _, aprPriv, c := setupP2(t)
+		cand, _ := e.k.GetCandidate(e.ctx, c.EntitlementID)
+		e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.ChallengeWindowSeconds, 0))
+		_, err := e.server.ApproveEntitlement(e.ctx, approveMsg(t, e, aprPriv, c, "1506"))
+		require.NoError(t, err)
+		ev, ok := findEvent(e.ctx.EventManager().Events(), types.EventTypeEntitlementApproved)
+		require.True(t, ok)
+		require.Equal(t, "false", eventAttr(ev, types.AttributeKeyResolutionBound))
+	})
+
+	t.Run("bound_dismissed_ok", func(t *testing.T) {
+		e, _, revPriv, aprPriv, c := setupP2(t)
+		openRes, err := e.server.OpenChallenge(e.ctx, &types.MsgOpenChallenge{
+			Challenger: e.payer.String(), EntitlementId: c.EntitlementID,
+			EvidenceType:   types.EvidenceTypeConfirmedRefundOrReversal,
+			EvidenceDigest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		})
+		require.NoError(t, err)
+		resolveRec := map[string]string{
+			"protocol_version": "1", "operation": "RESOLVE", "role": "reviewer",
+			"chain_id": testChainID, "pool_id": testPoolID, "key_id": "rev-1",
+			"nonce": "1510", "expires_at": "1893456000",
+			"challenge_id": openRes.ChallengeId, "candidate_id": c.EntitlementID,
+			"outcome": "DISMISSED", "rationale_digest": dismissedDigest,
 		}
-	}
-	_, err = e.server.ApproveEntitlement(e.ctx, buildApprove(unboundDigest, "1502"))
-	require.ErrorIs(t, err, types.ErrResolutionUnbound)
+		_, err = e.server.ResolveEntitlementChallenge(e.ctx, &types.MsgResolveEntitlementChallenge{
+			Submitter: e.sub.String(), ChainId: testChainID, PoolId: testPoolID,
+			ChallengeId: openRes.ChallengeId, Outcome: "DISMISSED",
+			RationaleDigest: resolveRec["rationale_digest"],
+			Proof:           signProof(t, revPriv, resolveRec),
+		})
+		require.NoError(t, err)
 
-	// Positive control: the same well-signed flow with the real dismissed
-	// digest succeeds, so the rejection above is caused by the binding and not
-	// by any incidental state.
-	_, err = e.server.ApproveEntitlement(e.ctx, buildApprove(dismissedDigest, "1503"))
-	require.NoError(t, err)
-	ent, ok := e.k.GetEntitlement(e.ctx, c.EntitlementID)
-	require.True(t, ok)
-	require.Equal(t, types.EntitlementStateClaimable, ent.State)
-
-	// The bound digest is surfaced on the approval event for auditability.
-	_, err = e.server.ApproveEntitlement(e.ctx, buildApprove(dismissedDigest, "1504"))
-	require.ErrorIs(t, err, types.ErrEntitlementExists)
+		cand, _ := e.k.GetCandidate(e.ctx, c.EntitlementID)
+		e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.ChallengeWindowSeconds, 0)).
+			WithEventManager(sdk.NewEventManager())
+		_, err = e.server.ApproveEntitlement(e.ctx, approveMsgWithResolution(t, e, aprPriv, c, "1503", dismissedDigest))
+		require.NoError(t, err)
+		ent, ok := e.k.GetEntitlement(e.ctx, c.EntitlementID)
+		require.True(t, ok)
+		require.Equal(t, types.EntitlementStateClaimable, ent.State)
+		ev, ok := findEvent(e.ctx.EventManager().Events(), types.EventTypeEntitlementApproved)
+		require.True(t, ok)
+		require.Equal(t, "true", eventAttr(ev, types.AttributeKeyResolutionBound))
+		require.Equal(t, dismissedDigest, eventAttr(ev, types.AttributeKeyEvidenceOrResolutionDigest))
+	})
 }
