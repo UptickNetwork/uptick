@@ -1,0 +1,25 @@
+{
+  "schema_version": "uge-app-mining-wire-golden-1.0",
+  "test_only_key_notice": "Ed25519 seed is 32 bytes of 0x01; public deterministic fixture, never a production key",
+  "public_key_der_hex": "302a300506032b65700321008a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+  "candidate_note": "same candidate as app-mining-v1-wire-golden-1.0.json (hash a2824b8d...); this vector pins the DEC-01 scheme C unbound approve path: challenge_resolution_hash is the empty string, encoded as a zero-length value",
+  "authorization": {
+    "protocol_version": "1",
+    "operation": "APPROVE",
+    "role": "approver",
+    "chain_id": "uptick_7777-1",
+    "pool_id": "ecosystem-v0",
+    "key_id": "test-key-1",
+    "nonce": "2",
+    "expires_at": "1893456000",
+    "entitlement_id": "970c4147badb6d3d95505024ae52d123f436f09957666f9a5b940bbf90a9ceb9",
+    "app_id": "1111111111111111111111111111111111111111111111111111111111111111",
+    "candidate_hash": "a2824b8d6cd1e9d361fb91838acffc8648a7124031a8bd68c4cc44c0aa5e3dc1",
+    "challenge_resolution_hash": "",
+    "amount": "31500",
+    "denom": "auptick",
+    "rule_version": "gas-reward-candidate-0.1"
+  },
+  "authorization_digest_sha256": "c6215ac0e17f01901f40b1d2283882e19b6d329a08b419bdbb2b0ba43937c8ca",
+  "signature_base64": "O+JGl+Yre54knF+D4FVxU/YtSfLqB/Xy3SDJyX4WWIiGDRHhj7ssuLFo7x7nK/OSCAaHcjYb1mMrXbIfB7GFAA=="
+}

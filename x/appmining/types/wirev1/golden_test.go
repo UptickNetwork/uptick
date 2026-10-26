@@ -53,6 +53,20 @@ func loadGolden(t *testing.T) goldenFile {
 	return g
 }
 
+// loadGoldenEmptyDigest loads the DEC-01 scheme C unbound-approve vector
+// (challenge_resolution_hash = empty string, zero-length wire encoding).
+func loadGoldenEmptyDigest(t *testing.T) goldenFile {
+	t.Helper()
+	_, file, _, ok := runtime.Caller(0)
+	require.True(t, ok)
+	path := filepath.Join(filepath.Dir(file), "..", "..", "spec", "app-mining-v1-wire-golden-empty-digest-1.0.json")
+	bz, err := os.ReadFile(path)
+	require.NoError(t, err)
+	var g goldenFile
+	require.NoError(t, json.Unmarshal(bz, &g))
+	return g
+}
+
 func parseUintField(t *testing.T, raw json.RawMessage) string {
 	t.Helper()
 	var asStr string
@@ -121,6 +135,34 @@ func TestE7_WireGolden_VerifyEd25519Signature(t *testing.T) {
 	}
 	tampered["amount"] = "31501"
 	require.False(t, wirev1.VerifyAuthorization(tampered, g.SignatureBase64, pub))
+}
+
+// TestE7_WireGoldenEmptyDigest_UnboundApprovePath pins the DEC-01 scheme C
+// unbound approve path: empty challenge_resolution_hash digests and verifies
+// identically to the bound path (zero-length wire value).
+func TestE7_WireGoldenEmptyDigest_UnboundApprovePath(t *testing.T) {
+	g := loadGoldenEmptyDigest(t)
+	require.Equal(t, "uge-app-mining-wire-golden-1.0", g.SchemaVersion)
+	require.Equal(t, "", g.Authorization["challenge_resolution_hash"])
+
+	digest, err := wirev1.AuthorizationDigest(g.Authorization)
+	require.NoError(t, err)
+	require.Equal(t, g.AuthorizationDigestSHA256, digest)
+
+	seed := bytes.Repeat([]byte{0x01}, ed25519.SeedSize)
+	priv := ed25519.NewKeyFromSeed(seed)
+	require.True(t, wirev1.VerifyAuthorization(g.Authorization, g.SignatureBase64, priv.Public().(ed25519.PublicKey)))
+
+	// A non-empty hash that equals no resolution must not verify against this
+	// vector's digest: the empty value is material to the wire encoding.
+	tampered := make(map[string]string, len(g.Authorization))
+	for k, v := range g.Authorization {
+		tampered[k] = v
+	}
+	tampered["challenge_resolution_hash"] = "5555555555555555555555555555555555555555555555555555555555555555"
+	tamperedDigest, err := wirev1.AuthorizationDigest(tampered)
+	require.NoError(t, err)
+	require.NotEqual(t, g.AuthorizationDigestSHA256, tamperedDigest)
 }
 
 func TestAuthorization_RejectsWrongRole(t *testing.T) {

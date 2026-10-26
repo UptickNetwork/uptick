@@ -433,4 +433,73 @@ func TestGapF3_ApproveDualPathBinding(t *testing.T) {
 		require.Equal(t, "true", eventAttr(ev, types.AttributeKeyResolutionBound))
 		require.Equal(t, dismissedDigest, eventAttr(ev, types.AttributeKeyEvidenceOrResolutionDigest))
 	})
+
+	// UGE reply 0.1 negative 2: a dismissed resolution exists, but the approve
+	// carries a digest that does not equal its stored ResolutionDigest → 78.
+	t.Run("bound_wrong_digest_rejected_78", func(t *testing.T) {
+		e, _, revPriv, aprPriv, c := setupP2(t)
+		openRes, err := e.server.OpenChallenge(e.ctx, &types.MsgOpenChallenge{
+			Challenger: e.payer.String(), EntitlementId: c.EntitlementID,
+			EvidenceType:   types.EvidenceTypeConfirmedRefundOrReversal,
+			EvidenceDigest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		})
+		require.NoError(t, err)
+		resolveRec := map[string]string{
+			"protocol_version": "1", "operation": "RESOLVE", "role": "reviewer",
+			"chain_id": testChainID, "pool_id": testPoolID, "key_id": "rev-1",
+			"nonce": "1520", "expires_at": "1893456000",
+			"challenge_id": openRes.ChallengeId, "candidate_id": c.EntitlementID,
+			"outcome": "DISMISSED", "rationale_digest": dismissedDigest,
+		}
+		_, err = e.server.ResolveEntitlementChallenge(e.ctx, &types.MsgResolveEntitlementChallenge{
+			Submitter: e.sub.String(), ChainId: testChainID, PoolId: testPoolID,
+			ChallengeId: openRes.ChallengeId, Outcome: "DISMISSED",
+			RationaleDigest: resolveRec["rationale_digest"],
+			Proof:           signProof(t, revPriv, resolveRec),
+		})
+		require.NoError(t, err)
+
+		cand, _ := e.k.GetCandidate(e.ctx, c.EntitlementID)
+		e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.ChallengeWindowSeconds, 0))
+		_, err = e.server.ApproveEntitlement(e.ctx, approveMsgWithResolution(t, e, aprPriv, c, "1521", unboundDigest))
+		require.ErrorIs(t, err, types.ErrResolutionUnbound)
+	})
+
+	// Empty digest and no challenge, but the challenge window has not yet
+	// elapsed: the unbound path requires window closure (ErrChallengeWindow).
+	t.Run("empty_before_window_rejected", func(t *testing.T) {
+		e, _, _, aprPriv, c := setupP2(t)
+		// setupP2 leaves ctx before publishedAt+ChallengeWindowSeconds.
+		_, err := e.server.ApproveEntitlement(e.ctx, approveMsg(t, e, aprPriv, c, "1522"))
+		require.ErrorIs(t, err, types.ErrChallengeWindow)
+	})
+
+	// An UPHELD resolution rejects the candidate outright: no approve path
+	// (bound or unbound) may run afterwards — fail-closed end to end.
+	t.Run("upheld_resolution_rejected_fail_closed", func(t *testing.T) {
+		e, _, revPriv, aprPriv, c := setupP2(t)
+		openRes, err := e.server.OpenChallenge(e.ctx, &types.MsgOpenChallenge{
+			Challenger: e.payer.String(), EntitlementId: c.EntitlementID,
+			EvidenceType:   types.EvidenceTypeConfirmedRefundOrReversal,
+			EvidenceDigest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		})
+		require.NoError(t, err)
+		resolveRec := map[string]string{
+			"protocol_version": "1", "operation": "RESOLVE", "role": "reviewer",
+			"chain_id": testChainID, "pool_id": testPoolID, "key_id": "rev-1",
+			"nonce": "1523", "expires_at": "1893456000",
+			"challenge_id": openRes.ChallengeId, "candidate_id": c.EntitlementID,
+			"outcome": "UPHELD", "rationale_digest": unboundDigest,
+		}
+		_, err = e.server.ResolveEntitlementChallenge(e.ctx, &types.MsgResolveEntitlementChallenge{
+			Submitter: e.sub.String(), ChainId: testChainID, PoolId: testPoolID,
+			ChallengeId: openRes.ChallengeId, Outcome: "UPHELD",
+			RationaleDigest: resolveRec["rationale_digest"],
+			Proof:           signProof(t, revPriv, resolveRec),
+		})
+		require.NoError(t, err)
+
+		_, err = e.server.ApproveEntitlement(e.ctx, approveMsgWithResolution(t, e, aprPriv, c, "1524", unboundDigest))
+		require.ErrorIs(t, err, types.ErrCandidateNotPublished)
+	})
 }
