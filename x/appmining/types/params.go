@@ -20,8 +20,11 @@ const (
 
 // V1 entitlement timing constants (workorder 13 §3): 7-day challenge window,
 // single freeze capped at 72h.
+// DEV-CHAIN OVERRIDE (2026-10-27): challenge window relaxed to 600s for the
+// uptick_7777-1 release-chain end-to-end dry run; restore 604800 before any
+// value-bearing deployment.
 const (
-	ChallengeWindowSeconds = 604800
+	ChallengeWindowSeconds = 600
 	MaxFreezeSeconds       = 259200
 )
 
