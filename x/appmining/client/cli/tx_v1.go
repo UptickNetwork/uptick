@@ -22,6 +22,8 @@ func addV1TxCommands(cmd *cobra.Command) {
 		CmdSetEntitlementPoolPaused(),
 		CmdRegisterRoleKey(),
 		CmdSetRoleKeyStatus(),
+		CmdRegisterAssessmentSigner(),
+		CmdSetAssessmentSignerStatus(),
 		CmdClaimEntitlement(),
 	)
 	addV1WireTxCommands(cmd)
@@ -168,6 +170,63 @@ func CmdSetRoleKeyStatus() *cobra.Command {
 				Authority: clientCtx.GetFromAddress().String(),
 				Role:      role,
 				KeyId:     args[1],
+				Status:    status,
+			}
+			return tx.GenerateOrBroadcastTxCLI(clientCtx, cmd.Flags(), msg)
+		},
+	}
+	flags.AddTxFlagsToCmd(cmd)
+	return cmd
+}
+
+func CmdRegisterAssessmentSigner() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "register-assessment-signer [key-id] [pubkey-hex] [version]",
+		Short: "Register an AssessmentCredential Ed25519 pubkey (authority). key-id matches ^[a-z0-9][a-z0-9-]{2,31}$",
+		Args:  cobra.ExactArgs(3),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			clientCtx, err := client.GetClientTxContext(cmd)
+			if err != nil {
+				return err
+			}
+			pk, err := hex.DecodeString(args[1])
+			if err != nil {
+				return fmt.Errorf("pubkey-hex: %w", err)
+			}
+			ver, err := strconv.ParseUint(args[2], 10, 64)
+			if err != nil {
+				return fmt.Errorf("version: %w", err)
+			}
+			msg := &types.MsgRegisterAssessmentSigner{
+				Authority: clientCtx.GetFromAddress().String(),
+				KeyId:     args[0],
+				Pubkey:    pk,
+				Version:   ver,
+			}
+			return tx.GenerateOrBroadcastTxCLI(clientCtx, cmd.Flags(), msg)
+		},
+	}
+	flags.AddTxFlagsToCmd(cmd)
+	return cmd
+}
+
+func CmdSetAssessmentSignerStatus() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "set-assessment-signer-status [key-id] [active|paused|revoked]",
+		Short: "Set AssessmentSigner status (authority). Revoked keys cannot be reactivated; re-register instead.",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			clientCtx, err := client.GetClientTxContext(cmd)
+			if err != nil {
+				return err
+			}
+			status, err := parseRoleKeyStatus(args[1])
+			if err != nil {
+				return err
+			}
+			msg := &types.MsgSetAssessmentSignerStatus{
+				Authority: clientCtx.GetFromAddress().String(),
+				KeyId:     args[0],
 				Status:    status,
 			}
 			return tx.GenerateOrBroadcastTxCLI(clientCtx, cmd.Flags(), msg)

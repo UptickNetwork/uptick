@@ -52,6 +52,12 @@ Ref: https://keepachangelog.com/en/1.0.0/
   (`open`/`none`/`deposit`); deposit escrow with UPHELD refund / DISMISSED → entitlement pool;
   acceptance-vectors-0.5 skeleton (T1 transitional cases covered by keeper tests).
 
+* (appmining) T1 closeout (S-1…S-5): assessment-credential golden JSON + Go cross-check;
+  authority `MsgRegisterAssessmentSigner` / `MsgSetAssessmentSignerStatus` + CLI;
+  credential_id permanent one-shot comments (D-A); decisions archive
+  `docs/workorder/UPTICK-CHAIN-T1-DECISIONS-0.1.md`; acceptance-vectors-0.5 T1 cases +
+  `keeper/vector_t1_test.go`.
+
 * (appmining) V1 entitlement wire Msg CLI (`publish-candidate`, `open-entitlement-challenge`,
   `resolve-entitlement-challenge`, `approve-entitlement`, `freeze-entitlement`, `revoke-entitlement`)
   and UGE doc14 integration contract (`workorder/UPTICK-UGE-V1-INTEGRATION-CONTRACT-0.1.md`).

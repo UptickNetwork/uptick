@@ -3,72 +3,132 @@
   "extends": "uptick-appmining-settlement-acceptance-vectors-0.4",
   "generated": "2026-10-28",
   "interface": "uptick.appmining.v1",
-  "change_note": "0.5 骨架（UGE publisher-binding R5）。T1 默认配置下 0.4 全绿且下列 T1 过渡期 case 通过；T4（credential_required=true + 全局 publisher REVOKED）要求 0.5 全绿。",
+  "change_note": "0.5 T1 过渡期全路径（UGE publisher-binding R1–R5 + T1 执行指令 S-5）。冻结口径：assessment wire UGE-APP-MINING-ASSESSMENT-V1 TLV、credential_id 永久一次性（D-A）、错误码 79/80/81。T1 默认 credential_required=false、challenge_open_access=open、全局 publisher 仍允许；T4 要求 credential_required=true 且全局 publisher REVOKED。链侧单测：keeper/vector_t1_test.go + publisher_binding/assessment/challenge_deposit。",
   "t1_defaults": {
     "credential_required": false,
     "challenge_open_access": "open",
-    "global_publisher_keys": "still_allowed"
+    "global_publisher_keys": "still_allowed",
+    "assessment_version_policy": "default-deny-allowlist"
+  },
+  "frozen_assessment_wire": {
+    "domain": "UGE-APP-MINING-ASSESSMENT-V1\\0",
+    "encoding": "TLV u16be(nameLen)||name||u32be(valLen)||value",
+    "field_count": 15,
+    "credential_id": "SHA-256(frame with credential_id forced empty); signature covers filled frame",
+    "credential_id_semantics": "permanent_one_shot_D-A"
   },
   "cases": [
     {
       "id": "BOUND_PUBLISHER_REQUIRES_CREDENTIAL",
       "input": { "publisher_key_app_bound": true, "credential": null },
       "expect": "REJECT_80_ASSESSMENT_CREDENTIAL_INVALID",
-      "phase": "T1"
+      "phase": "T1",
+      "test": "TestVector_BOUND_PUBLISHER_REQUIRES_CREDENTIAL"
     },
     {
       "id": "GLOBAL_PUBLISHER_WITHOUT_CREDENTIAL_OK",
       "input": { "publisher_key_global": true, "credential_required": false, "credential": null },
       "expect": "ACCEPT_PUBLISH",
-      "phase": "T1"
+      "phase": "T1",
+      "test": "TestVector_GLOBAL_PUBLISHER_WITHOUT_CREDENTIAL_OK"
     },
     {
       "id": "ROLE_KEY_APP_MISMATCH",
       "input": { "publisher_key_bound_to": "app_A", "msg_app_id": "app_B" },
       "expect": "REJECT_79_ROLE_KEY_APP_MISMATCH",
-      "phase": "T1"
+      "phase": "T1",
+      "test": "TestVector_ROLE_KEY_APP_MISMATCH"
+    },
+    {
+      "id": "REGISTER_APPLICATION_EMBEDDED_PUBLISHER",
+      "input": { "publisher_pubkey": true, "publisher_key_id": true, "same_tx_active": true },
+      "expect": "ROLE_KEY_ACTIVE_APP_BOUND",
+      "phase": "T1",
+      "test": "TestVector_REGISTER_APPLICATION_EMBEDDED_PUBLISHER"
+    },
+    {
+      "id": "ASSESSMENT_CREDENTIAL_VALID",
+      "input": { "credential": "valid_signed", "signer": "ACTIVE" },
+      "expect": "ACCEPT_PUBLISH_INDEX_CREDENTIAL_ID",
+      "phase": "T1",
+      "test": "TestVector_ASSESSMENT_CREDENTIAL_VALID"
+    },
+    {
+      "id": "ASSESSMENT_CREDENTIAL_EXPIRED",
+      "input": { "expires_at": "past" },
+      "expect": "REJECT_80_ASSESSMENT_CREDENTIAL_INVALID",
+      "phase": "T1",
+      "test": "TestVector_ASSESSMENT_CREDENTIAL_EXPIRED"
+    },
+    {
+      "id": "ASSESSMENT_CREDENTIAL_FIELD_MISMATCH",
+      "input": { "credential_amount_ne_candidate_amount": true },
+      "expect": "REJECT_80_ASSESSMENT_CREDENTIAL_INVALID",
+      "phase": "T1",
+      "test": "TestVector_ASSESSMENT_CREDENTIAL_FIELD_MISMATCH"
     },
     {
       "id": "ASSESSMENT_CREDENTIAL_REUSE",
       "input": { "same_credential_id_twice": true },
       "expect": "REJECT_81_ASSESSMENT_CREDENTIAL_REUSE",
-      "phase": "T1"
+      "phase": "T1",
+      "test": "TestVector_ASSESSMENT_CREDENTIAL_REUSE"
+    },
+    {
+      "id": "ASSESSMENT_VERSION_NOT_ALLOWLISTED",
+      "input": { "entitlement_allowed_assessment_versions": [] },
+      "expect": "REJECT_80_ASSESSMENT_CREDENTIAL_INVALID",
+      "phase": "T1",
+      "test": "TestVector_ASSESSMENT_VERSION_NOT_ALLOWLISTED"
+    },
+    {
+      "id": "CREDENTIAL_ID_HELD_AFTER_REJECTED",
+      "input": { "candidate_status": "REJECTED", "reuse_credential_id": true },
+      "expect": "REJECT_81_INDEX_NOT_RELEASED_D-A",
+      "phase": "T1",
+      "test": "TestVector_CREDENTIAL_ID_HELD_AFTER_REJECTED"
     },
     {
       "id": "CHALLENGE_OPEN_ACCESS_OPEN_NO_DEPOSIT",
       "input": { "challenge_open_access": "open" },
       "expect": "ACCEPT_OPEN_DEPOSIT_EMPTY",
-      "phase": "T1"
+      "phase": "T1",
+      "test": "TestVector_CHALLENGE_OPEN_ACCESS_OPEN_NO_DEPOSIT"
     },
     {
       "id": "CHALLENGE_OPEN_ACCESS_NONE_REJECTED",
       "input": { "challenge_open_access": "none" },
       "expect": "REJECT_UNAUTHORIZED",
-      "phase": "T1"
+      "phase": "T1",
+      "test": "TestVector_CHALLENGE_OPEN_ACCESS_NONE_REJECTED"
     },
     {
       "id": "CHALLENGE_DEPOSIT_UPHELD_REFUND",
       "input": { "challenge_open_access": "deposit", "outcome": "UPHELD" },
       "expect": "DEPOSIT_REFUNDED_TO_CHALLENGER",
-      "phase": "T1"
+      "phase": "T1",
+      "test": "TestVector_CHALLENGE_DEPOSIT_UPHELD_REFUND"
     },
     {
       "id": "CHALLENGE_DEPOSIT_DISMISSED_TO_POOL",
       "input": { "challenge_open_access": "deposit", "outcome": "DISMISSED" },
       "expect": "DEPOSIT_SLASHED_INTO_ENTITLEMENT_POOL_FUNDED_AVAILABLE",
-      "phase": "T1"
+      "phase": "T1",
+      "test": "TestVector_CHALLENGE_DEPOSIT_DISMISSED_TO_POOL"
     },
     {
       "id": "GLOBAL_PUBLISHER_REVOKED_REQUIRES_BOUND_KEY",
       "input": { "credential_required": true, "global_publisher": "REVOKED", "bound_key_with_credential": true },
       "expect": "ACCEPT_ONLY_BOUND_PATH",
-      "phase": "T4"
+      "phase": "T4",
+      "test": null
     },
     {
       "id": "CREDENTIAL_REQUIRED_GLOBAL_KEY_WITHOUT_CREDENTIAL",
       "input": { "credential_required": true, "publisher_key_global": true, "credential": null },
       "expect": "REJECT_80",
-      "phase": "T4"
+      "phase": "T4",
+      "test": null
     }
   ]
 }

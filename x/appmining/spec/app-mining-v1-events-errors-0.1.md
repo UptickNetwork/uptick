@@ -15,6 +15,8 @@
 | `entitlement_pool_paused` | `MsgSetEntitlementPoolPaused` | `pool_id`, `status` |
 | `role_key_registered` | `MsgRegisterRoleKey` / embedded publisher | `role`, `key_id`, `version`, `app_id` (64-hex; empty=global), `app_id_display` |
 | `role_key_status_changed` | `MsgSetRoleKeyStatus` | `role`, `key_id`, `old_status`, `new_status` |
+| `assessment_signer_registered` | `MsgRegisterAssessmentSigner` | `authority`, `key_id`, `version`, `height` |
+| `assessment_signer_status_changed` | `MsgSetAssessmentSignerStatus` | `authority`, `key_id`, `old_status`, `new_status`, `height` |
 | `candidate_published` | `MsgPublishCandidate` | §6.1 + `action=publish` |
 | `entitlement_challenge_opened` | `MsgOpenChallenge` | §6.1 + `action=open_challenge` + `challenge_id`, `challenger` |
 | `entitlement_challenge_resolved` | `MsgResolveEntitlementChallenge` | §6.1 + `action=resolve` + `challenge_id`, challenge `status` |

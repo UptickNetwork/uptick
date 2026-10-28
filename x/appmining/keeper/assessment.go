@@ -11,6 +11,8 @@ import (
 
 // verifyAssessmentCredential validates an AssessmentCredential against the
 // published candidate fields and assessment-signer registry (T1b / R3).
+// credential_id is permanently one-shot per pool: HasCredentialID remains true
+// after candidate REJECTED (D-A final semantics; not a transitional T1 rule).
 // Returns the credential_id on success.
 func (k Keeper) verifyAssessmentCredential(
 	ctx sdk.Context,

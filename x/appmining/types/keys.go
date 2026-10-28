@@ -189,7 +189,8 @@ func AssessmentSignerKey(keyID string) []byte {
 	return append(append([]byte{}, KeyPrefixAssessmentSigner...), []byte(keyID)...)
 }
 
-// CredentialIndexKey maps credential_id -> entitlement_id (permanent).
+// CredentialIndexKey maps credential_id -> entitlement_id.
+// Permanent one-shot (D-A): entries are never released after REJECTED.
 func CredentialIndexKey(credentialID string) []byte {
 	return append(append([]byte{}, KeyPrefixCredentialIndex...), []byte(credentialID)...)
 }

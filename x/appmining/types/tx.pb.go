@@ -3554,6 +3554,10 @@ type MsgServer interface {
 	RegisterRoleKey(context.Context, *MsgRegisterRoleKey) (*MsgRegisterRoleKeyResponse, error)
 	// SetRoleKeyStatus handles the corresponding module request.
 	SetRoleKeyStatus(context.Context, *MsgSetRoleKeyStatus) (*MsgSetRoleKeyStatusResponse, error)
+	// RegisterAssessmentSigner registers an assessment credential Ed25519 pubkey (authority).
+	RegisterAssessmentSigner(context.Context, *MsgRegisterAssessmentSigner) (*MsgRegisterAssessmentSignerResponse, error)
+	// SetAssessmentSignerStatus pauses or revokes an assessment signer (authority).
+	SetAssessmentSignerStatus(context.Context, *MsgSetAssessmentSignerStatus) (*MsgSetAssessmentSignerStatusResponse, error)
 	// PublishCandidate publishes an immutable V1 candidate commitment (no pool lock).
 	PublishCandidate(context.Context, *MsgPublishCandidate) (*MsgPublishCandidateResponse, error)
 	// OpenChallenge is the V1 entitlement challenge opener (attestation uses ChallengeAttestation).
@@ -3630,6 +3634,12 @@ func (*UnimplementedMsgServer) RegisterRoleKey(ctx context.Context, req *MsgRegi
 }
 func (*UnimplementedMsgServer) SetRoleKeyStatus(ctx context.Context, req *MsgSetRoleKeyStatus) (*MsgSetRoleKeyStatusResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SetRoleKeyStatus not implemented")
+}
+func (*UnimplementedMsgServer) RegisterAssessmentSigner(ctx context.Context, req *MsgRegisterAssessmentSigner) (*MsgRegisterAssessmentSignerResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RegisterAssessmentSigner not implemented")
+}
+func (*UnimplementedMsgServer) SetAssessmentSignerStatus(ctx context.Context, req *MsgSetAssessmentSignerStatus) (*MsgSetAssessmentSignerStatusResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SetAssessmentSignerStatus not implemented")
 }
 func (*UnimplementedMsgServer) PublishCandidate(ctx context.Context, req *MsgPublishCandidate) (*MsgPublishCandidateResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PublishCandidate not implemented")

@@ -427,6 +427,8 @@ func (k Keeper) IterateAssessmentSigners(ctx sdk.Context, fn func(types.Assessme
 	}
 }
 
+// HasCredentialID reports whether credential_id was consumed. Index entries are
+// never deleted — including after candidate REJECTED (D-A permanent one-shot).
 func (k Keeper) HasCredentialID(ctx sdk.Context, credentialID string) bool {
 	return k.store(ctx).Has(types.CredentialIndexKey(credentialID))
 }

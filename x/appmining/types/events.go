@@ -53,6 +53,8 @@ const (
 	EventTypeEntitlementPoolPaused        = "entitlement_pool_paused"
 	EventTypeRoleKeyRegistered            = "role_key_registered"
 	EventTypeRoleKeyStatusChanged         = "role_key_status_changed"
+	EventTypeAssessmentSignerRegistered   = "assessment_signer_registered"
+	EventTypeAssessmentSignerStatusChanged = "assessment_signer_status_changed"
 	EventTypeCandidatePublished           = "candidate_published"
 	EventTypeEntitlementChallengeOpened   = "entitlement_challenge_opened"
 	EventTypeEntitlementChallengeResolved = "entitlement_challenge_resolved"
