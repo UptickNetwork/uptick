@@ -353,6 +353,8 @@ var (
 	_ sdk.Msg = &MsgSetEntitlementPoolPaused{}
 	_ sdk.Msg = &MsgRegisterRoleKey{}
 	_ sdk.Msg = &MsgSetRoleKeyStatus{}
+	_ sdk.Msg = &MsgRegisterAssessmentSigner{}
+	_ sdk.Msg = &MsgSetAssessmentSignerStatus{}
 	_ sdk.Msg = &MsgPublishCandidate{}
 	_ sdk.Msg = &MsgOpenChallenge{}
 	_ sdk.Msg = &MsgResolveEntitlementChallenge{}
@@ -466,6 +468,42 @@ func (m *MsgSetRoleKeyStatus) ValidateBasic() error {
 }
 
 func (m *MsgSetRoleKeyStatus) GetSigners() []sdk.AccAddress {
+	addr, _ := sdk.AccAddressFromBech32(m.Authority)
+	return []sdk.AccAddress{addr}
+}
+
+func (m *MsgRegisterAssessmentSigner) ValidateBasic() error {
+	if err := validateSigner(m.Authority); err != nil {
+		return err
+	}
+	if err := ValidateAssessmentSignerKeyID(m.KeyId); err != nil {
+		return err
+	}
+	if err := ValidateEd25519PubKey(m.Pubkey); err != nil {
+		return sdkerrors.Wrap(ErrInvalidCommitment, "pubkey must be 32-byte Ed25519")
+	}
+	return nil
+}
+
+func (m *MsgRegisterAssessmentSigner) GetSigners() []sdk.AccAddress {
+	addr, _ := sdk.AccAddressFromBech32(m.Authority)
+	return []sdk.AccAddress{addr}
+}
+
+func (m *MsgSetAssessmentSignerStatus) ValidateBasic() error {
+	if err := validateSigner(m.Authority); err != nil {
+		return err
+	}
+	if err := ValidateAssessmentSignerKeyID(m.KeyId); err != nil {
+		return err
+	}
+	if m.Status == RoleKeyStatusUnspecified {
+		return sdkerrors.Wrap(ErrInvalidRoleKeyStatus, "status unspecified")
+	}
+	return nil
+}
+
+func (m *MsgSetAssessmentSignerStatus) GetSigners() []sdk.AccAddress {
 	addr, _ := sdk.AccAddressFromBech32(m.Authority)
 	return []sdk.AccAddress{addr}
 }

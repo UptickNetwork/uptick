@@ -75,6 +75,14 @@ service Msg {
   rpc SetRoleKeyStatus(MsgSetRoleKeyStatus) returns (MsgSetRoleKeyStatusResponse) {
     option (google.api.http).post = "/uptick/appmining/v1/tx/set_role_key_status";
   }
+  // RegisterAssessmentSigner registers an assessment credential Ed25519 pubkey (authority).
+  rpc RegisterAssessmentSigner(MsgRegisterAssessmentSigner) returns (MsgRegisterAssessmentSignerResponse) {
+    option (google.api.http).post = "/uptick/appmining/v1/tx/register_assessment_signer";
+  }
+  // SetAssessmentSignerStatus pauses or revokes an assessment signer (authority).
+  rpc SetAssessmentSignerStatus(MsgSetAssessmentSignerStatus) returns (MsgSetAssessmentSignerStatusResponse) {
+    option (google.api.http).post = "/uptick/appmining/v1/tx/set_assessment_signer_status";
+  }
 
   // PublishCandidate publishes an immutable V1 candidate commitment (no pool lock).
   rpc PublishCandidate(MsgPublishCandidate) returns (MsgPublishCandidateResponse) {
@@ -339,6 +347,29 @@ message MsgSetRoleKeyStatus {
 
 // MsgSetRoleKeyStatusResponse is the request/response type for the module API.
 message MsgSetRoleKeyStatusResponse {}
+
+// MsgRegisterAssessmentSigner registers or rotates an assessment Ed25519 pubkey (authority).
+message MsgRegisterAssessmentSigner {
+  option (cosmos.msg.v1.signer) = "authority";
+  string authority = 1;
+  string key_id = 2;
+  bytes pubkey = 3; // raw Ed25519, 32 bytes
+  uint64 version = 4;
+}
+
+// MsgRegisterAssessmentSignerResponse is the request/response type for the module API.
+message MsgRegisterAssessmentSignerResponse {}
+
+// MsgSetAssessmentSignerStatus pauses or revokes an assessment signer (authority).
+message MsgSetAssessmentSignerStatus {
+  option (cosmos.msg.v1.signer) = "authority";
+  string authority = 1;
+  string key_id = 2;
+  RoleKeyStatus status = 3; // ACTIVE | PAUSED | REVOKED
+}
+
+// MsgSetAssessmentSignerStatusResponse is the request/response type for the module API.
+message MsgSetAssessmentSignerStatusResponse {}
 
 // MsgPublishCandidate publishes an immutable candidate commitment (no lock).
 message MsgPublishCandidate {
