@@ -1,0 +1,86 @@
+{
+  "schema_version": "uge-appmining-v1-wire-secp256k1-golden-1.0",
+  "generated_at": "2026-10-28T11:35:11.462Z",
+  "generated_by": "UGE scripts/gen-secp256k1-wire-golden-vectors.mjs (sdk/javascript/appmining-v1-wire.mjs authorizationBytes + @noble/curves)",
+  "requirement": "DEC-10 / REQ-D scheme 1 (UPTICK-UGE-CHAIN-ACTION-REQUESTS-0.2.md)",
+  "fixed_test_private_key_hex": "4646464646464646464646464646464646464646464646464646464646464646",
+  "fixed_test_address": "0x9d8a62f656a8d1615c1294fd71e9cfb3e4855a4f",
+  "chain_verify_reference": "x/appmining/types/wirev1.VerifyAuthorizationSecp256k1",
+  "vectors": [
+    {
+      "name": "publish_low_s_v27_v28_canonical",
+      "expect": "ok",
+      "record": {
+        "protocol_version": "1",
+        "operation": "PUBLISH",
+        "role": "publisher",
+        "chain_id": "uptick_7777-1",
+        "pool_id": "uge-golden-pool-1",
+        "key_id": "pub-mm-golden-1",
+        "nonce": "1",
+        "expires_at": "1793273711",
+        "entitlement_id": "6350ada1b52a1fb5663d2dee1ebd689d7e519ac63d9ab215397f50940574e029",
+        "app_id": "1a61586dd391bb0739962574b06582cb008e52e8b8fac1ec92ead23a478682b5",
+        "candidate_hash": "cbb19df073b6b8a620a2609707e412364eef7d4e13dfb84935d9645865e2c7d6",
+        "rule_version": "pav-0.1"
+      },
+      "frame_sha256": "db738acbc19329f3fa2686b4b47b5b5557b3049c5feb32a75fe7e60ae75a88f6",
+      "frame_len": 478,
+      "signature_base64": "ULv6A5x9vkUslQ8fwYGSJhA0Ba4vEza2g6b9h1/cDmdXPM+BTp8ElpmEY678fbi4gSX3GwJu8XHnn63HvwwvTxw=",
+      "signature_len": 65,
+      "v": 28,
+      "expected_address": "0x9d8a62f656a8d1615c1294fd71e9cfb3e4855a4f",
+      "note": "RoleKeyTypeSecp256k1EvmAddress (1); EIP-191 personal_sign over UGE-APP-MINING-WIRE-V1 frame bytes; low-s enforced; v in {27,28}"
+    },
+    {
+      "name": "publish_high_s_rejected",
+      "expect": "high_s",
+      "is_high_s_confirmed": true,
+      "record": {
+        "protocol_version": "1",
+        "operation": "PUBLISH",
+        "role": "publisher",
+        "chain_id": "uptick_7777-1",
+        "pool_id": "uge-golden-pool-1",
+        "key_id": "pub-mm-golden-2",
+        "nonce": "2",
+        "expires_at": "1793273711",
+        "entitlement_id": "53539769b7bcc8206450eac4756e8245d40a4572bab9d8bf9cb94bb5448b02b9",
+        "app_id": "864ad4633e7551bd47e25d6e8ab9a4758529ac210dc6fe1b640aa2d1aaf5e76a",
+        "candidate_hash": "51b49d99c260674146e71528cf8ae45d08008bbbd7ea54bb7ef67865ef7a7906",
+        "rule_version": "pav-0.1"
+      },
+      "frame_sha256": "13bd6bc7c09b43a88c36d2eb5e5653c4d1711d590034747b2b95533525fb1214",
+      "frame_len": 478,
+      "signature_base64": "gn7cH3MCiNF/PGoEuItBwsxd20EmS+80nWpBih5/m7yNS6B2vS5a0O0WdYecAlXGbWLlggIsA/QzhMmfPlw8jhw=",
+      "signature_len": 65,
+      "v": 28,
+      "expected_address": "0x9d8a62f656a8d1615c1294fd71e9cfb3e4855a4f",
+      "note": "negative vector: s > n/2 must yield ErrWireProofHighS (85)"
+    },
+    {
+      "name": "publish_sig_length_64_rejected",
+      "expect": "sig_length",
+      "record": {
+        "protocol_version": "1",
+        "operation": "PUBLISH",
+        "role": "publisher",
+        "chain_id": "uptick_7777-1",
+        "pool_id": "uge-golden-pool-1",
+        "key_id": "pub-mm-golden-3",
+        "nonce": "3",
+        "expires_at": "1793273711",
+        "entitlement_id": "e53bc43d112d71807b49471023d27e0104b03ba0a3a5bead805c33ef7c4f8d5b",
+        "app_id": "9274fcd0f4ec763939e080d598475ac07dbe1fbc3f229eaec1caf228938636a7",
+        "candidate_hash": "4e84aee151e0ef6b2efb0f4e9b0c07f32709bb50590bb46c16d28d25e16a3156",
+        "rule_version": "pav-0.1"
+      },
+      "frame_sha256": "01820b38ce1630f0ca34af11b1236911f67cdad17dff2b560fdb5cdf8be8abf5",
+      "frame_len": 478,
+      "signature_base64": "6jZYk0MnekSs5FMljS1IejR29b6O9o3wBYsdTpdxCRc+kTyt0TvTRkUd/+CC6eKBJOFtGagYIm0jVzENsjLVow==",
+      "signature_len": 64,
+      "expected_address": "0x9d8a62f656a8d1615c1294fd71e9cfb3e4855a4f",
+      "note": "negative vector: 64B (Ed25519-shaped) signature on type-1 key must yield ErrWireProofSigLength (82)"
+    }
+  ]
+}
