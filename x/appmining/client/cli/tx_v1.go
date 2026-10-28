@@ -106,8 +106,8 @@ func CmdSetEntitlementPoolPaused() *cobra.Command {
 
 func CmdRegisterRoleKey() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "register-role-key [role] [key-id] [pubkey-hex] [version]",
-		Short: "Register a V1 Ed25519 role key (authority). role=publisher|approver|reviewer|risk|audit",
+		Use:   "register-role-key [role] [key-id] [pubkey-or-address-hex] [version]",
+		Short: "Register a V1 role key (authority). role=publisher|approver|reviewer|risk|audit. Use --key-type secp256k1-evm for publisher MetaMask address (20B).",
 		Args:  cobra.ExactArgs(4),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clientCtx, err := client.GetClientTxContext(cmd)
@@ -118,9 +118,14 @@ func CmdRegisterRoleKey() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			pk, err := hex.DecodeString(args[2])
+			keyType, err := parseRoleKeyTypeFlag(cmd)
 			if err != nil {
-				return fmt.Errorf("pubkey-hex: %w", err)
+				return err
+			}
+			raw := strings.TrimPrefix(strings.ToLower(strings.TrimSpace(args[2])), "0x")
+			pk, err := hex.DecodeString(raw)
+			if err != nil {
+				return fmt.Errorf("pubkey/address-hex: %w", err)
 			}
 			ver, err := strconv.ParseUint(args[3], 10, 64)
 			if err != nil {
@@ -132,6 +137,7 @@ func CmdRegisterRoleKey() *cobra.Command {
 				KeyId:     args[1],
 				Pubkey:    pk,
 				Version:   ver,
+				KeyType:   keyType,
 			}
 			if appHex, _ := cmd.Flags().GetString("app-id-hex"); appHex != "" {
 				appID, err := hex.DecodeString(appHex)
@@ -144,6 +150,7 @@ func CmdRegisterRoleKey() *cobra.Command {
 		},
 	}
 	cmd.Flags().String("app-id-hex", "", "optional 32-byte app binding (hex); empty = global key")
+	cmd.Flags().String("key-type", "ed25519", "ed25519 | secp256k1-evm (publisher only; pubkey arg = 20-byte address hex)")
 	flags.AddTxFlagsToCmd(cmd)
 	return cmd
 }
@@ -284,5 +291,17 @@ func parseRoleKeyStatus(s string) (types.RoleKeyStatus, error) {
 		return types.RoleKeyStatusRevoked, nil
 	default:
 		return types.RoleKeyStatusUnspecified, fmt.Errorf("status must be active|paused|revoked")
+	}
+}
+
+func parseRoleKeyTypeFlag(cmd *cobra.Command) (types.RoleKeyType, error) {
+	s, _ := cmd.Flags().GetString("key-type")
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "", "ed25519", "0":
+		return types.RoleKeyTypeEd25519, nil
+	case "secp256k1-evm", "secp256k1_evm_address", "1":
+		return types.RoleKeyTypeSecp256k1EvmAddress, nil
+	default:
+		return types.RoleKeyTypeEd25519, fmt.Errorf("key-type must be ed25519|secp256k1-evm")
 	}
 }

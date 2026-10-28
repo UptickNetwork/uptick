@@ -215,8 +215,8 @@ func validateV1Genesis(gs GenesisState) error {
 		if rk.KeyId == "" || len(rk.KeyId) > 128 {
 			return fmt.Errorf("role key id %q invalid", rk.KeyId)
 		}
-		if err := ValidateEd25519PubKey(rk.Pubkey); err != nil {
-			return fmt.Errorf("role key %q pubkey: %w", rk.KeyId, err)
+		if err := ValidateRoleKeyMaterial(rk.Role, rk.KeyType, rk.Pubkey); err != nil {
+			return fmt.Errorf("role key %q material: %w", rk.KeyId, err)
 		}
 		if len(rk.AppId) > 0 {
 			if err := ValidateAppID(rk.AppId); err != nil {

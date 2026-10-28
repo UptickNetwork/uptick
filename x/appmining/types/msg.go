@@ -435,8 +435,17 @@ func (m *MsgRegisterRoleKey) ValidateBasic() error {
 	if err := ValidateWireID(m.KeyId); err != nil {
 		return sdkerrors.Wrap(ErrInvalidWireID, "key_id")
 	}
-	if err := ValidateEd25519PubKey(m.Pubkey); err != nil {
-		return sdkerrors.Wrap(ErrInvalidCommitment, "pubkey must be 32-byte Ed25519")
+	material := m.Pubkey
+	if m.KeyType == RoleKeyTypeSecp256k1EvmAddress {
+		norm, err := NormalizeEvmAddressInput(m.Pubkey)
+		if err != nil {
+			return sdkerrors.Wrap(ErrInvalidCommitment, "evm address must be 20 bytes or 40-hex")
+		}
+		m.Pubkey = norm
+		material = norm
+	}
+	if err := ValidateRoleKeyMaterial(m.Role, m.KeyType, material); err != nil {
+		return err
 	}
 	if len(m.AppId) > 0 {
 		if err := ValidateAppID(m.AppId); err != nil {

@@ -58,6 +58,7 @@ func (k msgServer) RegisterApplication(goCtx context.Context, msg *types.MsgRegi
 		if err := k.persistActiveRoleKey(
 			ctx, msg.Authority, types.EntitlementRolePublisher,
 			msg.PublisherKeyId, msg.PublisherPubkey, 1, msg.AppId,
+			types.RoleKeyTypeEd25519,
 		); err != nil {
 			return nil, err
 		}

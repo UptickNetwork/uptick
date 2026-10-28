@@ -66,6 +66,7 @@ const (
 	AttributeKeyChainID   = "chain_id"
 	AttributeKeyPoolID    = "pool_id"
 	AttributeKeyKeyID     = "key_id"
+	AttributeKeyKeyType   = "key_type"
 	AttributeKeyRole      = "role"
 	AttributeKeyVersion   = "version"
 	AttributeKeyFunded    = "funded"

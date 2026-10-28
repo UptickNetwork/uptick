@@ -223,6 +223,19 @@ enum RoleKeyStatus {
   ROLE_KEY_STATUS_REVOKED = 3 [(gogoproto.enumvalue_customname) = "RoleKeyStatusRevoked"];
 }
 
+// RoleKeyType selects WireProof verification scheme (UGE DEC-10 / REQ-D).
+// Default 0 preserves all existing Ed25519 keys (zero migration).
+enum RoleKeyType {
+  option (gogoproto.goproto_enum_prefix) = false;
+
+  // ROLE_KEY_TYPE_ED25519: pubkey = raw 32-byte Ed25519 public key; sig = 64 bytes.
+  ROLE_KEY_TYPE_ED25519 = 0 [(gogoproto.enumvalue_customname) = "RoleKeyTypeEd25519"];
+  // ROLE_KEY_TYPE_SECP256K1_EVM_ADDRESS: pubkey = raw 20-byte EVM address;
+  // signature = EIP-191 personal_sign over wire frame (65 bytes r||s||v, v in {27,28}).
+  // Publisher + PUBLISH only.
+  ROLE_KEY_TYPE_SECP256K1_EVM_ADDRESS = 1 [(gogoproto.enumvalue_customname) = "RoleKeyTypeSecp256k1EvmAddress"];
+}
+
 // Pool is the fixed entitlement fund ledger.
 // Invariant: funded = available + reserved + paid;
 // module account balance for denom covers sum(available+reserved) across all pools of that denom.
@@ -237,11 +250,11 @@ message Pool {
   uint64 version = 8;
 }
 
-// RoleKey is a versioned Ed25519 public key for one UGE role.
+// RoleKey is a versioned role authorization key for one UGE role.
 message RoleKey {
   EntitlementRole role = 1;
   string key_id = 2;
-  // raw Ed25519 public key, exactly 32 bytes
+  // key material: 32B Ed25519 pubkey (type 0) or 20B EVM address (type 1).
   bytes pubkey = 3;
   RoleKeyStatus status = 4;
   uint64 version = 5;
@@ -249,9 +262,12 @@ message RoleKey {
   // optional app binding (UGE publisher-binding R1): empty = global key;
   // non-empty = exactly AppIDLength (32) bytes and must match a registered app.
   bytes app_id = 7;
+  // WireProof scheme (UGE DEC-10). Default 0 = Ed25519.
+  RoleKeyType key_type = 8;
 }
 
-// WireProof is the Ed25519 domain-separated authorization attached to V1 msgs.
+// WireProof is the domain-separated authorization attached to V1 msgs.
+// Signature scheme is inferred from the registered RoleKey.key_type (no scheme field).
 message WireProof {
   string key_id = 1;
   string nonce = 2;

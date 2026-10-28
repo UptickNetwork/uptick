@@ -98,6 +98,10 @@ entitlement_challenge_opened.entitlement_id='<64-lowercase-hex>'
 | 79 | `ErrRoleKeyAppMismatch` | role key app_id does not match message app_id | R1：ACTIVE 键绑定了 app，但与 MsgPublishCandidate.app_id 不一致 |
 | 80 | `ErrAssessmentCredentialInvalid` | assessment credential invalid | R3：签名/字段/过期/版本白名单失败；绑定键缺凭证 |
 | 81 | `ErrAssessmentCredentialReuse` | assessment credential_id already used | R3：credential_id 复用（REJECTED 亦不释放） |
+| 82 | `ErrWireProofSigLength` | wire proof signature length mismatches key type | DEC-10：签名长度 / v 与 key_type 不符 |
+| 83 | `ErrRoleKeyTypeUnsupported` | role key type unsupported for role or operation | DEC-10：非 publisher 使用类型 1 等 |
+| 84 | `ErrWireProofRecoverMismatch` | wire proof recovered address mismatch | DEC-10：ecrecover 地址不匹配 |
+| 85 | `ErrWireProofHighS` | wire proof secp256k1 signature high-s | DEC-10：非 low-s |
 | 2 | `ErrUnauthorized` | unauthorized | 签名篡改、金额与候选不一致等（E-1 / UNAUTHORIZED_AMOUNT） |
 | 11 | `ErrChallengeWindow` | challenge window not elapsed | Approve 早于 604800s（E-6） |
 

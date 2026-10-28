@@ -122,15 +122,15 @@ func (k msgServer) RegisterRoleKey(goCtx context.Context, msg *types.MsgRegister
 	if msg.Authority != params.Authority {
 		return nil, types.ErrUnauthorized
 	}
-	if err := k.persistActiveRoleKey(ctx, msg.Authority, msg.Role, msg.KeyId, msg.Pubkey, msg.Version, msg.AppId); err != nil {
+	if err := k.persistActiveRoleKey(ctx, msg.Authority, msg.Role, msg.KeyId, msg.Pubkey, msg.Version, msg.AppId, msg.KeyType); err != nil {
 		return nil, err
 	}
 	return &types.MsgRegisterRoleKeyResponse{}, nil
 }
 
-// persistActiveRoleKey registers or re-activates an Ed25519 role key.
+// persistActiveRoleKey registers or re-activates a role authorization key.
 // appID empty = global; non-empty must be 32B and reference a registered app (R1).
-// Idempotent when the same (role, key_id, pubkey, app_id) is already ACTIVE.
+// Idempotent when the same (role, key_id, pubkey, app_id, key_type) is already ACTIVE.
 func (k msgServer) persistActiveRoleKey(
 	ctx sdk.Context,
 	authority string,
@@ -139,7 +139,11 @@ func (k msgServer) persistActiveRoleKey(
 	pubkey []byte,
 	version uint64,
 	appID []byte,
+	keyType types.RoleKeyType,
 ) error {
+	if err := types.ValidateRoleKeyMaterial(role, keyType, pubkey); err != nil {
+		return err
+	}
 	if len(appID) > 0 {
 		if err := types.ValidateAppID(appID); err != nil {
 			return err
@@ -152,11 +156,12 @@ func (k msgServer) persistActiveRoleKey(
 		switch {
 		case bytes.Equal(existing.Pubkey, pubkey) &&
 			bytes.Equal(existing.AppId, appID) &&
+			existing.KeyType == keyType &&
 			existing.Status == types.RoleKeyStatusActive:
 			return nil // idempotent
 		case existing.Status == types.RoleKeyStatusRevoked:
 			// re-register allowed after revoke
-		case !bytes.Equal(existing.Pubkey, pubkey) || !bytes.Equal(existing.AppId, appID):
+		case !bytes.Equal(existing.Pubkey, pubkey) || !bytes.Equal(existing.AppId, appID) || existing.KeyType != keyType:
 			return types.ErrRoleKeyConflict
 		}
 	}
@@ -174,12 +179,14 @@ func (k msgServer) persistActiveRoleKey(
 		Version:          version,
 		RegisteredHeight: ctx.BlockHeight(),
 		AppId:            append([]byte(nil), appID...),
+		KeyType:          keyType,
 	}
 	k.SetRoleKey(ctx, rk)
 	attrs := []sdk.Attribute{
 		sdk.NewAttribute(types.AttributeKeyAuthority, authority),
 		sdk.NewAttribute(types.AttributeKeyRole, role.String()),
 		sdk.NewAttribute(types.AttributeKeyKeyID, keyID),
+		sdk.NewAttribute(types.AttributeKeyKeyType, keyType.String()),
 		sdk.NewAttribute(types.AttributeKeyVersion, strconv.FormatUint(version, 10)),
 		sdk.NewAttribute(types.AttributeKeyHeight, strconv.FormatInt(ctx.BlockHeight(), 10)),
 		sdk.NewAttribute(types.AttributeKeyAppID, hex.EncodeToString(appID)),

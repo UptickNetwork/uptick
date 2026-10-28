@@ -39,6 +39,9 @@ Ref: https://keepachangelog.com/en/1.0.0/
 
 ### Features
 
+* (appmining) DEC-10 / REQ-D: publisher `RoleKeyType` secp256k1 EVM-address keys with
+  EIP-191 personal_sign WireProof verify (errors 82–85); Ed25519 default unchanged.
+
 * (appmining) Publisher-binding T1a (R1/R2): optional `RoleKey.app_id` / `MsgRegisterRoleKey.app_id`,
   embedded publisher on `MsgRegisterApplication`, PublishCandidate app-bound key check (error 79
   `ErrRoleKeyAppMismatch`), `QueryRoles` app filter, and params placeholders

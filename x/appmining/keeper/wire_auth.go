@@ -46,8 +46,29 @@ func (k Keeper) verifyAndConsumeWireAuth(
 	if k.HasAuthNonce(ctx, role, proof.KeyId, proof.Nonce) {
 		return types.ErrAuthReplay
 	}
-	if !wirev1.VerifyAuthorization(record, proof.SignatureBase64, rk.Pubkey) {
-		return types.ErrUnauthorized
+	switch rk.KeyType {
+	case types.RoleKeyTypeEd25519:
+		if !wirev1.VerifyAuthorization(record, proof.SignatureBase64, rk.Pubkey) {
+			return types.ErrUnauthorized
+		}
+	case types.RoleKeyTypeSecp256k1EvmAddress:
+		if role != types.EntitlementRolePublisher || record["operation"] != "PUBLISH" {
+			return types.ErrRoleKeyTypeUnsupported
+		}
+		switch wirev1.VerifyAuthorizationSecp256k1(record, proof.SignatureBase64, rk.Pubkey) {
+		case "":
+			// ok
+		case "sig_length":
+			return types.ErrWireProofSigLength
+		case "high_s":
+			return types.ErrWireProofHighS
+		case "mismatch", "recover":
+			return types.ErrWireProofRecoverMismatch
+		default:
+			return types.ErrUnauthorized
+		}
+	default:
+		return types.ErrRoleKeyTypeUnsupported
 	}
 	k.SetAuthNonce(ctx, role, proof.KeyId, proof.Nonce)
 	return nil

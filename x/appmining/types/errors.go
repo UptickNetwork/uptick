@@ -94,4 +94,12 @@ var (
 	// ErrAssessmentCredentialReuse (81): credential_id already bound to an entitlement
 	// (never released on REJECTED).
 	ErrAssessmentCredentialReuse = sdkerrors.Register(ModuleName, 81, "assessment credential_id already used")
+	// ErrWireProofSigLength (82): WireProof signature length mismatches RoleKey.key_type (UGE DEC-10).
+	ErrWireProofSigLength = sdkerrors.Register(ModuleName, 82, "wire proof signature length mismatches key type")
+	// ErrRoleKeyTypeUnsupported (83): key_type not allowed for this role/operation (UGE DEC-10).
+	ErrRoleKeyTypeUnsupported = sdkerrors.Register(ModuleName, 83, "role key type unsupported for role or operation")
+	// ErrWireProofRecoverMismatch (84): ecrecover address != registered EVM address (UGE DEC-10).
+	ErrWireProofRecoverMismatch = sdkerrors.Register(ModuleName, 84, "wire proof recovered address mismatch")
+	// ErrWireProofHighS (85): secp256k1 signature s is not low-s (UGE DEC-10 / EIP-2).
+	ErrWireProofHighS = sdkerrors.Register(ModuleName, 85, "wire proof secp256k1 signature high-s")
 )

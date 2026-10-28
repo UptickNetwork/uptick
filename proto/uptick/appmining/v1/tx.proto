@@ -320,17 +320,20 @@ message MsgSetEntitlementPoolPaused {
 // MsgSetEntitlementPoolPausedResponse is the request/response type for the module API.
 message MsgSetEntitlementPoolPausedResponse {}
 
-// MsgRegisterRoleKey registers or rotates an Ed25519 role public key.
-// Same (role, key_id) with identical pubkey is idempotent; conflicting pubkey rejected.
+// MsgRegisterRoleKey registers or rotates a role authorization key.
+// Same (role, key_id) with identical pubkey+key_type is idempotent; conflicting material rejected.
 message MsgRegisterRoleKey {
   option (cosmos.msg.v1.signer) = "authority";
   string authority = 1;
   EntitlementRole role = 2;
   string key_id = 3;
-  bytes pubkey = 4; // raw Ed25519, 32 bytes
+  // type 0: raw Ed25519 32 bytes; type 1: raw EVM address 20 bytes.
+  bytes pubkey = 4;
   uint64 version = 5;
   // optional app binding (UGE R1): empty = global; else exactly 32 bytes of a registered app.
   bytes app_id = 6;
+  // UGE DEC-10: default 0 = Ed25519; 1 = secp256k1 EVM address (publisher only).
+  RoleKeyType key_type = 7;
 }
 
 // MsgRegisterRoleKeyResponse is the request/response type for the module API.
