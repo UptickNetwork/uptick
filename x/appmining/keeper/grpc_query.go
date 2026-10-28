@@ -1,6 +1,7 @@
 package keeper
 
 import (
+	"bytes"
 	"context"
 
 	"cosmossdk.io/store/prefix"
@@ -304,10 +305,17 @@ func (k Keeper) Roles(goCtx context.Context, req *types.QueryRolesRequest) (*typ
 		roles = []types.EntitlementRole{req.Role}
 	}
 	var keys []types.RoleKey
+	filterApp := len(req.AppId) > 0
 	for _, role := range roles {
 		k.IterateRoleKeys(ctx, role, func(rk types.RoleKey) bool {
 			if req.Status != types.RoleKeyStatusUnspecified && rk.Status != req.Status {
 				return true
+			}
+			// When app_id is set, return bound keys only (exact match).
+			if filterApp {
+				if len(rk.AppId) == 0 || !bytes.Equal(rk.AppId, req.AppId) {
+					return true
+				}
 			}
 			keys = append(keys, rk)
 			return true

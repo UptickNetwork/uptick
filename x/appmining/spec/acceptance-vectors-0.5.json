@@ -1,0 +1,74 @@
+{
+  "schema_version": "uptick-appmining-settlement-acceptance-vectors-0.5",
+  "extends": "uptick-appmining-settlement-acceptance-vectors-0.4",
+  "generated": "2026-10-28",
+  "interface": "uptick.appmining.v1",
+  "change_note": "0.5 骨架（UGE publisher-binding R5）。T1 默认配置下 0.4 全绿且下列 T1 过渡期 case 通过；T4（credential_required=true + 全局 publisher REVOKED）要求 0.5 全绿。",
+  "t1_defaults": {
+    "credential_required": false,
+    "challenge_open_access": "open",
+    "global_publisher_keys": "still_allowed"
+  },
+  "cases": [
+    {
+      "id": "BOUND_PUBLISHER_REQUIRES_CREDENTIAL",
+      "input": { "publisher_key_app_bound": true, "credential": null },
+      "expect": "REJECT_80_ASSESSMENT_CREDENTIAL_INVALID",
+      "phase": "T1"
+    },
+    {
+      "id": "GLOBAL_PUBLISHER_WITHOUT_CREDENTIAL_OK",
+      "input": { "publisher_key_global": true, "credential_required": false, "credential": null },
+      "expect": "ACCEPT_PUBLISH",
+      "phase": "T1"
+    },
+    {
+      "id": "ROLE_KEY_APP_MISMATCH",
+      "input": { "publisher_key_bound_to": "app_A", "msg_app_id": "app_B" },
+      "expect": "REJECT_79_ROLE_KEY_APP_MISMATCH",
+      "phase": "T1"
+    },
+    {
+      "id": "ASSESSMENT_CREDENTIAL_REUSE",
+      "input": { "same_credential_id_twice": true },
+      "expect": "REJECT_81_ASSESSMENT_CREDENTIAL_REUSE",
+      "phase": "T1"
+    },
+    {
+      "id": "CHALLENGE_OPEN_ACCESS_OPEN_NO_DEPOSIT",
+      "input": { "challenge_open_access": "open" },
+      "expect": "ACCEPT_OPEN_DEPOSIT_EMPTY",
+      "phase": "T1"
+    },
+    {
+      "id": "CHALLENGE_OPEN_ACCESS_NONE_REJECTED",
+      "input": { "challenge_open_access": "none" },
+      "expect": "REJECT_UNAUTHORIZED",
+      "phase": "T1"
+    },
+    {
+      "id": "CHALLENGE_DEPOSIT_UPHELD_REFUND",
+      "input": { "challenge_open_access": "deposit", "outcome": "UPHELD" },
+      "expect": "DEPOSIT_REFUNDED_TO_CHALLENGER",
+      "phase": "T1"
+    },
+    {
+      "id": "CHALLENGE_DEPOSIT_DISMISSED_TO_POOL",
+      "input": { "challenge_open_access": "deposit", "outcome": "DISMISSED" },
+      "expect": "DEPOSIT_SLASHED_INTO_ENTITLEMENT_POOL_FUNDED_AVAILABLE",
+      "phase": "T1"
+    },
+    {
+      "id": "GLOBAL_PUBLISHER_REVOKED_REQUIRES_BOUND_KEY",
+      "input": { "credential_required": true, "global_publisher": "REVOKED", "bound_key_with_credential": true },
+      "expect": "ACCEPT_ONLY_BOUND_PATH",
+      "phase": "T4"
+    },
+    {
+      "id": "CREDENTIAL_REQUIRED_GLOBAL_KEY_WITHOUT_CREDENTIAL",
+      "input": { "credential_required": true, "publisher_key_global": true, "credential": null },
+      "expect": "REJECT_80",
+      "phase": "T4"
+    }
+  ]
+}

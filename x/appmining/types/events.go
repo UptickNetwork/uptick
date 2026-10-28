@@ -80,4 +80,5 @@ const (
 	// challenge_resolution_hash bound a DISMISSED resolution; false for the
 	// no-challenge empty-hash path.
 	AttributeKeyResolutionBound = "resolution_bound"
+	AttributeKeyCredentialID    = "credential_id"
 )

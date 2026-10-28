@@ -85,4 +85,13 @@ var (
 	// ErrResolutionUnbound (78): non-empty challenge_resolution_hash that does
 	// not bind a DISMISSED resolution (UGE DEC-01 scheme C / approve dual-path).
 	ErrResolutionUnbound = sdkerrors.Register(ModuleName, 78, "non-empty challenge_resolution_hash is not bound to a dismissed challenge")
+	// ErrRoleKeyAppMismatch (79): ACTIVE role key is bound to a different app_id
+	// than the message (UGE publisher-binding R1).
+	ErrRoleKeyAppMismatch = sdkerrors.Register(ModuleName, 79, "role key app_id does not match message app_id")
+	// ErrAssessmentCredentialInvalid (80): AssessmentCredential signature / fields /
+	// expiry / version allowlist failure (UGE publisher-binding R3).
+	ErrAssessmentCredentialInvalid = sdkerrors.Register(ModuleName, 80, "assessment credential invalid")
+	// ErrAssessmentCredentialReuse (81): credential_id already bound to an entitlement
+	// (never released on REJECTED).
+	ErrAssessmentCredentialReuse = sdkerrors.Register(ModuleName, 81, "assessment credential_id already used")
 )

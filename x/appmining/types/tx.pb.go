@@ -37,6 +37,9 @@ type MsgRegisterApplication struct {
 	Owner                string `protobuf:"bytes,3,opt,name=owner,proto3" json:"owner,omitempty"`
 	AttestationSubmitter string `protobuf:"bytes,4,opt,name=attestation_submitter,json=attestationSubmitter,proto3" json:"attestation_submitter,omitempty"`
 	MetadataCommitment   []byte `protobuf:"bytes,5,opt,name=metadata_commitment,json=metadataCommitment,proto3" json:"metadata_commitment,omitempty"`
+	// optional embedded publisher (UGE R2)
+	PublisherPubkey []byte `protobuf:"bytes,6,opt,name=publisher_pubkey,json=publisherPubkey,proto3" json:"publisher_pubkey,omitempty"`
+	PublisherKeyId  string `protobuf:"bytes,7,opt,name=publisher_key_id,json=publisherKeyId,proto3" json:"publisher_key_id,omitempty"`
 }
 
 func (m *MsgRegisterApplication) Reset()         { *m = MsgRegisterApplication{} }
@@ -105,6 +108,20 @@ func (m *MsgRegisterApplication) GetMetadataCommitment() []byte {
 		return m.MetadataCommitment
 	}
 	return nil
+}
+
+func (m *MsgRegisterApplication) GetPublisherPubkey() []byte {
+	if m != nil {
+		return m.PublisherPubkey
+	}
+	return nil
+}
+
+func (m *MsgRegisterApplication) GetPublisherKeyId() string {
+	if m != nil {
+		return m.PublisherKeyId
+	}
+	return ""
 }
 
 // MsgRegisterApplicationResponse is the request/response type for the module API.
@@ -1757,6 +1774,8 @@ type MsgRegisterRoleKey struct {
 	KeyId     string          `protobuf:"bytes,3,opt,name=key_id,json=keyId,proto3" json:"key_id,omitempty"`
 	Pubkey    []byte          `protobuf:"bytes,4,opt,name=pubkey,proto3" json:"pubkey,omitempty"`
 	Version   uint64          `protobuf:"varint,5,opt,name=version,proto3" json:"version,omitempty"`
+	// optional app binding (empty = global)
+	AppId []byte `protobuf:"bytes,6,opt,name=app_id,json=appId,proto3" json:"app_id,omitempty"`
 }
 
 func (m *MsgRegisterRoleKey) Reset()         { *m = MsgRegisterRoleKey{} }
@@ -1825,6 +1844,13 @@ func (m *MsgRegisterRoleKey) GetVersion() uint64 {
 		return m.Version
 	}
 	return 0
+}
+
+func (m *MsgRegisterRoleKey) GetAppId() []byte {
+	if m != nil {
+		return m.AppId
+	}
+	return nil
 }
 
 // MsgRegisterRoleKeyResponse is the request/response type for the module API.
@@ -1988,6 +2014,8 @@ type MsgPublishCandidate struct {
 	GasEvidenceRoot  string    `protobuf:"bytes,13,opt,name=gas_evidence_root,json=gasEvidenceRoot,proto3" json:"gas_evidence_root,omitempty"`
 	RuleVersion      string    `protobuf:"bytes,14,opt,name=rule_version,json=ruleVersion,proto3" json:"rule_version,omitempty"`
 	Proof            WireProof `protobuf:"bytes,15,opt,name=proof,proto3" json:"proof"`
+	// optional AssessmentCredential (T1b / R3); empty = not provided
+	Credential AssessmentCredential `protobuf:"bytes,16,opt,name=credential,proto3" json:"credential"`
 }
 
 func (m *MsgPublishCandidate) Reset()         { *m = MsgPublishCandidate{} }
@@ -2126,6 +2154,13 @@ func (m *MsgPublishCandidate) GetProof() WireProof {
 		return m.Proof
 	}
 	return WireProof{}
+}
+
+func (m *MsgPublishCandidate) GetCredential() AssessmentCredential {
+	if m != nil {
+		return m.Credential
+	}
+	return AssessmentCredential{}
 }
 
 // MsgPublishCandidateResponse is the request/response type for the module API.
@@ -4224,6 +4259,20 @@ func (m *MsgRegisterApplication) MarshalToSizedBuffer(dAtA []byte) (int, error) 
 	_ = i
 	var l int
 	_ = l
+	if len(m.PublisherKeyId) > 0 {
+		i -= len(m.PublisherKeyId)
+		copy(dAtA[i:], m.PublisherKeyId)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.PublisherKeyId)))
+		i--
+		dAtA[i] = 0x3a
+	}
+	if len(m.PublisherPubkey) > 0 {
+		i -= len(m.PublisherPubkey)
+		copy(dAtA[i:], m.PublisherPubkey)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.PublisherPubkey)))
+		i--
+		dAtA[i] = 0x32
+	}
 	if len(m.MetadataCommitment) > 0 {
 		i -= len(m.MetadataCommitment)
 		copy(dAtA[i:], m.MetadataCommitment)
@@ -5412,6 +5461,13 @@ func (m *MsgRegisterRoleKey) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if len(m.AppId) > 0 {
+		i -= len(m.AppId)
+		copy(dAtA[i:], m.AppId)
+		i = encodeVarintTx(dAtA, i, uint64(len(m.AppId)))
+		i--
+		dAtA[i] = 0x32
+	}
 	if m.Version != 0 {
 		i = encodeVarintTx(dAtA, i, uint64(m.Version))
 		i--
@@ -5559,6 +5615,18 @@ func (m *MsgPublishCandidate) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	{
+		size, err := m.Credential.MarshalToSizedBuffer(dAtA[:i])
+		if err != nil {
+			return 0, err
+		}
+		i -= size
+		i = encodeVarintTx(dAtA, i, uint64(size))
+	}
+	i--
+	dAtA[i] = 0x1
+	i--
+	dAtA[i] = 0x82
 	{
 		size, err := m.Proof.MarshalToSizedBuffer(dAtA[:i])
 		if err != nil {
@@ -6307,6 +6375,14 @@ func (m *MsgRegisterApplication) Size() (n int) {
 	if l > 0 {
 		n += 1 + l + sovTx(uint64(l))
 	}
+	l = len(m.PublisherPubkey)
+	if l > 0 {
+		n += 1 + l + sovTx(uint64(l))
+	}
+	l = len(m.PublisherKeyId)
+	if l > 0 {
+		n += 1 + l + sovTx(uint64(l))
+	}
 	return n
 }
 
@@ -6820,6 +6896,10 @@ func (m *MsgRegisterRoleKey) Size() (n int) {
 	if m.Version != 0 {
 		n += 1 + sovTx(uint64(m.Version))
 	}
+	l = len(m.AppId)
+	if l > 0 {
+		n += 1 + l + sovTx(uint64(l))
+	}
 	return n
 }
 
@@ -6928,6 +7008,8 @@ func (m *MsgPublishCandidate) Size() (n int) {
 	}
 	l = m.Proof.Size()
 	n += 1 + l + sovTx(uint64(l))
+	l = m.Credential.Size()
+	n += 2 + l + sovTx(uint64(l))
 	return n
 }
 
@@ -7400,6 +7482,74 @@ func (m *MsgRegisterApplication) Unmarshal(dAtA []byte) error {
 			if m.MetadataCommitment == nil {
 				m.MetadataCommitment = []byte{}
 			}
+			iNdEx = postIndex
+
+		case 6:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field PublisherPubkey", wireType)
+			}
+			var byteLen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				byteLen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if byteLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + byteLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.PublisherPubkey = append(m.PublisherPubkey[:0], dAtA[iNdEx:postIndex]...)
+			if m.PublisherPubkey == nil {
+				m.PublisherPubkey = []byte{}
+			}
+			iNdEx = postIndex
+
+		case 7:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field PublisherKeyId", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.PublisherKeyId = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
@@ -10811,6 +10961,41 @@ func (m *MsgRegisterRoleKey) Unmarshal(dAtA []byte) error {
 					break
 				}
 			}
+
+		case 6:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field AppId", wireType)
+			}
+			var byteLen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				byteLen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if byteLen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + byteLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.AppId = append(m.AppId[:0], dAtA[iNdEx:postIndex]...)
+			if m.AppId == nil {
+				m.AppId = []byte{}
+			}
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipTx(dAtA[iNdEx:])
@@ -11591,6 +11776,39 @@ func (m *MsgPublishCandidate) Unmarshal(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			if err := m.Proof.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 16:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Credential", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTx
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthTx
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthTx
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.Credential.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex

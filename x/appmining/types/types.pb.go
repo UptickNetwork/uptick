@@ -546,6 +546,17 @@ type Params struct {
 	// V1: allowlist of rule_version values accepted by MsgApproveEntitlement (§3
 	// "规则版本允许"). Empty list denies every approval (default-deny).
 	EntitlementAllowedRuleVersions []string `protobuf:"bytes,13,rep,name=entitlement_allowed_rule_versions,json=entitlementAllowedRuleVersions,proto3" json:"entitlement_allowed_rule_versions,omitempty"`
+	// V1 publisher-binding T1: when true, every PublishCandidate requires a valid
+	// AssessmentCredential (T1b). Default false keeps global-key path usable.
+	CredentialRequired bool `protobuf:"varint,14,opt,name=credential_required,json=credentialRequired,proto3" json:"credential_required,omitempty"`
+	// V1 challenge open access: "none" | "open" | "deposit" (T1c; default "open").
+	ChallengeOpenAccess string `protobuf:"bytes,15,opt,name=challenge_open_access,json=challengeOpenAccess,proto3" json:"challenge_open_access,omitempty"`
+	// Deposit required when challenge_open_access=deposit (smallest units decimal).
+	ChallengeDepositAmount string `protobuf:"bytes,16,opt,name=challenge_deposit_amount,json=challengeDepositAmount,proto3" json:"challenge_deposit_amount,omitempty"`
+	ChallengeDepositDenom  string `protobuf:"bytes,17,opt,name=challenge_deposit_denom,json=challengeDepositDenom,proto3" json:"challenge_deposit_denom,omitempty"`
+	// V1 T1b: allowlist of AssessmentCredential.credential_version values.
+	// Empty list denies every credential (default-deny until governance sets).
+	EntitlementAllowedAssessmentVersions []string `protobuf:"bytes,18,rep,name=entitlement_allowed_assessment_versions,json=entitlementAllowedAssessmentVersions,proto3" json:"entitlement_allowed_assessment_versions,omitempty"`
 }
 
 func (m *Params) Reset()         { *m = Params{} }
@@ -668,6 +679,41 @@ func (m *Params) GetEntitlementEnableMinFunded() string {
 func (m *Params) GetEntitlementAllowedRuleVersions() []string {
 	if m != nil {
 		return m.EntitlementAllowedRuleVersions
+	}
+	return nil
+}
+
+func (m *Params) GetCredentialRequired() bool {
+	if m != nil {
+		return m.CredentialRequired
+	}
+	return false
+}
+
+func (m *Params) GetChallengeOpenAccess() string {
+	if m != nil {
+		return m.ChallengeOpenAccess
+	}
+	return ""
+}
+
+func (m *Params) GetChallengeDepositAmount() string {
+	if m != nil {
+		return m.ChallengeDepositAmount
+	}
+	return ""
+}
+
+func (m *Params) GetChallengeDepositDenom() string {
+	if m != nil {
+		return m.ChallengeDepositDenom
+	}
+	return ""
+}
+
+func (m *Params) GetEntitlementAllowedAssessmentVersions() []string {
+	if m != nil {
+		return m.EntitlementAllowedAssessmentVersions
 	}
 	return nil
 }
@@ -1468,6 +1514,8 @@ type RoleKey struct {
 	Status           RoleKeyStatus `protobuf:"varint,4,opt,name=status,proto3,enum=uptick.appmining.v1.RoleKeyStatus" json:"status,omitempty"`
 	Version          uint64        `protobuf:"varint,5,opt,name=version,proto3" json:"version,omitempty"`
 	RegisteredHeight int64         `protobuf:"varint,6,opt,name=registered_height,json=registeredHeight,proto3" json:"registered_height,omitempty"`
+	// optional app binding (empty = global); exactly 32 bytes when set
+	AppId []byte `protobuf:"bytes,7,opt,name=app_id,json=appId,proto3" json:"app_id,omitempty"`
 }
 
 func (m *RoleKey) Reset()         { *m = RoleKey{} }
@@ -1543,6 +1591,13 @@ func (m *RoleKey) GetRegisteredHeight() int64 {
 		return m.RegisteredHeight
 	}
 	return 0
+}
+
+func (m *RoleKey) GetAppId() []byte {
+	if m != nil {
+		return m.AppId
+	}
+	return nil
 }
 
 // WireProof is the Ed25519 domain-separated authorization attached to V1 msgs.
@@ -1636,6 +1691,8 @@ type Candidate struct {
 	Publisher         string          `protobuf:"bytes,18,opt,name=publisher,proto3" json:"publisher,omitempty"`
 	Status            CandidateStatus `protobuf:"varint,19,opt,name=status,proto3,enum=uptick.appmining.v1.CandidateStatus" json:"status,omitempty"`
 	MaxObservedTime   int64           `protobuf:"varint,20,opt,name=max_observed_time,json=maxObservedTime,proto3" json:"max_observed_time,omitempty"`
+	// AssessmentCredential id (64 hex); empty when publish had no credential
+	CredentialId string `protobuf:"bytes,21,opt,name=credential_id,json=credentialId,proto3" json:"credential_id,omitempty"`
 }
 
 func (m *Candidate) Reset()         { *m = Candidate{} }
@@ -1811,6 +1868,13 @@ func (m *Candidate) GetMaxObservedTime() int64 {
 	return 0
 }
 
+func (m *Candidate) GetCredentialId() string {
+	if m != nil {
+		return m.CredentialId
+	}
+	return ""
+}
+
 // EntitlementChallenge is the V1 challenge record (distinct from attestation Challenge).
 type EntitlementChallenge struct {
 	ChallengeId      string                     `protobuf:"bytes,1,opt,name=challenge_id,json=challengeId,proto3" json:"challenge_id,omitempty"`
@@ -1824,6 +1888,9 @@ type EntitlementChallenge struct {
 	Reviewer         string                     `protobuf:"bytes,9,opt,name=reviewer,proto3" json:"reviewer,omitempty"`
 	ResolutionDigest string                     `protobuf:"bytes,10,opt,name=resolution_digest,json=resolutionDigest,proto3" json:"resolution_digest,omitempty"`
 	ResolvedAt       int64                      `protobuf:"varint,11,opt,name=resolved_at,json=resolvedAt,proto3" json:"resolved_at,omitempty"`
+	// V1 T1c deposit (empty when challenge_open_access != deposit)
+	DepositAmount string `protobuf:"bytes,12,opt,name=deposit_amount,json=depositAmount,proto3" json:"deposit_amount,omitempty"`
+	DepositDenom  string `protobuf:"bytes,13,opt,name=deposit_denom,json=depositDenom,proto3" json:"deposit_denom,omitempty"`
 }
 
 func (m *EntitlementChallenge) Reset()         { *m = EntitlementChallenge{} }
@@ -1934,6 +2001,20 @@ func (m *EntitlementChallenge) GetResolvedAt() int64 {
 		return m.ResolvedAt
 	}
 	return 0
+}
+
+func (m *EntitlementChallenge) GetDepositAmount() string {
+	if m != nil {
+		return m.DepositAmount
+	}
+	return ""
+}
+
+func (m *EntitlementChallenge) GetDepositDenom() string {
+	if m != nil {
+		return m.DepositDenom
+	}
+	return ""
 }
 
 // Entitlement is created only after Approve (pool liability reserved).
@@ -2480,6 +2561,52 @@ func (m *Params) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if len(m.EntitlementAllowedAssessmentVersions) > 0 {
+		for iNdEx := len(m.EntitlementAllowedAssessmentVersions) - 1; iNdEx >= 0; iNdEx-- {
+			i -= len(m.EntitlementAllowedAssessmentVersions[iNdEx])
+			copy(dAtA[i:], m.EntitlementAllowedAssessmentVersions[iNdEx])
+			i = encodeVarintTypes(dAtA, i, uint64(len(m.EntitlementAllowedAssessmentVersions[iNdEx])))
+			i--
+			dAtA[i] = 0x1
+			i--
+			dAtA[i] = 0x92
+		}
+	}
+	if len(m.ChallengeDepositDenom) > 0 {
+		i -= len(m.ChallengeDepositDenom)
+		copy(dAtA[i:], m.ChallengeDepositDenom)
+		i = encodeVarintTypes(dAtA, i, uint64(len(m.ChallengeDepositDenom)))
+		i--
+		dAtA[i] = 0x1
+		i--
+		dAtA[i] = 0x8a
+	}
+	if len(m.ChallengeDepositAmount) > 0 {
+		i -= len(m.ChallengeDepositAmount)
+		copy(dAtA[i:], m.ChallengeDepositAmount)
+		i = encodeVarintTypes(dAtA, i, uint64(len(m.ChallengeDepositAmount)))
+		i--
+		dAtA[i] = 0x1
+		i--
+		dAtA[i] = 0x82
+	}
+	if len(m.ChallengeOpenAccess) > 0 {
+		i -= len(m.ChallengeOpenAccess)
+		copy(dAtA[i:], m.ChallengeOpenAccess)
+		i = encodeVarintTypes(dAtA, i, uint64(len(m.ChallengeOpenAccess)))
+		i--
+		dAtA[i] = 0x7a
+	}
+	if m.CredentialRequired {
+		i--
+		if m.CredentialRequired {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i--
+		dAtA[i] = 0x70
+	}
 	if len(m.EntitlementAllowedRuleVersions) > 0 {
 		for iNdEx := len(m.EntitlementAllowedRuleVersions) - 1; iNdEx >= 0; iNdEx-- {
 			i -= len(m.EntitlementAllowedRuleVersions[iNdEx])
@@ -3194,6 +3321,13 @@ func (m *RoleKey) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if len(m.AppId) > 0 {
+		i -= len(m.AppId)
+		copy(dAtA[i:], m.AppId)
+		i = encodeVarintTypes(dAtA, i, uint64(len(m.AppId)))
+		i--
+		dAtA[i] = 0x3a
+	}
 	if m.RegisteredHeight != 0 {
 		i = encodeVarintTypes(dAtA, i, uint64(m.RegisteredHeight))
 		i--
@@ -3302,6 +3436,15 @@ func (m *Candidate) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if len(m.CredentialId) > 0 {
+		i -= len(m.CredentialId)
+		copy(dAtA[i:], m.CredentialId)
+		i = encodeVarintTypes(dAtA, i, uint64(len(m.CredentialId)))
+		i--
+		dAtA[i] = 0x1
+		i--
+		dAtA[i] = 0xaa
+	}
 	if m.MaxObservedTime != 0 {
 		i = encodeVarintTypes(dAtA, i, uint64(m.MaxObservedTime))
 		i--
@@ -3465,6 +3608,20 @@ func (m *EntitlementChallenge) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if len(m.DepositDenom) > 0 {
+		i -= len(m.DepositDenom)
+		copy(dAtA[i:], m.DepositDenom)
+		i = encodeVarintTypes(dAtA, i, uint64(len(m.DepositDenom)))
+		i--
+		dAtA[i] = 0x6a
+	}
+	if len(m.DepositAmount) > 0 {
+		i -= len(m.DepositAmount)
+		copy(dAtA[i:], m.DepositAmount)
+		i = encodeVarintTypes(dAtA, i, uint64(len(m.DepositAmount)))
+		i--
+		dAtA[i] = 0x62
+	}
 	if m.ResolvedAt != 0 {
 		i = encodeVarintTypes(dAtA, i, uint64(m.ResolvedAt))
 		i--
@@ -3771,6 +3928,27 @@ func (m *Params) Size() (n int) {
 		for _, s := range m.EntitlementAllowedRuleVersions {
 			l = len(s)
 			n += 1 + l + sovTypes(uint64(l))
+		}
+	}
+	if m.CredentialRequired {
+		n += 2
+	}
+	l = len(m.ChallengeOpenAccess)
+	if l > 0 {
+		n += 1 + l + sovTypes(uint64(l))
+	}
+	l = len(m.ChallengeDepositAmount)
+	if l > 0 {
+		n += 2 + l + sovTypes(uint64(l))
+	}
+	l = len(m.ChallengeDepositDenom)
+	if l > 0 {
+		n += 2 + l + sovTypes(uint64(l))
+	}
+	if len(m.EntitlementAllowedAssessmentVersions) > 0 {
+		for _, s := range m.EntitlementAllowedAssessmentVersions {
+			l = len(s)
+			n += 2 + l + sovTypes(uint64(l))
 		}
 	}
 	return n
@@ -4102,6 +4280,10 @@ func (m *RoleKey) Size() (n int) {
 	if m.RegisteredHeight != 0 {
 		n += 1 + sovTypes(uint64(m.RegisteredHeight))
 	}
+	l = len(m.AppId)
+	if l > 0 {
+		n += 1 + l + sovTypes(uint64(l))
+	}
 	return n
 }
 
@@ -4211,6 +4393,10 @@ func (m *Candidate) Size() (n int) {
 	if m.MaxObservedTime != 0 {
 		n += 2 + sovTypes(uint64(m.MaxObservedTime))
 	}
+	l = len(m.CredentialId)
+	if l > 0 {
+		n += 2 + l + sovTypes(uint64(l))
+	}
 	return n
 }
 
@@ -4259,6 +4445,14 @@ func (m *EntitlementChallenge) Size() (n int) {
 	}
 	if m.ResolvedAt != 0 {
 		n += 1 + sovTypes(uint64(m.ResolvedAt))
+	}
+	l = len(m.DepositAmount)
+	if l > 0 {
+		n += 1 + l + sovTypes(uint64(l))
+	}
+	l = len(m.DepositDenom)
+	if l > 0 {
+		n += 1 + l + sovTypes(uint64(l))
 	}
 	return n
 }
@@ -5036,6 +5230,158 @@ func (m *Params) Unmarshal(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.EntitlementAllowedRuleVersions = append(m.EntitlementAllowedRuleVersions, string(dAtA[iNdEx:postIndex]))
+			iNdEx = postIndex
+
+		case 14:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field CredentialRequired", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTypes
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.CredentialRequired = bool(v != 0)
+
+		case 15:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ChallengeOpenAccess", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTypes
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTypes
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTypes
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ChallengeOpenAccess = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+
+		case 16:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ChallengeDepositAmount", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTypes
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTypes
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTypes
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ChallengeDepositAmount = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+
+		case 17:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ChallengeDepositDenom", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTypes
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTypes
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTypes
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ChallengeDepositDenom = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 18:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field EntitlementAllowedAssessmentVersions", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTypes
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTypes
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTypes
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.EntitlementAllowedAssessmentVersions = append(m.EntitlementAllowedAssessmentVersions, string(dAtA[iNdEx:postIndex]))
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
@@ -7377,6 +7723,40 @@ func (m *RoleKey) Unmarshal(dAtA []byte) error {
 					break
 				}
 			}
+		case 7:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field AppId", wireType)
+			}
+			var byteLen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTypes
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				byteLen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if byteLen < 0 {
+				return ErrInvalidLengthTypes
+			}
+			postIndex := iNdEx + byteLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTypes
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.AppId = append(m.AppId[:0], dAtA[iNdEx:postIndex]...)
+			if m.AppId == nil {
+				m.AppId = []byte{}
+			}
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipTypes(dAtA[iNdEx:])
@@ -8180,6 +8560,38 @@ func (m *Candidate) Unmarshal(dAtA []byte) error {
 					break
 				}
 			}
+		case 21:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field CredentialId", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTypes
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTypes
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTypes
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.CredentialId = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipTypes(dAtA[iNdEx:])
@@ -8530,6 +8942,70 @@ func (m *EntitlementChallenge) Unmarshal(dAtA []byte) error {
 					break
 				}
 			}
+		case 12:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field DepositAmount", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTypes
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTypes
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTypes
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.DepositAmount = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 13:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field DepositDenom", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowTypes
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthTypes
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthTypes
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.DepositDenom = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipTypes(dAtA[iNdEx:])

@@ -114,6 +114,10 @@ message MsgRegisterApplication {
   string owner = 3;
   string attestation_submitter = 4;
   bytes metadata_commitment = 5; // optional; empty or exactly 32 bytes
+  // optional embedded publisher (UGE R2): non-empty registers an ACTIVE
+  // PUBLISHER role key bound to this app_id in the same tx.
+  bytes publisher_pubkey = 6;  // raw Ed25519, 32 bytes when set
+  string publisher_key_id = 7; // required when publisher_pubkey is set
 }
 
 // MsgRegisterApplicationResponse is the request/response type for the module API.
@@ -317,6 +321,8 @@ message MsgRegisterRoleKey {
   string key_id = 3;
   bytes pubkey = 4; // raw Ed25519, 32 bytes
   uint64 version = 5;
+  // optional app binding (UGE R1): empty = global; else exactly 32 bytes of a registered app.
+  bytes app_id = 6;
 }
 
 // MsgRegisterRoleKeyResponse is the request/response type for the module API.
@@ -353,6 +359,8 @@ message MsgPublishCandidate {
   string gas_evidence_root = 13;
   string rule_version = 14;
   WireProof proof = 15 [(gogoproto.nullable) = false];
+  // optional AssessmentCredential (T1b / R3); omit / empty = not provided
+  AssessmentCredential credential = 16 [(gogoproto.nullable) = false];
 }
 
 // MsgPublishCandidateResponse is the request/response type for the module API.

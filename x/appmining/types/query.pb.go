@@ -1314,6 +1314,8 @@ type QueryRolesRequest struct {
 	Role EntitlementRole `protobuf:"varint,1,opt,name=role,proto3,enum=uptick.appmining.v1.EntitlementRole" json:"role,omitempty"`
 	// optional filter; UNSPECIFIED = all statuses
 	Status RoleKeyStatus `protobuf:"varint,2,opt,name=status,proto3,enum=uptick.appmining.v1.RoleKeyStatus" json:"status,omitempty"`
+	// optional app filter (bound keys only)
+	AppId []byte `protobuf:"bytes,3,opt,name=app_id,json=appId,proto3" json:"app_id,omitempty"`
 }
 
 func (m *QueryRolesRequest) Reset()         { *m = QueryRolesRequest{} }
@@ -1361,6 +1363,13 @@ func (m *QueryRolesRequest) GetStatus() RoleKeyStatus {
 		return m.Status
 	}
 	return RoleKeyStatusUnspecified
+}
+
+func (m *QueryRolesRequest) GetAppId() []byte {
+	if m != nil {
+		return m.AppId
+	}
+	return nil
 }
 
 // QueryRolesResponse is the request/response type for the module API.
@@ -3652,6 +3661,13 @@ func (m *QueryRolesRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if len(m.AppId) > 0 {
+		i -= len(m.AppId)
+		copy(dAtA[i:], m.AppId)
+		i = encodeVarintQuery(dAtA, i, uint64(len(m.AppId)))
+		i--
+		dAtA[i] = 0x1a
+	}
 	if m.Status != 0 {
 		i = encodeVarintQuery(dAtA, i, uint64(m.Status))
 		i--
@@ -4380,6 +4396,10 @@ func (m *QueryRolesRequest) Size() (n int) {
 	}
 	if m.Status != 0 {
 		n += 1 + sovQuery(uint64(m.Status))
+	}
+	l = len(m.AppId)
+	if l > 0 {
+		n += 1 + l + sovQuery(uint64(l))
 	}
 	return n
 }
@@ -7095,6 +7115,41 @@ func (m *QueryRolesRequest) Unmarshal(dAtA []byte) error {
 					break
 				}
 			}
+
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field AppId", wireType)
+			}
+			var byteLen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowQuery
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				byteLen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if byteLen < 0 {
+				return ErrInvalidLengthQuery
+			}
+			postIndex := iNdEx + byteLen
+			if postIndex < 0 {
+				return ErrInvalidLengthQuery
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.AppId = append(m.AppId[:0], dAtA[iNdEx:postIndex]...)
+			if m.AppId == nil {
+				m.AppId = []byte{}
+			}
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipQuery(dAtA[iNdEx:])

@@ -131,9 +131,17 @@ func CmdRegisterRoleKey() *cobra.Command {
 				Pubkey:    pk,
 				Version:   ver,
 			}
+			if appHex, _ := cmd.Flags().GetString("app-id-hex"); appHex != "" {
+				appID, err := hex.DecodeString(appHex)
+				if err != nil {
+					return fmt.Errorf("app-id-hex: %w", err)
+				}
+				msg.AppId = appID
+			}
 			return tx.GenerateOrBroadcastTxCLI(clientCtx, cmd.Flags(), msg)
 		},
 	}
+	cmd.Flags().String("app-id-hex", "", "optional 32-byte app binding (hex); empty = global key")
 	flags.AddTxFlagsToCmd(cmd)
 	return cmd
 }

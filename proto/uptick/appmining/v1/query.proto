@@ -225,6 +225,9 @@ message QueryRolesRequest {
   EntitlementRole role = 1;
   // optional filter; UNSPECIFIED = all statuses
   RoleKeyStatus status = 2;
+  // optional app filter (UGE R1): empty = no filter; 32 raw bytes or omit.
+  // When set, returns keys whose app_id equals this value (bound keys only).
+  bytes app_id = 3;
 }
 // QueryRolesResponse is the request/response type for the module API.
 message QueryRolesResponse {

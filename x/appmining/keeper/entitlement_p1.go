@@ -1,6 +1,7 @@
 package keeper
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -43,7 +44,7 @@ func (k msgServer) PublishCandidate(goCtx context.Context, msg *types.MsgPublish
 	if msg.ChainId != ctx.ChainID() {
 		return nil, types.ErrChainIDMismatch
 	}
-	pool, _, err := k.requireEntitlementFlow(ctx, msg.PoolId)
+	pool, params, err := k.requireEntitlementFlow(ctx, msg.PoolId)
 	if err != nil {
 		return nil, err
 	}
@@ -93,6 +94,23 @@ func (k msgServer) PublishCandidate(goCtx context.Context, msg *types.MsgPublish
 		return nil, types.ErrCandidateConflict
 	}
 
+	// R1: app-bound ACTIVE publisher keys must match msg.app_id (64-hex ↔ 32B);
+	// global keys (empty AppId) remain allowed during the transition period.
+	publisherAppBound := false
+	if rk, found := k.GetRoleKey(ctx, types.EntitlementRolePublisher, msg.Proof.KeyId); found {
+		if len(rk.AppId) > 0 {
+			publisherAppBound = true
+			if !bytes.Equal(rk.AppId, appID) {
+				return nil, types.ErrRoleKeyAppMismatch
+			}
+		}
+	}
+
+	credentialID, err := k.requirePublishCredential(ctx, params, msg, publisherAppBound, now)
+	if err != nil {
+		return nil, err
+	}
+
 	record := map[string]string{
 		"protocol_version": "1",
 		"operation":        "PUBLISH",
@@ -132,12 +150,17 @@ func (k msgServer) PublishCandidate(goCtx context.Context, msg *types.MsgPublish
 		Publisher:         msg.Submitter,
 		Status:            types.CandidateStatusPublished,
 		MaxObservedTime:   now,
+		CredentialId:      credentialID,
 	}
 	k.SetCandidate(ctx, stored)
+	if credentialID != "" {
+		k.SetCredentialIndex(ctx, credentialID, msg.EntitlementId)
+	}
 
 	emitV1StateEvent(ctx, types.EventTypeCandidatePublished, "publish",
 		msg.PoolId, msg.EntitlementId, msg.AppId,
-		"", stored.Status.String(), msg.Amount, msg.Denom, msg.EvidenceRoot)
+		"", stored.Status.String(), msg.Amount, msg.Denom, msg.EvidenceRoot,
+		sdk.NewAttribute(types.AttributeKeyCredentialID, credentialID))
 	return &types.MsgPublishCandidateResponse{
 		CandidateHash:     hash,
 		ChallengeDeadline: stored.ChallengeDeadline,
@@ -170,8 +193,19 @@ func (k msgServer) OpenChallenge(goCtx context.Context, msg *types.MsgOpenChalle
 	if cand.Status != types.CandidateStatusPublished {
 		return nil, types.ErrCandidateNotPublished
 	}
-	if _, _, err := k.requireEntitlementFlow(ctx, cand.PoolId); err != nil {
+	pool, params, err := k.requireEntitlementFlow(ctx, cand.PoolId)
+	if err != nil {
 		return nil, err
+	}
+
+	access := params.EffectiveChallengeOpenAccess()
+	switch access {
+	case types.ChallengeOpenAccessNone:
+		// Emergency switch: public open disabled (UGE R4).
+		return nil, types.ErrUnauthorized
+	case types.ChallengeOpenAccessOpen, types.ChallengeOpenAccessDeposit:
+	default:
+		return nil, types.ErrUnauthorized
 	}
 
 	blockUnix := ctx.BlockTime().Unix()
@@ -191,6 +225,32 @@ func (k msgServer) OpenChallenge(goCtx context.Context, msg *types.MsgOpenChalle
 		ref = "0000000000000000000000000000000000000000000000000000000000000000"
 	}
 
+	depositAmt, depositDenom := "", ""
+	if access == types.ChallengeOpenAccessDeposit {
+		depositAmt = params.ChallengeDepositAmount
+		depositDenom = params.ChallengeDepositDenom
+		if depositAmt == "" || types.IsZeroAmount(depositAmt) || depositDenom == "" {
+			return nil, types.ErrInvalidAmount
+		}
+		if depositDenom != pool.Denom {
+			// Deposit must match the candidate pool denom so confiscation can
+			// credit that pool without cross-denom bookkeeping.
+			return nil, types.ErrInvalidDenom
+		}
+		challenger, err := sdk.AccAddressFromBech32(msg.Challenger)
+		if err != nil {
+			return nil, err
+		}
+		amt, err := types.ParseAmount(depositAmt)
+		if err != nil {
+			return nil, err
+		}
+		coin := sdk.NewCoin(depositDenom, amt)
+		if err := k.bank.SendCoinsFromAccountToModule(ctx, challenger, types.ChallengeEscrowName, sdk.NewCoins(coin)); err != nil {
+			return nil, err
+		}
+	}
+
 	id := entitlementChallengeID(cand.PoolId, msg.EntitlementId, msg.Challenger, now, evWire, msg.EvidenceDigest)
 	chal := types.EntitlementChallenge{
 		ChallengeId:     id,
@@ -201,6 +261,8 @@ func (k msgServer) OpenChallenge(goCtx context.Context, msg *types.MsgOpenChalle
 		ReferenceDigest: ref,
 		Status:          types.EntitlementChallengeStatusOpen,
 		OpenedAt:        now,
+		DepositAmount:   depositAmt,
+		DepositDenom:    depositDenom,
 	}
 	k.SetEntitlementChallenge(ctx, chal)
 	k.SetOpenEntitlementChallenge(ctx, msg.EntitlementId, msg.Challenger, id)
@@ -213,6 +275,7 @@ func (k msgServer) OpenChallenge(goCtx context.Context, msg *types.MsgOpenChalle
 		"", chal.Status.String(), cand.Amount, cand.Denom, msg.EvidenceDigest,
 		sdk.NewAttribute(types.AttributeKeyChallengeID, id),
 		sdk.NewAttribute(types.AttributeKeyChallenger, msg.Challenger),
+		sdk.NewAttribute(types.AttributeKeyBondFlow, access),
 	)
 	return &types.MsgOpenChallengeResponse{ChallengeId: id}, nil
 }
@@ -263,12 +326,25 @@ func (k msgServer) ResolveEntitlementChallenge(goCtx context.Context, msg *types
 	chal.ResolutionDigest = msg.RationaleDigest
 	chal.ResolvedAt = now
 	prevCand := cand.Status.String()
+	bondFlow := ""
 	switch msg.Outcome {
 	case "UPHELD":
 		chal.Status = types.EntitlementChallengeStatusUpheld
 		cand.Status = types.CandidateStatusRejected
+		if err := k.releaseEntitlementChallengeDeposit(ctx, chal, true, cand.PoolId); err != nil {
+			return nil, err
+		}
+		if chal.DepositAmount != "" {
+			bondFlow = "refund_in"
+		}
 	case "DISMISSED":
 		chal.Status = types.EntitlementChallengeStatusDismissed
+		if err := k.releaseEntitlementChallengeDeposit(ctx, chal, false, cand.PoolId); err != nil {
+			return nil, err
+		}
+		if chal.DepositAmount != "" {
+			bondFlow = "slash_in"
+		}
 	default:
 		return nil, types.ErrInvalidOutcome
 	}
@@ -277,11 +353,60 @@ func (k msgServer) ResolveEntitlementChallenge(goCtx context.Context, msg *types
 	cand.MaxObservedTime = now
 	k.SetCandidate(ctx, cand)
 
+	extra := []sdk.Attribute{
+		sdk.NewAttribute(types.AttributeKeyChallengeID, chal.ChallengeId),
+		sdk.NewAttribute(types.AttributeKeyStatus, chal.Status.String()),
+	}
+	if bondFlow != "" {
+		extra = append(extra, sdk.NewAttribute(types.AttributeKeyBondFlow, bondFlow))
+	}
 	emitV1StateEvent(ctx, types.EventTypeEntitlementChallengeResolved, "resolve",
 		cand.PoolId, chal.CandidateId, cand.AppId,
 		prevCand, cand.Status.String(), cand.Amount, cand.Denom, msg.RationaleDigest,
-		sdk.NewAttribute(types.AttributeKeyChallengeID, chal.ChallengeId),
-		sdk.NewAttribute(types.AttributeKeyStatus, chal.Status.String()),
+		extra...,
 	)
 	return &types.MsgResolveEntitlementChallengeResponse{}, nil
+}
+
+// releaseEntitlementChallengeDeposit settles a V1 deposit after resolve.
+// refund=true (UPHELD) returns coins to the challenger; false (DISMISSED)
+// moves them into the entitlement pool and credits funded+available.
+func (k Keeper) releaseEntitlementChallengeDeposit(ctx sdk.Context, chal types.EntitlementChallenge, refund bool, poolID string) error {
+	if chal.DepositAmount == "" || chal.DepositDenom == "" {
+		return nil
+	}
+	amt, err := types.ParseAmount(chal.DepositAmount)
+	if err != nil {
+		return err
+	}
+	coin := sdk.NewCoin(chal.DepositDenom, amt)
+	if refund {
+		challenger, err := sdk.AccAddressFromBech32(chal.Challenger)
+		if err != nil {
+			return err
+		}
+		return k.bank.SendCoinsFromModuleToAccount(ctx, types.ChallengeEscrowName, challenger, sdk.NewCoins(coin))
+	}
+	if err := k.bank.SendCoinsFromModuleToModule(ctx, types.ChallengeEscrowName, types.EntitlementPoolName, sdk.NewCoins(coin)); err != nil {
+		return err
+	}
+	pool, found := k.GetEntitlementPool(ctx, poolID)
+	if !found {
+		return types.ErrPoolNotFound
+	}
+	newFunded, err := types.AddAmountStrings(pool.Funded, chal.DepositAmount)
+	if err != nil {
+		return err
+	}
+	newAvailable, err := types.AddAmountStrings(pool.Available, chal.DepositAmount)
+	if err != nil {
+		return err
+	}
+	pool.Funded = newFunded
+	pool.Available = newAvailable
+	if err := types.ValidatePoolInvariant(pool); err != nil {
+		return err
+	}
+	k.SetEntitlementPool(ctx, pool)
+	return nil
 }

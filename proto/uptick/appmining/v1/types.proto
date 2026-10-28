@@ -94,6 +94,17 @@ message Params {
   // V1: allowlist of rule_version values accepted by MsgApproveEntitlement (§3
   // "规则版本允许"). Empty list denies every approval (default-deny).
   repeated string entitlement_allowed_rule_versions = 13;
+  // V1 publisher-binding T1: when true, every PublishCandidate requires a valid
+  // AssessmentCredential (T1b). Default false keeps global-key path usable.
+  bool credential_required = 14;
+  // V1 challenge open access: "none" | "open" | "deposit" (T1c; default "open").
+  string challenge_open_access = 15;
+  // Deposit required when challenge_open_access=deposit (smallest units decimal).
+  string challenge_deposit_amount = 16;
+  string challenge_deposit_denom = 17;
+  // V1 T1b: allowlist of AssessmentCredential.credential_version values.
+  // Empty list denies every credential (default-deny until governance sets).
+  repeated string entitlement_allowed_assessment_versions = 18;
 }
 
 // Application is the request/response type for the module API.
@@ -235,6 +246,9 @@ message RoleKey {
   RoleKeyStatus status = 4;
   uint64 version = 5;
   int64 registered_height = 6;
+  // optional app binding (UGE publisher-binding R1): empty = global key;
+  // non-empty = exactly AppIDLength (32) bytes and must match a registered app.
+  bytes app_id = 7;
 }
 
 // WireProof is the Ed25519 domain-separated authorization attached to V1 msgs.
@@ -313,6 +327,39 @@ message Candidate {
   string publisher = 18;           // cosmos bech32 submitter
   CandidateStatus status = 19;
   int64 max_observed_time = 20;    // anti-rollback watermark
+  // AssessmentCredential id (64 hex); empty when publish had no credential
+  string credential_id = 21;
+}
+
+// AssessmentCredential is the UGE assessment attestation (T1b / R3).
+// Empty / default message means "not provided".
+message AssessmentCredential {
+  string credential_version = 1;
+  string app_id = 2; // 64 lowercase hex
+  string pool_id = 3;
+  string pav_id = 4;
+  string evidence_root = 5;
+  string gas_evidence_root = 6;
+  string amount = 7;
+  string denom = 8;
+  string gas_used = 9;
+  string qualified_tx_count = 10;
+  string rule_version = 11;
+  string issued_at = 12;  // unix seconds, unsigned decimal
+  string expires_at = 13;
+  string credential_id = 14; // SHA-256 hex of frame with credential_id empty
+  string signer_key_id = 15;
+  string signature_base64 = 16;
+}
+
+// AssessmentSigner is an authority-registered Ed25519 key for AssessmentCredential.
+// Separate from EntitlementRole keys.
+message AssessmentSigner {
+  string key_id = 1;
+  bytes pubkey = 2;
+  RoleKeyStatus status = 3;
+  uint64 version = 4;
+  int64 registered_height = 5;
 }
 
 // EntitlementChallenge is the V1 challenge record (distinct from attestation Challenge).
@@ -328,6 +375,9 @@ message EntitlementChallenge {
   string reviewer = 9;           // key_id of resolving reviewer
   string resolution_digest = 10; // 64 hex
   int64 resolved_at = 11;
+  // V1 T1c deposit (empty when challenge_open_access != deposit)
+  string deposit_amount = 12;
+  string deposit_denom = 13;
 }
 
 // EntitlementState enumerates allowed values for the module.

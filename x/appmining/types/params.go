@@ -56,7 +56,27 @@ func DefaultParams() Params {
 		// MsgApproveEntitlement is rejected until governance allows rule
 		// versions explicitly (workorder 13 §3 "规则版本允许").
 		EntitlementAllowedRuleVersions: nil,
+		// T1a publisher-binding placeholders (T1b/T1c activate behavior).
+		CredentialRequired:     false,
+		ChallengeOpenAccess:    ChallengeOpenAccessOpen,
+		ChallengeDepositAmount: "",
+		ChallengeDepositDenom:  "",
 	}
+}
+
+// Challenge open-access modes (UGE publisher-binding R4 / T1c).
+const (
+	ChallengeOpenAccessNone    = "none"
+	ChallengeOpenAccessOpen    = "open"
+	ChallengeOpenAccessDeposit = "deposit"
+)
+
+// EffectiveChallengeOpenAccess returns the configured mode (empty → open).
+func (p Params) EffectiveChallengeOpenAccess() string {
+	if p.ChallengeOpenAccess == "" {
+		return ChallengeOpenAccessOpen
+	}
+	return p.ChallengeOpenAccess
 }
 
 // EffectiveMaxGasPayers returns the configured cap (default 16 when unset).
@@ -145,6 +165,43 @@ func (p Params) Validate() error {
 			return fmt.Errorf("duplicate entitlement_allowed_rule_versions entry %q", rv)
 		}
 		seenRV[rv] = struct{}{}
+	}
+	mode := p.EffectiveChallengeOpenAccess()
+	switch mode {
+	case ChallengeOpenAccessOpen, ChallengeOpenAccessNone, ChallengeOpenAccessDeposit:
+	default:
+		return fmt.Errorf("invalid challenge_open_access %q (want none|open|deposit)", p.ChallengeOpenAccess)
+	}
+	if p.ChallengeDepositAmount != "" {
+		if err := ValidateAmountString(p.ChallengeDepositAmount); err != nil {
+			return fmt.Errorf("invalid challenge_deposit_amount: %w", err)
+		}
+	}
+	if p.ChallengeDepositDenom != "" {
+		if err := sdk.ValidateDenom(p.ChallengeDepositDenom); err != nil {
+			return fmt.Errorf("invalid challenge_deposit_denom: %w", err)
+		}
+		if !DenomAllowed(p, p.ChallengeDepositDenom) {
+			return fmt.Errorf("challenge_deposit_denom %q must be in reward_denom_allowlist", p.ChallengeDepositDenom)
+		}
+	}
+	if mode == ChallengeOpenAccessDeposit {
+		if p.ChallengeDepositAmount == "" || IsZeroAmount(p.ChallengeDepositAmount) {
+			return fmt.Errorf("challenge_deposit_amount must be > 0 when challenge_open_access=deposit")
+		}
+		if p.ChallengeDepositDenom == "" {
+			return fmt.Errorf("challenge_deposit_denom required when challenge_open_access=deposit")
+		}
+	}
+	seenAV := make(map[string]struct{}, len(p.EntitlementAllowedAssessmentVersions))
+	for _, av := range p.EntitlementAllowedAssessmentVersions {
+		if err := ValidateWireID(av); err != nil {
+			return fmt.Errorf("invalid entitlement_allowed_assessment_versions entry %q: %w", av, err)
+		}
+		if _, ok := seenAV[av]; ok {
+			return fmt.Errorf("duplicate entitlement_allowed_assessment_versions entry %q", av)
+		}
+		seenAV[av] = struct{}{}
 	}
 	return nil
 }

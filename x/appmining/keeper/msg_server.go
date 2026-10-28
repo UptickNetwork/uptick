@@ -53,6 +53,15 @@ func (k msgServer) RegisterApplication(goCtx context.Context, msg *types.MsgRegi
 		sdk.NewAttribute(types.AttributeKeyOwner, msg.Owner),
 		sdk.NewAttribute(types.AttributeKeySubmitter, msg.AttestationSubmitter),
 	))
+	// R2: optional embedded publisher key bound to this app in the same tx.
+	if len(msg.PublisherPubkey) > 0 {
+		if err := k.persistActiveRoleKey(
+			ctx, msg.Authority, types.EntitlementRolePublisher,
+			msg.PublisherKeyId, msg.PublisherPubkey, 1, msg.AppId,
+		); err != nil {
+			return nil, err
+		}
+	}
 	return &types.MsgRegisterApplicationResponse{}, nil
 }
 

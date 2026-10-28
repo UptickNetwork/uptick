@@ -72,10 +72,22 @@ func CmdRegisterApplication() *cobra.Command {
 				}
 				msg.MetadataCommitment = meta
 			}
+			if pubHex, _ := cmd.Flags().GetString("publisher-pubkey-hex"); pubHex != "" {
+				pk, err := hex.DecodeString(pubHex)
+				if err != nil {
+					return fmt.Errorf("publisher-pubkey-hex: %w", err)
+				}
+				msg.PublisherPubkey = pk
+			}
+			if kid, _ := cmd.Flags().GetString("publisher-key-id"); kid != "" {
+				msg.PublisherKeyId = kid
+			}
 			return tx.GenerateOrBroadcastTxCLI(clientCtx, cmd.Flags(), msg)
 		},
 	}
 	cmd.Flags().String("metadata-commitment", "", "optional 32-byte metadata commitment (hex)")
+	cmd.Flags().String("publisher-pubkey-hex", "", "optional embedded PUBLISHER Ed25519 pubkey (hex)")
+	cmd.Flags().String("publisher-key-id", "", "optional embedded publisher key_id (required with pubkey)")
 	flags.AddTxFlagsToCmd(cmd)
 	return cmd
 }

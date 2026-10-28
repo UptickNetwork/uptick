@@ -61,6 +61,8 @@ const (
 	prefixOpenEntitlementChallenge
 	prefixRoleKey
 	prefixAuthNonce
+	prefixAssessmentSigner
+	prefixCredentialIndex // credential_id -> entitlement_id (never released)
 )
 
 var (
@@ -82,6 +84,8 @@ var (
 	KeyPrefixOpenEntitlementChallenge = []byte{prefixOpenEntitlementChallenge}
 	KeyPrefixRoleKey                  = []byte{prefixRoleKey}
 	KeyPrefixAuthNonce                = []byte{prefixAuthNonce}
+	KeyPrefixAssessmentSigner         = []byte{prefixAssessmentSigner}
+	KeyPrefixCredentialIndex          = []byte{prefixCredentialIndex}
 )
 
 func ApplicationKey(appID []byte) []byte {
@@ -178,4 +182,14 @@ func AuthNonceKey(role EntitlementRole, keyID, nonce string) []byte {
 	key = append(key, []byte(keyID)...)
 	key = append(key, []byte{0}...)
 	return append(key, []byte(nonce)...)
+}
+
+// AssessmentSignerKey stores an assessment signer by key_id.
+func AssessmentSignerKey(keyID string) []byte {
+	return append(append([]byte{}, KeyPrefixAssessmentSigner...), []byte(keyID)...)
+}
+
+// CredentialIndexKey maps credential_id -> entitlement_id (permanent).
+func CredentialIndexKey(credentialID string) []byte {
+	return append(append([]byte{}, KeyPrefixCredentialIndex...), []byte(credentialID)...)
 }

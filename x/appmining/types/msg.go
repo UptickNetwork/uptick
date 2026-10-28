@@ -41,6 +41,19 @@ func (m *MsgRegisterApplication) ValidateBasic() error {
 	if err := ValidateOptionalCommitment(m.MetadataCommitment); err != nil {
 		return err
 	}
+	hasPub := len(m.PublisherPubkey) > 0
+	hasKey := m.PublisherKeyId != ""
+	if hasPub != hasKey {
+		return sdkerrors.Wrap(errortypes.ErrInvalidRequest, "publisher_pubkey and publisher_key_id must both be set or both empty")
+	}
+	if hasPub {
+		if err := ValidateEd25519PubKey(m.PublisherPubkey); err != nil {
+			return sdkerrors.Wrap(ErrInvalidCommitment, "publisher_pubkey must be 32-byte Ed25519")
+		}
+		if err := ValidateWireID(m.PublisherKeyId); err != nil {
+			return sdkerrors.Wrap(ErrInvalidWireID, "publisher_key_id")
+		}
+	}
 	return nil
 }
 
@@ -422,6 +435,11 @@ func (m *MsgRegisterRoleKey) ValidateBasic() error {
 	}
 	if err := ValidateEd25519PubKey(m.Pubkey); err != nil {
 		return sdkerrors.Wrap(ErrInvalidCommitment, "pubkey must be 32-byte Ed25519")
+	}
+	if len(m.AppId) > 0 {
+		if err := ValidateAppID(m.AppId); err != nil {
+			return err
+		}
 	}
 	return nil
 }

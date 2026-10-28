@@ -198,6 +198,11 @@ func validateV1Genesis(gs GenesisState) error {
 		pools[p.PoolId] = p
 	}
 
+	appSeen := make(map[string]struct{}, len(gs.Applications))
+	for _, app := range gs.Applications {
+		appSeen[string(app.AppId)] = struct{}{}
+	}
+
 	roleKeySeen := make(map[string]struct{}, len(gs.RoleKeys))
 	pubkeyRoles := make(map[string]string) // pubkey hex -> "role/key_id" (first ACTIVE owner)
 	for _, rk := range gs.RoleKeys {
@@ -212,6 +217,14 @@ func validateV1Genesis(gs GenesisState) error {
 		}
 		if err := ValidateEd25519PubKey(rk.Pubkey); err != nil {
 			return fmt.Errorf("role key %q pubkey: %w", rk.KeyId, err)
+		}
+		if len(rk.AppId) > 0 {
+			if err := ValidateAppID(rk.AppId); err != nil {
+				return fmt.Errorf("role key %q app_id: %w", rk.KeyId, err)
+			}
+			if _, ok := appSeen[string(rk.AppId)]; !ok {
+				return fmt.Errorf("role key %q app_id not in genesis applications", rk.KeyId)
+			}
 		}
 		key := fmt.Sprintf("%d/%s", rk.Role, rk.KeyId)
 		if _, ok := roleKeySeen[key]; ok {

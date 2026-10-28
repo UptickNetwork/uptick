@@ -39,6 +39,19 @@ Ref: https://keepachangelog.com/en/1.0.0/
 
 ### Features
 
+* (appmining) Publisher-binding T1a (R1/R2): optional `RoleKey.app_id` / `MsgRegisterRoleKey.app_id`,
+  embedded publisher on `MsgRegisterApplication`, PublishCandidate app-bound key check (error 79
+  `ErrRoleKeyAppMismatch`), `QueryRoles` app filter, and params placeholders
+  `credential_required` / `challenge_open_access` / deposit fields (defaults keep global-key path).
+
+* (appmining) Publisher-binding T1b (R3): `AssessmentCredential` on PublishCandidate, assessment
+  signer registry, `credential_id` persistence + permanent index (errors 80/81),
+  `entitlement_allowed_assessment_versions` param (default-deny until set).
+
+* (appmining) Publisher-binding T1c (R4/R5): `challenge_open_access` gates OpenChallenge
+  (`open`/`none`/`deposit`); deposit escrow with UPHELD refund / DISMISSED → entitlement pool;
+  acceptance-vectors-0.5 skeleton (T1 transitional cases covered by keeper tests).
+
 * (appmining) V1 entitlement wire Msg CLI (`publish-candidate`, `open-entitlement-challenge`,
   `resolve-entitlement-challenge`, `approve-entitlement`, `freeze-entitlement`, `revoke-entitlement`)
   and UGE doc14 integration contract (`workorder/UPTICK-UGE-V1-INTEGRATION-CONTRACT-0.1.md`).

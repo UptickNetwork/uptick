@@ -400,3 +400,45 @@ func (k Keeper) IterateAuthNonces(ctx sdk.Context, fn func(string) bool) {
 		}
 	}
 }
+
+func (k Keeper) SetAssessmentSigner(ctx sdk.Context, s types.AssessmentSigner) {
+	k.store(ctx).Set(types.AssessmentSignerKey(s.KeyId), k.cdc.MustMarshal(&s))
+}
+
+func (k Keeper) GetAssessmentSigner(ctx sdk.Context, keyID string) (types.AssessmentSigner, bool) {
+	bz := k.store(ctx).Get(types.AssessmentSignerKey(keyID))
+	if bz == nil {
+		return types.AssessmentSigner{}, false
+	}
+	var s types.AssessmentSigner
+	k.cdc.MustUnmarshal(bz, &s)
+	return s, true
+}
+
+func (k Keeper) IterateAssessmentSigners(ctx sdk.Context, fn func(types.AssessmentSigner) bool) {
+	it := storetypes.KVStorePrefixIterator(k.store(ctx), types.KeyPrefixAssessmentSigner)
+	defer it.Close()
+	for ; it.Valid(); it.Next() {
+		var s types.AssessmentSigner
+		k.cdc.MustUnmarshal(it.Value(), &s)
+		if !fn(s) {
+			return
+		}
+	}
+}
+
+func (k Keeper) HasCredentialID(ctx sdk.Context, credentialID string) bool {
+	return k.store(ctx).Has(types.CredentialIndexKey(credentialID))
+}
+
+func (k Keeper) SetCredentialIndex(ctx sdk.Context, credentialID, entitlementID string) {
+	k.store(ctx).Set(types.CredentialIndexKey(credentialID), []byte(entitlementID))
+}
+
+func (k Keeper) GetCredentialEntitlement(ctx sdk.Context, credentialID string) (string, bool) {
+	bz := k.store(ctx).Get(types.CredentialIndexKey(credentialID))
+	if bz == nil {
+		return "", false
+	}
+	return string(bz), true
+}

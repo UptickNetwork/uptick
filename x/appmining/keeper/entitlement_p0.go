@@ -3,6 +3,7 @@ package keeper
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"strconv"
 
 	sdkerrors "cosmossdk.io/errors"
@@ -121,40 +122,75 @@ func (k msgServer) RegisterRoleKey(goCtx context.Context, msg *types.MsgRegister
 	if msg.Authority != params.Authority {
 		return nil, types.ErrUnauthorized
 	}
-	if existing, found := k.GetRoleKey(ctx, msg.Role, msg.KeyId); found {
+	if err := k.persistActiveRoleKey(ctx, msg.Authority, msg.Role, msg.KeyId, msg.Pubkey, msg.Version, msg.AppId); err != nil {
+		return nil, err
+	}
+	return &types.MsgRegisterRoleKeyResponse{}, nil
+}
+
+// persistActiveRoleKey registers or re-activates an Ed25519 role key.
+// appID empty = global; non-empty must be 32B and reference a registered app (R1).
+// Idempotent when the same (role, key_id, pubkey, app_id) is already ACTIVE.
+func (k msgServer) persistActiveRoleKey(
+	ctx sdk.Context,
+	authority string,
+	role types.EntitlementRole,
+	keyID string,
+	pubkey []byte,
+	version uint64,
+	appID []byte,
+) error {
+	if len(appID) > 0 {
+		if err := types.ValidateAppID(appID); err != nil {
+			return err
+		}
+		if _, found := k.GetApplication(ctx, appID); !found {
+			return types.ErrApplicationNotFound
+		}
+	}
+	if existing, found := k.GetRoleKey(ctx, role, keyID); found {
 		switch {
-		case bytes.Equal(existing.Pubkey, msg.Pubkey) && existing.Status == types.RoleKeyStatusActive:
-			return &types.MsgRegisterRoleKeyResponse{}, nil // idempotent
+		case bytes.Equal(existing.Pubkey, pubkey) &&
+			bytes.Equal(existing.AppId, appID) &&
+			existing.Status == types.RoleKeyStatusActive:
+			return nil // idempotent
 		case existing.Status == types.RoleKeyStatusRevoked:
 			// re-register allowed after revoke
-		case !bytes.Equal(existing.Pubkey, msg.Pubkey):
-			return nil, types.ErrRoleKeyConflict
+		case !bytes.Equal(existing.Pubkey, pubkey) || !bytes.Equal(existing.AppId, appID):
+			return types.ErrRoleKeyConflict
 		}
 	}
 	// F-2 (§1.5): the same pubkey bytes must never be ACTIVE under two roles,
 	// otherwise Revoke's risk/audit dual signature is a no-op. Check every
 	// other role before persisting the new registration.
-	if err := k.rejectPubkeyActiveInOtherRole(ctx, msg.Role, msg.Pubkey); err != nil {
-		return nil, err
+	if err := k.rejectPubkeyActiveInOtherRole(ctx, role, pubkey); err != nil {
+		return err
 	}
 	rk := types.RoleKey{
-		Role:             msg.Role,
-		KeyId:            msg.KeyId,
-		Pubkey:           append([]byte(nil), msg.Pubkey...),
+		Role:             role,
+		KeyId:            keyID,
+		Pubkey:           append([]byte(nil), pubkey...),
 		Status:           types.RoleKeyStatusActive,
-		Version:          msg.Version,
+		Version:          version,
 		RegisteredHeight: ctx.BlockHeight(),
+		AppId:            append([]byte(nil), appID...),
 	}
 	k.SetRoleKey(ctx, rk)
-	ctx.EventManager().EmitEvent(sdk.NewEvent(
-		types.EventTypeRoleKeyRegistered,
-		sdk.NewAttribute(types.AttributeKeyAuthority, msg.Authority),
-		sdk.NewAttribute(types.AttributeKeyRole, msg.Role.String()),
-		sdk.NewAttribute(types.AttributeKeyKeyID, msg.KeyId),
-		sdk.NewAttribute(types.AttributeKeyVersion, strconv.FormatUint(msg.Version, 10)),
+	attrs := []sdk.Attribute{
+		sdk.NewAttribute(types.AttributeKeyAuthority, authority),
+		sdk.NewAttribute(types.AttributeKeyRole, role.String()),
+		sdk.NewAttribute(types.AttributeKeyKeyID, keyID),
+		sdk.NewAttribute(types.AttributeKeyVersion, strconv.FormatUint(version, 10)),
 		sdk.NewAttribute(types.AttributeKeyHeight, strconv.FormatInt(ctx.BlockHeight(), 10)),
-	))
-	return &types.MsgRegisterRoleKeyResponse{}, nil
+		sdk.NewAttribute(types.AttributeKeyAppID, hex.EncodeToString(appID)),
+	}
+	if len(appID) > 0 {
+		attrs = append(attrs, sdk.NewAttribute(types.AttributeKeyAppIDDisplay, types.AppIDDisplay(appID)))
+	} else {
+		attrs = append(attrs, sdk.NewAttribute(types.AttributeKeyAppIDDisplay, ""))
+	}
+	ctx.EventManager().EmitEvent(sdk.NewEvent(types.EventTypeRoleKeyRegistered, attrs...))
+	return nil
 }
 
 func (k msgServer) SetRoleKeyStatus(goCtx context.Context, msg *types.MsgSetRoleKeyStatus) (*types.MsgSetRoleKeyStatusResponse, error) {

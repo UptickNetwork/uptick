@@ -131,7 +131,8 @@ func GasCreditConservationInvariant(k Keeper) sdk.Invariant {
 	}
 }
 
-// OpenChallengeEscrowInvariant checks challenge escrow balance covers sum of OPEN bonds per denom.
+// OpenChallengeEscrowInvariant checks challenge escrow balance covers sum of
+// OPEN attestation bonds plus OPEN V1 entitlement challenge deposits per denom.
 func OpenChallengeEscrowInvariant(k Keeper) sdk.Invariant {
 	return func(ctx sdk.Context) (string, bool) {
 		needed := map[string]math.Int{}
@@ -154,6 +155,25 @@ func OpenChallengeEscrowInvariant(k Keeper) sdk.Invariant {
 				cur = math.ZeroInt()
 			}
 			needed[c.BondDenom] = cur.Add(amt)
+		}
+		eit := storetypes.KVStorePrefixIterator(store, types.KeyPrefixEntitlementChallenge)
+		defer eit.Close()
+		for ; eit.Valid(); eit.Next() {
+			var c types.EntitlementChallenge
+			k.cdc.MustUnmarshal(eit.Value(), &c)
+			if c.Status != types.EntitlementChallengeStatusOpen || c.DepositAmount == "" {
+				continue
+			}
+			amt, err := types.ParseAmount(c.DepositAmount)
+			if err != nil {
+				return sdk.FormatInvariant(types.ModuleName, "open-challenge-escrow",
+					fmt.Sprintf("entitlement challenge %s bad deposit: %v", c.ChallengeId, err)), true
+			}
+			cur, ok := needed[c.DepositDenom]
+			if !ok {
+				cur = math.ZeroInt()
+			}
+			needed[c.DepositDenom] = cur.Add(amt)
 		}
 		escrow := k.ak.GetModuleAddress(types.ChallengeEscrowName)
 		for denom, want := range needed {

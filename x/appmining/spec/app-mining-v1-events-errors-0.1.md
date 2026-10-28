@@ -13,7 +13,7 @@
 | `entitlement_pool_opened` | `MsgOpenEntitlementPool` | `pool_id`, `denom`, `version` |
 | `entitlement_pool_funded` | `MsgFundEntitlementPool` | `pool_id`, `funder`, `amount`, `funded`, `available` |
 | `entitlement_pool_paused` | `MsgSetEntitlementPoolPaused` | `pool_id`, `status` |
-| `role_key_registered` | `MsgRegisterRoleKey` | `role`, `key_id`, `version` |
+| `role_key_registered` | `MsgRegisterRoleKey` / embedded publisher | `role`, `key_id`, `version`, `app_id` (64-hex; empty=global), `app_id_display` |
 | `role_key_status_changed` | `MsgSetRoleKeyStatus` | `role`, `key_id`, `old_status`, `new_status` |
 | `candidate_published` | `MsgPublishCandidate` | §6.1 + `action=publish` |
 | `entitlement_challenge_opened` | `MsgOpenChallenge` | §6.1 + `action=open_challenge` + `challenge_id`, `challenger` |
@@ -93,6 +93,9 @@ entitlement_challenge_opened.entitlement_id='<64-lowercase-hex>'
 | 76 | `ErrDualAuthRequired` | independent risk and audit proofs required | 同 key / 缺一方 |
 | 77 | `ErrRuleVersionNotAllowed` | candidate rule_version is not allowed | F-1：`rule_version` 不在治理白名单（空白名单=全拒） |
 | 78 | `ErrResolutionUnbound` | non-empty challenge_resolution_hash is not bound to a dismissed challenge | F-3 / DEC-01 方案 C：**摘要非空**但未锚定 DISMISSED 裁决；无挑战路径用**空摘要**（窗口届满且零挑战） |
+| 79 | `ErrRoleKeyAppMismatch` | role key app_id does not match message app_id | R1：ACTIVE 键绑定了 app，但与 MsgPublishCandidate.app_id 不一致 |
+| 80 | `ErrAssessmentCredentialInvalid` | assessment credential invalid | R3：签名/字段/过期/版本白名单失败；绑定键缺凭证 |
+| 81 | `ErrAssessmentCredentialReuse` | assessment credential_id already used | R3：credential_id 复用（REJECTED 亦不释放） |
 | 2 | `ErrUnauthorized` | unauthorized | 签名篡改、金额与候选不一致等（E-1 / UNAUTHORIZED_AMOUNT） |
 | 11 | `ErrChallengeWindow` | challenge window not elapsed | Approve 早于 604800s（E-6） |
 

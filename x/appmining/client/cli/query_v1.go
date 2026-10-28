@@ -1,6 +1,9 @@
 package cli
 
 import (
+	"encoding/hex"
+	"fmt"
+
 	"github.com/spf13/cobra"
 
 	"github.com/cosmos/cosmos-sdk/client"
@@ -150,13 +153,22 @@ func CmdQueryRoles() *cobra.Command {
 					return err
 				}
 			}
-			res, err := types.NewQueryClient(clientCtx).Roles(cmd.Context(), &types.QueryRolesRequest{Role: role})
+			req := &types.QueryRolesRequest{Role: role}
+			if appHex, _ := cmd.Flags().GetString("app-id-hex"); appHex != "" {
+				appID, err := hex.DecodeString(appHex)
+				if err != nil {
+					return fmt.Errorf("app-id-hex: %w", err)
+				}
+				req.AppId = appID
+			}
+			res, err := types.NewQueryClient(clientCtx).Roles(cmd.Context(), req)
 			if err != nil {
 				return err
 			}
 			return clientCtx.PrintProto(res)
 		},
 	}
+	cmd.Flags().String("app-id-hex", "", "optional filter: return keys bound to this 32-byte app_id (hex)")
 	flags.AddQueryFlagsToCmd(cmd)
 	return cmd
 }
