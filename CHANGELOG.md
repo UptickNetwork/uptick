@@ -64,6 +64,10 @@ Ref: https://keepachangelog.com/en/1.0.0/
 
 ### Bug Fixes
 
+* (appmining) Regen `types.pb.go` FileDescriptor so Params field 18
+  (`entitlement_allowed_assessment_versions`) passes CheckTx
+  `RejectUnknownFieldsStrict` (FIELD18); drop hand-maintained assessment pb duplicates.
+
 * (appmining) Approve dual-path binding (UGE DEC-01 scheme C): non-empty `challenge_resolution_hash`
   must bind a DISMISSED resolution (error 78); empty hash allows the no-challenge path after the
   window when zero challenges exist (else 71). Approve events include `resolution_bound`.
