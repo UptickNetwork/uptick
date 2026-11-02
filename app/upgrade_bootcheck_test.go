@@ -22,19 +22,18 @@ import (
 //
 // The chain roll-out this table encodes:
 //
-//	chain      last completed   this binary (v0.5.0)   next binary (v0.5.1)
-//	mainnet    v0.3.3           served                 must be served
-//	testnet    v0.4.1           NOT served             must be served
+//	chain      last completed   this binary (v0.5.1)
+//	mainnet    v0.5.0           served
+//	testnet    v0.4.1           served
 //
-// Mainnet becomes served by v0.5.1 for a different reason than testnet: after it
-// runs its own v0.5.0 plan, v0.5.0 is its LAST COMPLETED name, so the next
-// binary owes it a handler for exactly the name this one executes. Testnet is not
-// served here because it is not meant to be: it stays on v0.4.1 and upgrades
-// straight to v0.5.1, so its last completed name is v0.4.1 all the way through.
-//
-// The two sub-cases are deliberately opposites. One asserts a chain is served,
-// the other asserts a chain is not. Do not "fix" the second by registering
-// v0.4.1 in THIS release; read the note on `router` instead.
+// v0.5.1 is the first binary scoped to BOTH chains: mainnet reaches it from
+// v0.5.0, testnet jumps v0.4.1 -> v0.5.1 without ever running a v0.5.0 plan.
+// Both last-completed names therefore have to resolve to a handler here, or
+// the respective nodes abort on start. v0.3.3 stays registered as well: it is
+// mainnet's pre-v0.5.0 last-completed name and the router never drops a name a
+// live chain may still carry in applied_plan. v0.4.0 remains unregistered on
+// purpose: its legacy-pair deletion is not idempotent, and no live chain's last
+// completed plan is v0.4.0 (testnet passed through it to v0.4.1 long ago).
 func TestBootSelfCheckAgainstEveryServedChainsLastCompletedPlan(t *testing.T) {
 	app, ctx := sharedTestApp(t)
 
@@ -68,34 +67,35 @@ func TestBootSelfCheckAgainstEveryServedChainsLastCompletedPlan(t *testing.T) {
 		return err
 	}
 
-	// Mainnet stopped on v0.3.3 with nothing scheduled -- the ordinary operator
-	// window, and the case that has to boot. Height is mainnet's real
-	// applied_plan/v0.3.3.
-	t.Run("mainnet is served", func(t *testing.T) {
-		require.NoError(t, preBlocker(t, 18_147_950, "v0.3.3"),
-			"v0.3.3 is mainnet's last completed plan; with no handler every mainnet node aborts on start")
+	// Mainnet's last completed plan after its own v0.5.0 execution; the name
+	// this binary must serve for mainnet to reach v0.5.1.
+	t.Run("mainnet is served at v0.5.0", func(t *testing.T) {
+		require.NoError(t, preBlocker(t, 19_500_000, "v0.5.0"),
+			"v0.5.0 is mainnet's last completed plan; with no handler every mainnet node aborts on start")
 	})
 
-	// The testnet, and the price of this release's scope. Testnet does not
-	// upgrade in this release at all -- it waits on v0.4.1 and follows a plan
-	// named v0.5.1 later -- so this one must FAIL here. If it ever starts
-	// passing, a name came back into the router: check whether the fence in
-	// app/upgrade.go came down with it, and whether v0.5.1 landed first. Height
-	// is the testnet's real applied_plan/v0.4.1.
-	t.Run("testnet is deliberately not served", func(t *testing.T) {
-		err := preBlocker(t, 14_942_340, "v0.4.1")
-		require.Error(t, err,
-			"v0.4.1 must not be registered: this binary is scoped to mainnet, and v0.5.1 is the release that adds it back")
-		require.Contains(t, err.Error(), "v0.4.1",
-			"the failure has to name the missing plan; that string is the operator's only signal")
+	// Historical mainnet name: nodes that recorded v0.3.3 as their last
+	// completed plan (pre-v0.5.0 window) must still boot this binary.
+	t.Run("mainnet historical v0.3.3 stays served", func(t *testing.T) {
+		require.NoError(t, preBlocker(t, 18_147_950, "v0.3.3"),
+			"v0.3.3 is a done record mainnet nodes still carry; the router never drops a served name")
+	})
+
+	// Testnet jumps v0.4.1 -> v0.5.1 without ever running a v0.5.0 plan, so
+	// v0.4.1 is its last completed name and MUST boot this binary. This
+	// sub-case used to assert the opposite under the v0.5.0 binary's scope.
+	// Height is the testnet's real applied_plan/v0.4.1.
+	t.Run("testnet is served at v0.4.1", func(t *testing.T) {
+		require.NoError(t, preBlocker(t, 14_942_340, "v0.4.1"),
+			"v0.4.1 is the testnet's last completed plan; v0.5.1 upgrades testnet straight from it")
 	})
 
 	// The fence itself, stated as a boot-level fact rather than as an assertion
 	// about the router's map: a chain whose LAST completed plan is v0.4.0 could
 	// not start on this binary. No live chain is in that position (testnet's
-	// last completed is v0.4.1, mainnet's is v0.3.3), which is why the absence of
-	// v0.4.0 from the table costs nothing -- and it is the reason the name can be
-	// withheld without breaking either chain.
+	// last completed is v0.4.1, mainnet's is v0.5.0), which is why the absence
+	// of v0.4.0 from the table costs nothing -- and it is the reason the name
+	// can be withheld without breaking either chain.
 	t.Run("v0.4.0 is not a served name either", func(t *testing.T) {
 		err := preBlocker(t, 14_607_000, "v0.4.0")
 		require.Error(t, err)
@@ -116,10 +116,12 @@ func TestBootSelfCheckAgainstEveryServedChainsLastCompletedPlan(t *testing.T) {
 // ahead of the height halts the node, and the recovery is to put the old binary
 // back.
 //
-// The control case is the state every node is in while a proposal is pending:
-// the running binary has no handler for the plan's name, so nothing halts and
-// the chain keeps producing blocks. It uses "v0.5.1" because that is the next
-// plan name, and neither chain's current binary is the v0.5.1 release.
+// The control case is the state every node is in while the v0.5.1 proposal is
+// pending: the running binary (v0.5.0) has no handler for that name, so nothing
+// halts and the chain keeps producing blocks. It uses "v0.4.0" as the
+// unregistered name because that name is deliberately absent from this binary's
+// router (see `router` in app/upgrade.go); "v0.5.1" no longer qualifies --
+// THIS binary is the one that carries it.
 func TestBootSelfCheckRefusesToRunTheNewBinaryBeforeItsHeight(t *testing.T) {
 	app, ctx := sharedTestApp(t)
 
@@ -145,15 +147,15 @@ func TestBootSelfCheckRefusesToRunTheNewBinaryBeforeItsHeight(t *testing.T) {
 	}
 
 	t.Run("a registered plan refuses an early swap", func(t *testing.T) {
-		err := schedule(t, "v0.5.0")
+		err := schedule(t, "v0.5.1")
 		require.Error(t, err,
-			"a node that swaps in the new binary before the upgrade height must halt, not run")
+			"a node that swaps in this binary before the v0.5.1 upgrade height must halt, not run")
 		require.Contains(t, err.Error(), "BINARY UPDATED BEFORE TRIGGER",
 			"the message is the operator's only clue that the fix is to put the old binary back")
 	})
 
 	t.Run("an unregistered plan leaves the running binary alone", func(t *testing.T) {
-		require.NoError(t, schedule(t, "v0.5.1"),
+		require.NoError(t, schedule(t, "v0.4.0"),
 			"while a plan is pending, the binary that does not carry its handler has to keep running normally")
 	})
 }
