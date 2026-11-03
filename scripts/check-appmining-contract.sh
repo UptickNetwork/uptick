@@ -4,9 +4,19 @@
 # Executable twin: x/appmining/contract_guard_test.go
 #
 # Rules:
-#   [1] No EVM / go-ethereum imports.
+#   [1] No EVM imports. github.com/cosmos/evm is forbidden outright (design
+#       level: an EVM state import makes a contract a possible caller).
+#       github.com/ethereum/go-ethereum is forbidden EXCEPT in files listed in
+#       GETH_PRIMITIVES_OK below, and even there ONLY the pure crypto
+#       primitives subpackages (accounts / common / crypto) may be imported --
+#       signature recovery and address derivation, never an EVM runtime or
+#       state. Carve-out origin: DEC-10 secp256k1 EVM-address WireProof.
 #   [2] Do not json/proto-unmarshal opaque hash fields as structured payloads.
 #   [3] No literal "chain/" app_id key prefix.
+#
+# Exemption hygiene: every GETH_PRIMITIVES_OK entry must still exist among the
+# scanned files; a stale entry fails the gate, so an exemption cannot outlive
+# the file it was granted for.
 #
 # Exit codes: 0 = clean; 1 = findings; 2 = could not check.
 set -euo pipefail
@@ -58,9 +68,48 @@ scan() {
   printf '%s\n' "$2" | tr '\n' '\0' | xargs -0 grep -nIE "$1" 2>/dev/null || true
 }
 
-raw="$(scan '"github\.com/cosmos/evm|"github\.com/ethereum/go-ethereum' "$prod_go")"
+raw="$(scan '"github\.com/cosmos/evm' "$prod_go")"
 if [[ -n "$raw" ]]; then
-  report 1 'x/appmining must not import EVM packages' "$raw"
+  report 1 'x/appmining must not import github.com/cosmos/evm (no exemptions)' "$raw"
+fi
+
+# Files permitted to import go-ethereum PRIMITIVES only (see rule [1]).
+# One repo-relative path per line. Deleting the file requires deleting its
+# entry in the same commit -- the stale-entry check below enforces it.
+GETH_PRIMITIVES_OK=$(cat <<'EOF'
+x/appmining/types/wirev1/auth_secp256k1.go
+EOF
+)
+# Reasons:
+#   x/appmining/types/wirev1/auth_secp256k1.go
+#     -- DEC-10 secp256k1 EVM-address WireProof: EIP-191 TextHash / SigToPub /
+#        address derivation only. No EVM runtime, no state, no caller surface.
+
+geth_raw="$(scan '"github\.com/ethereum/go-ethereum' "$prod_go")"
+geth_findings=""
+if [[ -n "$geth_raw" ]]; then
+  while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
+    fpath="${line%%:*}"
+    if printf '%s\n' "$GETH_PRIMITIVES_OK" | grep -Fxq -- "$fpath"; then
+      # Exempt file: only the primitives subpackages may be imported.
+      if ! printf '%s' "$line" | grep -qE 'github\.com/ethereum/go-ethereum/(accounts|common|crypto)"'; then
+        geth_findings+="$line"$'\n'
+      fi
+    else
+      geth_findings+="$line"$'\n'
+    fi
+  done <<< "$geth_raw"
+fi
+# Stale-exemption check: an entry whose file no longer exists must be removed.
+while IFS= read -r p; do
+  [[ -z "$p" ]] && continue
+  if ! printf '%s\n' "$prod_go" | grep -Fxq -- "$p"; then
+    report 1 "stale rule-[1] exemption: '$p' is listed in GETH_PRIMITIVES_OK but is no longer a scanned production file" ""
+  fi
+done <<< "$GETH_PRIMITIVES_OK"
+if [[ -n "$geth_findings" ]]; then
+  report 1 'x/appmining must not import go-ethereum outside GETH_PRIMITIVES_OK; inside an exempt file only the accounts/common/crypto primitives subpackages may be imported' "$geth_findings"
 fi
 
 raw="$(scan 'json\.Unmarshal\([^)]*(attestation|AttestationHash|evidence|EvidenceHash|result_commitment|ResultCommitment)|proto\.Unmarshal\([^)]*(AttestationHash|EvidenceHash|ResultCommitment)' "$prod_go")"

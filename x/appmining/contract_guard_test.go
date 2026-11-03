@@ -28,25 +28,36 @@ import (
 // contract.
 const moduleDir = "."
 
-// Production Go files in this package, excluding tests.
+// Production Go files in this package, RECURSIVELY (subpackages included),
+// excluding tests and generated protobuf. The scan must match
+// scripts/check-appmining-contract.sh exactly: both twins cover the whole
+// module tree. (The original top-level os.ReadDir missed x/appmining/types/
+// wirev1/ entirely -- a subpackage importing go-ethereum passed `go test`
+// while the shell twin failed, i.e. the executable twin was blinder than the
+// script it claims to mirror.)
 func productionFiles(t *testing.T) []string {
 	t.Helper()
 
-	entries, err := os.ReadDir(moduleDir)
-	if err != nil {
-		t.Fatalf("read %s: %v", moduleDir, err)
-	}
-
 	var out []string
-	for _, e := range entries {
-		if e.IsDir() {
-			continue
+	err := fs.WalkDir(os.DirFS(moduleDir), ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
 		}
-		name := e.Name()
-		if !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
-			continue
+		if d.IsDir() {
+			return nil
 		}
-		out = append(out, name)
+		name := d.Name()
+		if !strings.HasSuffix(name, ".go") ||
+			strings.HasSuffix(name, "_test.go") ||
+			strings.HasSuffix(name, ".pb.go") ||
+			strings.HasSuffix(name, ".pb.gw.go") {
+			return nil
+		}
+		out = append(out, path)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk %s: %v", moduleDir, err)
 	}
 	return out
 }
@@ -77,28 +88,84 @@ func TestAppminingModuleAbsentUntilItLands(t *testing.T) {
 // and every permission check written against sdk.AccAddress has to be
 // re-derived against a caller that can be code. That is a design change, so it
 // has to be a deliberate one rather than an import someone added while fixing
-// something unrelated.
+// something unrelated. github.com/cosmos/evm is forbidden with NO exemptions.
+//
+// github.com/ethereum/go-ethereum is forbidden except in gethPrimitivesOK:
+// files using ONLY its pure crypto primitives (signature recovery / address
+// derivation -- DEC-10 secp256k1 EVM-address WireProof). Even in an exempt
+// file, only the accounts/common/crypto subpackages may appear; any other
+// go-ethereum subpackage (core, eth, state, ...) fails. An exemption entry
+// whose file no longer exists is itself a failure, so an exemption cannot
+// outlive the code it was granted for.
 //
 // Matched on the import path so an aliased import (`evm "github.com/cosmos/evm/..."`)
-// cannot slip past.
+// cannot slip past. Mirrors scripts/check-appmining-contract.sh rule [1].
 func TestNoEVMImport(t *testing.T) {
-	forbidden := []string{
-		`"github.com/cosmos/evm`,
-		`"github.com/ethereum/go-ethereum`,
+	// Repo-relative paths (x/appmining/...) allowed to import go-ethereum
+	// primitives only. Keep in lockstep with GETH_PRIMITIVES_OK in
+	// scripts/check-appmining-contract.sh.
+	gethPrimitivesOK := map[string][]string{
+		"types/wirev1/auth_secp256k1.go": {
+			`"github.com/ethereum/go-ethereum/accounts"`,
+			`"github.com/ethereum/go-ethereum/common"`,
+			`"github.com/ethereum/go-ethereum/crypto"`,
+		},
 	}
 
-	for _, file := range productionFiles(t) {
+	files := productionFiles(t)
+	seen := make(map[string]bool, len(files))
+	for _, file := range files {
+		seen[file] = true
 		src := readFile(t, file)
-		for _, needle := range forbidden {
-			if strings.Contains(src, needle) {
-				t.Errorf("%s imports %s.\n"+
-					"UGE is a Cosmos-side protocol; an EVM import makes a contract a possible caller and "+
-					"invalidates every sdk.AccAddress permission check in this module. If this import is "+
-					"genuinely required, it is a design decision to raise before merge, not a local fix.",
-					file, needle)
+
+		if strings.Contains(src, `"github.com/cosmos/evm`) {
+			t.Errorf("%s imports github.com/cosmos/evm.\n"+
+				"UGE is a Cosmos-side protocol; an EVM state import makes a contract a possible caller and "+
+				"invalidates every sdk.AccAddress permission check in this module. This ban has no exemptions; "+
+				"if it is genuinely required, it is a design decision to raise before merge, not a local fix.",
+				file)
+		}
+
+		allowed, exempt := gethPrimitivesOK[file]
+		for _, line := range strings.Split(src, "\n") {
+			idx := strings.Index(line, `"github.com/ethereum/go-ethereum`)
+			if idx < 0 {
+				continue
+			}
+			if !exempt {
+				t.Errorf("%s imports go-ethereum without a rule-[1] exemption (gethPrimitivesOK).\n"+
+					"Pure crypto primitives (accounts/common/crypto) may be exempted for signature "+
+					"verification; anything reaching EVM runtime or state is a design change to raise before merge.",
+					file)
+				break
+			}
+			if !containsExact(allowed, strings.TrimSpace(line)) {
+				t.Errorf("%s imports a go-ethereum package outside the primitives carve-out: %s\n"+
+					"Exempt files may import only the accounts/common/crypto subpackages.",
+					file, strings.TrimSpace(line))
+				break
 			}
 		}
 	}
+
+	// Stale-exemption check (reverse control): an entry for a file that no
+	// longer exists must be deleted in the same commit that deletes the file.
+	for path := range gethPrimitivesOK {
+		if !seen[path] {
+			t.Errorf("stale rule-[1] exemption: %q is listed in gethPrimitivesOK but is no longer a scanned production file.\n"+
+				"Delete the entry in the same commit that deleted the file.", "x/appmining/"+path)
+		}
+	}
+}
+
+// containsExact reports whether needle appears in the list verbatim.
+func containsExact(list []string, needle string) bool {
+	for _, s := range list {
+		if s == needle {
+			return true
+		}
+	}
+	return false
 }
 
 // TestNoPavCommitmentFieldAccess pins rule [2].
