@@ -104,9 +104,14 @@ jobs:
           proto_dirs=$(find ./uptick -path -prune -o -name '*.proto' -print0 | xargs -0 -n1 dirname | sort | uniq)
           echo "proto_dirs: $(echo "$proto_dirs" | wc -l)"
           echo "$proto_dirs" | head -8
-          echo "=== single-file buf verbose ==="
-          buf generate --template buf.gen.gogo.yaml ./uptick/appmining/v1/tx.proto; echo "rc=$?"
-          ls -d ../github.com 2>/dev/null && find ../github.com -name '*.pb.go' | head -3 || echo "NO SCRATCH produced"
+          echo "=== single-file buf INSIDE container ==="
+          docker run --rm -v "$(pwd)":/workspace --workdir /workspace --entrypoint sh \
+            ghcr.io/cosmos/proto-builder:0.14.0 -c '
+              cd proto
+              buf generate --template buf.gen.gogo.yaml ./uptick/appmining/v1/tx.proto
+              echo "buf rc=$?"
+              ls -d /workspace/github.com 2>/dev/null && find /workspace/github.com -name "*.pb.go" | head -3 || echo "NO SCRATCH in container"
+            '
 
       - name: Inspect scratch after proto-gen (temp)
         if: always()
