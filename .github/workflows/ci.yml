@@ -108,13 +108,17 @@ jobs:
           docker run --rm -v "$(pwd)":/workspace --workdir /workspace --entrypoint sh \
             -e BUF_LOG_LEVEL=debug \
             ghcr.io/cosmos/proto-builder:0.14.0 -c '
-              cd proto
-              buf generate --template buf.gen.gogo.yaml ./uptick/appmining/v1/tx.proto 2>&1 | tail -30
+              echo "=== /workspace as seen by container ==="
+              ls /workspace | head -12
+              ls -ld /workspace/proto 2>&1
+              cd /workspace/proto || exit 9
+              pwd
+              buf generate --template buf.gen.gogo.yaml ./uptick/appmining/v1/tx.proto
               echo "buf rc=$?"
-              echo "=== where did it write? search container fs ==="
-              find / -maxdepth 6 -type d -name github.com -not -path "*/proc/*" 2>/dev/null
-              find / -maxdepth 9 -name "tx.pb.go" -newer /workspace/proto/buf.yaml 2>/dev/null | head -5
-            '
+              echo "=== where did it write? ==="
+              find / -maxdepth 6 -type d -name github.com -not -path "/proc/*" -not -path "/go/*" 2>/dev/null
+              find /workspace -name "tx.pb.go" -newer /workspace/proto/buf.yaml 2>/dev/null | head -5
+            ' 2>&1 | tail -60
 
       - name: Inspect scratch after proto-gen (temp)
         if: always()
