@@ -8,7 +8,7 @@ on:
 # Least privilege: the release job builds artifacts locally and uploads them
 # via goreleaser; it never talks to a Docker daemon.
 permissions:
-  contents: write
+  contents: read
 
 env:
   # goreleaser-cross image pinned by immutable digest (tag v1.25.8 at the
@@ -18,7 +18,57 @@ env:
   GORELEASER_CROSS_IMAGE: ghcr.io/goreleaser/goreleaser-cross@sha256:75b288263cf8ac2cabb10bd464acd0792dcaec99ca0d3d0eae42ca7106e55355
 
 jobs:
+  # Guard: only tags whose commit sits on the mainline may publish a release.
+  #
+  # Why this exists: engineering lines that live on their own branch (uge/*)
+  # carry v* tags too, and every `v*` tag push used to run the full
+  # goreleaser pipeline and publish a public GitHub Release — even for code
+  # that was never merged to main. That let a test-stage tag become the
+  # repo's "Latest" release and occupy a mainline version name (both of
+  # which happened in Oct 2026).
+  #
+  # Semantics: a tag passes if the commit it points at is an ancestor of
+  # origin/main, i.e. the tagged code IS mainline code (tagged exactly on a
+  # main commit, or on a commit main already contains). Anything else —
+  # feature branches, release-engineering branches, stale forks of main —
+  # is skipped with a visible message instead of publishing.
+  #
+  # Note on reach: for a tag push, GitHub runs THIS file as it exists at the
+  # tagged commit. The guard therefore applies to tags created after this
+  # change reached the branch being tagged. Tags already published keep
+  # their releases; the three UGE test releases are marked pre-release.
+  mainline-guard:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      mainline: ${{ steps.check.outputs.mainline }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+
+      - name: Require the tagged commit to be on main
+        id: check
+        run: |
+          # Resolve the commit the tag points at. `$GITHUB_REF^{commit}` is
+          # correct for both lightweight and annotated tags, where
+          # `$GITHUB_SHA` alone is ambiguous.
+          commit="$(git rev-parse "${GITHUB_REF}^{commit}")"
+          echo "tag commit: $commit"
+
+          if git merge-base --is-ancestor "$commit" origin/main; then
+            echo "mainline=true" >> "$GITHUB_OUTPUT"
+            echo "tagged commit is on mainline: publishing allowed"
+          else
+            echo "mainline=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::tag ${GITHUB_REF#refs/tags/} does not point at mainline code (not an ancestor of origin/main); release skipped"
+          fi
+
   goreleaser:
+    needs: mainline-guard
+    if: needs.mainline-guard.outputs.mainline == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
