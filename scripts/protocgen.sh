@@ -27,13 +27,19 @@ buf generate --template buf.gen.doc.yaml
 
 cd ..
 
-# move proto files to the right places
-cp -r github.com/UptickNetwork/uptick/x/collection/types/* ./x/collection/types
-cp -r github.com/UptickNetwork/uptick/x/cw721/types/* ./x/cw721/types
-cp -r github.com/UptickNetwork/uptick/x/erc721/types/* ./x/erc721/types
-cp -r github.com/UptickNetwork/uptick/x/evmibc/types/* ./x/evmibc/types
-cp -r github.com/UptickNetwork/uptick/x/nft/types/* ./x/nft/types
-cp -r github.com/UptickNetwork/uptick/x/appmining/types/* ./x/appmining/types
-# scratch output of buf generate must not linger: a leftover github.com/ tree
-# pollutes git status and would trip the CI generated-code drift check.
-rm -rf github.com
+# buf >= 1.x resolves each file's go_package against the workspace and writes
+# the generated code DIRECTLY into x/<module>/types; the older buf wrote a
+# literal out/<go_package-path>/ scratch tree (github.com/UptickNetwork/...)
+# that the moves below then relocated. Support both layouts: only move when
+# the scratch tree exists, otherwise generation already landed in place.
+if [ -d github.com ]; then
+  cp -r github.com/UptickNetwork/uptick/x/collection/types/* ./x/collection/types
+  cp -r github.com/UptickNetwork/uptick/x/cw721/types/* ./x/cw721/types
+  cp -r github.com/UptickNetwork/uptick/x/erc721/types/* ./x/erc721/types
+  cp -r github.com/UptickNetwork/uptick/x/evmibc/types/* ./x/evmibc/types
+  cp -r github.com/UptickNetwork/uptick/x/nft/types/* ./x/nft/types
+  cp -r github.com/UptickNetwork/uptick/x/appmining/types/* ./x/appmining/types
+  # scratch output of buf generate must not linger: a leftover github.com/ tree
+  # pollutes git status and would trip the CI generated-code drift check.
+  rm -rf github.com
+fi
