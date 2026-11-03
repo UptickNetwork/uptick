@@ -83,6 +83,30 @@ func (k msgServer) PublishCandidate(goCtx context.Context, msg *types.MsgPublish
 	}
 
 	now := ctx.BlockTime().Unix()
+
+	record := map[string]string{
+		"protocol_version": "1",
+		"operation":        "PUBLISH",
+		"role":             "publisher",
+		"chain_id":         msg.ChainId,
+		"pool_id":          msg.PoolId,
+		"key_id":           msg.Proof.KeyId,
+		"nonce":            msg.Proof.Nonce,
+		"expires_at":       msg.Proof.ExpiresAt,
+		"entitlement_id":   msg.EntitlementId,
+		"app_id":           msg.AppId,
+		"candidate_hash":   hash,
+		"rule_version":     msg.RuleVersion,
+	}
+
+	// P2-1: verify the wire signature BEFORE the idempotent short-circuit.
+	// Otherwise an unsigned/garbage proof could probe candidate existence and
+	// get a success response. The nonce is NOT consumed here: an identical
+	// retry (same signed record, nonce already burned by the first publish)
+	// still reaches the idempotent path below.
+	if err := k.verifyWireAuth(ctx, types.EntitlementRolePublisher, msg.Proof, record, now); err != nil {
+		return nil, err
+	}
 	if existing, ok := k.GetCandidate(ctx, msg.EntitlementId); ok {
 		if existing.CandidateHash == hash {
 			// idempotent same content
@@ -111,21 +135,7 @@ func (k msgServer) PublishCandidate(goCtx context.Context, msg *types.MsgPublish
 		return nil, err
 	}
 
-	record := map[string]string{
-		"protocol_version": "1",
-		"operation":        "PUBLISH",
-		"role":             "publisher",
-		"chain_id":         msg.ChainId,
-		"pool_id":          msg.PoolId,
-		"key_id":           msg.Proof.KeyId,
-		"nonce":            msg.Proof.Nonce,
-		"expires_at":       msg.Proof.ExpiresAt,
-		"entitlement_id":   msg.EntitlementId,
-		"app_id":           msg.AppId,
-		"candidate_hash":   hash,
-		"rule_version":     msg.RuleVersion,
-	}
-	if err := k.verifyAndConsumeWireAuth(ctx, types.EntitlementRolePublisher, msg.Proof, record, now); err != nil {
+	if err := k.consumeWireAuthNonce(ctx, types.EntitlementRolePublisher, msg.Proof); err != nil {
 		return nil, err
 	}
 

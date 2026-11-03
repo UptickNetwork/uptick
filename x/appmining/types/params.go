@@ -28,6 +28,19 @@ const (
 	MaxFreezeSeconds       = 259200
 )
 
+// MaxWireProofValiditySeconds caps WireProof.expires_at relative to the
+// processing block time: exp <= now + 7d. Wire proofs are one-shot (nonce
+// consumed on use), so the cap bounds how long a leaked-but-unused signed
+// proof stays a live credential; replay beyond the cap is also dead because
+// the expiry check rejects now > exp. Consumed auth nonces are retained for
+// NonceRetentionSeconds before pruning (pruning is safe: any replay of a
+// pruned nonce necessarily carries its original expires_at, which by then has
+// passed).
+const (
+	MaxWireProofValiditySeconds = 604800 // 7d
+	NonceRetentionSeconds       = 691200 // 8d = validity + 1d grace
+)
+
 // DefaultParams returns production-safe defaults.
 // pause_authority defaults to the same address as authority (Q-06 P0).
 // Legacy attestation/GasCredit/Finalize writes are paused by default (S-2 /

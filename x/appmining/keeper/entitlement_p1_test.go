@@ -111,7 +111,7 @@ func TestVector_PUBLISH_IS_NOT_PAYMENT(t *testing.T) {
 		rec := map[string]string{
 			"protocol_version": "1", "operation": "PUBLISH", "role": "publisher",
 			"chain_id": testChainID, "pool_id": testPoolID, "key_id": "pub-1",
-			"nonce": nonce, "expires_at": "1893456000",
+			"nonce": nonce, "expires_at": wireExp(e.ctx),
 			"entitlement_id": c.EntitlementID, "app_id": c.AppID,
 			"candidate_hash": hash, "rule_version": c.RuleVersion,
 		}
@@ -160,7 +160,7 @@ func TestP1_OpenAndResolveChallenge(t *testing.T) {
 	rec := map[string]string{
 		"protocol_version": "1", "operation": "PUBLISH", "role": "publisher",
 		"chain_id": testChainID, "pool_id": testPoolID, "key_id": "pub-1",
-		"nonce": "10", "expires_at": "1893456000",
+		"nonce": "10", "expires_at": wireExp(e.ctx),
 		"entitlement_id": c.EntitlementID, "app_id": c.AppID,
 		"candidate_hash": hash, "rule_version": c.RuleVersion,
 	}
@@ -194,7 +194,7 @@ func TestP1_OpenAndResolveChallenge(t *testing.T) {
 	resolveRec := map[string]string{
 		"protocol_version": "1", "operation": "RESOLVE", "role": "reviewer",
 		"chain_id": testChainID, "pool_id": testPoolID, "key_id": "rev-1",
-		"nonce": "20", "expires_at": "1893456000",
+		"nonce": "20", "expires_at": wireExp(e.ctx),
 		"challenge_id": openRes.ChallengeId, "candidate_id": c.EntitlementID,
 		"outcome": "DISMISSED", "rationale_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
 	}
@@ -219,7 +219,7 @@ func TestP1_UpholdRejectsCandidate(t *testing.T) {
 	rec := map[string]string{
 		"protocol_version": "1", "operation": "PUBLISH", "role": "publisher",
 		"chain_id": testChainID, "pool_id": testPoolID, "key_id": "pub-1",
-		"nonce": "30", "expires_at": "1893456000",
+		"nonce": "30", "expires_at": wireExp(e.ctx),
 		"entitlement_id": c.EntitlementID, "app_id": c.AppID,
 		"candidate_hash": hash, "rule_version": c.RuleVersion,
 	}
@@ -242,7 +242,7 @@ func TestP1_UpholdRejectsCandidate(t *testing.T) {
 	resolveRec := map[string]string{
 		"protocol_version": "1", "operation": "RESOLVE", "role": "reviewer",
 		"chain_id": testChainID, "pool_id": testPoolID, "key_id": "rev-1",
-		"nonce": "40", "expires_at": "1893456000",
+		"nonce": "40", "expires_at": wireExp(e.ctx),
 		"challenge_id": openRes.ChallengeId, "candidate_id": c.EntitlementID,
 		"outcome": "UPHELD", "rationale_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
 	}

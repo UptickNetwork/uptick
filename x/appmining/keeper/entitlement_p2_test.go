@@ -44,7 +44,7 @@ func setupP2(t *testing.T) (testEnv, ed25519.PrivateKey, ed25519.PrivateKey, ed2
 	rec := map[string]string{
 		"protocol_version": "1", "operation": "PUBLISH", "role": "publisher",
 		"chain_id": testChainID, "pool_id": testPoolID, "key_id": "pub-1",
-		"nonce": "100", "expires_at": "1893456000",
+		"nonce": "100", "expires_at": wireExp(e.ctx),
 		"entitlement_id": c.EntitlementID, "app_id": c.AppID,
 		"candidate_hash": hash, "rule_version": c.RuleVersion,
 	}
@@ -76,7 +76,7 @@ func approveMsgWithResolution(t *testing.T, e testEnv, aprPriv ed25519.PrivateKe
 	rec := map[string]string{
 		"protocol_version": "1", "operation": "APPROVE", "role": "approver",
 		"chain_id": testChainID, "pool_id": testPoolID, "key_id": "apr-1",
-		"nonce": nonce, "expires_at": "1893456000",
+		"nonce": nonce, "expires_at": wireExp(e.ctx),
 		"entitlement_id": c.EntitlementID, "app_id": c.AppID,
 		"candidate_hash":            cand.CandidateHash,
 		"challenge_resolution_hash": resolutionDigest,
@@ -130,7 +130,7 @@ func TestVector_FIXED_POOL_EXHAUSTION_AND_CROSS_EPOCH_RESERVATION(t *testing.T) 
 	rec := map[string]string{
 		"protocol_version": "1", "operation": "PUBLISH", "role": "publisher",
 		"chain_id": testChainID, "pool_id": testPoolID, "key_id": "pub-1",
-		"nonce": "302", "expires_at": "1893456000",
+		"nonce": "302", "expires_at": wireExp(e.ctx),
 		"entitlement_id": c2.EntitlementID, "app_id": c2.AppID,
 		"candidate_hash": hash, "rule_version": c2.RuleVersion,
 	}

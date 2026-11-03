@@ -84,7 +84,11 @@ func (k Keeper) InitGenesis(ctx sdk.Context, gs types.GenesisState) {
 		if !ok {
 			continue
 		}
-		k.SetAuthNonce(ctx, role, parts[1], parts[2])
+		// The genesis string carries no expiry; anchor it at import time.
+		// NonceRetentionSeconds (validity + grace) then covers the remaining
+		// life of any genuine record exported recently, after which the record
+		// itself is expired and replay fails the expiry check anyway.
+		k.SetAuthNonce(ctx, role, parts[1], parts[2], ctx.BlockTime().Unix())
 	}
 }
 

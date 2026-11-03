@@ -52,9 +52,21 @@ func TestDisabledAuthzIncludesAppminingSensitiveMsgs(t *testing.T) {
 	require.Contains(t, urls, sdk.MsgTypeURL(&appminingtypes.MsgSubmitAttestation{}))
 	require.Contains(t, urls, sdk.MsgTypeURL(&appminingtypes.MsgChallengeAttestation{}))
 	require.Contains(t, urls, sdk.MsgTypeURL(&appminingtypes.MsgPause{}))
+	// V1 entitlement control plane: authority-gated, never delegatable.
+	require.Contains(t, urls, sdk.MsgTypeURL(&appminingtypes.MsgOpenEntitlementPool{}))
+	require.Contains(t, urls, sdk.MsgTypeURL(&appminingtypes.MsgSetEntitlementPoolPaused{}))
+	require.Contains(t, urls, sdk.MsgTypeURL(&appminingtypes.MsgRegisterRoleKey{}))
+	require.Contains(t, urls, sdk.MsgTypeURL(&appminingtypes.MsgSetRoleKeyStatus{}))
+	require.Contains(t, urls, sdk.MsgTypeURL(&appminingtypes.MsgRegisterAssessmentSigner{}))
+	require.Contains(t, urls, sdk.MsgTypeURL(&appminingtypes.MsgSetAssessmentSignerStatus{}))
 	// Permissionless surfaces stay grantable.
 	require.NotContains(t, urls, sdk.MsgTypeURL(&appminingtypes.MsgFinalizeAttestation{}))
 	require.NotContains(t, urls, sdk.MsgTypeURL(&appminingtypes.MsgFundRewardPool{}))
+	// Wire-op messages are proof-keyed (signature over the record), not
+	// signer-keyed: a grantee still needs the role key signature, so they stay
+	// grantable -- same rule as the permissionless IBC surface.
+	require.NotContains(t, urls, sdk.MsgTypeURL(&appminingtypes.MsgPublishCandidate{}))
+	require.NotContains(t, urls, sdk.MsgTypeURL(&appminingtypes.MsgFundEntitlementPool{}))
 }
 
 func TestAuthzLimiterAllowsBankSendInMsgExec(t *testing.T) {

@@ -60,7 +60,7 @@ func TestVector_DISMISSED_CHALLENGE_ALLOWS_APPROVAL(t *testing.T) {
 	resolveRec := map[string]string{
 		"protocol_version": "1", "operation": "RESOLVE", "role": "reviewer",
 		"chain_id": testChainID, "pool_id": testPoolID, "key_id": "rev-1",
-		"nonce": "920", "expires_at": "1893456000",
+		"nonce": "920", "expires_at": wireExp(e.ctx),
 		"challenge_id": openRes.ChallengeId, "candidate_id": c.EntitlementID,
 		"outcome": "DISMISSED", "rationale_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
 	}

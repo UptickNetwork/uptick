@@ -45,7 +45,7 @@ func TestT1b_BoundKeyRequiresCredential(t *testing.T) {
 	rec := map[string]string{
 		"protocol_version": "1", "operation": "PUBLISH", "role": "publisher",
 		"chain_id": testChainID, "pool_id": testPoolID, "key_id": "bound-need-cred",
-		"nonce": "9201", "expires_at": "1893456000",
+		"nonce": "9201", "expires_at": wireExp(e.ctx),
 		"entitlement_id": cand.EntitlementID, "app_id": cand.AppID,
 		"candidate_hash": hash, "rule_version": cand.RuleVersion,
 	}
@@ -105,7 +105,7 @@ func TestT1b_CredentialHappyPathAndReuse(t *testing.T) {
 	rec := map[string]string{
 		"protocol_version": "1", "operation": "PUBLISH", "role": "publisher",
 		"chain_id": testChainID, "pool_id": testPoolID, "key_id": "bound-ok",
-		"nonce": "9210", "expires_at": "1893456000",
+		"nonce": "9210", "expires_at": wireExp(e.ctx),
 		"entitlement_id": cand.EntitlementID, "app_id": cand.AppID,
 		"candidate_hash": hash, "rule_version": cand.RuleVersion,
 	}
@@ -157,7 +157,7 @@ func TestT1b_CredentialHappyPathAndReuse(t *testing.T) {
 	rec2 := map[string]string{
 		"protocol_version": "1", "operation": "PUBLISH", "role": "publisher",
 		"chain_id": testChainID, "pool_id": testPoolID, "key_id": "bound-ok",
-		"nonce": "9211", "expires_at": "1893456000",
+		"nonce": "9211", "expires_at": wireExp(e.ctx),
 		"entitlement_id": cand2.EntitlementID, "app_id": cand2.AppID,
 		"candidate_hash": hash2, "rule_version": cand2.RuleVersion,
 	}

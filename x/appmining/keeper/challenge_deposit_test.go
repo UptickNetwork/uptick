@@ -28,7 +28,7 @@ func publishForDeposit(t *testing.T, e testEnv, pubPriv ed25519.PrivateKey, nonc
 	rec := map[string]string{
 		"protocol_version": "1", "operation": "PUBLISH", "role": "publisher",
 		"chain_id": testChainID, "pool_id": testPoolID, "key_id": "pub-1",
-		"nonce": nonce, "expires_at": "1893456000",
+		"nonce": nonce, "expires_at": wireExp(e.ctx),
 		"entitlement_id": c.EntitlementID, "app_id": c.AppID,
 		"candidate_hash": hash, "rule_version": c.RuleVersion,
 	}
@@ -48,7 +48,7 @@ func resolveForDeposit(t *testing.T, e testEnv, revPriv ed25519.PrivateKey, chal
 	rec := map[string]string{
 		"protocol_version": "1", "operation": "RESOLVE", "role": "reviewer",
 		"chain_id": testChainID, "pool_id": testPoolID, "key_id": "rev-1",
-		"nonce": nonce, "expires_at": "1893456000",
+		"nonce": nonce, "expires_at": wireExp(e.ctx),
 		"challenge_id": challengeID, "candidate_id": entitlementID,
 		"outcome": outcome, "rationale_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
 	}

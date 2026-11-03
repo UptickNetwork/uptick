@@ -1,6 +1,8 @@
 package keeper
 
 import (
+	"bytes"
+	"encoding/binary"
 	"encoding/hex"
 
 	storetypes "cosmossdk.io/store/types"
@@ -383,22 +385,79 @@ func (k Keeper) HasAuthNonce(ctx sdk.Context, role types.EntitlementRole, keyID,
 	return k.store(ctx).Has(types.AuthNonceKey(role, keyID, nonce))
 }
 
-// SetAuthNonce consumes the wire-v1 nonce. The value records
-// "role_wire/key_id/nonce" so genesis export can reconstruct UsedAuthNonces.
-func (k Keeper) SetAuthNonce(ctx sdk.Context, role types.EntitlementRole, keyID, nonce string) {
-	roleWire, _ := types.RoleWire(role)
-	k.store(ctx).Set(types.AuthNonceKey(role, keyID, nonce), []byte(roleWire+"/"+keyID+"/"+nonce))
+// SetAuthNonce consumes the wire-v1 nonce. The value is the proof's
+// expires_at as 8-byte big-endian, used only for pruning; the genesis string
+// ("role_wire/key_id/nonce") is reconstructed from the key, which carries the
+// full identity. Legacy entries written before the expiry format keep their
+// old string values -- they are never pruned and export identically.
+func (k Keeper) SetAuthNonce(ctx sdk.Context, role types.EntitlementRole, keyID, nonce string, expiresAt int64) {
+	k.pruneAuthNonces(ctx, role, keyID, expiresAt)
+	k.store(ctx).Set(types.AuthNonceKey(role, keyID, nonce), types.Uint64Bytes(uint64(expiresAt)))
 }
 
-// IterateAuthNonces walks consumed wire-v1 nonces ("role/key_id/nonce").
+// pruneAuthNonces deletes consumed nonces of one (role, key_id) whose expiry
+// passed the retention window. Safe because replaying a pruned nonce requires
+// resubmitting its original signed record, whose expires_at has already
+// expired (now > exp fails verifyWireAuth). Entries with unparseable values
+// (legacy pre-expiry format) are kept.
+func (k Keeper) pruneAuthNonces(ctx sdk.Context, role types.EntitlementRole, keyID string, now int64) {
+	cutoff := now - types.NonceRetentionSeconds
+	prefix := append(append([]byte{}, types.KeyPrefixAuthNonce...), byte(role))
+	prefix = append(prefix, []byte(keyID)...)
+	prefix = append(prefix, 0)
+	store := k.store(ctx)
+	var toDelete [][]byte
+	it := storetypes.KVStorePrefixIterator(store, prefix)
+	defer it.Close()
+	for ; it.Valid(); it.Next() {
+		if v := it.Value(); len(v) == 8 {
+			if int64(binary.BigEndian.Uint64(v)) < cutoff {
+				toDelete = append(toDelete, it.Key())
+			}
+		}
+	}
+	for _, key := range toDelete {
+		store.Delete(key)
+	}
+}
+
+// IterateAuthNonces walks consumed wire-v1 nonces ("role/key_id/nonce"),
+// reconstructing the identity from the store key so the value format stays
+// free to evolve.
 func (k Keeper) IterateAuthNonces(ctx sdk.Context, fn func(string) bool) {
 	it := storetypes.KVStorePrefixIterator(k.store(ctx), types.KeyPrefixAuthNonce)
 	defer it.Close()
 	for ; it.Valid(); it.Next() {
-		if !fn(string(it.Value())) {
-			return
+		if n, ok := authNonceIdentityFromKey(it.Key()); ok {
+			if !fn(n) {
+				return
+			}
 		}
 	}
+}
+
+// authNonceIdentityFromKey parses "prefix | role | key_id | 0x00 | nonce"
+// back into "role_wire/key_id/nonce". key_id is validated by ValidateWireID
+// ([A-Za-z0-9._:-]), so 0x00 is an unambiguous separator.
+func authNonceIdentityFromKey(key []byte) (string, bool) {
+	rest, ok := bytes.CutPrefix(key, types.KeyPrefixAuthNonce)
+	if !ok || len(rest) < 3 {
+		return "", false
+	}
+	roleWire, ok := types.RoleWire(types.EntitlementRole(rest[0]))
+	if !ok {
+		return "", false
+	}
+	sep := bytes.IndexByte(rest[1:], 0)
+	if sep < 0 {
+		return "", false
+	}
+	keyID := string(rest[1 : 1+sep])
+	nonce := string(rest[2+sep:])
+	if keyID == "" || nonce == "" {
+		return "", false
+	}
+	return roleWire + "/" + keyID + "/" + nonce, true
 }
 
 func (k Keeper) SetAssessmentSigner(ctx sdk.Context, s types.AssessmentSigner) {

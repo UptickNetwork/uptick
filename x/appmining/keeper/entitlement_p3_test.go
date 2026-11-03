@@ -44,7 +44,7 @@ func freezeMsg(t *testing.T, e testEnv, riskPriv ed25519.PrivateKey, c wirev1.Ca
 	rec := map[string]string{
 		"protocol_version": "1", "operation": "FREEZE", "role": "risk",
 		"chain_id": testChainID, "pool_id": testPoolID, "key_id": "risk-1",
-		"nonce": nonce, "expires_at": "1893456000",
+		"nonce": nonce, "expires_at": wireExp(e.ctx),
 		"entitlement_id":  c.EntitlementID,
 		"evidence_type":   "CONFIRMED_REFUND_OR_REVERSAL",
 		"evidence_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -77,7 +77,7 @@ func revokeMsg(t *testing.T, e testEnv, riskPriv, auditPriv ed25519.PrivateKey, 
 	riskRec["role"] = "risk"
 	riskRec["key_id"] = "risk-1"
 	riskRec["nonce"] = riskNonce
-	riskRec["expires_at"] = "1893456000"
+	riskRec["expires_at"] = wireExp(e.ctx)
 	auditRec := map[string]string{}
 	for k, v := range base {
 		auditRec[k] = v
@@ -85,7 +85,7 @@ func revokeMsg(t *testing.T, e testEnv, riskPriv, auditPriv ed25519.PrivateKey, 
 	auditRec["role"] = "audit"
 	auditRec["key_id"] = "audit-1"
 	auditRec["nonce"] = auditNonce
-	auditRec["expires_at"] = "1893456000"
+	auditRec["expires_at"] = wireExp(e.ctx)
 	return &types.MsgRevokeEntitlement{
 		Submitter: e.sub.String(), ChainId: testChainID, PoolId: testPoolID,
 		EntitlementId:   c.EntitlementID,

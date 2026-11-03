@@ -3,6 +3,7 @@ package keeper_test
 import (
 	"context"
 	"crypto/ed25519"
+	"strconv"
 	"testing"
 
 	coreaddress "cosmossdk.io/core/address"
@@ -209,4 +210,13 @@ func enableManualConsume(t *testing.T, e testEnv) {
 	p := e.k.GetParams(e.ctx)
 	p.AllowManualGasCreditConsume = true
 	require.NoError(t, e.k.SetParams(e.ctx, p))
+}
+
+// wireExp returns a WireProof.expires_at valid for an op processed at the
+// current test block time: one hour ahead, within the P2-3 far-future cap
+// (types.MaxWireProofValiditySeconds). Records in this suite are built at
+// their processing context, so the helper tracks WithBlockTime advances and
+// rollbacks alike.
+func wireExp(ctx sdk.Context) string {
+	return strconv.FormatInt(ctx.BlockTime().Unix()+3600, 10)
 }

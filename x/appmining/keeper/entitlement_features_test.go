@@ -51,7 +51,7 @@ func TestFeature_AuthNonceReplayRejected(t *testing.T) {
 	rec := map[string]string{
 		"protocol_version": "1", "operation": "PUBLISH", "role": "publisher",
 		"chain_id": testChainID, "pool_id": testPoolID, "key_id": "pub-1",
-		"nonce": "1302", "expires_at": "1893456000",
+		"nonce": "1302", "expires_at": wireExp(e.ctx),
 		"entitlement_id": c2.EntitlementID, "app_id": c2.AppID,
 		"candidate_hash": hash, "rule_version": c2.RuleVersion,
 	}
@@ -106,7 +106,7 @@ func TestFeature_PoolPausedRejectsPublish(t *testing.T) {
 	rec := map[string]string{
 		"protocol_version": "1", "operation": "PUBLISH", "role": "publisher",
 		"chain_id": testChainID, "pool_id": testPoolID, "key_id": "pub-1",
-		"nonce": "1320", "expires_at": "1893456000",
+		"nonce": "1320", "expires_at": wireExp(e.ctx),
 		"entitlement_id": c.EntitlementID, "app_id": c.AppID,
 		"candidate_hash": hash, "rule_version": c.RuleVersion,
 	}
@@ -174,7 +174,7 @@ func TestFeature_ChallengeOpenedEventIndexKey(t *testing.T) {
 	rec := map[string]string{
 		"protocol_version": "1", "operation": "PUBLISH", "role": "publisher",
 		"chain_id": testChainID, "pool_id": testPoolID, "key_id": "pub-1",
-		"nonce": "1340", "expires_at": "1893456000",
+		"nonce": "1340", "expires_at": wireExp(e.ctx),
 		"entitlement_id": c.EntitlementID, "app_id": c.AppID,
 		"candidate_hash": hash, "rule_version": c.RuleVersion,
 	}
@@ -258,7 +258,7 @@ func TestFeature_PublishStoresTxHash(t *testing.T) {
 	rec := map[string]string{
 		"protocol_version": "1", "operation": "PUBLISH", "role": "publisher",
 		"chain_id": testChainID, "pool_id": testPoolID, "key_id": "pub-1",
-		"nonce": "1360", "expires_at": "1893456000",
+		"nonce": "1360", "expires_at": wireExp(e.ctx),
 		"entitlement_id": c.EntitlementID, "app_id": c.AppID,
 		"candidate_hash": hash, "rule_version": c.RuleVersion,
 	}

@@ -127,7 +127,7 @@ func TestAssessmentSigner_MsgPathAcceptedByVerify(t *testing.T) {
 	rec := map[string]string{
 		"protocol_version": "1", "operation": "PUBLISH", "role": "publisher",
 		"chain_id": testChainID, "pool_id": testPoolID, "key_id": "bound-msg",
-		"nonce": "9301", "expires_at": "1893456000",
+		"nonce": "9301", "expires_at": wireExp(e.ctx),
 		"entitlement_id": cand.EntitlementID, "app_id": cand.AppID,
 		"candidate_hash": hash, "rule_version": cand.RuleVersion,
 	}

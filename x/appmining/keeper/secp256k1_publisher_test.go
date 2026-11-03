@@ -63,7 +63,7 @@ func TestDEC10_Secp256k1PublisherPublish(t *testing.T) {
 	rec := map[string]string{
 		"protocol_version": "1", "operation": "PUBLISH", "role": "publisher",
 		"chain_id": testChainID, "pool_id": testPoolID, "key_id": "mm-1",
-		"nonce": "9601", "expires_at": "1893456000",
+		"nonce": "9601", "expires_at": wireExp(e.ctx),
 		"entitlement_id": cand.EntitlementID, "app_id": cand.AppID,
 		"candidate_hash": hash, "rule_version": cand.RuleVersion,
 	}
@@ -97,7 +97,7 @@ func TestDEC10_Secp256k1PublisherPublish(t *testing.T) {
 	rec2 := map[string]string{
 		"protocol_version": "1", "operation": "PUBLISH", "role": "publisher",
 		"chain_id": testChainID, "pool_id": testPoolID, "key_id": "mm-2",
-		"nonce": "9602", "expires_at": "1893456000",
+		"nonce": "9602", "expires_at": wireExp(e.ctx),
 		"entitlement_id": cand2.EntitlementID, "app_id": cand2.AppID,
 		"candidate_hash": hash2, "rule_version": cand2.RuleVersion,
 	}

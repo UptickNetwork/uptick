@@ -10,6 +10,15 @@ import (
 
 // ConsumeGasCredit debits gas credit for an authorized payer. Shared by Msg
 // server and Cosmos PostHandler auto-consume.
+//
+// Storage note (P1-2): GasCreditConsumption records grow unboundedly by
+// design and are NOT prunable. Each record is the only thing binding a
+// source tx hash to exactly one debit; deleting one would let the same
+// sourceTxHash be debited again (MsgConsumeGasCredit is a separate tx from
+// the source tx, so cometbft dedup does not protect it). Growth is bounded
+// in rate: one ~110B record per actual gas consumption, same order as the
+// tx index itself. AuthNonce (the other append-only set) IS pruned -- see
+// store.pruneAuthNonces -- because wire proofs carry expires_at.
 func (k Keeper) ConsumeGasCredit(
 	ctx sdk.Context,
 	appID []byte,

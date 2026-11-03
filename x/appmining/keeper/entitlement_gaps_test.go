@@ -33,7 +33,7 @@ func TestVector_OPEN_OR_UPHELD_CHALLENGE_BLOCKS_APPROVAL(t *testing.T) {
 	resolveRec := map[string]string{
 		"protocol_version": "1", "operation": "RESOLVE", "role": "reviewer",
 		"chain_id": testChainID, "pool_id": testPoolID, "key_id": "rev-1",
-		"nonce": "1202", "expires_at": "1893456000",
+		"nonce": "1202", "expires_at": wireExp(e.ctx),
 		"challenge_id": openRes.ChallengeId, "candidate_id": c.EntitlementID,
 		"outcome": "UPHELD", "rationale_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
 	}
@@ -68,7 +68,7 @@ func TestVector_UNAUTHORIZED_AMOUNT_AND_DUPLICATE_APPROVAL(t *testing.T) {
 	rec := map[string]string{
 		"protocol_version": "1", "operation": "APPROVE", "role": "approver",
 		"chain_id": testChainID, "pool_id": testPoolID, "key_id": "pub-1",
-		"nonce": "1101", "expires_at": "1893456000",
+		"nonce": "1101", "expires_at": wireExp(e.ctx),
 		"entitlement_id": c.EntitlementID, "app_id": c.AppID,
 		"candidate_hash":            cand.CandidateHash,
 		"challenge_resolution_hash": "",
@@ -86,7 +86,7 @@ func TestVector_UNAUTHORIZED_AMOUNT_AND_DUPLICATE_APPROVAL(t *testing.T) {
 	badAmt := map[string]string{
 		"protocol_version": "1", "operation": "APPROVE", "role": "approver",
 		"chain_id": testChainID, "pool_id": testPoolID, "key_id": "apr-1",
-		"nonce": "1102", "expires_at": "1893456000",
+		"nonce": "1102", "expires_at": wireExp(e.ctx),
 		"entitlement_id": c.EntitlementID, "app_id": c.AppID,
 		"candidate_hash":            cand.CandidateHash,
 		"challenge_resolution_hash": "",
@@ -229,7 +229,7 @@ func TestE8_UnfundedPoolRejectsEntitlementMsgs(t *testing.T) {
 	rec := map[string]string{
 		"protocol_version": "1", "operation": "PUBLISH", "role": "publisher",
 		"chain_id": testChainID, "pool_id": testPoolID, "key_id": "pub-1",
-		"nonce": "1150", "expires_at": "1893456000",
+		"nonce": "1150", "expires_at": wireExp(e.ctx),
 		"entitlement_id": c.EntitlementID, "app_id": c.AppID,
 		"candidate_hash": hash, "rule_version": c.RuleVersion,
 	}
@@ -368,7 +368,7 @@ func TestGapF3_ApproveDualPathBinding(t *testing.T) {
 		resolveRec := map[string]string{
 			"protocol_version": "1", "operation": "RESOLVE", "role": "reviewer",
 			"chain_id": testChainID, "pool_id": testPoolID, "key_id": "rev-1",
-			"nonce": "1501", "expires_at": "1893456000",
+			"nonce": "1501", "expires_at": wireExp(e.ctx),
 			"challenge_id": openRes.ChallengeId, "candidate_id": c.EntitlementID,
 			"outcome": "DISMISSED", "rationale_digest": dismissedDigest,
 		}
@@ -408,7 +408,7 @@ func TestGapF3_ApproveDualPathBinding(t *testing.T) {
 		resolveRec := map[string]string{
 			"protocol_version": "1", "operation": "RESOLVE", "role": "reviewer",
 			"chain_id": testChainID, "pool_id": testPoolID, "key_id": "rev-1",
-			"nonce": "1510", "expires_at": "1893456000",
+			"nonce": "1510", "expires_at": wireExp(e.ctx),
 			"challenge_id": openRes.ChallengeId, "candidate_id": c.EntitlementID,
 			"outcome": "DISMISSED", "rationale_digest": dismissedDigest,
 		}
@@ -447,7 +447,7 @@ func TestGapF3_ApproveDualPathBinding(t *testing.T) {
 		resolveRec := map[string]string{
 			"protocol_version": "1", "operation": "RESOLVE", "role": "reviewer",
 			"chain_id": testChainID, "pool_id": testPoolID, "key_id": "rev-1",
-			"nonce": "1520", "expires_at": "1893456000",
+			"nonce": "1520", "expires_at": wireExp(e.ctx),
 			"challenge_id": openRes.ChallengeId, "candidate_id": c.EntitlementID,
 			"outcome": "DISMISSED", "rationale_digest": dismissedDigest,
 		}
@@ -487,7 +487,7 @@ func TestGapF3_ApproveDualPathBinding(t *testing.T) {
 		resolveRec := map[string]string{
 			"protocol_version": "1", "operation": "RESOLVE", "role": "reviewer",
 			"chain_id": testChainID, "pool_id": testPoolID, "key_id": "rev-1",
-			"nonce": "1523", "expires_at": "1893456000",
+			"nonce": "1523", "expires_at": wireExp(e.ctx),
 			"challenge_id": openRes.ChallengeId, "candidate_id": c.EntitlementID,
 			"outcome": "UPHELD", "rationale_digest": unboundDigest,
 		}
