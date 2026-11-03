@@ -86,6 +86,34 @@ jobs:
       - name: Regenerate protobuf artifacts
         run: make proto-gen
 
+      # TEMP DIAGNOSTIC for proto-consistency red on GH runners while the same
+      # image+script+content succeeds in a local clone: print the toolchain and
+      # loop state. Remove once the root cause is fixed.
+      - name: Diagnose proto generation (temp)
+        if: always()
+        run: |
+          echo "=== toolchain ==="
+          docker --version
+          docker run --rm ghcr.io/cosmos/proto-builder:0.14.0 buf --version
+          echo "=== repo shape ==="
+          ls proto/ | head -8
+          find proto/uptick -name '*.proto' | wc -l
+          grep -l "option go_package" $(find proto/uptick -name '*.proto') 2>/dev/null | wc -l
+          echo "=== loop dry run ==="
+          cd proto
+          proto_dirs=$(find ./uptick -path -prune -o -name '*.proto' -print0 | xargs -0 -n1 dirname | sort | uniq)
+          echo "proto_dirs: $(echo "$proto_dirs" | wc -l)"
+          echo "$proto_dirs" | head -8
+          echo "=== single-file buf verbose ==="
+          buf generate --template buf.gen.gogo.yaml ./uptick/appmining/v1/tx.proto; echo "rc=$?"
+          ls -d ../github.com 2>/dev/null && find ../github.com -name '*.pb.go' | head -3 || echo "NO SCRATCH produced"
+
+      - name: Inspect scratch after proto-gen (temp)
+        if: always()
+        run: |
+          ls -d github.com 2>/dev/null && du -sh github.com || echo "no github.com scratch on host"
+          git status --porcelain | head -20
+
       # Scoped to the generated-code patterns (not `git status` at large):
       # protocgen.sh also rewrites docs/proto & docs/api proto-docs.md, and any
       # other dirty file would be a pre-existing condition of the runner, not
