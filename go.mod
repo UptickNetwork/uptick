@@ -1,6 +1,6 @@
 module github.com/UptickNetwork/uptick
 
-go 1.26.9
+go 1.26.10
 
 require (
 	cosmossdk.io/simapp v0.0.0-20240118210941-3897926e722e

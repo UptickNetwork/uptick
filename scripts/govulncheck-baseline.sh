@@ -26,8 +26,11 @@ fi
 # whatever is on $PATH in BOTH places, so if one copy is bumped alone the other
 # fails loudly instead of quietly scanning with a different scanner.
 #
-# v1.7.0 is the newest x/vuln that go.mod's toolchain (go 1.25.13) can build;
-# v1.8.0 requires `go >= 1.26.0`. Bump this only together with the toolchain.
+# v1.7.0 is the pin chosen when go.mod's toolchain was go 1.25.13 (v1.8.0
+# requires `go >= 1.26.0`). The toolchain has since moved to 1.26.10, so v1.8.0
+# would now build -- but moving the pin is a dedicated change (new scanner can
+# surface new findings) and must move together with GOVULNCHECK_VERSION in
+# .github/workflows/security.yml.
 PINNED_GOVULNCHECK_VERSION="v1.7.0"
 
 if ! command -v govulncheck >/dev/null 2>&1; then

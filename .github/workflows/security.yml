@@ -39,9 +39,11 @@ jobs:
       #
       # `local` is only safe when the pinned scanner can be built by the declared
       # toolchain, which is exactly what GOVULNCHECK_VERSION buys us: x/vuln
-      # v1.7.0 requires `go >= 1.25.0` (OK against go.mod's 1.25.13), whereas the
-      # currently-latest v1.8.0 requires `go >= 1.26.0` and would fail here.
-      # Move the two together if the toolchain is ever bumped.
+      # v1.7.0 requires `go >= 1.25.0` (OK against go.mod's 1.26.10). The
+      # currently-latest v1.8.0 would also build now, but moving the scanner pin
+      # is a dedicated change: it can surface new findings and both pins must
+      # move together (see scripts/govulncheck-baseline.sh).
+      # Move the two together if the scanner pin is ever bumped.
       GOTOOLCHAIN: local
       GOVULNCHECK_VERSION: v1.7.0
     steps:
