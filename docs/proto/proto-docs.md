@@ -21,6 +21,49 @@ Application is the request/response type for the module API.
 
 
 
+## AssessmentCredential
+AssessmentCredential is the UGE assessment attestation (T1b / R3).
+Empty / default message means "not provided".
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| credential_version | string |  |  |
+| app_id | string |  | 64 lowercase hex |
+| pool_id | string |  |  |
+| pav_id | string |  |  |
+| evidence_root | string |  |  |
+| gas_evidence_root | string |  |  |
+| amount | string |  |  |
+| denom | string |  |  |
+| gas_used | string |  |  |
+| qualified_tx_count | string |  |  |
+| rule_version | string |  |  |
+| issued_at | string |  | unix seconds, unsigned decimal |
+| expires_at | string |  |  |
+| credential_id | string |  | SHA-256 hex of frame with credential_id empty |
+| signer_key_id | string |  |  |
+| signature_base64 | string |  |  |
+
+
+
+
+## AssessmentSigner
+AssessmentSigner is an authority-registered Ed25519 key for AssessmentCredential.
+Separate from EntitlementRole keys.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key_id | string |  |  |
+| pubkey | bytes |  |  |
+| status | RoleKeyStatus |  |  |
+| version | uint64 |  |  |
+| registered_height | int64 |  |  |
+
+
+
+
 ## AttestationCommitment
 AttestationCommitment is the request/response type for the module API.
 
@@ -83,6 +126,7 @@ Candidate is a published entitlement candidate (no pool liability until Approve)
 | publisher | string |  | cosmos bech32 submitter |
 | status | CandidateStatus |  |  |
 | max_observed_time | int64 |  | anti-rollback watermark |
+| credential_id | string |  | AssessmentCredential id (64 hex); empty when publish had no credential |
 
 
 
@@ -149,6 +193,8 @@ EntitlementChallenge is the V1 challenge record (distinct from attestation Chall
 | reviewer | string |  | key_id of resolving reviewer |
 | resolution_digest | string |  | 64 hex |
 | resolved_at | int64 |  |  |
+| deposit_amount | string |  | V1 T1c deposit (empty when challenge_open_access != deposit) |
+| deposit_denom | string |  |  |
 
 
 
@@ -220,6 +266,13 @@ Params is the request/response type for the module API.
 entitlement msgs are enabled. Empty or "0" keeps the new flow disabled. |
 | entitlement_allowed_rule_versions | string | repeated | V1: allowlist of rule_version values accepted by MsgApproveEntitlement (§3
 "规则版本允许"). Empty list denies every approval (default-deny). |
+| credential_required | bool |  | V1 publisher-binding T1: when true, every PublishCandidate requires a valid
+AssessmentCredential (T1b). Default false keeps global-key path usable. |
+| challenge_open_access | string |  | V1 challenge open access: "none" | "open" | "deposit" (T1c; default "open"). |
+| challenge_deposit_amount | string |  | Deposit required when challenge_open_access=deposit (smallest units decimal). |
+| challenge_deposit_denom | string |  |  |
+| entitlement_allowed_assessment_versions | string | repeated | V1 T1b: allowlist of AssessmentCredential.credential_version values.
+Empty list denies every credential (default-deny until governance sets). |
 
 
 
@@ -242,7 +295,8 @@ PauseState is the request/response type for the module API.
 
 ## Pool
 Pool is the fixed entitlement fund ledger.
-Invariant: funded = available + reserved + paid; reserved <= module account balance.
+Invariant: funded = available + reserved + paid;
+module account balance for denom covers sum(available+reserved) across all pools of that denom.
 
 
 | Field | Type | Label | Description |
@@ -260,17 +314,20 @@ Invariant: funded = available + reserved + paid; reserved <= module account bala
 
 
 ## RoleKey
-RoleKey is a versioned Ed25519 public key for one UGE role.
+RoleKey is a versioned role authorization key for one UGE role.
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | role | EntitlementRole |  |  |
 | key_id | string |  |  |
-| pubkey | bytes |  | raw Ed25519 public key, exactly 32 bytes |
+| pubkey | bytes |  | key material: 32B Ed25519 pubkey (type 0) or 20B EVM address (type 1). |
 | status | RoleKeyStatus |  |  |
 | version | uint64 |  |  |
 | registered_height | int64 |  |  |
+| app_id | bytes |  | optional app binding (UGE publisher-binding R1): empty = global key;
+non-empty = exactly AppIDLength (32) bytes and must match a registered app. |
+| key_type | RoleKeyType |  | WireProof scheme (UGE DEC-10). Default 0 = Ed25519. |
 
 
 
@@ -294,7 +351,8 @@ Settlement is the request/response type for the module API.
 
 
 ## WireProof
-WireProof is the Ed25519 domain-separated authorization attached to V1 msgs.
+WireProof is the domain-separated authorization attached to V1 msgs.
+Signature scheme is inferred from the registered RoleKey.key_type (no scheme field).
 
 
 | Field | Type | Label | Description |
@@ -422,6 +480,19 @@ RoleKeyStatus enumerates allowed values for the module.
 | ROLE_KEY_STATUS_ACTIVE | 1 | ROLE_KEY_STATUS_ACTIVE is a valid enum value. |
 | ROLE_KEY_STATUS_PAUSED | 2 | ROLE_KEY_STATUS_PAUSED is a valid enum value. |
 | ROLE_KEY_STATUS_REVOKED | 3 | ROLE_KEY_STATUS_REVOKED is a valid enum value. |
+
+
+
+## RoleKeyType
+RoleKeyType selects WireProof verification scheme (UGE DEC-10 / REQ-D).
+Default 0 preserves all existing Ed25519 keys (zero migration).
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| ROLE_KEY_TYPE_ED25519 | 0 | ROLE_KEY_TYPE_ED25519: pubkey = raw 32-byte Ed25519 public key; sig = 64 bytes. |
+| ROLE_KEY_TYPE_SECP256K1_EVM_ADDRESS | 1 | ROLE_KEY_TYPE_SECP256K1_EVM_ADDRESS: pubkey = raw 20-byte EVM address;
+signature = EIP-191 personal_sign over wire frame (65 bytes r||s||v, v in {27,28}).
+Publisher + PUBLISH only. |
 
 
 
@@ -821,6 +892,8 @@ QueryRolesRequest is the request/response type for the module API.
 | ----- | ---- | ----- | ----------- |
 | role | EntitlementRole |  | optional filter; UNSPECIFIED = all roles |
 | status | RoleKeyStatus |  | optional filter; UNSPECIFIED = all statuses |
+| app_id | bytes |  | optional app filter (UGE R1): empty = no filter; 32 raw bytes or omit.
+When set, returns keys whose app_id equals this value (bound keys only). |
 
 
 
@@ -1211,6 +1284,7 @@ MsgPublishCandidate publishes an immutable candidate commitment (no lock).
 | gas_evidence_root | string |  |  |
 | rule_version | string |  |  |
 | proof | WireProof |  |  |
+| credential | AssessmentCredential |  | optional AssessmentCredential (T1b / R3); omit / empty = not provided |
 
 
 
@@ -1238,6 +1312,11 @@ MsgRegisterApplication is the request/response type for the module API.
 | owner | string |  |  |
 | attestation_submitter | string |  |  |
 | metadata_commitment | bytes |  | optional; empty or exactly 32 bytes |
+| publisher_pubkey | bytes |  | optional embedded publisher (UGE R2): non-empty registers an ACTIVE
+PUBLISHER role key bound to this app_id in the same tx.
+
+raw Ed25519, 32 bytes when set |
+| publisher_key_id | string |  | required when publisher_pubkey is set |
 
 
 
@@ -1248,9 +1327,29 @@ MsgRegisterApplicationResponse is the request/response type for the module API.
 
 
 
+## MsgRegisterAssessmentSigner
+MsgRegisterAssessmentSigner registers or rotates an assessment Ed25519 pubkey (authority).
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| authority | string |  |  |
+| key_id | string |  |  |
+| pubkey | bytes |  | raw Ed25519, 32 bytes |
+| version | uint64 |  |  |
+
+
+
+
+## MsgRegisterAssessmentSignerResponse
+MsgRegisterAssessmentSignerResponse is the request/response type for the module API.
+
+
+
+
 ## MsgRegisterRoleKey
-MsgRegisterRoleKey registers or rotates an Ed25519 role public key.
-Same (role, key_id) with identical pubkey is idempotent; conflicting pubkey rejected.
+MsgRegisterRoleKey registers or rotates a role authorization key.
+Same (role, key_id) with identical pubkey+key_type is idempotent; conflicting material rejected.
 
 
 | Field | Type | Label | Description |
@@ -1258,8 +1357,10 @@ Same (role, key_id) with identical pubkey is idempotent; conflicting pubkey reje
 | authority | string |  |  |
 | role | EntitlementRole |  |  |
 | key_id | string |  |  |
-| pubkey | bytes |  | raw Ed25519, 32 bytes |
+| pubkey | bytes |  | type 0: raw Ed25519 32 bytes; type 1: raw EVM address 20 bytes. |
 | version | uint64 |  |  |
+| app_id | bytes |  | optional app binding (UGE R1): empty = global; else exactly 32 bytes of a registered app. |
+| key_type | RoleKeyType |  | UGE DEC-10: default 0 = Ed25519; 1 = secp256k1 EVM address (publisher only). |
 
 
 
@@ -1372,6 +1473,25 @@ MsgSetApplicationStatus is the request/response type for the module API.
 
 ## MsgSetApplicationStatusResponse
 MsgSetApplicationStatusResponse is the request/response type for the module API.
+
+
+
+
+## MsgSetAssessmentSignerStatus
+MsgSetAssessmentSignerStatus pauses or revokes an assessment signer (authority).
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| authority | string |  |  |
+| key_id | string |  |  |
+| status | RoleKeyStatus |  | ACTIVE | PAUSED | REVOKED |
+
+
+
+
+## MsgSetAssessmentSignerStatusResponse
+MsgSetAssessmentSignerStatusResponse is the request/response type for the module API.
 
 
 
@@ -1524,6 +1644,8 @@ OpenEntitlementPool creates a V1 fixed entitlement fund pool ledger. |
 | SetEntitlementPoolPaused | MsgSetEntitlementPoolPaused | MsgSetEntitlementPoolPausedResponse | SetEntitlementPoolPaused handles the corresponding module request. |
 | RegisterRoleKey | MsgRegisterRoleKey | MsgRegisterRoleKeyResponse | RegisterRoleKey handles the corresponding module request. |
 | SetRoleKeyStatus | MsgSetRoleKeyStatus | MsgSetRoleKeyStatusResponse | SetRoleKeyStatus handles the corresponding module request. |
+| RegisterAssessmentSigner | MsgRegisterAssessmentSigner | MsgRegisterAssessmentSignerResponse | RegisterAssessmentSigner registers an assessment credential Ed25519 pubkey (authority). |
+| SetAssessmentSignerStatus | MsgSetAssessmentSignerStatus | MsgSetAssessmentSignerStatusResponse | SetAssessmentSignerStatus pauses or revokes an assessment signer (authority). |
 | PublishCandidate | MsgPublishCandidate | MsgPublishCandidateResponse | PublishCandidate publishes an immutable V1 candidate commitment (no pool lock). |
 | OpenChallenge | MsgOpenChallenge | MsgOpenChallengeResponse | OpenChallenge is the V1 entitlement challenge opener (attestation uses ChallengeAttestation). |
 | ResolveEntitlementChallenge | MsgResolveEntitlementChallenge | MsgResolveEntitlementChallengeResponse | ResolveEntitlementChallenge avoids clashing with attestation MsgResolveChallenge. |

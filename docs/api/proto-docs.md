@@ -6,6 +6,8 @@
 
 - [uptick/appmining/v1/types.proto](#uptick/appmining/v1/types.proto)
     - [Application](#uptick.appmining.v1.Application)
+    - [AssessmentCredential](#uptick.appmining.v1.AssessmentCredential)
+    - [AssessmentSigner](#uptick.appmining.v1.AssessmentSigner)
     - [AttestationCommitment](#uptick.appmining.v1.AttestationCommitment)
     - [AttestationProfile](#uptick.appmining.v1.AttestationProfile)
     - [Candidate](#uptick.appmining.v1.Candidate)
@@ -31,6 +33,7 @@
     - [EntitlementState](#uptick.appmining.v1.EntitlementState)
     - [EvidenceType](#uptick.appmining.v1.EvidenceType)
     - [RoleKeyStatus](#uptick.appmining.v1.RoleKeyStatus)
+    - [RoleKeyType](#uptick.appmining.v1.RoleKeyType)
   
 - [uptick/appmining/v1/genesis.proto](#uptick/appmining/v1/genesis.proto)
     - [GenesisState](#uptick.appmining.v1.GenesisState)
@@ -104,6 +107,8 @@
     - [MsgPublishCandidateResponse](#uptick.appmining.v1.MsgPublishCandidateResponse)
     - [MsgRegisterApplication](#uptick.appmining.v1.MsgRegisterApplication)
     - [MsgRegisterApplicationResponse](#uptick.appmining.v1.MsgRegisterApplicationResponse)
+    - [MsgRegisterAssessmentSigner](#uptick.appmining.v1.MsgRegisterAssessmentSigner)
+    - [MsgRegisterAssessmentSignerResponse](#uptick.appmining.v1.MsgRegisterAssessmentSignerResponse)
     - [MsgRegisterRoleKey](#uptick.appmining.v1.MsgRegisterRoleKey)
     - [MsgRegisterRoleKeyResponse](#uptick.appmining.v1.MsgRegisterRoleKeyResponse)
     - [MsgResolveChallenge](#uptick.appmining.v1.MsgResolveChallenge)
@@ -116,6 +121,8 @@
     - [MsgRevokeGasPayerResponse](#uptick.appmining.v1.MsgRevokeGasPayerResponse)
     - [MsgSetApplicationStatus](#uptick.appmining.v1.MsgSetApplicationStatus)
     - [MsgSetApplicationStatusResponse](#uptick.appmining.v1.MsgSetApplicationStatusResponse)
+    - [MsgSetAssessmentSignerStatus](#uptick.appmining.v1.MsgSetAssessmentSignerStatus)
+    - [MsgSetAssessmentSignerStatusResponse](#uptick.appmining.v1.MsgSetAssessmentSignerStatusResponse)
     - [MsgSetAttestationSubmitter](#uptick.appmining.v1.MsgSetAttestationSubmitter)
     - [MsgSetAttestationSubmitterResponse](#uptick.appmining.v1.MsgSetAttestationSubmitterResponse)
     - [MsgSetEntitlementPoolPaused](#uptick.appmining.v1.MsgSetEntitlementPoolPaused)
@@ -331,6 +338,57 @@ Application is the request/response type for the module API.
 
 
 
+<a name="uptick.appmining.v1.AssessmentCredential"></a>
+
+### AssessmentCredential
+AssessmentCredential is the UGE assessment attestation (T1b / R3).
+Empty / default message means "not provided".
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| `credential_version` | [string](#string) |  |  |
+| `app_id` | [string](#string) |  | 64 lowercase hex |
+| `pool_id` | [string](#string) |  |  |
+| `pav_id` | [string](#string) |  |  |
+| `evidence_root` | [string](#string) |  |  |
+| `gas_evidence_root` | [string](#string) |  |  |
+| `amount` | [string](#string) |  |  |
+| `denom` | [string](#string) |  |  |
+| `gas_used` | [string](#string) |  |  |
+| `qualified_tx_count` | [string](#string) |  |  |
+| `rule_version` | [string](#string) |  |  |
+| `issued_at` | [string](#string) |  | unix seconds, unsigned decimal |
+| `expires_at` | [string](#string) |  |  |
+| `credential_id` | [string](#string) |  | SHA-256 hex of frame with credential_id empty |
+| `signer_key_id` | [string](#string) |  |  |
+| `signature_base64` | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="uptick.appmining.v1.AssessmentSigner"></a>
+
+### AssessmentSigner
+AssessmentSigner is an authority-registered Ed25519 key for AssessmentCredential.
+Separate from EntitlementRole keys.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| `key_id` | [string](#string) |  |  |
+| `pubkey` | [bytes](#bytes) |  |  |
+| `status` | [RoleKeyStatus](#uptick.appmining.v1.RoleKeyStatus) |  |  |
+| `version` | [uint64](#uint64) |  |  |
+| `registered_height` | [int64](#int64) |  |  |
+
+
+
+
+
+
 <a name="uptick.appmining.v1.AttestationCommitment"></a>
 
 ### AttestationCommitment
@@ -403,6 +461,7 @@ Candidate is a published entitlement candidate (no pool liability until Approve)
 | `publisher` | [string](#string) |  | cosmos bech32 submitter |
 | `status` | [CandidateStatus](#uptick.appmining.v1.CandidateStatus) |  |  |
 | `max_observed_time` | [int64](#int64) |  | anti-rollback watermark |
+| `credential_id` | [string](#string) |  | AssessmentCredential id (64 hex); empty when publish had no credential |
 
 
 
@@ -481,6 +540,8 @@ EntitlementChallenge is the V1 challenge record (distinct from attestation Chall
 | `reviewer` | [string](#string) |  | key_id of resolving reviewer |
 | `resolution_digest` | [string](#string) |  | 64 hex |
 | `resolved_at` | [int64](#int64) |  |  |
+| `deposit_amount` | [string](#string) |  | V1 T1c deposit (empty when challenge_open_access != deposit) |
+| `deposit_denom` | [string](#string) |  |  |
 
 
 
@@ -566,6 +627,11 @@ Params is the request/response type for the module API.
 | `allow_manual_gas_credit_consume` | [bool](#bool) |  | when false (default), MsgConsumeGasCredit is rejected; PostHandler auto-debit remains |
 | `entitlement_enable_min_funded` | [string](#string) |  | V1: minimum Pool.funded (smallest units, unsigned decimal string) required before entitlement msgs are enabled. Empty or "0" keeps the new flow disabled. |
 | `entitlement_allowed_rule_versions` | [string](#string) | repeated | V1: allowlist of rule_version values accepted by MsgApproveEntitlement (§3 "规则版本允许"). Empty list denies every approval (default-deny). |
+| `credential_required` | [bool](#bool) |  | V1 publisher-binding T1: when true, every PublishCandidate requires a valid AssessmentCredential (T1b). Default false keeps global-key path usable. |
+| `challenge_open_access` | [string](#string) |  | V1 challenge open access: "none" | "open" | "deposit" (T1c; default "open"). |
+| `challenge_deposit_amount` | [string](#string) |  | Deposit required when challenge_open_access=deposit (smallest units decimal). |
+| `challenge_deposit_denom` | [string](#string) |  |  |
+| `entitlement_allowed_assessment_versions` | [string](#string) | repeated | V1 T1b: allowlist of AssessmentCredential.credential_version values. Empty list denies every credential (default-deny until governance sets). |
 
 
 
@@ -596,7 +662,8 @@ PauseState is the request/response type for the module API.
 
 ### Pool
 Pool is the fixed entitlement fund ledger.
-Invariant: funded = available + reserved + paid; reserved <= module account balance.
+Invariant: funded = available + reserved + paid;
+module account balance for denom covers sum(available+reserved) across all pools of that denom.
 
 
 | Field | Type | Label | Description |
@@ -618,17 +685,19 @@ Invariant: funded = available + reserved + paid; reserved <= module account bala
 <a name="uptick.appmining.v1.RoleKey"></a>
 
 ### RoleKey
-RoleKey is a versioned Ed25519 public key for one UGE role.
+RoleKey is a versioned role authorization key for one UGE role.
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | `role` | [EntitlementRole](#uptick.appmining.v1.EntitlementRole) |  |  |
 | `key_id` | [string](#string) |  |  |
-| `pubkey` | [bytes](#bytes) |  | raw Ed25519 public key, exactly 32 bytes |
+| `pubkey` | [bytes](#bytes) |  | key material: 32B Ed25519 pubkey (type 0) or 20B EVM address (type 1). |
 | `status` | [RoleKeyStatus](#uptick.appmining.v1.RoleKeyStatus) |  |  |
 | `version` | [uint64](#uint64) |  |  |
 | `registered_height` | [int64](#int64) |  |  |
+| `app_id` | [bytes](#bytes) |  | optional app binding (UGE publisher-binding R1): empty = global key; non-empty = exactly AppIDLength (32) bytes and must match a registered app. |
+| `key_type` | [RoleKeyType](#uptick.appmining.v1.RoleKeyType) |  | WireProof scheme (UGE DEC-10). Default 0 = Ed25519. |
 
 
 
@@ -660,7 +729,8 @@ Settlement is the request/response type for the module API.
 <a name="uptick.appmining.v1.WireProof"></a>
 
 ### WireProof
-WireProof is the Ed25519 domain-separated authorization attached to V1 msgs.
+WireProof is the domain-separated authorization attached to V1 msgs.
+Signature scheme is inferred from the registered RoleKey.key_type (no scheme field).
 
 
 | Field | Type | Label | Description |
@@ -807,6 +877,19 @@ RoleKeyStatus enumerates allowed values for the module.
 | ROLE_KEY_STATUS_ACTIVE | 1 | ROLE_KEY_STATUS_ACTIVE is a valid enum value. |
 | ROLE_KEY_STATUS_PAUSED | 2 | ROLE_KEY_STATUS_PAUSED is a valid enum value. |
 | ROLE_KEY_STATUS_REVOKED | 3 | ROLE_KEY_STATUS_REVOKED is a valid enum value. |
+
+
+
+<a name="uptick.appmining.v1.RoleKeyType"></a>
+
+### RoleKeyType
+RoleKeyType selects WireProof verification scheme (UGE DEC-10 / REQ-D).
+Default 0 preserves all existing Ed25519 keys (zero migration).
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| ROLE_KEY_TYPE_ED25519 | 0 | ROLE_KEY_TYPE_ED25519: pubkey = raw 32-byte Ed25519 public key; sig = 64 bytes. |
+| ROLE_KEY_TYPE_SECP256K1_EVM_ADDRESS | 1 | ROLE_KEY_TYPE_SECP256K1_EVM_ADDRESS: pubkey = raw 20-byte EVM address; signature = EIP-191 personal_sign over wire frame (65 bytes r||s||v, v in {27,28}). Publisher + PUBLISH only. |
 
 
  <!-- end enums -->
@@ -1338,6 +1421,7 @@ QueryRolesRequest is the request/response type for the module API.
 | ----- | ---- | ----- | ----------- |
 | `role` | [EntitlementRole](#uptick.appmining.v1.EntitlementRole) |  | optional filter; UNSPECIFIED = all roles |
 | `status` | [RoleKeyStatus](#uptick.appmining.v1.RoleKeyStatus) |  | optional filter; UNSPECIFIED = all statuses |
+| `app_id` | [bytes](#bytes) |  | optional app filter (UGE R1): empty = no filter; 32 raw bytes or omit. When set, returns keys whose app_id equals this value (bound keys only). |
 
 
 
@@ -1853,6 +1937,7 @@ MsgPublishCandidate publishes an immutable candidate commitment (no lock).
 | `gas_evidence_root` | [string](#string) |  |  |
 | `rule_version` | [string](#string) |  |  |
 | `proof` | [WireProof](#uptick.appmining.v1.WireProof) |  |  |
+| `credential` | [AssessmentCredential](#uptick.appmining.v1.AssessmentCredential) |  | optional AssessmentCredential (T1b / R3); omit / empty = not provided |
 
 
 
@@ -1888,6 +1973,10 @@ MsgRegisterApplication is the request/response type for the module API.
 | `owner` | [string](#string) |  |  |
 | `attestation_submitter` | [string](#string) |  |  |
 | `metadata_commitment` | [bytes](#bytes) |  | optional; empty or exactly 32 bytes |
+| `publisher_pubkey` | [bytes](#bytes) |  | optional embedded publisher (UGE R2): non-empty registers an ACTIVE PUBLISHER role key bound to this app_id in the same tx.
+
+raw Ed25519, 32 bytes when set |
+| `publisher_key_id` | [string](#string) |  | required when publisher_pubkey is set |
 
 
 
@@ -1904,11 +1993,39 @@ MsgRegisterApplicationResponse is the request/response type for the module API.
 
 
 
+<a name="uptick.appmining.v1.MsgRegisterAssessmentSigner"></a>
+
+### MsgRegisterAssessmentSigner
+MsgRegisterAssessmentSigner registers or rotates an assessment Ed25519 pubkey (authority).
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| `authority` | [string](#string) |  |  |
+| `key_id` | [string](#string) |  |  |
+| `pubkey` | [bytes](#bytes) |  | raw Ed25519, 32 bytes |
+| `version` | [uint64](#uint64) |  |  |
+
+
+
+
+
+
+<a name="uptick.appmining.v1.MsgRegisterAssessmentSignerResponse"></a>
+
+### MsgRegisterAssessmentSignerResponse
+MsgRegisterAssessmentSignerResponse is the request/response type for the module API.
+
+
+
+
+
+
 <a name="uptick.appmining.v1.MsgRegisterRoleKey"></a>
 
 ### MsgRegisterRoleKey
-MsgRegisterRoleKey registers or rotates an Ed25519 role public key.
-Same (role, key_id) with identical pubkey is idempotent; conflicting pubkey rejected.
+MsgRegisterRoleKey registers or rotates a role authorization key.
+Same (role, key_id) with identical pubkey+key_type is idempotent; conflicting material rejected.
 
 
 | Field | Type | Label | Description |
@@ -1916,8 +2033,10 @@ Same (role, key_id) with identical pubkey is idempotent; conflicting pubkey reje
 | `authority` | [string](#string) |  |  |
 | `role` | [EntitlementRole](#uptick.appmining.v1.EntitlementRole) |  |  |
 | `key_id` | [string](#string) |  |  |
-| `pubkey` | [bytes](#bytes) |  | raw Ed25519, 32 bytes |
+| `pubkey` | [bytes](#bytes) |  | type 0: raw Ed25519 32 bytes; type 1: raw EVM address 20 bytes. |
 | `version` | [uint64](#uint64) |  |  |
+| `app_id` | [bytes](#bytes) |  | optional app binding (UGE R1): empty = global; else exactly 32 bytes of a registered app. |
+| `key_type` | [RoleKeyType](#uptick.appmining.v1.RoleKeyType) |  | UGE DEC-10: default 0 = Ed25519; 1 = secp256k1 EVM address (publisher only). |
 
 
 
@@ -2074,6 +2193,33 @@ MsgSetApplicationStatus is the request/response type for the module API.
 
 ### MsgSetApplicationStatusResponse
 MsgSetApplicationStatusResponse is the request/response type for the module API.
+
+
+
+
+
+
+<a name="uptick.appmining.v1.MsgSetAssessmentSignerStatus"></a>
+
+### MsgSetAssessmentSignerStatus
+MsgSetAssessmentSignerStatus pauses or revokes an assessment signer (authority).
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| `authority` | [string](#string) |  |  |
+| `key_id` | [string](#string) |  |  |
+| `status` | [RoleKeyStatus](#uptick.appmining.v1.RoleKeyStatus) |  | ACTIVE | PAUSED | REVOKED |
+
+
+
+
+
+
+<a name="uptick.appmining.v1.MsgSetAssessmentSignerStatusResponse"></a>
+
+### MsgSetAssessmentSignerStatusResponse
+MsgSetAssessmentSignerStatusResponse is the request/response type for the module API.
 
 
 
@@ -2277,6 +2423,8 @@ Msg defines the gRPC query/tx service for x/appmining.
 | `SetEntitlementPoolPaused` | [MsgSetEntitlementPoolPaused](#uptick.appmining.v1.MsgSetEntitlementPoolPaused) | [MsgSetEntitlementPoolPausedResponse](#uptick.appmining.v1.MsgSetEntitlementPoolPausedResponse) | SetEntitlementPoolPaused handles the corresponding module request. | POST|/uptick/appmining/v1/tx/set_entitlement_pool_paused|
 | `RegisterRoleKey` | [MsgRegisterRoleKey](#uptick.appmining.v1.MsgRegisterRoleKey) | [MsgRegisterRoleKeyResponse](#uptick.appmining.v1.MsgRegisterRoleKeyResponse) | RegisterRoleKey handles the corresponding module request. | POST|/uptick/appmining/v1/tx/register_role_key|
 | `SetRoleKeyStatus` | [MsgSetRoleKeyStatus](#uptick.appmining.v1.MsgSetRoleKeyStatus) | [MsgSetRoleKeyStatusResponse](#uptick.appmining.v1.MsgSetRoleKeyStatusResponse) | SetRoleKeyStatus handles the corresponding module request. | POST|/uptick/appmining/v1/tx/set_role_key_status|
+| `RegisterAssessmentSigner` | [MsgRegisterAssessmentSigner](#uptick.appmining.v1.MsgRegisterAssessmentSigner) | [MsgRegisterAssessmentSignerResponse](#uptick.appmining.v1.MsgRegisterAssessmentSignerResponse) | RegisterAssessmentSigner registers an assessment credential Ed25519 pubkey (authority). | POST|/uptick/appmining/v1/tx/register_assessment_signer|
+| `SetAssessmentSignerStatus` | [MsgSetAssessmentSignerStatus](#uptick.appmining.v1.MsgSetAssessmentSignerStatus) | [MsgSetAssessmentSignerStatusResponse](#uptick.appmining.v1.MsgSetAssessmentSignerStatusResponse) | SetAssessmentSignerStatus pauses or revokes an assessment signer (authority). | POST|/uptick/appmining/v1/tx/set_assessment_signer_status|
 | `PublishCandidate` | [MsgPublishCandidate](#uptick.appmining.v1.MsgPublishCandidate) | [MsgPublishCandidateResponse](#uptick.appmining.v1.MsgPublishCandidateResponse) | PublishCandidate publishes an immutable V1 candidate commitment (no pool lock). | POST|/uptick/appmining/v1/tx/publish_candidate|
 | `OpenChallenge` | [MsgOpenChallenge](#uptick.appmining.v1.MsgOpenChallenge) | [MsgOpenChallengeResponse](#uptick.appmining.v1.MsgOpenChallengeResponse) | OpenChallenge is the V1 entitlement challenge opener (attestation uses ChallengeAttestation). | POST|/uptick/appmining/v1/tx/open_challenge|
 | `ResolveEntitlementChallenge` | [MsgResolveEntitlementChallenge](#uptick.appmining.v1.MsgResolveEntitlementChallenge) | [MsgResolveEntitlementChallengeResponse](#uptick.appmining.v1.MsgResolveEntitlementChallengeResponse) | ResolveEntitlementChallenge avoids clashing with attestation MsgResolveChallenge. | POST|/uptick/appmining/v1/tx/resolve_entitlement_challenge|

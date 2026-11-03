@@ -4427,7 +4427,6 @@ func _Msg_RevokeEntitlement_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
-var Msg_serviceDesc = _Msg_serviceDesc
 var _Msg_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "uptick.appmining.v1.Msg",
 	HandlerType: (*MsgServer)(nil),

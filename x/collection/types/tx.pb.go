@@ -921,7 +921,7 @@ type MsgServer interface {
 	IssueDenom(context.Context, *MsgIssueDenom) (*MsgIssueDenomResponse, error)
 	// MintNFT defines a method for mint a new nft
 	MintNFT(context.Context, *MsgMintNFT) (*MsgMintNFTResponse, error)
-	// RefundHTLC defines a method for editing a nft.
+	// EditNFT defines a method for editing a nft.
 	EditNFT(context.Context, *MsgEditNFT) (*MsgEditNFTResponse, error)
 	// TransferNFT defines a method for transferring a nft.
 	TransferNFT(context.Context, *MsgTransferNFT) (*MsgTransferNFTResponse, error)
