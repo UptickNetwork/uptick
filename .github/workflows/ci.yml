@@ -106,11 +106,14 @@ jobs:
           echo "$proto_dirs" | head -8
           echo "=== single-file buf INSIDE container ==="
           docker run --rm -v "$(pwd)":/workspace --workdir /workspace --entrypoint sh \
+            -e BUF_LOG_LEVEL=debug \
             ghcr.io/cosmos/proto-builder:0.14.0 -c '
               cd proto
-              buf generate --template buf.gen.gogo.yaml ./uptick/appmining/v1/tx.proto
+              buf generate --template buf.gen.gogo.yaml ./uptick/appmining/v1/tx.proto 2>&1 | tail -30
               echo "buf rc=$?"
-              ls -d /workspace/github.com 2>/dev/null && find /workspace/github.com -name "*.pb.go" | head -3 || echo "NO SCRATCH in container"
+              echo "=== where did it write? search container fs ==="
+              find / -maxdepth 6 -type d -name github.com -not -path "*/proc/*" 2>/dev/null
+              find / -maxdepth 9 -name "tx.pb.go" -newer /workspace/proto/buf.yaml 2>/dev/null | head -5
             '
 
       - name: Inspect scratch after proto-gen (temp)
