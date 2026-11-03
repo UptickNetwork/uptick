@@ -5,6 +5,9 @@ on:
   push:
     branches:
       - release/**
+      # uge/* is the active UGE V1 development line; without it pushes there
+      # ran no CI at all (ci-additions-plan.md, batch one).
+      - uge/**
 
 # Audit O-05: every third-party action below is pinned to an immutable commit
 # SHA (with the human-readable release in a trailing comment) instead of a

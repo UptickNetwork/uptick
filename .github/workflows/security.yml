@@ -17,6 +17,7 @@ on:
       # would only ever be scanned by a scheduled job, so a vulnerable
       # dependency could be released before anything scanned it.
       - "release/**"
+      - "uge/**"
 
 permissions:
   contents: read
