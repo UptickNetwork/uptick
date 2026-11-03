@@ -64,3 +64,64 @@ jobs:
 
       - name: Verify swagger docs are in sync
         run: make update-swagger-docs
+
+  # FIELD18 lesson: v0.5.1-t1 shipped with the Params case present in the Go
+  # code but missing from the registered FileDescriptor -- CheckTx
+  # RejectUnknownFieldsStrict rejected every legal Params message, and the gap
+  # was found by hand. Nothing in CI compared committed generated code against
+  # what the pinned toolchain produces (ci-additions-plan.md A1; the evmos /
+  # osmosis repos both run this gate). Regenerate with the repo's pinned
+  # protobuf toolchain and fail on any diff: the committed *.pb.go must be
+  # exactly what the committed *.proto files produce.
+  proto-consistency:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Regenerate protobuf artifacts
+        run: make proto-gen
+
+      # Scoped to the generated-code patterns (not `git status` at large):
+      # protocgen.sh also rewrites docs/proto & docs/api proto-docs.md, and any
+      # other dirty file would be a pre-existing condition of the runner, not
+      # this job's signal.
+      - name: Fail on generated-code drift
+        run: |
+          drift="$(git status --porcelain -- '*.pb.go' '*.pb.gw.go')"
+          if [[ -n "$drift" ]]; then
+            echo "::error::protobuf generated code is out of sync with the .proto sources."
+            echo "::error::Run 'make proto-gen' locally and commit the regenerated files."
+            echo "$drift"
+            exit 1
+          fi
+
+  # scripts/check-appmining-contract.sh has an executable twin
+  # (x/appmining/contract_guard_test.go) that runs under `make test`, but a Go
+  # test alone does not protect the shell-side whole-repo literal scans
+  # (ci-additions-plan.md A2). Run the script itself: it is pure bash, no Go
+  # toolchain needed, and it is the UGE V1 contract gate on the active branch.
+  appmining-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: UGE appmining contract guard
+        run: bash scripts/check-appmining-contract.sh
+
+  # Denom format guard: the Go pin tests (app/denom_format_pin_test.go) only
+  # pin specific denom shapes; the shell scan is the only place the whole repo
+  # is swept for the legacy "erc20/" literal, hardcoded "erc20:" and *denom*
+  # case folding (ci-workflow-review.md §4).
+  denom-format:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Denom format guard
+        run: bash scripts/check-denom-format.sh
