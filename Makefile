@@ -2,7 +2,7 @@
 
 BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
 COMMIT := $(shell git log -1 --format='%H')
-VERSION := v0.5.0
+VERSION := v0.5.1
 
 # Build timestamp, published to clients through the JSON-RPC `web3_clientVersion`
 # endpoint (see version/version.go). A reproducible build can pin it with the
