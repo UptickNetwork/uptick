@@ -55,11 +55,33 @@ func TestV051UpgradeHandlerAddsAppmining(t *testing.T) {
 
 	params := app.AppminingKeeper.GetParams(ctx)
 	require.NoError(t, params.Validate())
-	require.NotEmpty(t, params.AllowedProfiles)
 
-	// Replay must be a no-op beyond RunMigrations.
+	// V1 baseline must be live at the upgrade height: denom derived from the
+	// chain's staking bond denom, fund path unlocked, default-deny lists open.
+	bondDenom, err := app.StakingKeeper.BondDenom(ctx)
+	require.NoError(t, err)
+	require.NotEmpty(t, bondDenom, "test app must have a staking bond denom")
+	require.Equal(t, bondDenom, params.ChallengeBondDenom,
+		"baseline bond denom must follow the chain, not the binary default")
+	require.Equal(t, bondDenom, params.ChallengeDepositDenom)
+	require.Equal(t, []string{bondDenom}, params.RewardDenomAllowlist,
+		"reward allowlist must gate on the chain denom or pool/fund/budget all fail")
+	require.Equal(t, "1000000", params.EntitlementEnableMinFunded,
+		"empty min_funded would leave V1 silently disabled")
+	require.NotEmpty(t, params.EntitlementAllowedRuleVersions,
+		"empty rule allowlist denies every approval (error 77)")
+	require.NotEmpty(t, params.EntitlementAllowedAssessmentVersions,
+		"empty assessment allowlist denies every credential")
+	require.True(t, params.CredentialRequired)
+	require.Equal(t, appminingtypes.ChallengeOpenAccessDeposit, params.ChallengeOpenAccess)
+	require.NotEmpty(t, params.ChallengeDepositAmount)
+
+	// Replay must be a no-op beyond RunMigrations: baseline params survive.
 	_, err = handler(ctx, v051Plan(), newVM)
 	require.NoError(t, err)
+	afterReplay := app.AppminingKeeper.GetParams(ctx)
+	require.Equal(t, params, afterReplay,
+		"replayed plan must not re-write (or wipe) the baseline params")
 }
 
 func TestV051UpgradeHandlerRefusesLegacyState(t *testing.T) {

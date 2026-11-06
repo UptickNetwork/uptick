@@ -85,6 +85,15 @@ Ref: https://keepachangelog.com/en/1.0.0/
   epoch budget, attestation/challenge/settlement, gas-credit ledger, `MsgFundRewardPool`, and Cosmos/EVM PostHandler
   ledger auto-consume (not fee replacement).
 
+* (upgrade/appmining) The `v0.5.1` handler also applies the V1 production baseline over the InitGenesis defaults:
+  denom fields follow the live staking bond denom (auptick on mainnet, auoc on the origin testnet -- the
+  `reward_denom_allowlist` default would otherwise brick pool opening, funding, and epoch budgets on a chain
+  whose native denom differs); `entitlement_enable_min_funded`, rule/assessment version allowlists,
+  `credential_required`, and deposit-mode challenge access land at the values verified on the 7777 dev chain.
+  The V1 challenge window is restored to its production constant (7 days) after the dev-chain dry run. All
+  baseline values remain tunable afterwards via `MsgUpdateParams`; pool funding and role-key/application
+  registration still require post-upgrade transactions.
+
 * (upgrade) New `v0.5.0` plan: the one-hop upgrade mainnet follows from v0.3.3. It runs the whole v0.4.0
   change set and then the v0.4.1 repairs inside ONE governance plan, where the testnet executed those as two
   plans (`v0.4.0` first, then `v0.4.1`). The handler probes its starting state from state rather than from a

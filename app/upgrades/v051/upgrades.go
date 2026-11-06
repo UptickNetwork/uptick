@@ -14,6 +14,11 @@
 //     the only path for testnet, which never ran v0.5.0.
 //  3. Adds the x/appmining store and lets RunMigrations InitGenesis the module
 //     (ConsensusVersion 1) with default params and the reward-pool module account.
+//  4. Overwrites the fresh defaults with the V1 production baseline
+//     (applyV1BaselineParams): denom is derived from the live staking bond
+//     denom, so the same binary lands auptick on mainnet and auoc on the
+//     origin testnet with no per-chain config. After this step the UGE
+//     protocol is usable as-is; later adjustments go through MsgUpdateParams.
 //
 // # Store upgrades
 //
@@ -97,6 +102,13 @@ func upgradeHandlerConstructor(
 			return nil, fmt.Errorf("run migrations: %w", err)
 		}
 
+		// Overwrite InitGenesis defaults with the V1 production baseline so the
+		// protocol is live at the upgrade height. Later tuning goes through
+		// MsgUpdateParams, not another upgrade.
+		if err := applyV1BaselineParams(sdkCtx, box); err != nil {
+			return nil, fmt.Errorf("apply v1 baseline params: %w", err)
+		}
+
 		// Ensure segregated fund accounts exist (permissions are in maccPerms).
 		if acc := box.AccountKeeper.GetModuleAccount(sdkCtx, appminingtypes.RewardPoolName); acc == nil {
 			return nil, fmt.Errorf("appmining_reward_pool module account was not created during upgrade")
@@ -145,4 +157,86 @@ func evmCoinInfoPresent(ctx sdk.Context, evmStoreKey *storetypes.KVStoreKey) boo
 		return false
 	}
 	return ctx.KVStore(evmStoreKey).Has(evmtypes.KeyPrefixEvmCoinInfo)
+}
+
+// V1 production baseline applied at the upgrade height. The numerals are the
+// uptick_7777-1 values verified end-to-end on 2026-10-26/28 (DEC-10 vectors,
+// T4 execution). They are BASELINE, not immutable: any of them can be retuned
+// later with MsgUpdateParams -- nothing here is load-bearing for correctness,
+// only for "the protocol is usable right after the upgrade".
+const (
+	// funded threshold below which the V1 flow stays disabled (test01: pool-1
+	// was funded 10x above this before the e2e run).
+	v1BaselineMinFunded = "1000000"
+	// challenge deposit (T4: deposit-mode open access). Same numeral on both
+	// chains: auptick and auoc are both 18-decimal atto units.
+	v1BaselineChallengeDeposit = "500000000000000000000"
+	// legacy challenge bond, kept numerically consistent with the deposit
+	// (legacy flow itself is paused; the field must merely stay valid).
+	v1BaselineChallengeBond = "500000000000000000000"
+)
+
+// v1BaselineRuleVersions is the approve rule-version allowlist (F-1: empty
+// would deny every approval with error 77). Mirrors test01's live set.
+var v1BaselineRuleVersions = []string{
+	"rule-1",
+	"uge-candidate-rules-0.1",
+	"uge-candidate-rules-0.3",
+	"uge-candidate-rules-0.4",
+}
+
+// v1BaselineAssessmentVersions is the assessment credential-version allowlist
+// (AssessmentVersionAllowed is default-deny on an empty list).
+var v1BaselineAssessmentVersions = []string{
+	"uge-assessment-0.1",
+}
+
+// applyV1BaselineParams rewrites the just-initialized x/appmining params into
+// the production baseline. The denom is read from the live staking bond denom
+// rather than hardcoded: one binary serves mainnet (auptick) and the origin
+// testnet (auoc), and DenomAllowed gates pool opening, funding, and epoch
+// budgets off RewardDenomAllowlist -- leaving the InitGenesis default
+// ("auptick" everywhere) would brick the V1 fund path on any chain whose
+// native denom differs.
+//
+// Called inside the migrationsAppliedKey-protected region: a replayed plan
+// skips it, and a crash before the marker re-runs it with identical values
+// (all writes here are idempotent sets).
+func applyV1BaselineParams(ctx sdk.Context, box upgrades.Toolbox) error {
+	denom, err := box.StakingKeeper.BondDenom(ctx)
+	if err != nil {
+		return fmt.Errorf("read staking bond denom: %w", err)
+	}
+	if denom == "" {
+		return fmt.Errorf("staking bond denom is empty; cannot derive the v1 baseline denom")
+	}
+
+	params := box.AppminingKeeper.GetParams(ctx)
+	params.ChallengeBondDenom = denom
+	params.ChallengeBondAmount = v1BaselineChallengeBond
+	params.ChallengeDepositDenom = denom
+	params.ChallengeDepositAmount = v1BaselineChallengeDeposit
+	params.RewardDenomAllowlist = []string{denom}
+	params.EntitlementEnableMinFunded = v1BaselineMinFunded
+	params.EntitlementAllowedRuleVersions = append([]string(nil), v1BaselineRuleVersions...)
+	params.EntitlementAllowedAssessmentVersions = append([]string(nil), v1BaselineAssessmentVersions...)
+	params.CredentialRequired = true
+	params.ChallengeOpenAccess = appminingtypes.ChallengeOpenAccessDeposit
+
+	// SetParams validates again internally; the explicit check first keeps the
+	// failure message attributable to this step rather than a generic store error.
+	if err := params.Validate(); err != nil {
+		return fmt.Errorf("baseline params invalid: %w", err)
+	}
+	if err := box.AppminingKeeper.SetParams(ctx, params); err != nil {
+		return err
+	}
+
+	ctx.Logger().Info("v1 baseline params applied",
+		"upgrade", upgradeName,
+		"denom", denom,
+		"min_funded", v1BaselineMinFunded,
+		"challenge_deposit", v1BaselineChallengeDeposit,
+	)
+	return nil
 }
