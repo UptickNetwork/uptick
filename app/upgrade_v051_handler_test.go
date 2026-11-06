@@ -5,11 +5,22 @@ import (
 
 	upgradetypes "cosmossdk.io/x/upgrade/types"
 	evmtypes "github.com/cosmos/evm/x/vm/types"
+	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/stretchr/testify/require"
 
 	v051 "github.com/UptickNetwork/uptick/app/upgrades/v051"
 	appminingtypes "github.com/UptickNetwork/uptick/x/appmining/types"
 )
+
+// testBaselineAuthority is a syntactically valid stand-in for the release ops
+// multisig: the handler test pins the authority write without depending on
+// the real address, which is configured in v1BaselineAuthority before any
+// release build. Lazily derived: a package-level var would render before the
+// package init() flips the bech32 prefix to "uptick" and produce a cosmos1...
+// string that params.Validate rejects.
+var testBaselineAuthority = func() string {
+	return sdk.AccAddress([]byte("v051-baseline-authority")).String()
+}
 
 func v051Plan() upgradetypes.Plan {
 	return upgradetypes.Plan{Name: v051.Upgrade.UpgradeName, Height: 100}
@@ -38,6 +49,14 @@ func TestV051UpgradeHandlerAddsAppmining(t *testing.T) {
 	// (fresh shared apps may already include it from genesis wiring).
 	vm := app.mm.GetVersionMap()
 	delete(vm, appminingtypes.ModuleName)
+
+	// Inject a stand-in ops authority: the release gate refuses an empty
+	// v1BaselineAuthority, and this test pins the write, not the address.
+	// The pause authority is stubbed to empty as well: the release build fills
+	// both constants, and the fallback (pause == authority) this test asserts
+	// only triggers on an empty slot.
+	v051.SetBaselineAuthorityForTest(t, testBaselineAuthority())
+	v051.SetBaselinePauseAuthorityForTest(t, "")
 
 	handler := v051.Upgrade.UpgradeHandlerConstructor(app.mm, app.configurator, app.toolbox())
 	newVM, err := handler(ctx, v051Plan(), vm)
@@ -75,6 +94,12 @@ func TestV051UpgradeHandlerAddsAppmining(t *testing.T) {
 	require.True(t, params.CredentialRequired)
 	require.Equal(t, appminingtypes.ChallengeOpenAccessDeposit, params.ChallengeOpenAccess)
 	require.NotEmpty(t, params.ChallengeDepositAmount)
+	require.Equal(t, testBaselineAuthority(), params.Authority,
+		"upgrade must install the ops authority so remaining setup runs as plain txs")
+	// Empty v1BaselinePauseAuthority falls back to the authority address
+	// (kill switch held by the same multisig).
+	require.Equal(t, testBaselineAuthority(), params.PauseAuthority,
+		"pause authority must default to the ops authority when not split")
 
 	// Replay must be a no-op beyond RunMigrations: baseline params survive.
 	_, err = handler(ctx, v051Plan(), newVM)
@@ -82,6 +107,37 @@ func TestV051UpgradeHandlerAddsAppmining(t *testing.T) {
 	afterReplay := app.AppminingKeeper.GetParams(ctx)
 	require.Equal(t, params, afterReplay,
 		"replayed plan must not re-write (or wipe) the baseline params")
+}
+
+// TestV051UpgradeHandlerSplitsPauseAuthority pins the independent slot: when
+// v1BaselinePauseAuthority is configured, the kill switch goes to that address
+// instead of mirroring the admin authority.
+func TestV051UpgradeHandlerSplitsPauseAuthority(t *testing.T) {
+	app, ctx := sharedTestApp(t)
+	restoreSharedState(t, app)
+
+	upgradeStore := ctx.KVStore(app.GetKey(upgradetypes.StoreKey))
+	require.False(t, upgradeStore.Has([]byte(migrationsAppliedV051Key)))
+	t.Cleanup(func() {
+		upgradeStore.Delete([]byte(migrationsAppliedV051Key))
+	})
+
+	vm := app.mm.GetVersionMap()
+	delete(vm, appminingtypes.ModuleName)
+
+	v051.SetBaselineAuthorityForTest(t, testBaselineAuthority())
+	splitPause := func() string { return sdk.AccAddress([]byte("v051-oncall-pause-authority")).String() }
+	v051.SetBaselinePauseAuthorityForTest(t, splitPause())
+
+	handler := v051.Upgrade.UpgradeHandlerConstructor(app.mm, app.configurator, app.toolbox())
+	_, err := handler(ctx, v051Plan(), vm)
+	require.NoError(t, err)
+
+	params := app.AppminingKeeper.GetParams(ctx)
+	require.Equal(t, testBaselineAuthority(), params.Authority)
+	require.Equal(t, splitPause(), params.PauseAuthority,
+		"a configured pause authority must be installed verbatim, not overwritten by the authority fallback")
+	require.NoError(t, params.Validate())
 }
 
 func TestV051UpgradeHandlerRefusesLegacyState(t *testing.T) {

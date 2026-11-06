@@ -1138,13 +1138,16 @@ MsgFreezeEntitlementResponse is the request/response type for the module API.
 
 
 ## MsgFundEntitlementPool
-MsgFundEntitlementPool deposits coins into appmining_entitlement_pool and
-increases Pool.funded and Pool.available by the same amount (no mint).
+MsgFundEntitlementPool deposits coins from the authority account into
+appmining_entitlement_pool and increases Pool.funded and Pool.available
+by the same amount (no mint). Authority-gated: the debited account is the
+signer (authority), which keeps the module-account balance in sync with the
+pool ledger and removes the keeper-level transfer from arbitrary funders.
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| funder | string |  |  |
+| authority | string |  |  |
 | pool_id | string |  |  |
 | amount | string |  |  |
 

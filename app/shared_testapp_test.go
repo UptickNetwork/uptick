@@ -18,6 +18,15 @@ import (
 	simtypes "github.com/cosmos/cosmos-sdk/types/simulation"
 )
 
+// The binary wires the production bech32 prefix at startup (cmd/config). Test
+// binaries that bypass the CLI must repeat that wiring, or every Validate that
+// parses an uptick1... address (e.g. the v0.5.1 baseline params) fails with
+// "invalid Bech32 prefix; expected cosmos". No test in this package hardcodes
+// a cosmos1... literal, so setting it once here is safe for the whole binary.
+func init() {
+	sdk.GetConfig().SetBech32PrefixForAccount("uptick", "uptickpub")
+}
+
 // sharedTestApp returns the one application instance this test binary is
 // allowed to build, together with a context committed on top of its first
 // block.

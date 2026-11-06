@@ -36,9 +36,9 @@ func setupP1(t *testing.T) (testEnv, ed25519.PrivateKey, ed25519.PrivateKey) {
 		Authority: e.auth.String(), PoolId: testPoolID, Denom: types.DefaultChallengeBondDenom, Version: 1,
 	})
 	require.NoError(t, err)
-	e.bank.fundAccount(e.owner, types.DefaultChallengeBondDenom, math.NewInt(10_000))
+	e.bank.fundAccount(e.auth, types.DefaultChallengeBondDenom, math.NewInt(10_000))
 	_, err = e.server.FundEntitlementPool(e.ctx, &types.MsgFundEntitlementPool{
-		Funder: e.owner.String(), PoolId: testPoolID, Amount: "1000",
+		Authority: e.auth.String(), PoolId: testPoolID, Amount: "1000",
 	})
 	require.NoError(t, err)
 

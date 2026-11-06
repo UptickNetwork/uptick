@@ -390,7 +390,7 @@ func (m *MsgOpenEntitlementPool) GetSigners() []sdk.AccAddress {
 }
 
 func (m *MsgFundEntitlementPool) ValidateBasic() error {
-	if err := validateSigner(m.Funder); err != nil {
+	if err := validateSigner(m.Authority); err != nil {
 		return err
 	}
 	if err := ValidateWireID(m.PoolId); err != nil {
@@ -406,7 +406,7 @@ func (m *MsgFundEntitlementPool) ValidateBasic() error {
 }
 
 func (m *MsgFundEntitlementPool) GetSigners() []sdk.AccAddress {
-	addr, _ := sdk.AccAddressFromBech32(m.Funder)
+	addr, _ := sdk.AccAddressFromBech32(m.Authority)
 	return []sdk.AccAddress{addr}
 }
 

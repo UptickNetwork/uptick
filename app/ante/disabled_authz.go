@@ -143,12 +143,14 @@ func DisabledAuthzMsgTypeURLs() []string {
 		sdk.MsgTypeURL(&appminingtypes.MsgUpdateParams{}),
 		sdk.MsgTypeURL(&appminingtypes.MsgSetApplicationStatus{}),
 		sdk.MsgTypeURL(&appminingtypes.MsgPause{}),
-		// V1 entitlement control plane: all six handlers compare msg.Authority
-		// against params.Authority (entitlement_p0.go:18/:98/:122/:206,
+		// V1 entitlement control plane: all seven handlers compare msg.Authority
+		// against params.Authority (entitlement_p0.go:18/:44/:98/:122/:206,
 		// assessment_signer.go:17/:53), so a delegated grantee holding the
-		// authority EOA could mint role keys, open pools, and flip pause flags --
-		// i.e. walk the whole V1 fund flow.
+		// authority EOA could mint role keys, open pools, fund them from the
+		// authority balance, and flip pause flags -- i.e. walk the whole V1
+		// fund flow.
 		sdk.MsgTypeURL(&appminingtypes.MsgOpenEntitlementPool{}),
+		sdk.MsgTypeURL(&appminingtypes.MsgFundEntitlementPool{}),
 		sdk.MsgTypeURL(&appminingtypes.MsgSetEntitlementPoolPaused{}),
 		sdk.MsgTypeURL(&appminingtypes.MsgRegisterRoleKey{}),
 		sdk.MsgTypeURL(&appminingtypes.MsgSetRoleKeyStatus{}),

@@ -28,11 +28,11 @@ func TestP0_OpenFundPoolAndEnableGate(t *testing.T) {
 	require.False(t, q.EntitlementFlowEnabled)
 	require.Equal(t, "0", q.Pool.Funded)
 
-	e.bank.fundAccount(e.owner, types.DefaultChallengeBondDenom, math.NewInt(5000))
+	e.bank.fundAccount(e.auth, types.DefaultChallengeBondDenom, math.NewInt(5000))
 	_, err = e.server.FundEntitlementPool(e.ctx, &types.MsgFundEntitlementPool{
-		Funder: e.owner.String(),
-		PoolId: "ecosystem-v0",
-		Amount: "1000",
+		Authority: e.auth.String(),
+		PoolId:    "ecosystem-v0",
+		Amount:    "1000",
 	})
 	require.NoError(t, err)
 

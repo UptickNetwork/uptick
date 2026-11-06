@@ -59,7 +59,7 @@ func CmdOpenEntitlementPool() *cobra.Command {
 func CmdFundEntitlementPool() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "fund-entitlement-pool [pool-id] [amount]",
-		Short: "Fund a V1 entitlement pool (no mint)",
+		Short: "Fund a V1 entitlement pool from the authority account (no mint)",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clientCtx, err := client.GetClientTxContext(cmd)
@@ -67,9 +67,9 @@ func CmdFundEntitlementPool() *cobra.Command {
 				return err
 			}
 			msg := &types.MsgFundEntitlementPool{
-				Funder: clientCtx.GetFromAddress().String(),
-				PoolId: args[0],
-				Amount: args[1],
+				Authority: clientCtx.GetFromAddress().String(),
+				PoolId:    args[0],
+				Amount:    args[1],
 			}
 			return tx.GenerateOrBroadcastTxCLI(clientCtx, cmd.Flags(), msg)
 		},

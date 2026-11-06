@@ -19,9 +19,9 @@ func setupP2(t *testing.T) (testEnv, ed25519.PrivateKey, ed25519.PrivateKey, ed2
 	e, pubPriv, revPriv := setupP1(t)
 
 	// top up pool so Approve of 31500 succeeds
-	e.bank.fundAccount(e.owner, types.DefaultChallengeBondDenom, math.NewInt(100_000))
+	e.bank.fundAccount(e.auth, types.DefaultChallengeBondDenom, math.NewInt(100_000))
 	_, err := e.server.FundEntitlementPool(e.ctx, &types.MsgFundEntitlementPool{
-		Funder: e.owner.String(), PoolId: testPoolID, Amount: "50000",
+		Authority: e.auth.String(), PoolId: testPoolID, Amount: "50000",
 	})
 	require.NoError(t, err)
 	params := e.k.GetParams(e.ctx)

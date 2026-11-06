@@ -54,6 +54,7 @@ func TestDisabledAuthzIncludesAppminingSensitiveMsgs(t *testing.T) {
 	require.Contains(t, urls, sdk.MsgTypeURL(&appminingtypes.MsgPause{}))
 	// V1 entitlement control plane: authority-gated, never delegatable.
 	require.Contains(t, urls, sdk.MsgTypeURL(&appminingtypes.MsgOpenEntitlementPool{}))
+	require.Contains(t, urls, sdk.MsgTypeURL(&appminingtypes.MsgFundEntitlementPool{}))
 	require.Contains(t, urls, sdk.MsgTypeURL(&appminingtypes.MsgSetEntitlementPoolPaused{}))
 	require.Contains(t, urls, sdk.MsgTypeURL(&appminingtypes.MsgRegisterRoleKey{}))
 	require.Contains(t, urls, sdk.MsgTypeURL(&appminingtypes.MsgSetRoleKeyStatus{}))
@@ -66,7 +67,6 @@ func TestDisabledAuthzIncludesAppminingSensitiveMsgs(t *testing.T) {
 	// signer-keyed: a grantee still needs the role key signature, so they stay
 	// grantable -- same rule as the permissionless IBC surface.
 	require.NotContains(t, urls, sdk.MsgTypeURL(&appminingtypes.MsgPublishCandidate{}))
-	require.NotContains(t, urls, sdk.MsgTypeURL(&appminingtypes.MsgFundEntitlementPool{}))
 }
 
 func TestAuthzLimiterAllowsBankSendInMsgExec(t *testing.T) {

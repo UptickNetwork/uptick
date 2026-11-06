@@ -90,9 +90,17 @@ Ref: https://keepachangelog.com/en/1.0.0/
   `reward_denom_allowlist` default would otherwise brick pool opening, funding, and epoch budgets on a chain
   whose native denom differs); `entitlement_enable_min_funded`, rule/assessment version allowlists,
   `credential_required`, and deposit-mode challenge access land at the values verified on the 7777 dev chain.
-  The V1 challenge window is restored to its production constant (7 days) after the dev-chain dry run. All
-  baseline values remain tunable afterwards via `MsgUpdateParams`; pool funding and role-key/application
-  registration still require post-upgrade transactions.
+  `params.authority` is set to the configured ops multisig (`v1BaselineAuthority` -- release-gated on a non-empty
+  value) and `params.pause_authority` mirrors it (`v1BaselinePauseAuthority` may override with a dedicated
+  on-call address to split the one-way kill switch), so the remaining setup runs as plain transactions. The V1
+  challenge window is restored to its production constant (7 days) after the dev-chain dry run. All
+  baseline values remain tunable afterwards via `MsgUpdateParams`.
+
+* (appmining) `MsgFundEntitlementPool` is authority-gated (V1-AUDIT): the msg now carries an `authority` signer
+  (field 1; the old `funder` field is removed -- the module has never gone live), funds are debited from the
+  authority account, and the handler rejects non-authority signers before any pool lookup. The
+  `appmining_entitlement_pool` module account stays blocked to direct bank sends, so this msg is the only funding
+  entry into the V1 pool. Added to the authz disabled list; the legacy `MsgFundRewardPool` stays permissionless.
 
 * (upgrade) New `v0.5.0` plan: the one-hop upgrade mainnet follows from v0.3.3. It runs the whole v0.4.0
   change set and then the v0.4.1 repairs inside ONE governance plan, where the testnet executed those as two

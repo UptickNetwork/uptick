@@ -43,6 +43,9 @@ func (k msgServer) OpenEntitlementPool(goCtx context.Context, msg *types.MsgOpen
 func (k msgServer) FundEntitlementPool(goCtx context.Context, msg *types.MsgFundEntitlementPool) (*types.MsgFundEntitlementPoolResponse, error) {
 	ctx := sdk.UnwrapSDKContext(goCtx)
 	params := k.GetParams(ctx)
+	if msg.Authority != params.Authority {
+		return nil, types.ErrUnauthorized
+	}
 	if params.PauseState != nil && params.PauseState.EntitlementPaused {
 		return nil, types.ErrEntitlementPaused
 	}
@@ -57,7 +60,11 @@ func (k msgServer) FundEntitlementPool(goCtx context.Context, msg *types.MsgFund
 	if err != nil {
 		return nil, err
 	}
-	from, err := sdk.AccAddressFromBech32(msg.Funder)
+	// The debited account is the authority itself. SendCoinsFromAccountToModule
+	// bypasses signer auth at the bank layer, so letting the authority name an
+	// arbitrary "funder" would let it move third-party balances; debiting the
+	// signer keeps the module-account balance equal to the pool ledger.
+	from, err := sdk.AccAddressFromBech32(msg.Authority)
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +88,7 @@ func (k msgServer) FundEntitlementPool(goCtx context.Context, msg *types.MsgFund
 	k.SetEntitlementPool(ctx, pool)
 	ctx.EventManager().EmitEvent(sdk.NewEvent(
 		types.EventTypeEntitlementPoolFunded,
-		sdk.NewAttribute(types.AttributeKeyFunder, msg.Funder),
+		sdk.NewAttribute(types.AttributeKeyAuthority, msg.Authority),
 		sdk.NewAttribute(types.AttributeKeyPoolID, msg.PoolId),
 		sdk.NewAttribute(types.AttributeKeyDenom, pool.Denom),
 		sdk.NewAttribute(types.AttributeKeyAmount, msg.Amount),

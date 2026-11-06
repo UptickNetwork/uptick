@@ -17,8 +17,11 @@
 //  4. Overwrites the fresh defaults with the V1 production baseline
 //     (applyV1BaselineParams): denom is derived from the live staking bond
 //     denom, so the same binary lands auptick on mainnet and auoc on the
-//     origin testnet with no per-chain config. After this step the UGE
-//     protocol is usable as-is; later adjustments go through MsgUpdateParams.
+//     origin testnet with no per-chain config, and params.Authority is set to
+//     the configured ops multisig (v1BaselineAuthority) so the remaining
+//     setup -- pool opening, funding, registrations -- runs as plain
+//     transactions. After this step the UGE protocol is usable as-is; later
+//     adjustments go through MsgUpdateParams.
 //
 // # Store upgrades
 //
@@ -191,6 +194,46 @@ var v1BaselineAssessmentVersions = []string{
 	"uge-assessment-0.1",
 }
 
+// v1BaselineAuthority is written into params.Authority at the upgrade height,
+// replacing the gov-module default so pool opening, funding (now
+// authority-gated, see MsgFundEntitlementPool), role/signer registration, and
+// retuning run as plain transactions from this account instead of governance
+// proposals.
+//
+// RELEASE GATE: this must be a funded multisig address before the v0.5.1
+// binaries are built -- applyV1BaselineParams refuses to run on an empty
+// value. The same address takes effect on BOTH chains served by this binary
+// (mainnet and origin testnet). It stays mutable afterwards: the current
+// authority can hand it over via MsgUpdateParams.
+//
+// Decision 2026-11-06: uptick1r3dfm4lqs9eucv5s3mye98s80luaz3h53t9mcd (the ops
+// account, same holder as test01's mykey authority).
+var v1BaselineAuthority = "uptick1r3dfm4lqs9eucv5s3mye98s80luaz3h53t9mcd"
+
+// v1BaselinePauseAuthority is written into params.PauseAuthority at the
+// upgrade height. The kill switch (MsgPause) is a one-way fuse: it can only
+// set pause bits, never clear them, and cannot touch params -- so pointing it
+// at the same multisig is safe, and an on-call EOA can be separated later via
+// MsgUpdateParams without touching the admin authority. Empty falls back to
+// v1BaselineAuthority (decision 2026-11-06: same address, independent slot).
+var v1BaselinePauseAuthority = "uptick1r3dfm4lqs9eucv5s3mye98s80luaz3h53t9mcd"
+
+// SetBaselineAuthorityForTest overrides the release authority for handler
+// tests and restores the previous value when the test finishes.
+func SetBaselineAuthorityForTest(t interface{ Cleanup(func()) }, addr string) {
+	prev := v1BaselineAuthority
+	v1BaselineAuthority = addr
+	t.Cleanup(func() { v1BaselineAuthority = prev })
+}
+
+// SetBaselinePauseAuthorityForTest overrides the release kill-switch authority
+// for handler tests and restores the previous value when the test finishes.
+func SetBaselinePauseAuthorityForTest(t interface{ Cleanup(func()) }, addr string) {
+	prev := v1BaselinePauseAuthority
+	v1BaselinePauseAuthority = addr
+	t.Cleanup(func() { v1BaselinePauseAuthority = prev })
+}
+
 // applyV1BaselineParams rewrites the just-initialized x/appmining params into
 // the production baseline. The denom is read from the live staking bond denom
 // rather than hardcoded: one binary serves mainnet (auptick) and the origin
@@ -203,6 +246,9 @@ var v1BaselineAssessmentVersions = []string{
 // skips it, and a crash before the marker re-runs it with identical values
 // (all writes here are idempotent sets).
 func applyV1BaselineParams(ctx sdk.Context, box upgrades.Toolbox) error {
+	if v1BaselineAuthority == "" {
+		return fmt.Errorf("v1BaselineAuthority is empty: set the ops multisig address before building a release binary")
+	}
 	denom, err := box.StakingKeeper.BondDenom(ctx)
 	if err != nil {
 		return fmt.Errorf("read staking bond denom: %w", err)
@@ -212,6 +258,15 @@ func applyV1BaselineParams(ctx sdk.Context, box upgrades.Toolbox) error {
 	}
 
 	params := box.AppminingKeeper.GetParams(ctx)
+	params.Authority = v1BaselineAuthority
+	pauseAuthority := v1BaselinePauseAuthority
+	if pauseAuthority == "" {
+		// Same kill-switch holder as the admin authority (2026-11-06 decision);
+		// a dedicated on-call address can be configured or handed over later
+		// via MsgUpdateParams.
+		pauseAuthority = v1BaselineAuthority
+	}
+	params.PauseAuthority = pauseAuthority
 	params.ChallengeBondDenom = denom
 	params.ChallengeBondAmount = v1BaselineChallengeBond
 	params.ChallengeDepositDenom = denom
@@ -237,6 +292,8 @@ func applyV1BaselineParams(ctx sdk.Context, box upgrades.Toolbox) error {
 		"denom", denom,
 		"min_funded", v1BaselineMinFunded,
 		"challenge_deposit", v1BaselineChallengeDeposit,
+		"authority", params.Authority,
+		"pause_authority", params.PauseAuthority,
 	)
 	return nil
 }
