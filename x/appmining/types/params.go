@@ -20,11 +20,15 @@ const (
 
 // V1 entitlement timing constants (workorder 13 §3): 7-day challenge window,
 // single freeze capped at 72h.
-// DEV-CHAIN OVERRIDE (2026-10-27): challenge window relaxed to 600s for the
-// uptick_7777-1 release-chain end-to-end dry run; restore 604800 before any
-// value-bearing deployment.
+//
+// PRODUCTION VALUE (2026-11-06): restored to 604800s for the v0.5.1 release.
+// The uptick_7777-1 dev chain shipped a 600s override (a6d8259, 2026-10-27)
+// for its end-to-end dry run; that override lived only in the dev-chain
+// binary and MUST NOT return without an explicit workorder. This constant is
+// compile-time on purpose: the V1 challenge window is not a Params field, so
+// changing it means a new release, not a config flip.
 const (
-	ChallengeWindowSeconds = 600
+	ChallengeWindowSeconds = 604800
 	MaxFreezeSeconds       = 259200
 )
 

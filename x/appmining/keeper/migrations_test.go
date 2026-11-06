@@ -63,7 +63,15 @@ func TestE6_WatermarkKeepsWindowElapsedAfterRollback(t *testing.T) {
 	cand.MaxObservedTime = future
 	e.k.SetCandidate(e.ctx, cand)
 
+	// The rollback-protected auth clock is max(blockTime, watermark), so the
+	// wire proof must be minted against the watermark clock: under the
+	// production 7-day window the watermark sits ~7d ahead of the rolled-back
+	// block time, and a proof minted at the rolled-back time would be dead on
+	// arrival ("authorization expired") -- that is the guard working, not a
+	// regression.
+	e.ctx = e.ctx.WithBlockTime(time.Unix(future, 0))
+	msg := approveMsg(t, e, aprPriv, c, "962")
 	e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+1, 0))
-	_, err := e.server.ApproveEntitlement(e.ctx, approveMsg(t, e, aprPriv, c, "962"))
+	_, err := e.server.ApproveEntitlement(e.ctx, msg)
 	require.NoError(t, err)
 }
