@@ -60,7 +60,7 @@ func (k Keeper) verifyWireAuth(
 			return types.ErrUnauthorized
 		}
 	case types.RoleKeyTypeSecp256k1EvmAddress:
-		if role != types.EntitlementRolePublisher || record["operation"] != "PUBLISH" {
+		if !types.RoleKeyTypeOperationAllowed(role, rk.KeyType, record["operation"]) {
 			return types.ErrRoleKeyTypeUnsupported
 		}
 		switch wirev1.VerifyAuthorizationSecp256k1(record, proof.SignatureBase64, rk.Pubkey) {

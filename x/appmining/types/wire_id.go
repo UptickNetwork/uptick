@@ -67,13 +67,60 @@ func NormalizeEvmAddressInput(in []byte) ([]byte, error) {
 	return out, nil
 }
 
+// RoleKeyTypeAllowed reports whether keyType may be registered at all for role.
+//
+// An EVM-address key is *not* a weaker Ed25519 key: it can only authorize
+// operations whose preimage the holder's wallet will sign as EIP-191
+// personal_sign bytes (see RoleKeyTypeOperationAllowed). Registration is
+// therefore gated per role, and verification is gated per operation — the two
+// checks are deliberately separate so that a role which gains a new operation
+// cannot silently gain EVM-address authorization for it.
+func RoleKeyTypeAllowed(role EntitlementRole, keyType RoleKeyType) bool {
+	switch keyType {
+	case RoleKeyTypeEd25519:
+		return true
+	case RoleKeyTypeSecp256k1EvmAddress:
+		// publisher: PUBLISH (DEC-10). reviewer: RESOLVE, so the party who
+		// adjudicates a challenge can sign from a wallet they already hold
+		// instead of exporting an Ed25519 secret into an operations host.
+		return role == EntitlementRolePublisher || role == EntitlementRoleReviewer
+	default:
+		return false
+	}
+}
+
+// RoleKeyTypeOperationAllowed reports whether a key of keyType may authorize
+// operation for role.
+//
+// Ed25519 keys may authorize any operation the role owns; EVM-address keys are
+// restricted to the operations whose canonical bytes the wallet signs as
+// EIP-191 (`accounts.TextHash`), which is what wirev1.VerifyAuthorizationSecp256k1
+// verifies. Widening this without widening the wallet path would let a
+// registration exist that no wallet can ever produce a valid proof for.
+func RoleKeyTypeOperationAllowed(role EntitlementRole, keyType RoleKeyType, operation string) bool {
+	if keyType == RoleKeyTypeEd25519 {
+		return true
+	}
+	if keyType != RoleKeyTypeSecp256k1EvmAddress {
+		return false
+	}
+	switch role {
+	case EntitlementRolePublisher:
+		return operation == "PUBLISH"
+	case EntitlementRoleReviewer:
+		return operation == "RESOLVE"
+	default:
+		return false
+	}
+}
+
 // ValidateRoleKeyMaterial checks pubkey/address bytes for the given key type + role.
 func ValidateRoleKeyMaterial(role EntitlementRole, keyType RoleKeyType, material []byte) error {
 	switch keyType {
 	case RoleKeyTypeEd25519:
 		return ValidateEd25519PubKey(material)
 	case RoleKeyTypeSecp256k1EvmAddress:
-		if role != EntitlementRolePublisher {
+		if !RoleKeyTypeAllowed(role, keyType) {
 			return ErrRoleKeyTypeUnsupported
 		}
 		return ValidateEvmAddressBytes(material)

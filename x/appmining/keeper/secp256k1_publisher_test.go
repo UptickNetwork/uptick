@@ -46,12 +46,31 @@ func TestDEC10_Secp256k1PublisherPublish(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// non-publisher cannot register type 1
+	// A reviewer may now register an EVM-address key, but only for RESOLVE —
+	// see TestSecp256k1ReviewerResolve / ...OperationScope. Uses a distinct
+	// address because one pubkey may not be ACTIVE under two roles (F-2).
+	reviewerPriv, err := crypto.GenerateKey()
+	require.NoError(t, err)
 	_, err = e.server.RegisterRoleKey(e.ctx, &types.MsgRegisterRoleKey{
 		Authority: e.auth.String(),
 		Role:      types.EntitlementRoleReviewer,
 		KeyId:     "mm-rev",
-		Pubkey:    addr.Bytes(),
+		Pubkey:    crypto.PubkeyToAddress(reviewerPriv.PublicKey).Bytes(),
+		Version:   1,
+		KeyType:   types.RoleKeyTypeSecp256k1EvmAddress,
+	})
+	require.NoError(t, err)
+
+	// The widening is scoped to publisher + reviewer; every other role still
+	// rejects an EVM address, so a typo in the role enum cannot hand out a key
+	// type nobody designed for.
+	riskPriv, err := crypto.GenerateKey()
+	require.NoError(t, err)
+	_, err = e.server.RegisterRoleKey(e.ctx, &types.MsgRegisterRoleKey{
+		Authority: e.auth.String(),
+		Role:      types.EntitlementRoleRisk,
+		KeyId:     "mm-risk",
+		Pubkey:    crypto.PubkeyToAddress(riskPriv.PublicKey).Bytes(),
 		Version:   1,
 		KeyType:   types.RoleKeyTypeSecp256k1EvmAddress,
 	})
