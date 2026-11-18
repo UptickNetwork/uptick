@@ -156,7 +156,7 @@ func (k msgServer) PublishCandidate(goCtx context.Context, msg *types.MsgPublish
 		PublishTxHash:     currentTxHashHex(ctx),
 		PublishHeight:     ctx.BlockHeight(),
 		PublishedAt:       now,
-		ChallengeDeadline: now + types.ChallengeWindowSeconds,
+		ChallengeDeadline: now + params.EffectiveChallengeWindowSeconds(),
 		Publisher:         msg.Submitter,
 		Status:            types.CandidateStatusPublished,
 		MaxObservedTime:   now,
@@ -273,6 +273,14 @@ func (k msgServer) OpenChallenge(goCtx context.Context, msg *types.MsgOpenChalle
 		OpenedAt:        now,
 		DepositAmount:   depositAmt,
 		DepositDenom:    depositDenom,
+		// Sealed here so a later governance change to
+		// challenge_resolution_grace_seconds cannot move this in-flight
+		// challenge: the reviewer's exclusive window is fixed at open time.
+		ResolutionDeadline: types.ChallengeResolutionDeadline(
+			cand,
+			types.EntitlementChallenge{OpenedAt: now},
+			params.EffectiveChallengeResolutionGraceSeconds(),
+		),
 	}
 	k.SetEntitlementChallenge(ctx, chal)
 	k.SetOpenEntitlementChallenge(ctx, msg.EntitlementId, msg.Challenger, id)

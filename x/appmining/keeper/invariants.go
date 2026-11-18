@@ -19,6 +19,54 @@ func RegisterInvariants(ir sdk.InvariantRegistry, k Keeper) {
 	ir.RegisterRoute(types.ModuleName, "settlement-attestation-consistent", SettlementAttestationInvariant(k))
 	ir.RegisterRoute(types.ModuleName, "open-budget-pool-covered", OpenBudgetPoolInvariant(k))
 	ir.RegisterRoute(types.ModuleName, "entitlement-pool-invariant", EntitlementPoolInvariant(k))
+	ir.RegisterRoute(types.ModuleName, "challenge-index-consistent", ChallengeIndexInvariant(k))
+}
+
+// ChallengeIndexInvariant checks that every V1 challenge record is reachable
+// through the candidate index and that every OPEN record sits in the timeout
+// bucket (and settled records do not).
+//
+// Those two structures are derived state: if they drift, an OPEN challenge
+// becomes invisible to approve (which would release funds it must block) or
+// stops being swept. Migration 1→2 is the only writer that can legitimately
+// leave them stale while it runs, so any break outside an upgrade is a real
+// fault. Run with: uptickd query crisis invariant appmining challenge-index-consistent
+func ChallengeIndexInvariant(k Keeper) sdk.Invariant {
+	return func(ctx sdk.Context) (string, bool) {
+		store := k.store(ctx)
+		broken := 0
+		var first string
+		it := storetypes.KVStorePrefixIterator(store, types.KeyPrefixEntitlementChallenge)
+		defer it.Close()
+		for ; it.Valid(); it.Next() {
+			var c types.EntitlementChallenge
+			k.cdc.MustUnmarshal(it.Value(), &c)
+			report := func(msg string) {
+				broken++
+				if first == "" {
+					first = msg
+				}
+			}
+			if c.CandidateId == "" {
+				report(fmt.Sprintf("challenge %q has empty candidate_id", c.ChallengeId))
+			} else if !store.Has(types.EntitlementChallengeByCandidateKey(c.CandidateId, c.ChallengeId)) {
+				report(fmt.Sprintf("challenge %q missing candidate index for %q", c.ChallengeId, c.CandidateId))
+			}
+			forOpen := c.Status == types.EntitlementChallengeStatusOpen && c.ResolutionDeadline > 0
+			hasBucket := store.Has(types.ChallengeResolutionDeadlineKey(c.ResolutionDeadline, c.ChallengeId))
+			if forOpen && !hasBucket {
+				report(fmt.Sprintf("open challenge %q missing timeout bucket at %d", c.ChallengeId, c.ResolutionDeadline))
+			}
+			if !forOpen && c.ResolutionDeadline > 0 && hasBucket {
+				report(fmt.Sprintf("settled challenge %q still occupies timeout bucket at %d", c.ChallengeId, c.ResolutionDeadline))
+			}
+		}
+		if broken > 0 {
+			return sdk.FormatInvariant(types.ModuleName, "challenge-index-consistent",
+				fmt.Sprintf("%d inconsistent challenge index entries; first: %s", broken, first)), true
+		}
+		return "", false
+	}
 }
 
 // EntitlementPoolInvariant checks funded = available + reserved + paid per pool

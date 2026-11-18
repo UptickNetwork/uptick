@@ -37,6 +37,7 @@ func RegisterInterfaces(registry codectypes.InterfaceRegistry) {
 		&MsgPublishCandidate{},
 		&MsgOpenChallenge{},
 		&MsgResolveEntitlementChallenge{},
+		&MsgExpireEntitlementChallenge{},
 		&MsgApproveEntitlement{},
 		&MsgClaimEntitlement{},
 		&MsgFreezeEntitlement{},
@@ -71,6 +72,7 @@ func RegisterLegacyAminoCodec(cdc *codec.LegacyAmino) {
 	cdc.RegisterConcrete(&MsgPublishCandidate{}, "appmining/PublishCandidate", nil)
 	cdc.RegisterConcrete(&MsgOpenChallenge{}, "appmining/OpenChallenge", nil)
 	cdc.RegisterConcrete(&MsgResolveEntitlementChallenge{}, "appmining/ResolveEntitlementChallenge", nil)
+	cdc.RegisterConcrete(&MsgExpireEntitlementChallenge{}, "appmining/ExpireEntitlementChallenge", nil)
 	cdc.RegisterConcrete(&MsgApproveEntitlement{}, "appmining/ApproveEntitlement", nil)
 	cdc.RegisterConcrete(&MsgClaimEntitlement{}, "appmining/ClaimEntitlement", nil)
 	cdc.RegisterConcrete(&MsgFreezeEntitlement{}, "appmining/FreezeEntitlement", nil)

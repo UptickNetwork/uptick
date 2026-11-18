@@ -2,6 +2,7 @@ package types
 
 import (
 	"fmt"
+	"math"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
@@ -18,31 +19,42 @@ const (
 	DefaultMaxGasPayers          = 16
 )
 
-// V1 entitlement timing constants (workorder 13 §3): 7-day challenge window,
-// single freeze capped at 72h.
-//
-// PRODUCTION VALUE (2026-11-06): restored to 604800s for the v0.5.1 release.
-// The uptick_7777-1 dev chain shipped a 600s override (a6d8259, 2026-10-27)
-// for its end-to-end dry run; that override lived only in the dev-chain
-// binary and MUST NOT return without an explicit workorder. This constant is
-// compile-time on purpose: the V1 challenge window is not a Params field, so
-// changing it means a new release, not a config flip.
+// Production defaults for V1 timing params (workorder 13 §3). Zero on a Params
+// field means "use this default" via Effective* helpers so legacy state that
+// pre-dates fields 19–22 keeps the same behaviour without a forced migration.
 const (
-	ChallengeWindowSeconds = 604800
-	MaxFreezeSeconds       = 259200
+	DefaultChallengeWindowSeconds      = 604800 // 7d
+	DefaultMaxFreezeSeconds            = 259200 // 72h
+	DefaultMaxWireProofValiditySeconds = 604800 // 7d
+	DefaultNonceRetentionSeconds       = 691200 // 8d = validity + 1d grace
+	// DefaultChallengeResolutionGraceSeconds is how long a reviewer keeps the
+	// exclusive right to decide before anyone may settle an OPEN challenge as
+	// EXPIRED (24h after the challenge's own resolution window elapses).
+	DefaultChallengeResolutionGraceSeconds = 86400 // 24h
 )
 
-// MaxWireProofValiditySeconds caps WireProof.expires_at relative to the
-// processing block time: exp <= now + 7d. Wire proofs are one-shot (nonce
-// consumed on use), so the cap bounds how long a leaked-but-unused signed
-// proof stays a live credential; replay beyond the cap is also dead because
-// the expiry check rejects now > exp. Consumed auth nonces are retained for
-// NonceRetentionSeconds before pruning (pruning is safe: any replay of a
-// pruned nonce necessarily carries its original expires_at, which by then has
-// passed).
+// Governance bounds for the V1 timing params. Authority may tune within these
+// ranges via MsgUpdateParams; values outside fail Validate.
+//
+// Challenge window and wire-proof validity allow a 60s floor so short-lived
+// testnets can exercise expiry paths (600s window, or a proof that dies within
+// a minute) without a binary rebuild. Shrinking wire validity is additionally
+// gated by the CLI (--allow-shorten-wire-proof-validity) and emits an event,
+// so an accidental 60s on mainnet is visible rather than silent. Freeze and
+// nonce retention keep a 1h floor: collapsing those to seconds has no test
+// value and only risks stranding in-flight state.
 const (
-	MaxWireProofValiditySeconds = 604800 // 7d
-	NonceRetentionSeconds       = 691200 // 8d = validity + 1d grace
+	MinChallengeWindowSeconds        = 60      // 1m (origin e2e / dry-run)
+	MinWireProofValiditySeconds      = 60      // 1m (expiry path testing)
+	MinTimingSeconds                 = 3600    // 1h (freeze / nonce)
+	MaxChallengeWindowSecondsBound   = 2592000 // 30d
+	MaxFreezeSecondsBound            = 604800  // 7d
+	MaxWireProofValiditySecondsBound = 2592000 // 30d
+	MaxNonceRetentionSecondsBound    = 5184000 // 60d
+	// Resolution grace keeps the same 60s floor: testnets need to reach the
+	// timeout path within a block or two of the window closing.
+	MinChallengeResolutionGraceSeconds = 60
+	MaxChallengeResolutionGraceSeconds = 2592000 // 30d
 )
 
 // DefaultParams returns production-safe defaults.
@@ -74,10 +86,19 @@ func DefaultParams() Params {
 		// versions explicitly (workorder 13 §3 "规则版本允许").
 		EntitlementAllowedRuleVersions: nil,
 		// T1a publisher-binding placeholders (T1b/T1c activate behavior).
-		CredentialRequired:     false,
-		ChallengeOpenAccess:    ChallengeOpenAccessOpen,
-		ChallengeDepositAmount: "",
-		ChallengeDepositDenom:  "",
+		CredentialRequired:          false,
+		ChallengeOpenAccess:         ChallengeOpenAccessOpen,
+		ChallengeDepositAmount:      "",
+		ChallengeDepositDenom:       "",
+		ChallengeWindowSeconds:      DefaultChallengeWindowSeconds,
+		MaxFreezeSeconds:            DefaultMaxFreezeSeconds,
+		MaxWireProofValiditySeconds: DefaultMaxWireProofValiditySeconds,
+		NonceRetentionSeconds:       DefaultNonceRetentionSeconds,
+		// Field 23 stays 0 on purpose: InitGenesis of x/appmining runs inside the
+		// already-executed v0.5.1 upgrade plan, so writing a non-zero value here
+		// would change the params store bytes at that height and break genesis
+		// replay. 0 resolves to DefaultChallengeResolutionGraceSeconds via
+		// EffectiveChallengeResolutionGraceSeconds.
 	}
 }
 
@@ -102,6 +123,48 @@ func (p Params) EffectiveMaxGasPayers() uint32 {
 		return DefaultMaxGasPayers
 	}
 	return p.MaxGasPayers
+}
+
+// EffectiveChallengeWindowSeconds returns the V1 challenge window (0 → default).
+func (p Params) EffectiveChallengeWindowSeconds() int64 {
+	return timingSecondsAsInt64(p.ChallengeWindowSeconds, DefaultChallengeWindowSeconds)
+}
+
+// EffectiveMaxFreezeSeconds returns the freeze cap (0 → default).
+func (p Params) EffectiveMaxFreezeSeconds() int64 {
+	return timingSecondsAsInt64(p.MaxFreezeSeconds, DefaultMaxFreezeSeconds)
+}
+
+// EffectiveMaxWireProofValiditySeconds returns the wire-proof expiry cap (0 → default).
+func (p Params) EffectiveMaxWireProofValiditySeconds() int64 {
+	return timingSecondsAsInt64(p.MaxWireProofValiditySeconds, DefaultMaxWireProofValiditySeconds)
+}
+
+// EffectiveNonceRetentionSeconds returns the auth-nonce retention window (0 → default).
+func (p Params) EffectiveNonceRetentionSeconds() int64 {
+	return timingSecondsAsInt64(p.NonceRetentionSeconds, DefaultNonceRetentionSeconds)
+}
+
+// EffectiveChallengeResolutionGraceSeconds returns the reviewer grace period
+// after a challenge's resolution window before anyone may settle it as EXPIRED
+// (0 → default). This is the only knob that makes the timeout path reachable:
+// without it an OPEN challenge blocks approval forever.
+func (p Params) EffectiveChallengeResolutionGraceSeconds() int64 {
+	return timingSecondsAsInt64(p.ChallengeResolutionGraceSeconds, DefaultChallengeResolutionGraceSeconds)
+}
+
+// timingSecondsAsInt64 maps a uint64 Params timing field to int64 for wall-clock
+// math. Validate() keeps production values well below MaxInt64; the clamp is a
+// belt-and-suspenders guard if Effective* is called on unvalidated Params.
+func timingSecondsAsInt64(stored, defaultVal uint64) int64 {
+	v := stored
+	if v == 0 {
+		v = defaultVal
+	}
+	if v > uint64(math.MaxInt64) {
+		return math.MaxInt64
+	}
+	return int64(v)
 }
 
 // RuleVersionAllowed reports whether the candidate rule_version may be
@@ -219,6 +282,36 @@ func (p Params) Validate() error {
 			return fmt.Errorf("duplicate entitlement_allowed_assessment_versions entry %q", av)
 		}
 		seenAV[av] = struct{}{}
+	}
+	if err := validateTimingSeconds("challenge_window_seconds", p.ChallengeWindowSeconds, MinChallengeWindowSeconds, MaxChallengeWindowSecondsBound); err != nil {
+		return err
+	}
+	if err := validateTimingSeconds("max_freeze_seconds", p.MaxFreezeSeconds, MinTimingSeconds, MaxFreezeSecondsBound); err != nil {
+		return err
+	}
+	if err := validateTimingSeconds("max_wire_proof_validity_seconds", p.MaxWireProofValiditySeconds, MinWireProofValiditySeconds, MaxWireProofValiditySecondsBound); err != nil {
+		return err
+	}
+	if err := validateTimingSeconds("nonce_retention_seconds", p.NonceRetentionSeconds, MinTimingSeconds, MaxNonceRetentionSecondsBound); err != nil {
+		return err
+	}
+	if err := validateTimingSeconds("challenge_resolution_grace_seconds", p.ChallengeResolutionGraceSeconds, MinChallengeResolutionGraceSeconds, MaxChallengeResolutionGraceSeconds); err != nil {
+		return err
+	}
+	if p.EffectiveNonceRetentionSeconds() < p.EffectiveMaxWireProofValiditySeconds() {
+		return fmt.Errorf("nonce_retention_seconds (%d) must be >= max_wire_proof_validity_seconds (%d)",
+			p.EffectiveNonceRetentionSeconds(), p.EffectiveMaxWireProofValiditySeconds())
+	}
+	return nil
+}
+
+// validateTimingSeconds accepts 0 (Effective default) or a value in [min, max].
+func validateTimingSeconds(name string, v uint64, min, max uint64) error {
+	if v == 0 {
+		return nil
+	}
+	if v < min || v > max {
+		return fmt.Errorf("%s must be 0 (default) or in [%d, %d], got %d", name, min, max, v)
 	}
 	return nil
 }

@@ -17,8 +17,15 @@ func NewMigrator(k Keeper) Migrator {
 }
 
 // Migrate1to2 pauses the legacy attestation / GasCredit / Finalize settlement
-// flow for audit-only retention and ensures the V1 entitlement pool module
-// account exists. It does NOT convert POC settlements into Entitlements.
+// flow for audit-only retention, ensures the V1 entitlement pool module account
+// exists, and rebuilds the V1 challenge derived indexes. It does NOT convert POC
+// settlements into Entitlements.
+//
+// The index backfill is why this migration must run before any per-candidate
+// read is trusted: Read paths (approve's OPEN/UPHELD gate, the settled-digest
+// check, the timeout sweeper) only look at the candidate index and the deadline
+// buckets. A challenge written by a v1 binary has neither, so skipping the
+// backfill would make an existing OPEN challenge invisible to approve.
 func (m Migrator) Migrate1to2(ctx sdk.Context) error {
 	params := m.keeper.GetParams(ctx)
 	if params.PauseState == nil {
@@ -30,6 +37,12 @@ func (m Migrator) Migrate1to2(ctx sdk.Context) error {
 	}
 	// Touch module account so x/auth materializes it from maccPerms if missing.
 	_ = m.keeper.ak.GetModuleAccount(ctx, types.EntitlementPoolName)
-	ctx.Logger().Info("appmining migrated 1→2: legacy attestation/gas-credit/settlement paused; entitlement pool ready")
+
+	indexed, err := m.keeper.BackfillChallengeIndexes(ctx)
+	if err != nil {
+		return err
+	}
+	ctx.Logger().Info("appmining migrated 1→2: legacy attestation/gas-credit/settlement paused; entitlement pool ready; challenge indexes rebuilt",
+		"challenges_indexed", indexed)
 	return nil
 }

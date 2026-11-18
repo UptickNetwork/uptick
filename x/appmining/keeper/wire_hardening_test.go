@@ -20,8 +20,8 @@ import (
 //   - P1-2: consumed auth nonces past their retention window are pruned on
 //     the next write for the same (role, key_id).
 //
-// Tests avoid referencing types.MaxWireProofValiditySeconds /
-// types.NonceRetentionSeconds literals-free so they compile against both the
+// Tests avoid referencing types.DefaultMaxWireProofValiditySeconds /
+// types.DefaultNonceRetentionSeconds literals-free so they compile against both the
 // pre-fix and post-fix trees (red/green pinning).
 
 func publishMsgFor(t *testing.T, e testEnv, priv ed25519.PrivateKey, c wirev1.Candidate, nonce, expiresAt string, corruptSig bool) *types.MsgPublishCandidate {

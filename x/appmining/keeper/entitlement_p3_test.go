@@ -31,7 +31,7 @@ func setupP3(t *testing.T) (testEnv, ed25519.PrivateKey, ed25519.PrivateKey, ed2
 	require.NoError(t, err)
 
 	cand, _ := e.k.GetCandidate(e.ctx, c.EntitlementID)
-	e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.ChallengeWindowSeconds, 0))
+	e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.DefaultChallengeWindowSeconds, 0))
 	_, err = e.server.ApproveEntitlement(e.ctx, approveMsg(t, e, aprPriv, c, "601"))
 	require.NoError(t, err)
 
@@ -117,10 +117,10 @@ func TestVector_FREEZE_MAX_72_HOURS_AND_EXPIRY(t *testing.T) {
 	e, riskPriv, _, _, c := setupP3(t)
 	now := e.ctx.BlockTime().Unix()
 
-	_, err := e.server.FreezeEntitlement(e.ctx, freezeMsg(t, e, riskPriv, c, now+types.MaxFreezeSeconds+1, "702"))
+	_, err := e.server.FreezeEntitlement(e.ctx, freezeMsg(t, e, riskPriv, c, now+types.DefaultMaxFreezeSeconds+1, "702"))
 	require.ErrorIs(t, err, types.ErrFreezeDuration)
 
-	until := now + types.MaxFreezeSeconds
+	until := now + types.DefaultMaxFreezeSeconds
 	_, err = e.server.FreezeEntitlement(e.ctx, freezeMsg(t, e, riskPriv, c, until, "703"))
 	require.NoError(t, err)
 

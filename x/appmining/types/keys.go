@@ -63,6 +63,11 @@ const (
 	prefixAuthNonce
 	prefixAssessmentSigner
 	prefixCredentialIndex // credential_id -> entitlement_id (never released)
+	// V1 challenge indexes. Both are maintained inside
+	// SetEntitlementChallenge so every write path (open, resolve, expire,
+	// genesis) updates them; nothing else may write challenge records.
+	prefixEntitlementChallengeByCandidate // entitlement_id | 0x00 | challenge_id -> challenge_id
+	prefixChallengeResolutionDeadline     // be(deadline_unix) | challenge_id -> challenge_id
 )
 
 var (
@@ -86,6 +91,9 @@ var (
 	KeyPrefixAuthNonce                = []byte{prefixAuthNonce}
 	KeyPrefixAssessmentSigner         = []byte{prefixAssessmentSigner}
 	KeyPrefixCredentialIndex          = []byte{prefixCredentialIndex}
+
+	KeyPrefixEntitlementChallengeByCandidate = []byte{prefixEntitlementChallengeByCandidate}
+	KeyPrefixChallengeResolutionDeadline     = []byte{prefixChallengeResolutionDeadline}
 )
 
 func ApplicationKey(appID []byte) []byte {
@@ -161,6 +169,50 @@ func EntitlementKey(entitlementID string) []byte {
 // EntitlementChallengeKey stores the EntitlementChallenge record by challenge_id.
 func EntitlementChallengeKey(challengeID string) []byte {
 	return append(append([]byte{}, KeyPrefixEntitlementChallenge...), []byte(challengeID)...)
+}
+
+// EntitlementChallengeByCandidateKey indexes every challenge of one candidate
+// (candidate_id == entitlement_id) so per-candidate reads are O(challenges of
+// that candidate) instead of O(all challenges ever recorded). A 0x00 separator
+// keeps "abc" from prefix-matching "abcd"; ids are hex strings and never
+// contain 0x00.
+func EntitlementChallengeByCandidateKey(candidateID, challengeID string) []byte {
+	key := append(append([]byte{}, KeyPrefixEntitlementChallengeByCandidate...), []byte(candidateID)...)
+	key = append(key, 0x00)
+	return append(key, []byte(challengeID)...)
+}
+
+// EntitlementChallengeByCandidatePrefix is the scan prefix of one candidate.
+func EntitlementChallengeByCandidatePrefix(candidateID string) []byte {
+	key := append(append([]byte{}, KeyPrefixEntitlementChallengeByCandidate...), []byte(candidateID)...)
+	return append(key, 0x00)
+}
+
+// ChallengeResolutionDeadlineKey buckets an OPEN challenge by the unix second
+// after which it may be settled by timeout. Big-endian ordering lets the
+// sweeper stop as soon as it reaches a deadline still in the future.
+func ChallengeResolutionDeadlineKey(deadline int64, challengeID string) []byte {
+	key := append(append([]byte{}, KeyPrefixChallengeResolutionDeadline...), Uint64Bytes(uint64(deadline))...)
+	return append(key, []byte(challengeID)...)
+}
+
+// ChallengeIDFromDeadlineKey recovers the challenge_id from a bucket key, i.e.
+// everything after the 1-byte prefix and the 8-byte big-endian deadline.
+func ChallengeIDFromDeadlineKey(key []byte) string {
+	const off = 1 + 8
+	if len(key) <= off {
+		return ""
+	}
+	return string(key[off:])
+}
+
+// DeadlineFromDeadlineKey returns the bucket's deadline.
+func DeadlineFromDeadlineKey(key []byte) int64 {
+	const off = 1
+	if len(key) < off+8 {
+		return 0
+	}
+	return int64(binary.BigEndian.Uint64(key[off : off+8]))
 }
 
 // OpenEntitlementChallengeKey indexes the open challenge of one challenger for

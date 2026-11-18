@@ -10,6 +10,8 @@ import (
 
 	abci "github.com/cometbft/cometbft/abci/types"
 
+	appmodule "cosmossdk.io/core/appmodule"
+
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/codec"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
@@ -21,11 +23,15 @@ import (
 	"github.com/UptickNetwork/uptick/x/appmining/types"
 )
 
-const ConsensusVersion = 1
+// ConsensusVersion 2 adds the V1 challenge candidate index and timeout buckets
+// and the timeout sweep (migration 1→2 backfills the indexes; without it a
+// pre-existing challenge would be invisible to per-candidate reads).
+const ConsensusVersion = 2
 
 var (
-	_ module.AppModule      = AppModule{}
-	_ module.AppModuleBasic = AppModuleBasic{}
+	_ module.AppModule        = AppModule{}
+	_ module.AppModuleBasic   = AppModuleBasic{}
+	_ appmodule.HasEndBlocker = AppModule{}
 )
 
 // AppModuleBasic defines basic module elements.
@@ -83,6 +89,24 @@ func (am AppModule) RegisterInvariants(ir sdk.InvariantRegistry) {
 func (am AppModule) RegisterServices(cfg module.Configurator) {
 	types.RegisterMsgServer(cfg.MsgServer(), keeper.NewMsgServerImpl(am.keeper))
 	types.RegisterQueryServer(cfg.QueryServer(), am.keeper)
+	if err := cfg.RegisterMigration(types.ModuleName, 1, keeper.NewMigrator(am.keeper).Migrate1to2); err != nil {
+		panic(fmt.Sprintf("failed to migrate x/%s from version 1 to 2: %v", types.ModuleName, err))
+	}
+}
+
+// EndBlock drives the timeout settlement for challenges whose sealed resolution
+// window elapsed without a reviewer decision. It is the automatic path behind
+// MsgExpireEntitlementChallenge: without it the EXPIRED state (and the deposit
+// refund that goes with it) would only happen if somebody chose to pay gas for
+// it, which is not guaranteed for zero-deposit ("open access") challenges.
+//
+// It never returns an error: an EndBlocker error halts the chain, and a timeout
+// settlement is not worth a liveness failure. Every problem is logged and
+// retried on the next block.
+func (am AppModule) EndBlock(ctx context.Context) error {
+	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	am.keeper.SweepExpiredChallenges(sdkCtx)
+	return nil
 }
 
 func (am AppModule) InitGenesis(ctx sdk.Context, cdc codec.JSONCodec, data json.RawMessage) []abci.ValidatorUpdate {

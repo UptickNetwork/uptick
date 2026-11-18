@@ -36,15 +36,15 @@ import (
 // handler, fee deduction or a committed store. Everything here is signed with
 // SIGN_MODE_DIRECT by the localnet key and broadcast over the REST gateway.
 //
-// Scope note: the challenge window is a hardcoded 7-day wall-clock constant
-// (types.ChallengeWindowSeconds), so the approve/claim/freeze success paths
-// cannot complete inside an e2e run. They are covered by keeper tests with
-// controllable timestamps and already have signed evidence on the release
-// chain (three approvals, one revocation, two claims at uge/v1.1 b24c7a1).
-// What this suite proves on a real node: the authority-gated setup msgs, the
-// publisher/reviewer wire-signature pipeline, the challenge lifecycle, and
-// that approve/claim/freeze fail closed at the tx layer before the window
-// elapses.
+// Scope note: the challenge window is a Params field (default 7d via
+// EffectiveChallengeWindowSeconds). Localnet e2e keeps the production default,
+// so approve/claim/freeze success paths cannot complete inside a short run.
+// They are covered by keeper tests with controllable timestamps and already
+// have signed evidence on the release chain (three approvals, one revocation,
+// two claims at uge/v1.1 b24c7a1). What this suite proves on a real node: the
+// authority-gated setup msgs, the publisher/reviewer wire-signature pipeline,
+// the challenge lifecycle, and that approve/claim/freeze fail closed at the tx
+// layer before the window elapses.
 
 // Wire keys for the five entitlement roles. Public deterministic fixtures —
 // registered on-chain by the test itself, never production keys.
@@ -191,7 +191,6 @@ func appminingTxEvents(t *testing.T, rest, txHash, eventType, attrKey string) st
 	return ""
 }
 
-
 // appminingURLSafeAppID hashes seed into 32 bytes whose standard-base64 form
 // contains only [A-Za-z0-9=]: the gateway passes bytes path params through a
 // URL decode where '+' becomes a space and '/' splits the route.
@@ -268,9 +267,9 @@ func TestAppminingV1EntitlementLifecycleOnRealNode(t *testing.T) {
 	require.Equal(t, 200, paramsResp.status)
 	var chainParams struct {
 		Params struct {
-			Authority                 string   `json:"authority"`
-			EntitlementEnableMinFunded string  `json:"entitlement_enable_min_funded"`
-			AllowedRuleVersions       []string `json:"entitlement_allowed_rule_versions"`
+			Authority                  string   `json:"authority"`
+			EntitlementEnableMinFunded string   `json:"entitlement_enable_min_funded"`
+			AllowedRuleVersions        []string `json:"entitlement_allowed_rule_versions"`
 		} `json:"params"`
 	}
 	require.NoError(t, json.Unmarshal(paramsResp.body, &chainParams))
@@ -320,7 +319,7 @@ func TestAppminingV1EntitlementLifecycleOnRealNode(t *testing.T) {
 	// --- business flow, all real signatures ---
 
 	_, code, logStr = signAppminingBroadcast(t, enc, rest, privKey, pubKey, from,
-		&types.MsgFundEntitlementPool{Funder: from.String(), PoolId: poolID, Amount: fundAmount}, gas)
+		&types.MsgFundEntitlementPool{Authority: from.String(), PoolId: poolID, Amount: fundAmount}, gas)
 	require.Zero(t, code, "fund entitlement pool failed: %s", logStr)
 	require.Equal(t, fundAmount, appminingQueryField(t, rest,
 		"/uptick/appmining/v1/pools/"+poolID, "pool", "funded"))
@@ -363,7 +362,7 @@ func TestAppminingV1EntitlementLifecycleOnRealNode(t *testing.T) {
 				QualifiedTxCount: c.QualifiedTxCount, PavId: c.PavID,
 				EvidenceRoot: c.EvidenceRoot, GasEvidenceRoot: c.GasEvidenceRoot,
 				RuleVersion: c.RuleVersion,
-				Proof: appminingSignWire(t, wireKeys["pub-1"], record),
+				Proof:       appminingSignWire(t, wireKeys["pub-1"], record),
 			}, gas)
 		require.Zero(t, code, "publish %s failed: %s", c.EntitlementID[:12], logStr)
 		require.Equal(t, "CANDIDATE_STATUS_PUBLISHED", appminingQueryField(t, rest,
@@ -484,7 +483,7 @@ func TestAppminingV1EntitlementLifecycleOnRealNode(t *testing.T) {
 	_, code, logStr = signAppminingBroadcast(t, enc, rest, privKey, pubKey, from,
 		&types.MsgFreezeEntitlement{
 			Submitter: from.String(), ChainId: e2eChainID, PoolId: poolID,
-			EntitlementId: cand1.EntitlementID,
+			EntitlementId:  cand1.EntitlementID,
 			EvidenceType:   types.EvidenceTypeConfirmedRefundOrReversal,
 			EvidenceDigest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 			FreezeUntil:    freezeUntil,

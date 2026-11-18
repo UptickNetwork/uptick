@@ -26,7 +26,7 @@ func TestVector_OPEN_OR_UPHELD_CHALLENGE_BLOCKS_APPROVAL(t *testing.T) {
 	require.NoError(t, err)
 
 	cand, _ := e.k.GetCandidate(e.ctx, c.EntitlementID)
-	e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.ChallengeWindowSeconds, 0))
+	e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.DefaultChallengeWindowSeconds, 0))
 	_, err = e.server.ApproveEntitlement(e.ctx, approveMsg(t, e, aprPriv, c, "1201"))
 	require.ErrorIs(t, err, types.ErrOpenOrUpheldChallenge)
 
@@ -47,7 +47,7 @@ func TestVector_OPEN_OR_UPHELD_CHALLENGE_BLOCKS_APPROVAL(t *testing.T) {
 
 	cand, _ = e.k.GetCandidate(e.ctx, c.EntitlementID)
 	require.Equal(t, types.CandidateStatusRejected, cand.Status)
-	e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.ChallengeWindowSeconds+1, 0))
+	e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.DefaultChallengeWindowSeconds+1, 0))
 	_, err = e.server.ApproveEntitlement(e.ctx, approveMsg(t, e, aprPriv, c, "1203"))
 	require.Error(t, err) // not published and/or upheld challenge
 	require.True(t,
@@ -62,7 +62,7 @@ func TestVector_OPEN_OR_UPHELD_CHALLENGE_BLOCKS_APPROVAL(t *testing.T) {
 func TestVector_UNAUTHORIZED_AMOUNT_AND_DUPLICATE_APPROVAL(t *testing.T) {
 	e, pubPriv, _, aprPriv, c := setupP2(t)
 	cand, _ := e.k.GetCandidate(e.ctx, c.EntitlementID)
-	e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.ChallengeWindowSeconds, 0))
+	e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.DefaultChallengeWindowSeconds, 0))
 
 	// Non-approver key_id → role key miss / unauthorized
 	rec := map[string]string{
@@ -174,7 +174,7 @@ func TestE3_ClaimAndRevokeAtMostOneWins(t *testing.T) {
 func TestE4_ModuleBalanceReconcilesWithLedger(t *testing.T) {
 	e, _, _, aprPriv, c := setupP2(t)
 	cand, _ := e.k.GetCandidate(e.ctx, c.EntitlementID)
-	e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.ChallengeWindowSeconds, 0))
+	e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.DefaultChallengeWindowSeconds, 0))
 
 	assertReconcile := func(t *testing.T) {
 		t.Helper()
@@ -252,7 +252,7 @@ func TestE8_UnfundedPoolRejectsEntitlementMsgs(t *testing.T) {
 func TestGapF1_RuleVersionAllowlist(t *testing.T) {
 	e, _, _, aprPriv, c := setupP2(t)
 	cand, _ := e.k.GetCandidate(e.ctx, c.EntitlementID)
-	e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.ChallengeWindowSeconds, 0))
+	e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.DefaultChallengeWindowSeconds, 0))
 
 	// default-deny: empty allowlist rejects the approve
 	params := e.k.GetParams(e.ctx)
@@ -352,7 +352,7 @@ func TestGapF3_ApproveDualPathBinding(t *testing.T) {
 	t.Run("nonempty_no_challenge_rejected_78", func(t *testing.T) {
 		e, _, _, aprPriv, c := setupP2(t)
 		cand, _ := e.k.GetCandidate(e.ctx, c.EntitlementID)
-		e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.ChallengeWindowSeconds, 0))
+		e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.DefaultChallengeWindowSeconds, 0))
 		_, err := e.server.ApproveEntitlement(e.ctx, approveMsgWithResolution(t, e, aprPriv, c, "1502", unboundDigest))
 		require.ErrorIs(t, err, types.ErrResolutionUnbound)
 	})
@@ -381,7 +381,7 @@ func TestGapF3_ApproveDualPathBinding(t *testing.T) {
 		require.NoError(t, err)
 
 		cand, _ := e.k.GetCandidate(e.ctx, c.EntitlementID)
-		e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.ChallengeWindowSeconds, 0))
+		e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.DefaultChallengeWindowSeconds, 0))
 		_, err = e.server.ApproveEntitlement(e.ctx, approveMsg(t, e, aprPriv, c, "1505"))
 		require.ErrorIs(t, err, types.ErrOpenOrUpheldChallenge)
 	})
@@ -389,7 +389,7 @@ func TestGapF3_ApproveDualPathBinding(t *testing.T) {
 	t.Run("empty_no_challenge_ok", func(t *testing.T) {
 		e, _, _, aprPriv, c := setupP2(t)
 		cand, _ := e.k.GetCandidate(e.ctx, c.EntitlementID)
-		e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.ChallengeWindowSeconds, 0))
+		e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.DefaultChallengeWindowSeconds, 0))
 		_, err := e.server.ApproveEntitlement(e.ctx, approveMsg(t, e, aprPriv, c, "1506"))
 		require.NoError(t, err)
 		ev, ok := findEvent(e.ctx.EventManager().Events(), types.EventTypeEntitlementApproved)
@@ -421,7 +421,7 @@ func TestGapF3_ApproveDualPathBinding(t *testing.T) {
 		require.NoError(t, err)
 
 		cand, _ := e.k.GetCandidate(e.ctx, c.EntitlementID)
-		e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.ChallengeWindowSeconds, 0)).
+		e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.DefaultChallengeWindowSeconds, 0)).
 			WithEventManager(sdk.NewEventManager())
 		_, err = e.server.ApproveEntitlement(e.ctx, approveMsgWithResolution(t, e, aprPriv, c, "1503", dismissedDigest))
 		require.NoError(t, err)
@@ -460,7 +460,7 @@ func TestGapF3_ApproveDualPathBinding(t *testing.T) {
 		require.NoError(t, err)
 
 		cand, _ := e.k.GetCandidate(e.ctx, c.EntitlementID)
-		e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.ChallengeWindowSeconds, 0))
+		e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.DefaultChallengeWindowSeconds, 0))
 		_, err = e.server.ApproveEntitlement(e.ctx, approveMsgWithResolution(t, e, aprPriv, c, "1521", unboundDigest))
 		require.ErrorIs(t, err, types.ErrResolutionUnbound)
 	})
@@ -469,7 +469,7 @@ func TestGapF3_ApproveDualPathBinding(t *testing.T) {
 	// elapsed: the unbound path requires window closure (ErrChallengeWindow).
 	t.Run("empty_before_window_rejected", func(t *testing.T) {
 		e, _, _, aprPriv, c := setupP2(t)
-		// setupP2 leaves ctx before publishedAt+ChallengeWindowSeconds.
+		// setupP2 leaves ctx before publishedAt+DefaultChallengeWindowSeconds.
 		_, err := e.server.ApproveEntitlement(e.ctx, approveMsg(t, e, aprPriv, c, "1522"))
 		require.ErrorIs(t, err, types.ErrChallengeWindow)
 	})

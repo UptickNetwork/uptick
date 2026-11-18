@@ -555,8 +555,21 @@ func (k msgServer) UpdateParams(goCtx context.Context, msg *types.MsgUpdateParam
 		}
 		return nil, sdkerrors.Wrapf(errortypes.ErrUnauthorized, "expected %s got %s", params.Authority, msg.Authority)
 	}
+	prevValidity := params.EffectiveMaxWireProofValiditySeconds()
+	nextValidity := msg.Params.EffectiveMaxWireProofValiditySeconds()
 	if err := k.SetParams(ctx, msg.Params); err != nil {
 		return nil, err
+	}
+	// Shortening is allowed (authority-gated): already-issued unused proofs
+	// fail closed on the next verify. Emit so ops/audit can see emergency
+	// tightenings without relying on silent param diffs alone.
+	if nextValidity < prevValidity {
+		ctx.EventManager().EmitEvent(sdk.NewEvent(
+			types.EventTypeWireProofValidityShortened,
+			sdk.NewAttribute(types.AttributeKeyAuthority, msg.Authority),
+			sdk.NewAttribute(types.AttributeKeyPrevWireProofValiditySeconds, strconv.FormatInt(prevValidity, 10)),
+			sdk.NewAttribute(types.AttributeKeyNextWireProofValiditySeconds, strconv.FormatInt(nextValidity, 10)),
+		))
 	}
 	return &types.MsgUpdateParamsResponse{}, nil
 }

@@ -3,6 +3,9 @@ package keeper
 import (
 	"bytes"
 	"context"
+	"fmt"
+	"strconv"
+	"strings"
 
 	"cosmossdk.io/store/prefix"
 	storetypes "cosmossdk.io/store/types"
@@ -346,6 +349,92 @@ func (k Keeper) EntitlementChallenge(goCtx context.Context, req *types.QueryEnti
 		return nil, status.Error(codes.NotFound, "entitlement challenge not found")
 	}
 	return &types.QueryEntitlementChallengeResponse{Challenge: chal}, nil
+}
+
+// EntitlementChallenges lists V1 challenges with optional candidate_id and
+// status filters. Legacy attestation challenges live in a different store and
+// are served by OpenChallenges/Challenges.
+//
+// With candidate_id it walks the per-candidate index, so the cost is
+// O(challenges of that candidate) — the same structure approve relies on. Only
+// the unfiltered listing (operator/explorer use, no tx path) scans everything.
+func (k Keeper) EntitlementChallenges(goCtx context.Context, req *types.QueryEntitlementChallengesRequest) (*types.QueryEntitlementChallengesResponse, error) {
+	if req == nil {
+		return nil, status.Error(codes.InvalidArgument, "empty request")
+	}
+	ctx := sdk.UnwrapSDKContext(goCtx)
+	statusFilter, hasStatus, err := parseChallengeStatusFilter(req.Status)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+	pageReq, err := shapePageRequest(req.Pagination)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	var out []types.EntitlementChallenge
+	pageRes, err := query.FilteredPaginate(k.challengeQueryStore(ctx, req.CandidateId), pageReq, func(key, value []byte, accumulate bool) (bool, error) {
+		var chal types.EntitlementChallenge
+		if req.CandidateId != "" {
+			// Candidate index layout: value is the challenge_id, key carries it too.
+			found := false
+			chal, found = k.GetEntitlementChallenge(ctx, string(value))
+			if !found {
+				return false, nil
+			}
+		} else {
+			if err := k.cdc.Unmarshal(value, &chal); err != nil {
+				return false, err
+			}
+		}
+		if req.CandidateId != "" && chal.CandidateId != req.CandidateId {
+			return false, nil
+		}
+		if hasStatus && chal.Status != statusFilter {
+			return false, nil
+		}
+		if accumulate {
+			out = append(out, chal)
+		}
+		return true, nil
+	})
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	return &types.QueryEntitlementChallengesResponse{Challenges: out, Pagination: pageRes}, nil
+}
+
+// challengeQueryStore picks the scan domain: one candidate's index when the
+// caller filtered by candidate, the full record table otherwise.
+func (k Keeper) challengeQueryStore(ctx sdk.Context, candidateID string) storetypes.KVStore {
+	if candidateID == "" {
+		return prefixStore(k.store(ctx), types.KeyPrefixEntitlementChallenge)
+	}
+	return prefixStore(k.store(ctx), types.EntitlementChallengeByCandidatePrefix(candidateID))
+}
+
+// parseChallengeStatusFilter accepts "" (no filter), a numeric enum value, or a
+// name with or without the ENTITLEMENT_CHALLENGE_STATUS_ prefix.
+func parseChallengeStatusFilter(raw string) (types.EntitlementChallengeStatus, bool, error) {
+	if raw == "" {
+		return types.EntitlementChallengeStatusUnspecified, false, nil
+	}
+	if v, err := strconv.ParseInt(raw, 10, 32); err == nil {
+		st := types.EntitlementChallengeStatus(v)
+		if _, ok := types.EntitlementChallengeStatus_name[int32(v)]; !ok {
+			return 0, false, fmt.Errorf("unknown challenge status %q", raw)
+		}
+		return st, true, nil
+	}
+	name := strings.ToUpper(raw)
+	if !strings.HasPrefix(name, "ENTITLEMENT_CHALLENGE_STATUS_") {
+		name = "ENTITLEMENT_CHALLENGE_STATUS_" + name
+	}
+	v, ok := types.EntitlementChallengeStatus_value[name]
+	if !ok {
+		return 0, false, fmt.Errorf("unknown challenge status %q", raw)
+	}
+	return types.EntitlementChallengeStatus(v), true, nil
 }
 
 func (k Keeper) Entitlement(goCtx context.Context, req *types.QueryEntitlementRequest) (*types.QueryEntitlementResponse, error) {

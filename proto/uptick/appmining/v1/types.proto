@@ -105,6 +105,24 @@ message Params {
   // V1 T1b: allowlist of AssessmentCredential.credential_version values.
   // Empty list denies every credential (default-deny until governance sets).
   repeated string entitlement_allowed_assessment_versions = 18;
+  // V1 entitlement challenge window (seconds). 0 = module default (7d).
+  // Applied at PublishCandidate into Candidate.challenge_deadline; later
+  // param changes do not rewrite in-flight deadlines.
+  uint64 challenge_window_seconds = 19;
+  // Max single FreezeEntitlement duration (seconds). 0 = module default (72h).
+  uint64 max_freeze_seconds = 20;
+  // Cap on WireProof.expires_at relative to block time. 0 = module default (7d).
+  // Lower bound 60s so testnets can exercise the expiry path; shortening is
+  // CLI-gated (--allow-shorten-wire-proof-validity) and emits an event.
+  uint64 max_wire_proof_validity_seconds = 21;
+  // Auth-nonce retention after expiry before prune. 0 = module default (8d).
+  // Must be >= max_wire_proof_validity_seconds (Validate enforces).
+  uint64 nonce_retention_seconds = 22;
+  // Extra time (seconds) a reviewer gets after the challenge resolution window
+  // before an OPEN challenge may be expired by anyone. 0 = module default (24h).
+  // The window itself is sealed per candidate (challenge_deadline - published_at)
+  // so later param changes never shorten an in-flight challenge's deadline.
+  uint64 challenge_resolution_grace_seconds = 23;
 }
 
 // Application is the request/response type for the module API.
@@ -319,6 +337,11 @@ enum EntitlementChallengeStatus {
   ENTITLEMENT_CHALLENGE_STATUS_UPHELD = 2 [(gogoproto.enumvalue_customname) = "EntitlementChallengeStatusUpheld"];
   // ENTITLEMENT_CHALLENGE_STATUS_DISMISSED is a valid enum value.
   ENTITLEMENT_CHALLENGE_STATUS_DISMISSED = 3 [(gogoproto.enumvalue_customname) = "EntitlementChallengeStatusDismissed"];
+  // ENTITLEMENT_CHALLENGE_STATUS_EXPIRED marks a challenge whose resolution
+  // window elapsed without a reviewer decision. The deposit is refunded to the
+  // challenger (neutral outcome: nobody is punished) and the candidate stays
+  // PUBLISHED, requiring a digest-bound ApproveEntitlement to proceed.
+  ENTITLEMENT_CHALLENGE_STATUS_EXPIRED = 4 [(gogoproto.enumvalue_customname) = "EntitlementChallengeStatusExpired"];
 }
 
 // Candidate is a published entitlement candidate (no pool liability until Approve).
@@ -394,6 +417,12 @@ message EntitlementChallenge {
   // V1 T1c deposit (empty when challenge_open_access != deposit)
   string deposit_amount = 12;
   string deposit_denom = 13;
+  // resolution_deadline is sealed at open time
+  // (opened_at + sealed challenge window + challenge_resolution_grace_seconds)
+  // so a later governance change to grace cannot move an in-flight challenge.
+  // 0 on records written before the field existed; readers fall back to the
+  // dynamic computation in that case.
+  int64 resolution_deadline = 14;
 }
 
 // EntitlementState enumerates allowed values for the module.

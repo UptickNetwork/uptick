@@ -251,8 +251,80 @@ func (k Keeper) GetEntitlement(ctx sdk.Context, entitlementID string) (types.Ent
 	return e, true
 }
 
+// SetEntitlementChallenge is the ONLY write path for V1 challenge records.
+// Besides the record itself it maintains two derived structures so that
+// per-candidate reads never scan the whole history:
+//
+//   - candidate index: candidate_id | 0x00 | challenge_id -> challenge_id
+//   - timeout bucket:  be(resolution_deadline) | challenge_id -> challenge_id
+//
+// Keeping maintenance here (rather than in each handler) means open, resolve,
+// expire and genesis cannot drift apart. Both writes are idempotent.
 func (k Keeper) SetEntitlementChallenge(ctx sdk.Context, c types.EntitlementChallenge) {
-	k.store(ctx).Set(types.EntitlementChallengeKey(c.ChallengeId), k.cdc.MustMarshal(&c))
+	store := k.store(ctx)
+
+	// The previous revision may carry a different deadline (or none). Drop its
+	// bucket before writing the new one so the sweeper never revisits it.
+	if prev, ok := k.GetEntitlementChallenge(ctx, c.ChallengeId); ok {
+		k.deleteChallengeDeadlineBucket(ctx, prev)
+	}
+
+	store.Set(types.EntitlementChallengeKey(c.ChallengeId), k.cdc.MustMarshal(&c))
+
+	// candidate_id is the entitlement_id (CandidateKey is keyed by it).
+	if c.CandidateId != "" {
+		store.Set(
+			types.EntitlementChallengeByCandidateKey(c.CandidateId, c.ChallengeId),
+			[]byte(c.ChallengeId),
+		)
+	}
+
+	// Only OPEN challenges are sweepable; settled ones must not occupy the
+	// timeout index forever.
+	if c.Status == types.EntitlementChallengeStatusOpen && c.ResolutionDeadline > 0 {
+		store.Set(
+			types.ChallengeResolutionDeadlineKey(c.ResolutionDeadline, c.ChallengeId),
+			[]byte(c.ChallengeId),
+		)
+	}
+}
+
+// deleteChallengeDeadlineBucket removes the timeout bucket of one revision.
+func (k Keeper) deleteChallengeDeadlineBucket(ctx sdk.Context, c types.EntitlementChallenge) {
+	if c.ResolutionDeadline <= 0 {
+		return
+	}
+	k.store(ctx).Delete(types.ChallengeResolutionDeadlineKey(c.ResolutionDeadline, c.ChallengeId))
+}
+
+// BackfillChallengeIndexes rebuilds both derived structures from the record
+// table. It is idempotent and is run once from Migrate1to2 so chains that
+// already hold V1 challenges before this change keep correct per-candidate
+// reads. Returns the number of records visited.
+func (k Keeper) BackfillChallengeIndexes(ctx sdk.Context) (int, error) {
+	var records []types.EntitlementChallenge
+	it := storetypes.KVStorePrefixIterator(k.store(ctx), types.KeyPrefixEntitlementChallenge)
+	defer it.Close()
+	for ; it.Valid(); it.Next() {
+		var c types.EntitlementChallenge
+		if err := k.cdc.Unmarshal(it.Value(), &c); err != nil {
+			return 0, err
+		}
+		records = append(records, c)
+	}
+	grace := k.GetParams(ctx).EffectiveChallengeResolutionGraceSeconds()
+	for _, c := range records {
+		// Records written before resolution_deadline existed carry 0. Seal them
+		// now (with the migration-time grace) so the sweeper can reach them;
+		// otherwise an old OPEN challenge would never time out automatically.
+		if c.Status == types.EntitlementChallengeStatusOpen && c.ResolutionDeadline <= 0 {
+			if cand, ok := k.GetCandidate(ctx, c.CandidateId); ok {
+				c.ResolutionDeadline = types.EffectiveResolutionDeadline(cand, c, grace)
+			}
+		}
+		k.SetEntitlementChallenge(ctx, c)
+	}
+	return len(records), nil
 }
 
 func (k Keeper) GetEntitlementChallenge(ctx sdk.Context, challengeID string) (types.EntitlementChallenge, bool) {
@@ -281,65 +353,81 @@ func (k Keeper) DeleteOpenEntitlementChallenge(ctx sdk.Context, entitlementID, c
 	k.store(ctx).Delete(types.OpenEntitlementChallengeKey(entitlementID, challenger))
 }
 
-// HasOpenOrUpheldEntitlementChallenge reports whether any challenge for the
-// candidate is OPEN or UPHELD (blocks approval). DISMISSED does not block.
-func (k Keeper) HasOpenOrUpheldEntitlementChallenge(ctx sdk.Context, entitlementID string) bool {
-	store := k.store(ctx)
-	it := storetypes.KVStorePrefixIterator(store, types.KeyPrefixEntitlementChallenge)
+// iterateChallengesOfCandidate walks only the challenges of one candidate via
+// the candidate index. Cost is O(challenges of that candidate), independent of
+// how many challenges the chain has recorded in total.
+//
+// The index stores challenge ids; a dangling id (impossible unless the store is
+// corrupted) is skipped rather than panicking inside a tx.
+func (k Keeper) iterateChallengesOfCandidate(ctx sdk.Context, candidateID string, fn func(types.EntitlementChallenge) bool) {
+	it := storetypes.KVStorePrefixIterator(k.store(ctx), types.EntitlementChallengeByCandidatePrefix(candidateID))
 	defer it.Close()
 	for ; it.Valid(); it.Next() {
-		var c types.EntitlementChallenge
-		k.cdc.MustUnmarshal(it.Value(), &c)
-		if c.CandidateId != entitlementID {
+		c, ok := k.GetEntitlementChallenge(ctx, string(it.Value()))
+		if !ok {
 			continue
 		}
-		if c.Status == types.EntitlementChallengeStatusOpen || c.Status == types.EntitlementChallengeStatusUpheld {
-			return true
+		if !fn(c) {
+			return
 		}
 	}
-	return false
+}
+
+// IterateEntitlementChallengesByCandidate is the exported per-candidate walk.
+func (k Keeper) IterateEntitlementChallengesByCandidate(ctx sdk.Context, candidateID string, fn func(types.EntitlementChallenge) bool) {
+	k.iterateChallengesOfCandidate(ctx, candidateID, fn)
+}
+
+// HasOpenOrUpheldEntitlementChallenge reports whether any challenge for the
+// candidate is OPEN or UPHELD (blocks approval). DISMISSED/EXPIRED do not.
+func (k Keeper) HasOpenOrUpheldEntitlementChallenge(ctx sdk.Context, entitlementID string) bool {
+	found := false
+	k.iterateChallengesOfCandidate(ctx, entitlementID, func(c types.EntitlementChallenge) bool {
+		if c.Status == types.EntitlementChallengeStatusOpen || c.Status == types.EntitlementChallengeStatusUpheld {
+			found = true
+			return false
+		}
+		return true
+	})
+	return found
 }
 
 // HasAnyEntitlementChallenge reports whether the candidate has any stored
 // challenge record (any status). Used by the no-challenge approve path
 // (UGE DEC-01 scheme C): empty challenge_resolution_hash requires zero challenges.
 func (k Keeper) HasAnyEntitlementChallenge(ctx sdk.Context, entitlementID string) bool {
-	store := k.store(ctx)
-	it := storetypes.KVStorePrefixIterator(store, types.KeyPrefixEntitlementChallenge)
+	it := storetypes.KVStorePrefixIterator(k.store(ctx), types.EntitlementChallengeByCandidatePrefix(entitlementID))
 	defer it.Close()
-	for ; it.Valid(); it.Next() {
-		var c types.EntitlementChallenge
-		k.cdc.MustUnmarshal(it.Value(), &c)
-		if c.CandidateId == entitlementID {
-			return true
-		}
-	}
-	return false
+	return it.Valid()
 }
 
-// HasDismissedEntitlementChallengeResolution reports whether the candidate has
-// a DISMISSED challenge whose stored ResolutionDigest equals digest.
-func (k Keeper) HasDismissedEntitlementChallengeResolution(ctx sdk.Context, entitlementID, digest string) bool {
+// HasSettledEntitlementChallengeResolution reports whether the candidate has a
+// settled challenge (DISMISSED by a reviewer, or EXPIRED by timeout) whose
+// stored ResolutionDigest equals digest. Both are "no allegation proven" states
+// that unblock approval; OPEN and UPHELD are not accepted here.
+func (k Keeper) HasSettledEntitlementChallengeResolution(ctx sdk.Context, entitlementID, digest string) bool {
 	if digest == "" {
 		return false
 	}
-	store := k.store(ctx)
-	it := storetypes.KVStorePrefixIterator(store, types.KeyPrefixEntitlementChallenge)
-	defer it.Close()
-	for ; it.Valid(); it.Next() {
-		var c types.EntitlementChallenge
-		k.cdc.MustUnmarshal(it.Value(), &c)
-		if c.CandidateId != entitlementID {
-			continue
-		}
-		if c.Status == types.EntitlementChallengeStatusDismissed && c.ResolutionDigest == digest {
+	found := false
+	k.iterateChallengesOfCandidate(ctx, entitlementID, func(c types.EntitlementChallenge) bool {
+		if c.ResolutionDigest != digest {
 			return true
 		}
-	}
-	return false
+		if c.Status == types.EntitlementChallengeStatusDismissed || c.Status == types.EntitlementChallengeStatusExpired {
+			found = true
+			return false
+		}
+		return true
+	})
+	return found
 }
 
 // IterateEntitlementChallenges walks every entitlement challenge record.
+//
+// NOT for tx paths: use IterateEntitlementChallengesByCandidate there. This is
+// the O(history) walk kept for ExportGenesis, the 1→2 backfill and crisis
+// invariants.
 func (k Keeper) IterateEntitlementChallenges(ctx sdk.Context, fn func(types.EntitlementChallenge) bool) {
 	it := storetypes.KVStorePrefixIterator(k.store(ctx), types.KeyPrefixEntitlementChallenge)
 	defer it.Close()
@@ -396,12 +484,12 @@ func (k Keeper) SetAuthNonce(ctx sdk.Context, role types.EntitlementRole, keyID,
 }
 
 // pruneAuthNonces deletes consumed nonces of one (role, key_id) whose expiry
-// passed the retention window. Safe because replaying a pruned nonce requires
-// resubmitting its original signed record, whose expires_at has already
-// expired (now > exp fails verifyWireAuth). Entries with unparseable values
-// (legacy pre-expiry format) are kept.
+// passed params.nonce_retention_seconds. Safe because replaying a pruned nonce
+// requires resubmitting its original signed record, whose expires_at has
+// already expired (now > exp fails verifyWireAuth). Entries with unparseable
+// values (legacy pre-expiry format) are kept.
 func (k Keeper) pruneAuthNonces(ctx sdk.Context, role types.EntitlementRole, keyID string, now int64) {
-	cutoff := now - types.NonceRetentionSeconds
+	cutoff := now - k.GetParams(ctx).EffectiveNonceRetentionSeconds()
 	prefix := append(append([]byte{}, types.KeyPrefixAuthNonce...), byte(role))
 	prefix = append(prefix, []byte(keyID)...)
 	prefix = append(prefix, 0)

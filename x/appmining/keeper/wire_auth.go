@@ -43,8 +43,9 @@ func (k Keeper) verifyWireAuth(
 	}
 	// P2-3: bound the validity horizon. A proof is one-shot, but without an
 	// upper bound the signer could mint credentials that stay live for years;
-	// cap exp at now + MaxWireProofValiditySeconds.
-	if exp > nowUnix+types.MaxWireProofValiditySeconds {
+	// cap exp at now + params.max_wire_proof_validity_seconds.
+	maxValidity := k.GetParams(ctx).EffectiveMaxWireProofValiditySeconds()
+	if exp > nowUnix+maxValidity {
 		return sdkerrors.Wrap(types.ErrAuthMalformed, "expires_at too far in the future")
 	}
 	rk, found := k.GetRoleKey(ctx, role, proof.KeyId)

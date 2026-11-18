@@ -90,17 +90,34 @@ func approveMsgWithResolution(t *testing.T, e testEnv, aprPriv ed25519.PrivateKe
 	}
 }
 
+func TestApprove_SealedDeadlineIgnoresShorterParam(t *testing.T) {
+	e, _, _, aprPriv, c := setupP2(t)
+	cand, ok := e.k.GetCandidate(e.ctx, c.EntitlementID)
+	require.True(t, ok)
+	require.Equal(t, cand.PublishedAt+types.DefaultChallengeWindowSeconds, cand.ChallengeDeadline)
+
+	params := e.k.GetParams(e.ctx)
+	params.ChallengeWindowSeconds = 3600
+	require.NoError(t, e.k.SetParams(e.ctx, params))
+
+	// Would pass if Approve re-read the live param window; must still reject
+	// against the deadline sealed at Publish.
+	e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+3601, 0))
+	_, err := e.server.ApproveEntitlement(e.ctx, approveMsg(t, e, aprPriv, c, "260"))
+	require.ErrorIs(t, err, types.ErrChallengeWindow)
+}
+
 func TestVector_APPROVAL_BEFORE_SEVEN_DAYS(t *testing.T) {
 	e, _, _, aprPriv, c := setupP2(t)
 	cand, _ := e.k.GetCandidate(e.ctx, c.EntitlementID)
 
 	// now = published_at + 604799 → reject
-	e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.ChallengeWindowSeconds-1, 0))
+	e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.DefaultChallengeWindowSeconds-1, 0))
 	_, err := e.server.ApproveEntitlement(e.ctx, approveMsg(t, e, aprPriv, c, "201"))
 	require.ErrorIs(t, err, types.ErrChallengeWindow)
 
 	// now = published_at + 604800 → ok
-	e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.ChallengeWindowSeconds, 0))
+	e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.DefaultChallengeWindowSeconds, 0))
 	_, err = e.server.ApproveEntitlement(e.ctx, approveMsg(t, e, aprPriv, c, "202"))
 	require.NoError(t, err)
 
@@ -116,7 +133,7 @@ func TestVector_APPROVAL_BEFORE_SEVEN_DAYS(t *testing.T) {
 func TestVector_FIXED_POOL_EXHAUSTION_AND_CROSS_EPOCH_RESERVATION(t *testing.T) {
 	e, pubPriv, _, aprPriv, c1 := setupP2(t)
 	cand, _ := e.k.GetCandidate(e.ctx, c1.EntitlementID)
-	e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.ChallengeWindowSeconds, 0))
+	e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.DefaultChallengeWindowSeconds, 0))
 	_, err := e.server.ApproveEntitlement(e.ctx, approveMsg(t, e, aprPriv, c1, "301"))
 	require.NoError(t, err)
 
@@ -144,7 +161,7 @@ func TestVector_FIXED_POOL_EXHAUSTION_AND_CROSS_EPOCH_RESERVATION(t *testing.T) 
 	require.NoError(t, err)
 
 	cand2, _ := e.k.GetCandidate(e.ctx, c2.EntitlementID)
-	e.ctx = e.ctx.WithBlockTime(time.Unix(cand2.PublishedAt+types.ChallengeWindowSeconds, 0))
+	e.ctx = e.ctx.WithBlockTime(time.Unix(cand2.PublishedAt+types.DefaultChallengeWindowSeconds, 0))
 	_, err = e.server.ApproveEntitlement(e.ctx, approveMsg(t, e, aprPriv, c2, "303"))
 	require.ErrorIs(t, err, types.ErrInsufficientAvailable)
 }
@@ -152,7 +169,7 @@ func TestVector_FIXED_POOL_EXHAUSTION_AND_CROSS_EPOCH_RESERVATION(t *testing.T) 
 func TestVector_OWNER_CLAIM_ONCE_AND_CROSS_APP_REJECTED(t *testing.T) {
 	e, _, _, aprPriv, c := setupP2(t)
 	cand, _ := e.k.GetCandidate(e.ctx, c.EntitlementID)
-	e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.ChallengeWindowSeconds, 0))
+	e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.DefaultChallengeWindowSeconds, 0))
 	_, err := e.server.ApproveEntitlement(e.ctx, approveMsg(t, e, aprPriv, c, "401"))
 	require.NoError(t, err)
 

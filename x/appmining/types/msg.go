@@ -609,6 +609,28 @@ func (m *MsgResolveEntitlementChallenge) GetSigners() []sdk.AccAddress {
 	return []sdk.AccAddress{addr}
 }
 
+// MsgExpireEntitlementChallenge is permissionless on purpose: the timeout
+// outcome (EXPIRED + deposit refund) is fixed, so there is nothing for the
+// submitter to choose or profit from. Validation only checks shape; the handler
+// verifies the sealed deadline and challenge state.
+func (m *MsgExpireEntitlementChallenge) ValidateBasic() error {
+	if err := validateSigner(m.Submitter); err != nil {
+		return err
+	}
+	if err := ValidateWireID(m.PoolId); err != nil {
+		return sdkerrors.Wrap(ErrInvalidWireID, "pool_id")
+	}
+	if err := ValidateWireID(m.ChallengeId); err != nil {
+		return sdkerrors.Wrap(ErrInvalidWireID, "challenge_id")
+	}
+	return nil
+}
+
+func (m *MsgExpireEntitlementChallenge) GetSigners() []sdk.AccAddress {
+	addr, _ := sdk.AccAddressFromBech32(m.Submitter)
+	return []sdk.AccAddress{addr}
+}
+
 func (m *MsgApproveEntitlement) ValidateBasic() error {
 	if err := validateSigner(m.Submitter); err != nil {
 		return err

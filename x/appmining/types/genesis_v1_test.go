@@ -25,7 +25,7 @@ func TestValidateGenesis_V1CandidatesAndEntitlements(t *testing.T) {
 		EntitlementId: hash64, AppId: appHex, Epoch: "1", Amount: "10",
 		Denom: types.DefaultChallengeBondDenom, CandidateHash: hash64,
 		EvidenceRoot: hash64, PoolId: "pool-a",
-		PublishedAt: 100, ChallengeDeadline: 100 + types.ChallengeWindowSeconds,
+		PublishedAt: 100, ChallengeDeadline: 100 + types.DefaultChallengeWindowSeconds,
 		Status: types.CandidateStatusPublished,
 	}}
 	require.NoError(t, types.ValidateGenesis(*gs))
@@ -34,6 +34,11 @@ func TestValidateGenesis_V1CandidatesAndEntitlements(t *testing.T) {
 	bad.Candidates = append([]types.Candidate{}, gs.Candidates...)
 	bad.Candidates[0].PoolId = "missing"
 	require.Error(t, types.ValidateGenesis(bad))
+
+	tooFar := *gs
+	tooFar.Candidates = append([]types.Candidate{}, gs.Candidates...)
+	tooFar.Candidates[0].ChallengeDeadline = tooFar.Candidates[0].PublishedAt + int64(types.MaxChallengeWindowSecondsBound) + 1
+	require.Error(t, types.ValidateGenesis(tooFar))
 
 	gs.Entitlements = []types.Entitlement{{
 		EntitlementId: hash64, AppId: appHex, Amount: "10",
@@ -67,7 +72,7 @@ func TestValidateGenesis_DuplicateCandidate(t *testing.T) {
 		EntitlementId: hash64, AppId: appHex, Epoch: "1", Amount: "1",
 		Denom: types.DefaultChallengeBondDenom, CandidateHash: hash64,
 		EvidenceRoot: hash64, PoolId: "pool-a",
-		PublishedAt: 1, ChallengeDeadline: 1 + types.ChallengeWindowSeconds,
+		PublishedAt: 1, ChallengeDeadline: 1 + types.DefaultChallengeWindowSeconds,
 		Status: types.CandidateStatusPublished,
 	}
 	gs.Candidates = []types.Candidate{c, c}

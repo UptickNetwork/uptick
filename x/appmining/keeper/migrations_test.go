@@ -47,7 +47,7 @@ func TestE6_TimeRollbackDoesNotSkipChallengeWindow(t *testing.T) {
 	cand, _ := e.k.GetCandidate(e.ctx, c.EntitlementID)
 
 	// Peek past the window via block time only — watermark stays at publish time.
-	e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.ChallengeWindowSeconds, 0))
+	e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.DefaultChallengeWindowSeconds, 0))
 	// Roll clock back before the window elapses.
 	e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+1, 0))
 	_, err := e.server.ApproveEntitlement(e.ctx, approveMsg(t, e, aprPriv, c, "961"))
@@ -59,7 +59,7 @@ func TestE6_WatermarkKeepsWindowElapsedAfterRollback(t *testing.T) {
 	cand, _ := e.k.GetCandidate(e.ctx, c.EntitlementID)
 
 	// Prior observation past the window (e.g. earlier successful tx path).
-	future := cand.PublishedAt + types.ChallengeWindowSeconds
+	future := cand.PublishedAt + types.DefaultChallengeWindowSeconds
 	cand.MaxObservedTime = future
 	e.k.SetCandidate(e.ctx, cand)
 

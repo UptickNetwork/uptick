@@ -96,6 +96,11 @@ service Msg {
   rpc ResolveEntitlementChallenge(MsgResolveEntitlementChallenge) returns (MsgResolveEntitlementChallengeResponse) {
     option (google.api.http).post = "/uptick/appmining/v1/tx/resolve_entitlement_challenge";
   }
+  // ExpireEntitlementChallenge settles an OPEN challenge whose resolution
+  // window elapsed without a reviewer decision (neutral timeout outcome).
+  rpc ExpireEntitlementChallenge(MsgExpireEntitlementChallenge) returns (MsgExpireEntitlementChallengeResponse) {
+    option (google.api.http).post = "/uptick/appmining/v1/tx/expire_entitlement_challenge";
+  }
   // ApproveEntitlement handles the corresponding module request.
   rpc ApproveEntitlement(MsgApproveEntitlement) returns (MsgApproveEntitlementResponse) {
     option (google.api.http).post = "/uptick/appmining/v1/tx/approve_entitlement";
@@ -435,6 +440,23 @@ message MsgResolveEntitlementChallenge {
 
 // MsgResolveEntitlementChallengeResponse is the request/response type for the module API.
 message MsgResolveEntitlementChallengeResponse {}
+
+// MsgExpireEntitlementChallenge settles an OPEN challenge after its resolution
+// window elapsed without a reviewer decision. Permissionless: any submitter may
+// call it, the outcome is fixed (EXPIRED) so there is nothing to game.
+// The deposit is refunded to the challenger and the candidate keeps PUBLISHED.
+message MsgExpireEntitlementChallenge {
+  option (cosmos.msg.v1.signer) = "submitter";
+  string submitter = 1;
+  string pool_id = 2;
+  string challenge_id = 3;
+}
+
+// MsgExpireEntitlementChallengeResponse returns the deterministic digest that a
+// later ApproveEntitlement must bind (challenge_resolution_hash).
+message MsgExpireEntitlementChallengeResponse {
+  string resolution_digest = 1;
+}
 
 // MsgApproveEntitlement locks pool available→reserved and creates CLAIMABLE entitlement.
 message MsgApproveEntitlement {

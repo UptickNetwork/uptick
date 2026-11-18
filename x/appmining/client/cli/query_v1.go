@@ -17,6 +17,7 @@ func addV1QueryCommands(cmd *cobra.Command) {
 		CmdQueryEntitlementPool(),
 		CmdQueryCandidate(),
 		CmdQueryEntitlementChallenge(),
+		CmdQueryEntitlementChallenges(),
 		CmdQueryEntitlement(),
 		CmdQueryEntitlementsByApp(),
 		CmdQueryRoles(),
@@ -83,6 +84,46 @@ func CmdQueryEntitlementChallenge() *cobra.Command {
 		},
 	}
 	flags.AddQueryFlagsToCmd(cmd)
+	return cmd
+}
+
+func CmdQueryEntitlementChallenges() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "entitlement-challenges [candidate-id-hex] [status]",
+		Short: "List V1 entitlement challenges (optional candidate + status filter)",
+		Long: `Lists V1 challenges, newest state included. Use it to build the timeout worklist:
+
+  uptickd q appmining entitlement-challenges "" OPEN
+
+status accepts OPEN | UPHELD | DISMISSED | EXPIRED, the full enum name, or the
+numeric value. Empty filters match everything (paginated).`,
+		Args: cobra.MaximumNArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			clientCtx, err := client.GetClientQueryContext(cmd)
+			if err != nil {
+				return err
+			}
+			req := &types.QueryEntitlementChallengesRequest{}
+			if len(args) > 0 {
+				req.CandidateId = args[0]
+			}
+			if len(args) > 1 {
+				req.Status = args[1]
+			}
+			pageReq, err := client.ReadPageRequest(cmd.Flags())
+			if err != nil {
+				return err
+			}
+			req.Pagination = pageReq
+			res, err := types.NewQueryClient(clientCtx).EntitlementChallenges(cmd.Context(), req)
+			if err != nil {
+				return err
+			}
+			return clientCtx.PrintProto(res)
+		},
+	}
+	flags.AddQueryFlagsToCmd(cmd)
+	flags.AddPaginationFlagsToCmd(cmd, "entitlement-challenges")
 	return cmd
 }
 

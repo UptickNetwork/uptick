@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	upgradetypes "cosmossdk.io/x/upgrade/types"
-	evmtypes "github.com/cosmos/evm/x/vm/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	evmtypes "github.com/cosmos/evm/x/vm/types"
 	"github.com/stretchr/testify/require"
 
 	v051 "github.com/UptickNetwork/uptick/app/upgrades/v051"
@@ -61,8 +61,8 @@ func TestV051UpgradeHandlerAddsAppmining(t *testing.T) {
 	handler := v051.Upgrade.UpgradeHandlerConstructor(app.mm, app.configurator, app.toolbox())
 	newVM, err := handler(ctx, v051Plan(), vm)
 	require.NoError(t, err)
-	require.Equal(t, uint64(1), newVM[appminingtypes.ModuleName],
-		"appmining must be initialized at ConsensusVersion 1")
+	require.Equal(t, uint64(2), newVM[appminingtypes.ModuleName],
+		"appmining must be initialized at ConsensusVersion 2 (challenge indexes + timeout sweep)")
 
 	require.True(t, upgradeStore.Has([]byte(migrationsAppliedV051Key)))
 	require.NotNil(t, app.AccountKeeper.GetModuleAccount(ctx, appminingtypes.RewardPoolName),

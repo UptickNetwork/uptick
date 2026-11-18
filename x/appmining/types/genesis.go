@@ -269,8 +269,14 @@ func validateV1Genesis(gs GenesisState) error {
 		if c.PublishedAt <= 0 {
 			return fmt.Errorf("candidate %q published_at unset", c.EntitlementId)
 		}
-		if c.ChallengeDeadline != c.PublishedAt+ChallengeWindowSeconds {
-			return fmt.Errorf("candidate %q challenge_deadline mismatch", c.EntitlementId)
+		// Deadline is sealed at publish under the then-current params; do not
+		// re-derive from today's challenge_window_seconds (gov may have changed it).
+		if c.ChallengeDeadline <= c.PublishedAt {
+			return fmt.Errorf("candidate %q challenge_deadline must be > published_at", c.EntitlementId)
+		}
+		maxDeadline := c.PublishedAt + int64(MaxChallengeWindowSecondsBound)
+		if c.ChallengeDeadline > maxDeadline {
+			return fmt.Errorf("candidate %q challenge_deadline exceeds published_at + max window (%d)", c.EntitlementId, MaxChallengeWindowSecondsBound)
 		}
 	}
 

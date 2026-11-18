@@ -76,6 +76,12 @@ service Query {
   rpc EntitlementChallenge(QueryEntitlementChallengeRequest) returns (QueryEntitlementChallengeResponse) {
     option (google.api.http).get = "/uptick/appmining/v1/entitlement_challenges/{challenge_id}";
   }
+  // EntitlementChallenges lists V1 entitlement challenges, optionally filtered by
+  // candidate and/or status. Needed to build the "open but overdue" worklist
+  // on-chain: OpenChallenges only covers the legacy attestation challenges.
+  rpc EntitlementChallenges(QueryEntitlementChallengesRequest) returns (QueryEntitlementChallengesResponse) {
+    option (google.api.http).get = "/uptick/appmining/v1/entitlement_challenges";
+  }
   // Entitlement handles the corresponding module request.
   rpc Entitlement(QueryEntitlementRequest) returns (QueryEntitlementResponse) {
     option (google.api.http).get = "/uptick/appmining/v1/entitlements/{entitlement_id}";
@@ -250,6 +256,21 @@ message QueryEntitlementChallengeRequest {
 // QueryEntitlementChallengeResponse is the request/response type for the module API.
 message QueryEntitlementChallengeResponse {
   EntitlementChallenge challenge = 1 [(gogoproto.nullable) = false];
+}
+
+// QueryEntitlementChallengesRequest is the request/response type for the module API.
+message QueryEntitlementChallengesRequest {
+  // candidate_id filters by Candidate.entitlement_id (64 hex, optional).
+  string candidate_id = 1;
+  // status filters by EntitlementChallengeStatus name or numeric value
+  // (optional; e.g. "OPEN" or "4" for EXPIRED).
+  string status = 2;
+  cosmos.base.query.v1beta1.PageRequest pagination = 3;
+}
+// QueryEntitlementChallengesResponse is the request/response type for the module API.
+message QueryEntitlementChallengesResponse {
+  repeated EntitlementChallenge challenges = 1 [(gogoproto.nullable) = false];
+  cosmos.base.query.v1beta1.PageResponse pagination = 2;
 }
 
 // QueryEntitlementRequest is the request/response type for the module API.

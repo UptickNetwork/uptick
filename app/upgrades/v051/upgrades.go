@@ -98,8 +98,9 @@ func upgradeHandlerConstructor(
 			return nil, fmt.Errorf("v0.5.0 tail migrations: %w", err)
 		}
 
-		// RunMigrations InitGenesis's x/appmining (new ConsensusVersion 1) and
-		// advances every other module that already matches to a no-op.
+		// RunMigrations InitGenesis's x/appmining (new chain) at the current
+		// ConsensusVersion, or advances an already-initialized v1 module to v2
+		// (rebuilding the V1 challenge indexes), and is a no-op elsewhere.
 		newVM, err := box.ModuleManager.RunMigrations(sdkCtx, c, vm)
 		if err != nil {
 			return nil, fmt.Errorf("run migrations: %w", err)

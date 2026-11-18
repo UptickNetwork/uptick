@@ -90,6 +90,14 @@ func (k Keeper) InitGenesis(ctx sdk.Context, gs types.GenesisState) {
 		// itself is expired and replay fails the expiry check anyway.
 		k.SetAuthNonce(ctx, role, parts[1], parts[2], ctx.BlockTime().Unix())
 	}
+
+	// Seal deadlines of pre-field OPEN records and rebuild the derived challenge
+	// indexes. Imported state must offer the same guarantees as state built by
+	// open/resolve: without this an OPEN challenge would be invisible to approve
+	// and unreachable by the timeout sweep.
+	if _, err := k.BackfillChallengeIndexes(ctx); err != nil {
+		panic(err)
+	}
 }
 
 // ExportGenesis exports full module state (BLOCK-2 fix).

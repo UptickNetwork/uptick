@@ -2,6 +2,7 @@ package cli
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
@@ -450,11 +451,35 @@ func CmdPause() *cobra.Command {
 	return cmd
 }
 
+const (
+	flagFullParams                    = "full-params"
+	flagAllowShortenWireProofValidity = "allow-shorten-wire-proof-validity"
+)
+
 func CmdUpdateParams() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "update-params [params-json-file]",
-		Short: "Update module params from a full Params JSON file (authority signer; resume is authority-only via UpdateParams)",
-		Args:  cobra.ExactArgs(1),
+		Short: "Update module params (authority signer; resume is authority-only via UpdateParams)",
+		Long: `By default, keys from params-json-file are deep-merged onto the live on-chain
+Params (nested objects like pause_state merge key-by-key; arrays replace).
+A field-level diff is printed before the tx is built so resume/pause flips are
+visible to the signer. Timing fields show stored and Effective values (stored 0
+means the module default).
+
+Shortening max_wire_proof_validity_seconds (Effective) is allowed on-chain but
+invalidates already-issued unused proofs (fail-closed). The CLI refuses that
+change unless --allow-shorten-wire-proof-validity is set.
+
+When tightening both wire-proof validity and nonce retention in an emergency,
+put both keys in one patch (merged Params is validated together), or lower
+wire first then nonce. Lowering nonce alone while wire Effective is still
+larger fails Validate (nonce_retention must be >= max_wire_proof_validity).
+
+Use --full-params for air-gapped / --generate-only flows: skip the node query
+and treat the file as a complete Params object (legacy whole-document semantics).
+With --full-params the shorten guard is skipped (no before-state); verify
+max_wire_proof_validity_seconds manually against the last known on-chain value.`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clientCtx, err := client.GetClientTxContext(cmd)
 			if err != nil {
@@ -464,10 +489,51 @@ func CmdUpdateParams() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("read params json: %w", err)
 			}
-			var params types.Params
-			if err := clientCtx.Codec.UnmarshalJSON(raw, &params); err != nil {
-				return fmt.Errorf("parse params json: %w", err)
+			fullParams, err := cmd.Flags().GetBool(flagFullParams)
+			if err != nil {
+				return err
 			}
+			allowShorten, err := cmd.Flags().GetBool(flagAllowShortenWireProofValidity)
+			if err != nil {
+				return err
+			}
+
+			var params types.Params
+			if fullParams {
+				if err := validateFullParamsPauseState(raw); err != nil {
+					return err
+				}
+				if err := clientCtx.Codec.UnmarshalJSON(raw, &params); err != nil {
+					return fmt.Errorf("parse full params json: %w", err)
+				}
+				_, _ = fmt.Fprint(cmd.ErrOrStderr(),
+					"params mode: --full-params (no on-chain merge; diff vs chain skipped)\n"+
+						"shorten guard skipped; verify max_wire_proof_validity_seconds manually\n")
+			} else {
+				var before types.Params
+				var beforeJSON, afterJSON []byte
+				params, before, beforeJSON, afterJSON, err = mergeParamsJSON(cmd, clientCtx, raw)
+				if err != nil {
+					return err
+				}
+				beforeNorm, nerr := normalizeParamsJSONForDiff(beforeJSON)
+				if nerr != nil {
+					return fmt.Errorf("normalize before params: %w", nerr)
+				}
+				afterNorm, nerr := normalizeParamsJSONForDiff(afterJSON)
+				if nerr != nil {
+					return fmt.Errorf("normalize after params: %w", nerr)
+				}
+				lines, derr := paramsFieldDiffLines(beforeNorm, afterNorm, before, params)
+				if derr != nil {
+					return fmt.Errorf("params diff: %w", derr)
+				}
+				_, _ = fmt.Fprint(cmd.ErrOrStderr(), formatParamsDiff(lines))
+				if wireProofValidityDecreases(before, params) && !allowShorten {
+					return fmt.Errorf("%s", formatWireProofShortenError(before, params))
+				}
+			}
+
 			msg := &types.MsgUpdateParams{
 				Authority: clientCtx.GetFromAddress().String(),
 				Params:    params,
@@ -475,8 +541,53 @@ func CmdUpdateParams() *cobra.Command {
 			return tx.GenerateOrBroadcastTxCLI(clientCtx, cmd.Flags(), msg)
 		},
 	}
+	cmd.Flags().Bool(flagFullParams, false, "Treat file as a complete Params JSON; skip on-chain query/merge (offline / air-gap)")
+	cmd.Flags().Bool(flagAllowShortenWireProofValidity, false, "Allow decreasing Effective max_wire_proof_validity_seconds (invalidates unused proofs)")
 	flags.AddTxFlagsToCmd(cmd)
 	return cmd
+}
+
+// mergeParamsJSON loads on-chain Params and deep-merges keys present in patchJSON.
+// Returns after/before Params plus before/after codec JSON for diffing.
+func mergeParamsJSON(cmd *cobra.Command, clientCtx client.Context, patchJSON []byte) (types.Params, types.Params, []byte, []byte, error) {
+	queryClient := types.NewQueryClient(clientCtx)
+	res, err := queryClient.Params(cmd.Context(), &types.QueryParamsRequest{})
+	if err != nil {
+		return types.Params{}, types.Params{}, nil, nil, fmt.Errorf("query on-chain params: %w", err)
+	}
+	before := res.Params
+	baseJSON, err := clientCtx.Codec.MarshalJSON(&before)
+	if err != nil {
+		return types.Params{}, types.Params{}, nil, nil, fmt.Errorf("marshal on-chain params: %w", err)
+	}
+	var base map[string]json.RawMessage
+	if err := json.Unmarshal(baseJSON, &base); err != nil {
+		return types.Params{}, types.Params{}, nil, nil, fmt.Errorf("decode on-chain params json: %w", err)
+	}
+	var patch map[string]json.RawMessage
+	if err := json.Unmarshal(patchJSON, &patch); err != nil {
+		return types.Params{}, types.Params{}, nil, nil, fmt.Errorf("decode params patch json: %w", err)
+	}
+	if len(patch) == 0 {
+		return types.Params{}, types.Params{}, nil, nil, fmt.Errorf("params patch json is empty")
+	}
+	mergedMap, err := deepMergeJSONObjects(base, patch)
+	if err != nil {
+		return types.Params{}, types.Params{}, nil, nil, err
+	}
+	merged, err := json.Marshal(mergedMap)
+	if err != nil {
+		return types.Params{}, types.Params{}, nil, nil, fmt.Errorf("marshal merged params: %w", err)
+	}
+	var after types.Params
+	if err := clientCtx.Codec.UnmarshalJSON(merged, &after); err != nil {
+		return types.Params{}, types.Params{}, nil, nil, fmt.Errorf("parse merged params json: %w", err)
+	}
+	afterJSON, err := clientCtx.Codec.MarshalJSON(&after)
+	if err != nil {
+		return types.Params{}, types.Params{}, nil, nil, err
+	}
+	return after, before, baseJSON, afterJSON, nil
 }
 
 func CmdFundRewardPool() *cobra.Command {

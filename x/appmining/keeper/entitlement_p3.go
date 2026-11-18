@@ -22,7 +22,8 @@ func (k msgServer) FreezeEntitlement(goCtx context.Context, msg *types.MsgFreeze
 	if msg.PoolId != ent.PoolId {
 		return nil, types.ErrPoolMismatch
 	}
-	if _, _, err := k.requireEntitlementFlow(ctx, ent.PoolId); err != nil {
+	_, params, err := k.requireEntitlementFlow(ctx, ent.PoolId)
+	if err != nil {
 		return nil, err
 	}
 	if ent.State != types.EntitlementStateClaimable {
@@ -44,7 +45,7 @@ func (k msgServer) FreezeEntitlement(goCtx context.Context, msg *types.MsgFreeze
 	if err != nil {
 		return nil, types.ErrFreezeDuration
 	}
-	if freezeUntil <= now || freezeUntil > now+types.MaxFreezeSeconds {
+	if freezeUntil <= now || freezeUntil > now+params.EffectiveMaxFreezeSeconds() {
 		return nil, types.ErrFreezeDuration
 	}
 

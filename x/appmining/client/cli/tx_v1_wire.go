@@ -36,6 +36,7 @@ func addV1WireTxCommands(cmd *cobra.Command) {
 		CmdPublishCandidate(),
 		CmdOpenEntitlementChallenge(),
 		CmdResolveEntitlementChallenge(),
+		CmdExpireEntitlementChallenge(),
 		CmdApproveEntitlement(),
 		CmdFreezeEntitlement(),
 		CmdRevokeEntitlement(),
@@ -170,12 +171,42 @@ func CmdResolveEntitlementChallenge() *cobra.Command {
 	return cmd
 }
 
+func CmdExpireEntitlementChallenge() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "expire-entitlement-challenge [pool-id] [challenge-id]",
+		Short: "Settle an OPEN V1 challenge after its resolution window elapsed (permissionless)",
+		Long: `Neutral timeout settlement: the deposit is refunded to the challenger, the
+challenge becomes EXPIRED, and the candidate stays PUBLISHED.
+
+Anyone may submit it (no wire proof) because the outcome is fixed. The tx
+response/event carries the deterministic resolution digest that a later
+approve-entitlement must pass as challenge-resolution-hash.`,
+		Args: cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			clientCtx, err := client.GetClientTxContext(cmd)
+			if err != nil {
+				return err
+			}
+			msg := &types.MsgExpireEntitlementChallenge{
+				Submitter:   clientCtx.GetFromAddress().String(),
+				PoolId:      args[0],
+				ChallengeId: args[1],
+			}
+			return tx.GenerateOrBroadcastTxCLI(clientCtx, cmd.Flags(), msg)
+		},
+	}
+	flags.AddTxFlagsToCmd(cmd)
+	return cmd
+}
+
 func CmdApproveEntitlement() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "approve-entitlement [pool-id] [entitlement-id] [challenge-resolution-hash]",
 		Short: "Approve a V1 entitlement (approver wire proof; locks available→reserved)",
-		Long: `challenge-resolution-hash: 64-hex binding a DISMISSED resolution, or empty "" for the
-no-challenge path (window elapsed and zero challenges on the candidate; UGE DEC-01).`,
+		Long: `challenge-resolution-hash: 64-hex binding a settled resolution (DISMISSED by a
+reviewer, or EXPIRED by timeout — see expire-entitlement-challenge), or empty ""
+for the no-challenge path (window elapsed and zero challenges on the candidate;
+UGE DEC-01).`,
 		Args: cobra.ExactArgs(3),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clientCtx, err := client.GetClientTxContext(cmd)

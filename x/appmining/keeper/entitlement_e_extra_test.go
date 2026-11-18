@@ -13,7 +13,7 @@ import (
 func TestE1_TamperedSignatureRejected(t *testing.T) {
 	e, _, _, aprPriv, c := setupP2(t)
 	cand, _ := e.k.GetCandidate(e.ctx, c.EntitlementID)
-	e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.ChallengeWindowSeconds, 0))
+	e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.DefaultChallengeWindowSeconds, 0))
 
 	msg := approveMsg(t, e, aprPriv, c, "901")
 	sig, err := base64.StdEncoding.DecodeString(msg.Proof.SignatureBase64)
@@ -28,7 +28,7 @@ func TestE1_TamperedSignatureRejected(t *testing.T) {
 func TestE2_CrossChainIDReplayRejected(t *testing.T) {
 	e, _, _, aprPriv, c := setupP2(t)
 	cand, _ := e.k.GetCandidate(e.ctx, c.EntitlementID)
-	e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.ChallengeWindowSeconds, 0))
+	e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.DefaultChallengeWindowSeconds, 0))
 
 	msg := approveMsg(t, e, aprPriv, c, "902")
 	msg.ChainId = "other-chain-9"
@@ -39,7 +39,7 @@ func TestE2_CrossChainIDReplayRejected(t *testing.T) {
 func TestE2_CrossPoolIDReplayRejected(t *testing.T) {
 	e, _, _, aprPriv, c := setupP2(t)
 	cand, _ := e.k.GetCandidate(e.ctx, c.EntitlementID)
-	e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.ChallengeWindowSeconds, 0))
+	e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.DefaultChallengeWindowSeconds, 0))
 
 	msg := approveMsg(t, e, aprPriv, c, "903")
 	msg.PoolId = "other-pool"
@@ -73,7 +73,7 @@ func TestVector_DISMISSED_CHALLENGE_ALLOWS_APPROVAL(t *testing.T) {
 	require.NoError(t, err)
 
 	cand, _ := e.k.GetCandidate(e.ctx, c.EntitlementID)
-	e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.ChallengeWindowSeconds, 0))
+	e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.DefaultChallengeWindowSeconds, 0))
 	_, err = e.server.ApproveEntitlement(e.ctx, approveMsgWithResolution(t, e, aprPriv, c, "921", resolveRec["rationale_digest"]))
 	require.NoError(t, err)
 	ent, ok := e.k.GetEntitlement(e.ctx, c.EntitlementID)
@@ -84,7 +84,7 @@ func TestVector_DISMISSED_CHALLENGE_ALLOWS_APPROVAL(t *testing.T) {
 func TestE5_ExportImportGenesisRoundTrip(t *testing.T) {
 	e, _, _, aprPriv, c := setupP2(t)
 	cand, _ := e.k.GetCandidate(e.ctx, c.EntitlementID)
-	e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.ChallengeWindowSeconds, 0))
+	e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.DefaultChallengeWindowSeconds, 0))
 	_, err := e.server.ApproveEntitlement(e.ctx, approveMsg(t, e, aprPriv, c, "951"))
 	require.NoError(t, err)
 

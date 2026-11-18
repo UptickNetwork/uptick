@@ -36,7 +36,7 @@ func findEvent(events []sdk.Event, typ string) (sdk.Event, bool) {
 func TestFeature_AuthNonceReplayRejected(t *testing.T) {
 	e, pubPriv, _, aprPriv, c := setupP2(t)
 	cand, _ := e.k.GetCandidate(e.ctx, c.EntitlementID)
-	e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.ChallengeWindowSeconds, 0))
+	e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.DefaultChallengeWindowSeconds, 0))
 
 	_, err := e.server.ApproveEntitlement(e.ctx, approveMsg(t, e, aprPriv, c, "1301"))
 	require.NoError(t, err)
@@ -65,7 +65,7 @@ func TestFeature_AuthNonceReplayRejected(t *testing.T) {
 	require.NoError(t, err)
 
 	cand2, _ := e.k.GetCandidate(e.ctx, c2.EntitlementID)
-	e.ctx = e.ctx.WithBlockTime(time.Unix(cand2.PublishedAt+types.ChallengeWindowSeconds, 0))
+	e.ctx = e.ctx.WithBlockTime(time.Unix(cand2.PublishedAt+types.DefaultChallengeWindowSeconds, 0))
 	_, err = e.server.ApproveEntitlement(e.ctx, approveMsg(t, e, aprPriv, c2, "1301"))
 	require.ErrorIs(t, err, types.ErrAuthReplay)
 }
@@ -73,7 +73,7 @@ func TestFeature_AuthNonceReplayRejected(t *testing.T) {
 func TestFeature_AuthExpiredRejected(t *testing.T) {
 	e, _, _, aprPriv, c := setupP2(t)
 	cand, _ := e.k.GetCandidate(e.ctx, c.EntitlementID)
-	e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.ChallengeWindowSeconds, 0))
+	e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.DefaultChallengeWindowSeconds, 0))
 
 	msg := approveMsg(t, e, aprPriv, c, "1310")
 	msg.Proof.ExpiresAt = "1" // far in the past
@@ -129,7 +129,7 @@ func TestFeature_PausedRoleKeyRejectsApprove(t *testing.T) {
 	require.NoError(t, err)
 
 	cand, _ := e.k.GetCandidate(e.ctx, c.EntitlementID)
-	e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.ChallengeWindowSeconds, 0))
+	e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.DefaultChallengeWindowSeconds, 0))
 	_, err = e.server.ApproveEntitlement(e.ctx, approveMsg(t, e, aprPriv, c, "1330"))
 	require.ErrorIs(t, err, types.ErrRoleKeyInactive)
 }
@@ -224,7 +224,7 @@ func TestFeature_ApproveEventSchemaAndTxHash(t *testing.T) {
 	txBytes := []byte("feature-approve-tx-bytes")
 	wantHash := hex.EncodeToString(tmhash.Sum(txBytes))
 	e.ctx = e.ctx.
-		WithBlockTime(time.Unix(cand.PublishedAt+types.ChallengeWindowSeconds, 0)).
+		WithBlockTime(time.Unix(cand.PublishedAt+types.DefaultChallengeWindowSeconds, 0)).
 		WithTxBytes(txBytes).
 		WithEventManager(sdk.NewEventManager())
 
@@ -278,7 +278,7 @@ func TestFeature_PublishStoresTxHash(t *testing.T) {
 func TestFeature_EntitlementPoolInvariant(t *testing.T) {
 	e, _, _, aprPriv, c := setupP2(t)
 	cand, _ := e.k.GetCandidate(e.ctx, c.EntitlementID)
-	e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.ChallengeWindowSeconds, 0))
+	e.ctx = e.ctx.WithBlockTime(time.Unix(cand.PublishedAt+types.DefaultChallengeWindowSeconds, 0))
 	_, err := e.server.ApproveEntitlement(e.ctx, approveMsg(t, e, aprPriv, c, "1370"))
 	require.NoError(t, err)
 

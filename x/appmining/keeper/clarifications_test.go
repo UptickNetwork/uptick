@@ -81,12 +81,20 @@ func TestPauseOnlyTrueAndResumeRequiresAuthority(t *testing.T) {
 	})
 	require.ErrorIs(t, err, types.ErrPauseOnlyTrue)
 
+	// Seed entitlement_paused=true; MsgPause must preserve it when OR-merging
+	// other bits (ApplyPauseOR historically dropped the field → silent resume).
+	seed := e.k.GetParams(e.ctx)
+	seed.PauseState.EntitlementPaused = true
+	require.NoError(t, e.k.SetParams(e.ctx, seed))
+
 	_, err = e.server.Pause(e.ctx, &types.MsgPause{
 		PauseAuthority: pauseAuth.String(),
 		PauseBits:      types.PauseState{AttestationPaused: true},
 	})
 	require.NoError(t, err)
-	require.True(t, e.k.GetParams(e.ctx).PauseState.AttestationPaused)
+	afterPause := e.k.GetParams(e.ctx).PauseState
+	require.True(t, afterPause.AttestationPaused)
+	require.True(t, afterPause.EntitlementPaused, "MsgPause must not clear entitlement_paused")
 
 	// pause_authority cannot resume via UpdateParams
 	cleared := e.k.GetParams(e.ctx)
@@ -104,6 +112,34 @@ func TestPauseOnlyTrueAndResumeRequiresAuthority(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.False(t, e.k.GetParams(e.ctx).PauseState.AttestationPaused)
+}
+
+func TestUpdateParams_AllowsWireProofValidityDecreaseWithEvent(t *testing.T) {
+	e := setupTest(t)
+	params := e.k.GetParams(e.ctx)
+	params.MaxWireProofValiditySeconds = types.DefaultMaxWireProofValiditySeconds
+	params.NonceRetentionSeconds = types.DefaultNonceRetentionSeconds
+	require.NoError(t, e.k.SetParams(e.ctx, params))
+
+	next := e.k.GetParams(e.ctx)
+	next.MaxWireProofValiditySeconds = 3600
+	next.NonceRetentionSeconds = 3600
+	e.ctx = e.ctx.WithEventManager(sdk.NewEventManager())
+	_, err := e.server.UpdateParams(e.ctx, &types.MsgUpdateParams{
+		Authority: e.auth.String(),
+		Params:    next,
+	})
+	require.NoError(t, err)
+	require.Equal(t, uint64(3600), e.k.GetParams(e.ctx).MaxWireProofValiditySeconds)
+
+	found := false
+	for _, ev := range e.ctx.EventManager().Events() {
+		if ev.Type == types.EventTypeWireProofValidityShortened {
+			found = true
+			break
+		}
+	}
+	require.True(t, found, "expected %s event", types.EventTypeWireProofValidityShortened)
 }
 
 func TestBudgetDenomNotAllowlisted(t *testing.T) {

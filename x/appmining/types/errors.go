@@ -83,8 +83,8 @@ var (
 	ErrDualAuthRequired             = sdkerrors.Register(ModuleName, 76, "independent risk and audit proofs required")
 	ErrRuleVersionNotAllowed        = sdkerrors.Register(ModuleName, 77, "candidate rule_version is not allowed")
 	// ErrResolutionUnbound (78): non-empty challenge_resolution_hash that does
-	// not bind a DISMISSED resolution (UGE DEC-01 scheme C / approve dual-path).
-	ErrResolutionUnbound = sdkerrors.Register(ModuleName, 78, "non-empty challenge_resolution_hash is not bound to a dismissed challenge")
+	// not bind a settled resolution: DISMISSED or EXPIRED (UGE DEC-01 scheme C).
+	ErrResolutionUnbound = sdkerrors.Register(ModuleName, 78, "non-empty challenge_resolution_hash is not bound to a settled (dismissed or expired) challenge")
 	// ErrRoleKeyAppMismatch (79): ACTIVE role key is bound to a different app_id
 	// than the message (UGE publisher-binding R1).
 	ErrRoleKeyAppMismatch = sdkerrors.Register(ModuleName, 79, "role key app_id does not match message app_id")
@@ -102,4 +102,7 @@ var (
 	ErrWireProofRecoverMismatch = sdkerrors.Register(ModuleName, 84, "wire proof recovered address mismatch")
 	// ErrWireProofHighS (85): secp256k1 signature s is not low-s (UGE DEC-10 / EIP-2).
 	ErrWireProofHighS = sdkerrors.Register(ModuleName, 85, "wire proof secp256k1 signature high-s")
+	// ErrChallengeNotExpired (86): MsgExpireEntitlementChallenge arrived before the
+	// challenge's sealed resolution window + governance grace elapsed.
+	ErrChallengeNotExpired = sdkerrors.Register(ModuleName, 86, "challenge resolution window has not elapsed")
 )

@@ -74,10 +74,12 @@ func DenomAllowed(params Params, denom string) bool {
 // PauseBitsHasAnyTrue reports whether any pause dimension is requested.
 func PauseBitsHasAnyTrue(p PauseState) bool {
 	return p.RegistrationPaused || p.AttestationPaused || p.ChallengePaused ||
-		p.SettlementPaused || p.GasCreditPaused
+		p.SettlementPaused || p.GasCreditPaused || p.EntitlementPaused
 }
 
 // ApplyPauseOR merges true bits from req onto cur (pause-only-true).
+// EntitlementPaused is included so MsgPause cannot silently clear the V1 bit
+// by reconstructing PauseState without copying it.
 func ApplyPauseOR(cur, req PauseState) PauseState {
 	return PauseState{
 		RegistrationPaused: cur.RegistrationPaused || req.RegistrationPaused,
@@ -85,6 +87,7 @@ func ApplyPauseOR(cur, req PauseState) PauseState {
 		ChallengePaused:    cur.ChallengePaused || req.ChallengePaused,
 		SettlementPaused:   cur.SettlementPaused || req.SettlementPaused,
 		GasCreditPaused:    cur.GasCreditPaused || req.GasCreditPaused,
+		EntitlementPaused:  cur.EntitlementPaused || req.EntitlementPaused,
 	}
 }
 
@@ -94,5 +97,6 @@ func PauseClearsAny(cur, req PauseState) bool {
 		(cur.AttestationPaused && !req.AttestationPaused) ||
 		(cur.ChallengePaused && !req.ChallengePaused) ||
 		(cur.SettlementPaused && !req.SettlementPaused) ||
-		(cur.GasCreditPaused && !req.GasCreditPaused)
+		(cur.GasCreditPaused && !req.GasCreditPaused) ||
+		(cur.EntitlementPaused && !req.EntitlementPaused)
 }

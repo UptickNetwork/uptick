@@ -38,8 +38,9 @@ func (k msgServer) ApproveEntitlement(goCtx context.Context, msg *types.MsgAppro
 	}
 
 	now := observedTime(ctx.BlockTime().Unix(), cand.MaxObservedTime)
-	// Challenge window must have elapsed: now >= published_at + 604800
-	if now < cand.PublishedAt+types.ChallengeWindowSeconds {
+	// Use the deadline sealed at Publish time so later param changes do not
+	// rewrite in-flight challenge windows.
+	if now < cand.ChallengeDeadline {
 		return nil, types.ErrChallengeWindow
 	}
 	if k.HasOpenOrUpheldEntitlementChallenge(ctx, msg.EntitlementId) {
@@ -88,11 +89,12 @@ func (k msgServer) ApproveEntitlement(goCtx context.Context, msg *types.MsgAppro
 	}
 
 	// UGE DEC-01 scheme C — mutually exclusive approve paths:
-	//  - non-empty hash → must bind a DISMISSED ResolutionDigest (else 78)
+	//  - non-empty hash → must bind a settled ResolutionDigest: DISMISSED by a
+	//    reviewer, or EXPIRED by timeout (else 78)
 	//  - empty hash → window elapsed (already checked) and zero challenges (else 71)
 	resolutionBound := false
 	if msg.ChallengeResolutionHash != "" {
-		if !k.HasDismissedEntitlementChallengeResolution(ctx, msg.EntitlementId, msg.ChallengeResolutionHash) {
+		if !k.HasSettledEntitlementChallengeResolution(ctx, msg.EntitlementId, msg.ChallengeResolutionHash) {
 			return nil, types.ErrResolutionUnbound
 		}
 		resolutionBound = true
