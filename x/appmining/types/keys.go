@@ -68,6 +68,11 @@ const (
 	// genesis) updates them; nothing else may write challenge records.
 	prefixEntitlementChallengeByCandidate // entitlement_id | 0x00 | challenge_id -> challenge_id
 	prefixChallengeResolutionDeadline     // be(deadline_unix) | challenge_id -> challenge_id
+	// prefixChallengeIndexState holds ONE record: whether the two V1 challenge
+	// indexes above have been fully rebuilt for pre-existing records, plus the
+	// resume cursor of an in-progress rebuild. Appended last on purpose: adding
+	// a byte in the middle would shift every existing prefix and orphan history.
+	prefixChallengeIndexState
 )
 
 var (
@@ -94,6 +99,7 @@ var (
 
 	KeyPrefixEntitlementChallengeByCandidate = []byte{prefixEntitlementChallengeByCandidate}
 	KeyPrefixChallengeResolutionDeadline     = []byte{prefixChallengeResolutionDeadline}
+	KeyPrefixChallengeIndexState             = []byte{prefixChallengeIndexState}
 )
 
 func ApplicationKey(appID []byte) []byte {
@@ -245,4 +251,10 @@ func AssessmentSignerKey(keyID string) []byte {
 // Permanent one-shot (D-A): entries are never released after REJECTED.
 func CredentialIndexKey(credentialID string) []byte {
 	return append(append([]byte{}, KeyPrefixCredentialIndex...), []byte(credentialID)...)
+}
+
+// ChallengeIndexStateKey is the single record describing whether the V1
+// challenge indexes cover every stored challenge record.
+func ChallengeIndexStateKey() []byte {
+	return append([]byte{}, KeyPrefixChallengeIndexState...)
 }

@@ -33,6 +33,12 @@ func RegisterInvariants(ir sdk.InvariantRegistry, k Keeper) {
 // fault. Run with: uptickd query crisis invariant appmining challenge-index-consistent
 func ChallengeIndexInvariant(k Keeper) sdk.Invariant {
 	return func(ctx sdk.Context) (string, bool) {
+		// Before the one-time rebuild completes, records written by a v1 binary
+		// legitimately have no index entry yet, so firing here would report a
+		// fault on a consistent chain. Once ready, the check is strict.
+		if !k.ChallengeIndexesReady(ctx) {
+			return "", false
+		}
 		store := k.store(ctx)
 		broken := 0
 		var first string

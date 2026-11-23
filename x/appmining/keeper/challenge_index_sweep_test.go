@@ -240,6 +240,9 @@ func TestChallengeIndexInvariant_CleanAfterLifecycle(t *testing.T) {
 	e, pubPriv, _, _ := expireEnv(t)
 	cid := openDepositChallenge(t, e, pubPriv, "9307",
 		"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
+	// The invariant is a no-op until the rebuild has run; declare the indexes
+	// complete so this test checks the strict mode, not the skip.
+	e.k.MarkChallengeIndexesReady(e.ctx)
 
 	msg, broken := keeper.ChallengeIndexInvariant(e.k)(e.ctx)
 	require.False(t, broken, "OPEN record must have both index and bucket: %s", msg)

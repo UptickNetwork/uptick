@@ -105,6 +105,11 @@ func (am AppModule) RegisterServices(cfg module.Configurator) {
 // retried on the next block.
 func (am AppModule) EndBlock(ctx context.Context) error {
 	sdkCtx := sdk.UnwrapSDKContext(ctx)
+	// Order matters: the rebuild converts legacy challenge records into index
+	// entries and timeout buckets, and the sweep can only see challenges that
+	// are in a bucket. Running the rebuild first means a chain that upgrades
+	// with an already-expired OPEN challenge settles it in this same block.
+	am.keeper.EnsureChallengeIndexes(sdkCtx)
 	am.keeper.SweepExpiredChallenges(sdkCtx)
 	return nil
 }

@@ -114,4 +114,9 @@ func TestAppRouterRegistration(t *testing.T) {
 
 	// v0.5.1 adds the appmining store.
 	require.Equal(t, []string{"appmining"}, router.UpgradeInfo("v0.5.1").StoreUpgrades.Added)
+
+	// v0.5.1-cv2 was removed: the appmining index rebuild now runs from the
+	// EndBlocker, so no second plan name is needed for a bare binary swap.
+	require.Empty(t, router.UpgradeInfo("v0.5.1-cv2").UpgradeName,
+		"v0.5.1-cv2 must stay unregistered: the rebuild no longer needs a plan")
 }

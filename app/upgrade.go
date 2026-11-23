@@ -39,6 +39,13 @@ import (
 // mainnet. The executable upgrade is v0.5.1 (adds x/appmining + re-applies the
 // v0.5.0 tail migrations for testnet).
 //
+// v0.5.1-cv2 was removed on purpose. It existed only to run x/appmining's 1->2
+// migration on a chain that already completed v0.5.1 without governance; the
+// module now rebuilds its challenge indexes from the EndBlocker instead
+// (EnsureChallengeIndexes), so a bare binary swap converges without a plan.
+// Registering a name that will never be scheduled would only widen the
+// startup self-check surface.
+//
 // v0.4.0 remains unregistered on purpose: its legacy-pair deletion is not
 // idempotent, and mainnet has no done record for that name.
 var (

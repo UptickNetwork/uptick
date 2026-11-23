@@ -38,6 +38,9 @@ func (m Migrator) Migrate1to2(ctx sdk.Context) error {
 	// Touch module account so x/auth materializes it from maccPerms if missing.
 	_ = m.keeper.ak.GetModuleAccount(ctx, types.EntitlementPoolName)
 
+	// BackfillChallengeIndexes walks the whole table and marks the indexes ready,
+	// so the EndBlocker rebuild becomes a no-op on chains that upgrade through a
+	// plan instead of a bare binary swap.
 	indexed, err := m.keeper.BackfillChallengeIndexes(ctx)
 	if err != nil {
 		return err

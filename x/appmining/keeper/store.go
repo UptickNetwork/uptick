@@ -322,8 +322,14 @@ func (k Keeper) BackfillChallengeIndexes(ctx sdk.Context) (int, error) {
 				c.ResolutionDeadline = types.EffectiveResolutionDeadline(cand, c, grace)
 			}
 		}
+		if c.Status == types.EntitlementChallengeStatusOpen && c.CandidateId != "" && c.Challenger != "" {
+			k.SetOpenEntitlementChallenge(ctx, c.CandidateId, c.Challenger, c.ChallengeId)
+		}
 		k.SetEntitlementChallenge(ctx, c)
 	}
+	// A full walk just converted everything, so the indexes are complete and the
+	// EndBlocker rebuild must become a no-op.
+	k.MarkChallengeIndexesReady(ctx)
 	return len(records), nil
 }
 
@@ -353,18 +359,42 @@ func (k Keeper) DeleteOpenEntitlementChallenge(ctx sdk.Context, entitlementID, c
 	k.store(ctx).Delete(types.OpenEntitlementChallengeKey(entitlementID, challenger))
 }
 
-// iterateChallengesOfCandidate walks only the challenges of one candidate via
-// the candidate index. Cost is O(challenges of that candidate), independent of
-// how many challenges the chain has recorded in total.
+// iterateChallengesOfCandidate walks the challenges of one candidate.
 //
-// The index stores challenge ids; a dangling id (impossible unless the store is
-// corrupted) is skipped rather than panicking inside a tx.
+// Once the indexes are known to be complete (see ChallengeIndexesReady) it uses
+// the candidate index: O(challenges of that candidate), independent of how many
+// challenges the chain has recorded in total.
+//
+// Before that, it walks the record table and filters by candidate_id, i.e. the
+// exact semantics of the pre-index implementation. This branch is not a
+// nice-to-have: a legacy chain can hold challenges that have no index entry yet,
+// and answering "no challenge" for them would let approve release funds that an
+// OPEN or UPHELD challenge is supposed to block. The migration/rebuild removes
+// the branch's cost, not its need — it must stay for correctness.
 func (k Keeper) iterateChallengesOfCandidate(ctx sdk.Context, candidateID string, fn func(types.EntitlementChallenge) bool) {
-	it := storetypes.KVStorePrefixIterator(k.store(ctx), types.EntitlementChallengeByCandidatePrefix(candidateID))
+	if k.ChallengeIndexesReady(ctx) {
+		it := storetypes.KVStorePrefixIterator(k.store(ctx), types.EntitlementChallengeByCandidatePrefix(candidateID))
+		defer it.Close()
+		for ; it.Valid(); it.Next() {
+			// A dangling id (impossible unless the store is corrupted) is skipped
+			// rather than panicking inside a tx.
+			c, ok := k.GetEntitlementChallenge(ctx, string(it.Value()))
+			if !ok {
+				continue
+			}
+			if !fn(c) {
+				return
+			}
+		}
+		return
+	}
+
+	it := storetypes.KVStorePrefixIterator(k.store(ctx), types.KeyPrefixEntitlementChallenge)
 	defer it.Close()
 	for ; it.Valid(); it.Next() {
-		c, ok := k.GetEntitlementChallenge(ctx, string(it.Value()))
-		if !ok {
+		var c types.EntitlementChallenge
+		k.cdc.MustUnmarshal(it.Value(), &c)
+		if c.CandidateId != candidateID {
 			continue
 		}
 		if !fn(c) {
@@ -395,10 +425,17 @@ func (k Keeper) HasOpenOrUpheldEntitlementChallenge(ctx sdk.Context, entitlement
 // HasAnyEntitlementChallenge reports whether the candidate has any stored
 // challenge record (any status). Used by the no-challenge approve path
 // (UGE DEC-01 scheme C): empty challenge_resolution_hash requires zero challenges.
+//
+// It goes through the same accessor as the status predicates so it inherits the
+// pre-backfill fallback; a direct index lookup here would report "no challenge"
+// for legacy records and silently enable the empty-hash approval path.
 func (k Keeper) HasAnyEntitlementChallenge(ctx sdk.Context, entitlementID string) bool {
-	it := storetypes.KVStorePrefixIterator(k.store(ctx), types.EntitlementChallengeByCandidatePrefix(entitlementID))
-	defer it.Close()
-	return it.Valid()
+	found := false
+	k.iterateChallengesOfCandidate(ctx, entitlementID, func(types.EntitlementChallenge) bool {
+		found = true
+		return false
+	})
+	return found
 }
 
 // HasSettledEntitlementChallengeResolution reports whether the candidate has a
