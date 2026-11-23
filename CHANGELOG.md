@@ -67,6 +67,12 @@ Ref: https://keepachangelog.com/en/1.0.0/
 
 ### Bug Fixes
 
+* (appmining) Per-candidate challenge reads fall back to a full table walk while the derived challenge
+  indexes are incomplete, and the EndBlocker rebuilds them (`EnsureChallengeIndexes`, 256 records per
+  block, cursor resumable). A binary swap that does not run the `1->2` migration can therefore no longer
+  make an existing OPEN challenge invisible to approve (the guard returns error 71 again), and
+  `SweepExpiredChallenges` settles timed-out challenges without a msg, refunding the bond in full.
+
 * (appmining) Regen `types.pb.go` FileDescriptor so Params field 18
   (`entitlement_allowed_assessment_versions`) passes CheckTx
   `RejectUnknownFieldsStrict` (FIELD18); drop hand-maintained assessment pb duplicates.
@@ -79,6 +85,14 @@ Ref: https://keepachangelog.com/en/1.0.0/
   `available + reserved` (denom-aggregated across pools), not `reserved` alone (UGE doc15).
 
 ### State Machine Breaking
+
+* (appmining) The first block after the swap writes state: the EndBlocker backfills the candidate
+  index, seals `resolution_deadline` on legacy OPEN challenges (open time + window + grace), settles
+  the expiry-reached ones (`EXPIRED`, bond refunded), and sets the index-complete marker. Old and new
+  binaries diverge from that block on, so this release must be installed as a coordinated halt at one
+  height, never as a rolling replacement. Both `v0.5.1` (no index maintenance, no EndBlocker) and the
+  intermediate `4acf28b` tree (index reads without a fallback) are unsafe to run on the same state.
+
 
 * (upgrade/appmining) New `v0.5.1` plan adds the `x/appmining` store (`uptick.appmining.v1`) and re-applies the
   v0.5.0 tail migrations for testnet convergence. See `app/upgrades/v051`. Consensus module: Application registry,
