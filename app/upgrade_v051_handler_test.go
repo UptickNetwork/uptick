@@ -3,6 +3,8 @@ package app
 import (
 	"testing"
 
+	storetypes "cosmossdk.io/store/types"
+
 	upgradetypes "cosmossdk.io/x/upgrade/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	evmtypes "github.com/cosmos/evm/x/vm/types"
@@ -146,11 +148,13 @@ func TestV051UpgradeHandlerRefusesLegacyState(t *testing.T) {
 
 	evmStore := ctx.KVStore(app.GetKey(evmtypes.StoreKey))
 	require.True(t, evmStore.Has(evmtypes.KeyPrefixEvmCoinInfo))
+	// The shared app outlives this test: capture the record so the cleanup can
+	// put it back. Without it every later upgrade-handler test trips the
+	// legacy-state gate, which makes the suite fail purely by execution order.
+	original := append([]byte{}, evmStore.Get(evmtypes.KeyPrefixEvmCoinInfo)...)
 	evmStore.Delete(evmtypes.KeyPrefixEvmCoinInfo)
 	t.Cleanup(func() {
-		// Shared app: leave store as we found it is hard; restoreSharedState on
-		// other tests rebuilds from genesis. Re-seed a placeholder so later
-		// suites still see the key if they share the process.
+		evmStore.Set(evmtypes.KeyPrefixEvmCoinInfo, original)
 		restoreSharedState(t, app)
 	})
 
@@ -158,4 +162,87 @@ func TestV051UpgradeHandlerRefusesLegacyState(t *testing.T) {
 	_, err := handler(ctx, v051Plan(), app.mm.GetVersionMap())
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "legacy ethermint")
+}
+
+// TestV051UpgradeFromV050LeavesModuleConsistent covers the path a v0.5.0
+// chain actually takes, as opposed to a chain that already ran v0.5.1: x/appmining
+// is a NEW module there, so RunMigrations runs InitGenesis instead of the 1->2
+// migration (SDK types/module: a module missing from the version map is
+// initialized, never migrated). Three consequences follow, and none of them is
+// visible from the keeper tests:
+//
+//   - the module lands in the version map at ConsensusVersion 2 directly, so a
+//     later upgrade will not replay Migrate1to2;
+//   - InitGenesis' own BackfillChallengeIndexes leaves the derived indexes
+//     complete at the upgrade height, so the first block has nothing to rebuild
+//     (the bare-swap path is the opposite: it rebuilds in the first block);
+//   - the legacy pause posture comes from DefaultParams (all four flows paused),
+//     not from Migrate1to2, so a v0.5.0->v0.5.1 chain and a bare-swapped v0.5.1
+//     chain reach the same posture through different code paths.
+func TestV051UpgradeFromV050LeavesModuleConsistent(t *testing.T) {
+	app, ctx := sharedTestApp(t)
+	restoreSharedState(t, app)
+
+	upgradeStore := ctx.KVStore(app.GetKey(upgradetypes.StoreKey))
+	require.False(t, upgradeStore.Has([]byte(migrationsAppliedV051Key)))
+	t.Cleanup(func() {
+		upgradeStore.Delete([]byte(migrationsAppliedV051Key))
+	})
+
+	// v0.5.0 has no x/appmining: drop it from the version map so the manager
+	// treats it exactly as it would on that chain.
+	vm := app.mm.GetVersionMap()
+	delete(vm, appminingtypes.ModuleName)
+
+	// The shared app has already produced one block, and that block's EndBlocker
+	// marked the indexes ready. Delete the marker to restore the state a store
+	// created at the upgrade height actually has: the module exists, nothing has
+	// swept it yet.
+	appStore := ctx.KVStore(app.GetKey(appminingtypes.StoreKey))
+	appStore.Delete(appminingtypes.ChallengeIndexStateKey())
+	require.False(t, app.AppminingKeeper.ChallengeIndexesReady(ctx),
+		"test setup: the marker must be absent before the upgrade runs")
+
+	v051.SetBaselineAuthorityForTest(t, testBaselineAuthority())
+	v051.SetBaselinePauseAuthorityForTest(t, "")
+
+	handler := v051.Upgrade.UpgradeHandlerConstructor(app.mm, app.configurator, app.toolbox())
+	newVM, err := handler(ctx, v051Plan(), vm)
+	require.NoError(t, err)
+	require.Equal(t, uint64(2), newVM[appminingtypes.ModuleName])
+
+	// x/appmining's InitGenesis ends with BackfillChallengeIndexes (keeper/genesis.go):
+	// imported state must offer the same guarantees as state built by open/resolve,
+	// so the module seals pre-field OPEN records and rebuilds the derived indexes
+	// before returning. A module initialized at the upgrade height is therefore
+	// already consistent, and the first block after the upgrade has no rebuild to do.
+	//
+	// This is the one behavioural difference from the bare-swap path on a chain that
+	// already ran v0.5.1: there the indexes are absent and the EndBlocker rebuilds
+	// them in the first block (see workorder/UPTICK-APPMINING-SWAP-VERIFY-0.1.md).
+	require.True(t, app.AppminingKeeper.ChallengeIndexesReady(ctx),
+		"InitGenesis must leave the indexes complete: a v0.5.0 chain must not need a first-block scan")
+
+	params := app.AppminingKeeper.GetParams(ctx)
+	require.True(t, params.PauseState.AttestationPaused, "legacy attestation must be paused via DefaultParams")
+	require.True(t, params.PauseState.ChallengePaused, "legacy challenge must be paused via DefaultParams")
+	require.True(t, params.PauseState.SettlementPaused, "legacy settlement must be paused via DefaultParams")
+	require.True(t, params.PauseState.GasCreditPaused, "legacy gas credit must be paused via DefaultParams")
+
+	// The first block must be a no-op for this module, not a rebuild. Run the
+	// whole EndBlock on a cache branch: the ordering is what has to hold, and
+	// the shared app's store must not keep the writes.
+	cctx, _ := ctx.CacheContext()
+	// EndBlock runs under an infinite block gas meter in baseapp (abci.go), and
+	// the shared context has none: give the branch what a real block provides.
+	cctx = cctx.WithBlockGasMeter(storetypes.NewInfiniteGasMeter())
+	_, err = app.mm.EndBlock(cctx)
+	require.NoError(t, err)
+	require.True(t, app.AppminingKeeper.ChallengeIndexesReady(cctx),
+		"the EndBlocker must find the indexes already complete")
+
+	// Steady state: the next block re-reads the marker and writes nothing new.
+	_, err = app.mm.EndBlock(cctx)
+	require.NoError(t, err)
+	require.True(t, app.AppminingKeeper.ChallengeIndexesReady(cctx))
 }
